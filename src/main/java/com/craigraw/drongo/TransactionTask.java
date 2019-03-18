@@ -1,6 +1,7 @@
 package com.craigraw.drongo;
 
 import com.craigraw.drongo.address.Address;
+import com.craigraw.drongo.crypto.ChildNumber;
 import com.craigraw.drongo.protocol.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -74,6 +75,52 @@ public class TransactionTask implements Runnable {
         }
 
         builder.append(outputJoiner.toString());
-        log.info(builder.toString() + " " + transaction.getAllAddresses());
+        log.debug(builder.toString());
+
+        checkWallet(transaction);
+    }
+
+    private void checkWallet(Transaction transaction) {
+        for(WatchWallet wallet : drongo.getWallets()) {
+            List<Address> fromAddresses = new ArrayList<>();
+            for(TransactionInput input : transaction.getInputs()) {
+                for(Address address : input.getOutpoint().getAddresses()) {
+                    if(wallet.containsAddress(address)) {
+                        fromAddresses.add(address);
+                    }
+                }
+            }
+
+            Map<Address,Long> toAddresses = new HashMap<>();
+            for(TransactionOutput output : transaction.getOutputs()) {
+                for(Address address : output.getAddresses()) {
+                    if(wallet.containsAddress(address)) {
+                        toAddresses.put(address, output.getValue());
+                    }
+                }
+            }
+
+            if(!fromAddresses.isEmpty()) {
+                StringBuilder builder = new StringBuilder();
+                builder.append("Wallet ").append(wallet.getName()).append(" sent from address").append(fromAddresses.size() == 1 ? " " : "es ");
+                StringJoiner fromJoiner = new StringJoiner(", ", "[", "]");
+                for(Address address : fromAddresses) {
+                    fromJoiner.add(address.toString() + " [" + Utils.formatHDPath(wallet.getAddressPath(address)) + "]");
+                }
+                builder.append(fromJoiner.toString()).append(" in txid ").append(transaction.getTxId());
+                log.info(builder.toString());
+            }
+
+            if(!toAddresses.isEmpty()) {
+                StringBuilder builder = new StringBuilder();
+                builder.append("Wallet ").append(wallet.getName()).append(" received to address").append(toAddresses.size() == 1 ? " " : "es ");
+                StringJoiner toJoiner = new StringJoiner(", ", "[", "]");
+                for(Address address : toAddresses.keySet()) {
+                    toJoiner.add(address.toString() + " [" + Utils.formatHDPath(wallet.getAddressPath(address)) + "]" + " (" + toAddresses.get(address) + " sats)");
+                }
+                builder.append(toJoiner.toString()).append(" in txid ").append(transaction.getTxId());
+                log.info(builder.toString());
+            }
+        }
     }
 }

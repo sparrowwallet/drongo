@@ -66,4 +66,8 @@ public class Drongo {
     public BitcoinJSONRPCClient getBitcoinJSONRPCClient() {
         return bitcoinJSONRPCClient;
     }
+
+    public List<WatchWallet> getWallets() {
+        return watchWallets;
+    }
 }

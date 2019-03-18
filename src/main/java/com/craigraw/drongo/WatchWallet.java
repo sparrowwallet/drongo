@@ -41,6 +41,10 @@ public class WatchWallet {
         }
     }
 
+    public String getName() {
+        return name;
+    }
+
     public boolean containsAddress(Address address) {
         return addresses.containsKey(address);
     }
