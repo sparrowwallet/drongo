@@ -74,7 +74,7 @@ public class TransactionTask implements Runnable {
         }
 
         builder.append(outputJoiner.toString());
-        log.debug(builder.toString());
+        log.info(builder.toString());
 
         checkWallet(transaction);
     }
