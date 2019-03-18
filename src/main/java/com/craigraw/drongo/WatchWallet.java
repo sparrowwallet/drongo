@@ -10,18 +10,15 @@ public class WatchWallet {
     private static final int LOOK_AHEAD_LIMIT = 500;
 
     private String name;
-    private String extPubKey;
-
     private OutputDescriptor outputDescriptor;
     private DeterministicHierarchy hierarchy;
 
-    private HashMap<String,String> addresses = new HashMap<>(LOOK_AHEAD_LIMIT*2);
+    private HashMap<Address,List<ChildNumber>> addresses = new HashMap<>(LOOK_AHEAD_LIMIT*2);
 
     public WatchWallet(String name, String descriptor) {
         this.name = name;
         this.outputDescriptor = OutputDescriptor.getOutputDescriptor(descriptor);
         this.hierarchy = new DeterministicHierarchy(outputDescriptor.getPubKey());
-
     }
 
     public void initialiseAddresses() {
@@ -29,19 +26,27 @@ public class WatchWallet {
             for(int index = 0; index <= LOOK_AHEAD_LIMIT; index++) {
                 List<ChildNumber> receivingDerivation = outputDescriptor.getReceivingDerivation(index);
                 Address address = getAddress(receivingDerivation);
-                addresses.put(address.toString(), Utils.formatHDPath(receivingDerivation));
+                addresses.put(address, receivingDerivation);
             }
 
             for(int index = 0; index <= LOOK_AHEAD_LIMIT; index++) {
                 List<ChildNumber> changeDerivation = outputDescriptor.getChangeDerivation(index);
                 Address address = getAddress(changeDerivation);
-                addresses.put(address.toString(), Utils.formatHDPath(changeDerivation));
+                addresses.put(address, changeDerivation);
             }
         } else {
             List<ChildNumber> derivation = outputDescriptor.getChildDerivation();
             Address address = getAddress(derivation);
-            addresses.put(address.toString(), Utils.formatHDPath(derivation));
+            addresses.put(address, derivation);
         }
+    }
+
+    public boolean containsAddress(Address address) {
+        return addresses.containsKey(address);
+    }
+
+    public List<ChildNumber> getAddressPath(Address address) {
+        return addresses.get(address);
     }
 
     public Address getReceivingAddress(int index) {

@@ -11,7 +11,7 @@ public class TransactionOutPoint extends TransactionPart {
     /** Which output of that transaction we are talking about. */
     private long index;
 
-    private Address[] addresses;
+    private Address[] addresses = new Address[0];
 
     public TransactionOutPoint(byte[] rawtx, int offset, TransactionPart parent) {
         super(rawtx, offset);

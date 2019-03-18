@@ -74,6 +74,6 @@ public class TransactionTask implements Runnable {
         }
 
         builder.append(outputJoiner.toString());
-        log.info(builder.toString());
+        log.info(builder.toString() + " " + transaction.getAllAddresses());
     }
 }

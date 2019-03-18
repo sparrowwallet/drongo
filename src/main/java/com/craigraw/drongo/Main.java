@@ -47,7 +47,7 @@ public class Main {
         int walletNumber = 1;
         WatchWallet wallet = getWalletFromProperties(properties, walletNumber);
         if(wallet == null) {
-            log.error("Property wallet.name.1 and/or wallet.pubkey.1 not set, provide wallet name and Base58 encoded key starting with xpub or ypub");
+            log.error("Property wallet.name.1 and/or wallet.descriptor.1 not set, provide wallet name and Base58 encoded key starting with xpub or ypub");
             System.exit(1);
         }
         while(wallet != null) {
@@ -67,9 +67,9 @@ public class Main {
 
     private static WatchWallet getWalletFromProperties(Properties properties, int walletNumber) {
         String walletName = properties.getProperty("wallet.name." + walletNumber);
-        String walletPubKey = properties.getProperty("wallet.pubkey." + walletNumber);
-        if(walletName != null && walletPubKey != null) {
-            return new WatchWallet(walletName, walletPubKey);
+        String walletDescriptor = properties.getProperty("wallet.descriptor." + walletNumber);
+        if(walletName != null && walletDescriptor != null) {
+            return new WatchWallet(walletName, walletDescriptor);
         }
 
         return null;

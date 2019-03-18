@@ -7,6 +7,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 
@@ -175,6 +176,19 @@ public class Transaction extends TransactionPart {
     /** Returns an unmodifiable view of all outputs. */
     public List<TransactionOutput> getOutputs() {
         return Collections.unmodifiableList(outputs);
+    }
+
+    public List<Address> getAllAddresses() {
+        List<Address> addresses = new ArrayList<>();
+        for(TransactionInput input : getInputs()) {
+            addresses.addAll(Arrays.asList(input.getOutpoint().getAddresses()));
+        }
+
+        for(TransactionOutput output : getOutputs()) {
+            addresses.addAll(Arrays.asList(output.getAddresses()));
+        }
+
+        return addresses;
     }
 
     public static final void main(String[] args) {

@@ -18,7 +18,7 @@ public class TransactionOutput extends TransactionPart {
 
     private int scriptLen;
 
-    private Address[] addresses;
+    private Address[] addresses = new Address[0];
 
     public TransactionOutput(Transaction transaction, byte[] rawtx, int offset) {
         super(rawtx, offset);
