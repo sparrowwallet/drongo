@@ -1,7 +1,6 @@
 package com.craigraw.drongo;
 
 import com.craigraw.drongo.address.Address;
-import com.craigraw.drongo.crypto.ChildNumber;
 import com.craigraw.drongo.protocol.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
