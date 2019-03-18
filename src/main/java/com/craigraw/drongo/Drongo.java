@@ -25,6 +25,10 @@ public class Drongo {
         this.bitcoinJSONRPCClient = new BitcoinJSONRPCClient(nodeRpc.get("host"), nodeRpc.get("port"), nodeRpc.get("user"), nodeRpc.get("password"));
         this.watchWallets = watchWallets;
         this.notifyRecipients = notifyRecipients;
+
+        for(WatchWallet wallet : watchWallets) {
+            wallet.initialiseAddresses();
+        }
     }
 
     public void start() {
