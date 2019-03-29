@@ -25,4 +25,17 @@ public abstract class Address {
     public abstract int getVersion();
 
     public abstract Script getOutputScript();
+
+    public boolean equals(Object obj) {
+        if(!(obj instanceof Address)) {
+            return false;
+        }
+
+        Address address = (Address)obj;
+        return address.getAddress().equals(this.getAddress());
+    }
+
+    public int hashCode() {
+        return getAddress().hashCode();
+    }
 }
