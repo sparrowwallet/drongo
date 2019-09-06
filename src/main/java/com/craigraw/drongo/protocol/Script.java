@@ -105,7 +105,7 @@ public class Script {
      * Returns true if this script has the required form to contain a destination address
      */
     public boolean containsToAddress() {
-        return ScriptPattern.isP2PK(this) || ScriptPattern.isP2PKH(this) || ScriptPattern.isP2SH(this) || ScriptPattern.isP2WH(this) || ScriptPattern.isSentToMultisig(this);
+        return ScriptPattern.isP2PK(this) || ScriptPattern.isP2PKH(this) || ScriptPattern.isP2SH(this) || ScriptPattern.isP2WPKH(this) || ScriptPattern.isP2WSH(this) || ScriptPattern.isSentToMultisig(this);
     }
 
     /**
@@ -118,7 +118,7 @@ public class Script {
             return ScriptPattern.extractHashFromP2PKH(this);
         else if (ScriptPattern.isP2SH(this))
             return ScriptPattern.extractHashFromP2SH(this);
-        else if (ScriptPattern.isP2WH(this))
+        else if (ScriptPattern.isP2WPKH(this) || ScriptPattern.isP2WSH(this))
             return ScriptPattern.extractHashFromP2WH(this);
         else
             throw new ProtocolException("Script not in the standard scriptPubKey form");
@@ -134,8 +134,10 @@ public class Script {
             return new Address[] { new P2PKHAddress( ScriptPattern.extractHashFromP2PKH(this)) };
         else if (ScriptPattern.isP2SH(this))
             return new Address[] { new P2SHAddress(ScriptPattern.extractHashFromP2SH(this)) };
-        else if (ScriptPattern.isP2WH(this))
+        else if (ScriptPattern.isP2WPKH(this))
             return new Address[] { new P2WPKHAddress(ScriptPattern.extractHashFromP2WH(this)) };
+        else if (ScriptPattern.isP2WSH(this))
+            return new Address[] { new P2WSHAddress(ScriptPattern.extractHashFromP2WH(this)) };
         else if (ScriptPattern.isSentToMultisig(this))
             return ScriptPattern.extractMultisigAddresses(this);
         else

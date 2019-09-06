@@ -156,10 +156,9 @@ public class ScriptPattern {
     }
 
     /**
-     * Returns true if this script is of the form {@code OP_0 <hash>}. This can either be a P2WPKH or P2WSH scriptPubKey. These
-     * two script types were introduced with segwit.
+     * Returns true if this script is of the form {@code OP_0 <hash[20]>}. This is a P2WPKH scriptPubKey.
      */
-    public static boolean isP2WH(Script script) {
+    public static boolean isP2WPKH(Script script) {
         List<ScriptChunk> chunks = script.chunks;
         if (chunks.size() != 2)
             return false;
@@ -168,7 +167,24 @@ public class ScriptPattern {
         byte[] chunk1data = chunks.get(1).data;
         if (chunk1data == null)
             return false;
-        if (chunk1data.length != 20 && chunk1data.length != 32)
+        if (chunk1data.length != 20)
+            return false;
+        return true;
+    }
+
+    /**
+     * Returns true if this script is of the form {@code OP_0 <hash[32]>}. This is a P2WSH scriptPubKey.
+     */
+    public static boolean isP2WSH(Script script) {
+        List<ScriptChunk> chunks = script.chunks;
+        if (chunks.size() != 2)
+            return false;
+        if (!chunks.get(0).equalsOpCode(OP_0))
+            return false;
+        byte[] chunk1data = chunks.get(1).data;
+        if (chunk1data == null)
+            return false;
+        if (chunk1data.length != 32)
             return false;
         return true;
     }
@@ -176,7 +192,7 @@ public class ScriptPattern {
     /**
      * Extract the pubkey hash from a P2WPKH or the script hash from a P2WSH scriptPubKey. It's important that the
      * script is in the correct form, so you will want to guard calls to this method with
-     * {@link #isP2WH(Script)}.
+     * {@link #isP2WPKH(Script)} or {@link #isP2WSH(Script)}.
      */
     public static byte[] extractHashFromP2WH(Script script) {
         return script.chunks.get(1).data;
