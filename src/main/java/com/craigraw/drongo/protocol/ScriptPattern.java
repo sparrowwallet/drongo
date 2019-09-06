@@ -19,12 +19,12 @@ public class ScriptPattern {
         List<ScriptChunk> chunks = script.chunks;
         if (chunks.size() != 2)
             return false;
-        if (!chunks.get(0).equalsOpCode(0x21))
+        if (!chunks.get(0).equalsOpCode(0x21) && !chunks.get(0).equalsOpCode(0x41))
             return false;
         byte[] chunk2data = chunks.get(0).data;
         if (chunk2data == null)
             return false;
-        if (chunk2data.length != 33)
+        if (chunk2data.length != 33 && chunk2data.length != 65)
             return false;
         if (!chunks.get(1).equalsOpCode(OP_CHECKSIG))
             return false;
