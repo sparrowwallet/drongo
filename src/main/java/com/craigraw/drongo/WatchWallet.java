@@ -11,32 +11,30 @@ public class WatchWallet {
 
     private String name;
     private OutputDescriptor outputDescriptor;
-    private DeterministicHierarchy hierarchy;
 
     private HashMap<Address,List<ChildNumber>> addresses = new HashMap<>(LOOK_AHEAD_LIMIT*2);
 
     public WatchWallet(String name, String descriptor) {
         this.name = name;
         this.outputDescriptor = OutputDescriptor.getOutputDescriptor(descriptor);
-        this.hierarchy = new DeterministicHierarchy(outputDescriptor.getPubKey());
     }
 
     public void initialiseAddresses() {
         if(outputDescriptor.describesMultipleAddresses()) {
             for(int index = 0; index <= LOOK_AHEAD_LIMIT; index++) {
                 List<ChildNumber> receivingDerivation = outputDescriptor.getReceivingDerivation(index);
-                Address address = getAddress(receivingDerivation);
+                Address address = getReceivingAddress(index);
                 addresses.put(address, receivingDerivation);
             }
 
             for(int index = 0; index <= LOOK_AHEAD_LIMIT; index++) {
                 List<ChildNumber> changeDerivation = outputDescriptor.getChangeDerivation(index);
-                Address address = getAddress(changeDerivation);
+                Address address = getChangeAddress(index);
                 addresses.put(address, changeDerivation);
             }
         } else {
             List<ChildNumber> derivation = outputDescriptor.getChildDerivation();
-            Address address = getAddress(derivation);
+            Address address = outputDescriptor.getAddress(derivation);
             addresses.put(address, derivation);
         }
     }
@@ -61,8 +59,11 @@ public class WatchWallet {
         return getAddress(outputDescriptor.getChangeDerivation(index));
     }
 
-    private Address getAddress(List<ChildNumber> path) {
-        DeterministicKey childKey = hierarchy.get(path);
-        return outputDescriptor.getAddress(childKey);
+    public OutputDescriptor getOutputDescriptor() {
+        return outputDescriptor;
+    }
+
+    public Address getAddress(List<ChildNumber> path) {
+        return outputDescriptor.getAddress(path);
     }
 }
