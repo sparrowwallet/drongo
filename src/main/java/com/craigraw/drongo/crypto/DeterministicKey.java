@@ -5,7 +5,6 @@ import com.craigraw.drongo.Utils;
 import com.craigraw.drongo.protocol.Base58;
 import com.craigraw.drongo.protocol.Sha256Hash;
 
-import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.List;
 
@@ -13,7 +12,7 @@ public class DeterministicKey extends ECKey {
     private final DeterministicKey parent;
     private final List<ChildNumber> childNumberPath;
     private final int depth;
-    private int parentFingerprint; // 0 if this key is root node of key hierarchy
+    private byte[] parentFingerprint; // 0 if this key is root node of key hierarchy
 
     /** 32 bytes */
     private final byte[] chainCode;
@@ -27,7 +26,7 @@ public class DeterministicKey extends ECKey {
                             byte[] chainCode,
                             LazyECPoint publicAsPoint,
                             int depth,
-                            int parentFingerprint) {
+                            byte[] parentFingerprint) {
         super(compressPoint(publicAsPoint));
         if(chainCode.length != 32) {
             throw new IllegalArgumentException("Chaincode not 32 bytes in length");
@@ -51,7 +50,7 @@ public class DeterministicKey extends ECKey {
         this.childNumberPath = childNumberPath;
         this.chainCode = Arrays.copyOf(chainCode, chainCode.length);
         this.depth = parent == null ? 0 : parent.depth + 1;
-        this.parentFingerprint = (parent != null) ? parent.getFingerprint() : 0;
+        this.parentFingerprint = (parent != null) ? parent.getFingerprint() : new byte[4];
     }
 
     /**
@@ -64,9 +63,8 @@ public class DeterministicKey extends ECKey {
     }
 
     /** Returns the first 32 bits of the result of {@link #getIdentifier()}. */
-    public int getFingerprint() {
-        // TODO: why is this different than armory's fingerprint? BIP 32: "The first 32 bits of the identifier are called the fingerprint."
-        return ByteBuffer.wrap(Arrays.copyOfRange(getIdentifier(), 0, 4)).getInt();
+    public byte[] getFingerprint() {
+        return Arrays.copyOfRange(getIdentifier(), 0, 4);
     }
 
     /**

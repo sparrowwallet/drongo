@@ -15,7 +15,7 @@ public class ExtendedPublicKey {
     private static final int bip32HeaderP2WPKHZPub = 0x04B24746; // The 4 byte header that serializes in base58 to "zpub"
     private static final int bip32HeaderP2WHSHPub = 0x2AA7ED3; // The 4 byte header that serializes in base58 to "Zpub"
 
-    private int parentFingerprint;
+    private byte[] parentFingerprint;
     private String keyDerivationPath;
     private DeterministicKey pubKey;
     private String childDerivationPath;
@@ -23,7 +23,7 @@ public class ExtendedPublicKey {
 
     private DeterministicHierarchy hierarchy;
 
-    public ExtendedPublicKey(int parentFingerprint, String keyDerivationPath, DeterministicKey pubKey, String childDerivationPath, ChildNumber pubKeyChildNumber) {
+    public ExtendedPublicKey(byte[] parentFingerprint, String keyDerivationPath, DeterministicKey pubKey, String childDerivationPath, ChildNumber pubKeyChildNumber) {
         this.parentFingerprint = parentFingerprint;
         this.keyDerivationPath = keyDerivationPath;
         this.pubKey = pubKey;
@@ -33,8 +33,12 @@ public class ExtendedPublicKey {
         this.hierarchy = new DeterministicHierarchy(pubKey);
     }
 
-    public int getParentFingerprint() {
+    public byte[] getParentFingerprint() {
         return parentFingerprint;
+    }
+
+    public byte[] getFingerprint() {
+        return pubKey.getFingerprint();
     }
 
     public List<ChildNumber> getKeyDerivation() {
@@ -137,7 +141,7 @@ public class ExtendedPublicKey {
         int depth = 5 - childPath.size();
         buffer.put((byte)depth);
 
-        buffer.putInt(parentFingerprint);
+        buffer.put(parentFingerprint);
 
         buffer.putInt(pubKeyChildNumber.i());
 
@@ -156,7 +160,8 @@ public class ExtendedPublicKey {
         }
 
         int depth = buffer.get() & 0xFF; // convert signed byte to positive int since depth cannot be negative
-        final int parentFingerprint = buffer.getInt();
+        byte[] parentFingerprint = new byte[4];
+        buffer.get(parentFingerprint);
         final int i = buffer.getInt();
         ChildNumber childNumber;
         List<ChildNumber> path;
