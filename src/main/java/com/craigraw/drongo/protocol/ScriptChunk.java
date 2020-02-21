@@ -1,9 +1,13 @@
 package com.craigraw.drongo.protocol;
 
 import com.craigraw.drongo.Utils;
+import org.bouncycastle.util.encoders.Hex;
 
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
+import java.util.Arrays;
+import java.util.Objects;
 
 import static com.craigraw.drongo.protocol.ScriptOpCodes.*;
 
@@ -67,5 +71,54 @@ public class ScriptChunk {
         } else {
             stream.write(opcode); // smallNum
         }
+    }
+
+    public byte[] toByteArray() {
+        ByteArrayOutputStream stream = new ByteArrayOutputStream();
+        try {
+            write(stream);
+        } catch (IOException e) {
+            // Should not happen as ByteArrayOutputStream does not throw IOException on write
+            throw new RuntimeException(e);
+        }
+        return stream.toByteArray();
+    }
+
+    /*
+     * The size, in bytes, that this chunk would occupy if serialized into a Script.
+     */
+    public int size() {
+        final int opcodeLength = 1;
+
+        int pushDataSizeLength = 0;
+        if (opcode == OP_PUSHDATA1) pushDataSizeLength = 1;
+        else if (opcode == OP_PUSHDATA2) pushDataSizeLength = 2;
+        else if (opcode == OP_PUSHDATA4) pushDataSizeLength = 4;
+
+        final int dataLength = data == null ? 0 : data.length;
+
+        return opcodeLength + pushDataSizeLength + dataLength;
+    }
+
+    public String toString() {
+        if (data == null) {
+            return "OP_" + getOpCodeName(opcode);
+        }
+        if (data.length == 0) {
+            return "0";
+        }
+
+        return Hex.toHexString(data);
+    }
+
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        ScriptChunk other = (ScriptChunk) o;
+        return opcode == other.opcode && Arrays.equals(data, other.data);
+    }
+
+    public int hashCode() {
+        return Objects.hash(opcode, Arrays.hashCode(data));
     }
 }

@@ -46,7 +46,7 @@ public class ChildNumber {
     public int i() { return i; }
 
     public String toString() {
-        return String.format(Locale.US, "%d%s", num(), isHardened() ? "H" : "");
+        return String.format(Locale.US, "%d%s", num(), isHardened() ? "'" : "");
     }
 
     public boolean equals(Object o) {

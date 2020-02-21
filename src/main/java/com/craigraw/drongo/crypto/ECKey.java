@@ -7,6 +7,7 @@ import org.bouncycastle.crypto.params.ECDomainParameters;
 import org.bouncycastle.math.ec.ECPoint;
 import org.bouncycastle.math.ec.FixedPointCombMultiplier;
 import org.bouncycastle.math.ec.FixedPointUtil;
+import org.bouncycastle.util.encoders.Hex;
 
 import java.math.BigInteger;
 import java.security.SecureRandom;
@@ -52,7 +53,7 @@ public class ECKey {
     }
 
     public static LazyECPoint compressPoint(LazyECPoint point) {
-        return point.isCompressed() ? point : new LazyECPoint(compressPoint(point.get()));
+        return point.isCompressed() ? point : new LazyECPoint(compressPoint(point.get()), true);
     }
 
     private static ECPoint getPointWithCompression(ECPoint point, boolean compressed) {
@@ -97,5 +98,17 @@ public class ECKey {
             privKey = privKey.mod(CURVE.getN());
         }
         return new FixedPointCombMultiplier().multiply(CURVE.getG(), privKey);
+    }
+
+    /**
+     * Returns true if the given pubkey is in its compressed form.
+     */
+    public static boolean isPubKeyCompressed(byte[] encoded) {
+        if (encoded.length == 33 && (encoded[0] == 0x02 || encoded[0] == 0x03))
+            return true;
+        else if (encoded.length == 65 && encoded[0] == 0x04)
+            return false;
+        else
+            throw new IllegalArgumentException(Hex.toHexString(encoded));
     }
 }

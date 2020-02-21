@@ -8,7 +8,6 @@ import org.bouncycastle.crypto.digests.SHA512Digest;
 import org.bouncycastle.crypto.macs.HMac;
 import org.bouncycastle.crypto.params.KeyParameter;
 
-import javax.xml.bind.DatatypeConverter;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -20,6 +19,17 @@ import java.util.StringJoiner;
 public class Utils {
     public static final int MAX_INITIAL_ARRAY_LENGTH = 20;
     private final static char[] hexArray = "0123456789abcdef".toCharArray();
+
+    public static final String HEX_REGEX = "^[0-9A-Fa-f]+$";
+    public static final String BASE64_REGEX = "^[0-9A-Za-z\\\\+=/]+$";
+
+    public static boolean isHex(String s)   {
+        return s.matches(HEX_REGEX);
+    }
+
+    public static boolean isBase64(String s)   {
+        return s.matches(BASE64_REGEX);
+    }
 
     public static String bytesToHex(byte[] bytes) {
         char[] hexChars = new char[bytes.length * 2];

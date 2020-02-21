@@ -168,4 +168,33 @@ public class Script {
         else
             return value - 1 + OP_1;
     }
+
+    public String toString() {
+        StringBuilder builder = new StringBuilder();
+        for(ScriptChunk chunk : chunks) {
+            builder.append(chunk.toString());
+            builder.append(" ");
+        }
+
+        return builder.toString().trim();
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        return Arrays.equals(getQuickProgram(), ((Script)o).getQuickProgram());
+    }
+
+    @Override
+    public int hashCode() {
+        return Arrays.hashCode(getQuickProgram());
+    }
+
+    // Utility that doesn't copy for internal use
+    private byte[] getQuickProgram() {
+        if (program != null)
+            return program;
+        return getProgram();
+    }
 }

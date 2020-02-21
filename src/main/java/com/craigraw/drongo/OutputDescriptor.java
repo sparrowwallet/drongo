@@ -17,6 +17,7 @@ import java.util.regex.Pattern;
 public class OutputDescriptor {
     private static final Pattern XPUB_PATTERN = Pattern.compile("(\\[[^\\]]+\\])?(.pub[^/\\)]+)(/[/\\d*']+)?");
     private static final Pattern MULTI_PATTERN = Pattern.compile("multi\\(([\\d+])");
+    private static final Pattern KEY_ORIGIN_PATTERN = Pattern.compile("\\[([a-f0-9]+)([/\\d']+)\\]");
 
     private String script;
     private int multisigThreshold;
@@ -196,12 +197,18 @@ public class OutputDescriptor {
         List<ExtendedPublicKey> keys = new ArrayList<>();
         Matcher matcher = XPUB_PATTERN.matcher(descriptor);
         while(matcher.find()) {
-            String keyDerivationPath ="";
+            String masterFingerprint = null;
+            String keyDerivationPath = null;
             String extPubKey = null;
             String childDerivationPath = "/0/*";
 
             if(matcher.group(1) != null) {
-                keyDerivationPath = matcher.group(1);
+                String keyOrigin = matcher.group(1);
+                Matcher keyOriginMatcher = KEY_ORIGIN_PATTERN.matcher(keyOrigin);
+                if(keyOriginMatcher.matches()) {
+                    masterFingerprint = keyOriginMatcher.group(1);
+                    keyDerivationPath = "m" + keyOriginMatcher.group(2);
+                }
             }
 
             extPubKey = matcher.group(2);
@@ -209,7 +216,7 @@ public class OutputDescriptor {
                 childDerivationPath = matcher.group(3);
             }
 
-            ExtendedPublicKey extendedPublicKey = ExtendedPublicKey.fromDescriptor(keyDerivationPath, extPubKey, childDerivationPath);
+            ExtendedPublicKey extendedPublicKey = ExtendedPublicKey.fromDescriptor(masterFingerprint, keyDerivationPath, extPubKey, childDerivationPath);
             keys.add(extendedPublicKey);
         }
 

@@ -16,6 +16,7 @@
 
 package com.craigraw.drongo.protocol;
 
+import java.util.HashMap;
 import java.util.Map;
 
 /**
@@ -161,4 +162,164 @@ public class ScriptOpCodes {
     public static final int OP_NOP9 = 0xb8;
     public static final int OP_NOP10 = 0xb9;
     public static final int OP_INVALIDOPCODE = 0xff;
+
+    private static final Map<Integer, String> opCodeNameMap;
+    private static final Map<String, Integer> nameOpCodeMap;
+
+    static {
+        opCodeNameMap = new HashMap<Integer, String>();
+        opCodeNameMap.put(OP_0, "0");
+        opCodeNameMap.put(OP_PUSHDATA1, "PUSHDATA1");
+        opCodeNameMap.put(OP_PUSHDATA2, "PUSHDATA2");
+        opCodeNameMap.put(OP_PUSHDATA4, "PUSHDATA4");
+        opCodeNameMap.put(OP_1NEGATE, "1NEGATE");
+        opCodeNameMap.put(OP_RESERVED, "RESERVED");
+        opCodeNameMap.put(OP_1, "1");
+        opCodeNameMap.put(OP_2, "2");
+        opCodeNameMap.put(OP_3, "3");
+        opCodeNameMap.put(OP_4, "4");
+        opCodeNameMap.put(OP_5, "5");
+        opCodeNameMap.put(OP_6, "6");
+        opCodeNameMap.put(OP_7, "7");
+        opCodeNameMap.put(OP_8, "8");
+        opCodeNameMap.put(OP_9, "9");
+        opCodeNameMap.put(OP_10, "10");
+        opCodeNameMap.put(OP_11, "11");
+        opCodeNameMap.put(OP_12, "12");
+        opCodeNameMap.put(OP_13, "13");
+        opCodeNameMap.put(OP_14, "14");
+        opCodeNameMap.put(OP_15, "15");
+        opCodeNameMap.put(OP_16, "16");
+        opCodeNameMap.put(OP_NOP, "NOP");
+        opCodeNameMap.put(OP_VER, "VER");
+        opCodeNameMap.put(OP_IF, "IF");
+        opCodeNameMap.put(OP_NOTIF, "NOTIF");
+        opCodeNameMap.put(OP_VERIF, "VERIF");
+        opCodeNameMap.put(OP_VERNOTIF, "VERNOTIF");
+        opCodeNameMap.put(OP_ELSE, "ELSE");
+        opCodeNameMap.put(OP_ENDIF, "ENDIF");
+        opCodeNameMap.put(OP_VERIFY, "VERIFY");
+        opCodeNameMap.put(OP_RETURN, "RETURN");
+        opCodeNameMap.put(OP_TOALTSTACK, "TOALTSTACK");
+        opCodeNameMap.put(OP_FROMALTSTACK, "FROMALTSTACK");
+        opCodeNameMap.put(OP_2DROP, "2DROP");
+        opCodeNameMap.put(OP_2DUP, "2DUP");
+        opCodeNameMap.put(OP_3DUP, "3DUP");
+        opCodeNameMap.put(OP_2OVER, "2OVER");
+        opCodeNameMap.put(OP_2ROT, "2ROT");
+        opCodeNameMap.put(OP_2SWAP, "2SWAP");
+        opCodeNameMap.put(OP_IFDUP, "IFDUP");
+        opCodeNameMap.put(OP_DEPTH, "DEPTH");
+        opCodeNameMap.put(OP_DROP, "DROP");
+        opCodeNameMap.put(OP_DUP, "DUP");
+        opCodeNameMap.put(OP_NIP, "NIP");
+        opCodeNameMap.put(OP_OVER, "OVER");
+        opCodeNameMap.put(OP_PICK, "PICK");
+        opCodeNameMap.put(OP_ROLL, "ROLL");
+        opCodeNameMap.put(OP_ROT, "ROT");
+        opCodeNameMap.put(OP_SWAP, "SWAP");
+        opCodeNameMap.put(OP_TUCK, "TUCK");
+        opCodeNameMap.put(OP_CAT, "CAT");
+        opCodeNameMap.put(OP_SUBSTR, "SUBSTR");
+        opCodeNameMap.put(OP_LEFT, "LEFT");
+        opCodeNameMap.put(OP_RIGHT, "RIGHT");
+        opCodeNameMap.put(OP_SIZE, "SIZE");
+        opCodeNameMap.put(OP_INVERT, "INVERT");
+        opCodeNameMap.put(OP_AND, "AND");
+        opCodeNameMap.put(OP_OR, "OR");
+        opCodeNameMap.put(OP_XOR, "XOR");
+        opCodeNameMap.put(OP_EQUAL, "EQUAL");
+        opCodeNameMap.put(OP_EQUALVERIFY, "EQUALVERIFY");
+        opCodeNameMap.put(OP_RESERVED1, "RESERVED1");
+        opCodeNameMap.put(OP_RESERVED2, "RESERVED2");
+        opCodeNameMap.put(OP_1ADD, "1ADD");
+        opCodeNameMap.put(OP_1SUB, "1SUB");
+        opCodeNameMap.put(OP_2MUL, "2MUL");
+        opCodeNameMap.put(OP_2DIV, "2DIV");
+        opCodeNameMap.put(OP_NEGATE, "NEGATE");
+        opCodeNameMap.put(OP_ABS, "ABS");
+        opCodeNameMap.put(OP_NOT, "NOT");
+        opCodeNameMap.put(OP_0NOTEQUAL, "0NOTEQUAL");
+        opCodeNameMap.put(OP_ADD, "ADD");
+        opCodeNameMap.put(OP_SUB, "SUB");
+        opCodeNameMap.put(OP_MUL, "MUL");
+        opCodeNameMap.put(OP_DIV, "DIV");
+        opCodeNameMap.put(OP_MOD, "MOD");
+        opCodeNameMap.put(OP_LSHIFT, "LSHIFT");
+        opCodeNameMap.put(OP_RSHIFT, "RSHIFT");
+        opCodeNameMap.put(OP_BOOLAND, "BOOLAND");
+        opCodeNameMap.put(OP_BOOLOR, "BOOLOR");
+        opCodeNameMap.put(OP_NUMEQUAL, "NUMEQUAL");
+        opCodeNameMap.put(OP_NUMEQUALVERIFY, "NUMEQUALVERIFY");
+        opCodeNameMap.put(OP_NUMNOTEQUAL, "NUMNOTEQUAL");
+        opCodeNameMap.put(OP_LESSTHAN, "LESSTHAN");
+        opCodeNameMap.put(OP_GREATERTHAN, "GREATERTHAN");
+        opCodeNameMap.put(OP_LESSTHANOREQUAL, "LESSTHANOREQUAL");
+        opCodeNameMap.put(OP_GREATERTHANOREQUAL, "GREATERTHANOREQUAL");
+        opCodeNameMap.put(OP_MIN, "MIN");
+        opCodeNameMap.put(OP_MAX, "MAX");
+        opCodeNameMap.put(OP_WITHIN, "WITHIN");
+        opCodeNameMap.put(OP_RIPEMD160, "RIPEMD160");
+        opCodeNameMap.put(OP_SHA1, "SHA1");
+        opCodeNameMap.put(OP_SHA256, "SHA256");
+        opCodeNameMap.put(OP_HASH160, "HASH160");
+        opCodeNameMap.put(OP_HASH256, "HASH256");
+        opCodeNameMap.put(OP_CODESEPARATOR, "CODESEPARATOR");
+        opCodeNameMap.put(OP_CHECKSIG, "CHECKSIG");
+        opCodeNameMap.put(OP_CHECKSIGVERIFY, "CHECKSIGVERIFY");
+        opCodeNameMap.put(OP_CHECKMULTISIG, "CHECKMULTISIG");
+        opCodeNameMap.put(OP_CHECKMULTISIGVERIFY, "CHECKMULTISIGVERIFY");
+        opCodeNameMap.put(OP_NOP1, "NOP1");
+        opCodeNameMap.put(OP_CHECKLOCKTIMEVERIFY, "CHECKLOCKTIMEVERIFY");
+        opCodeNameMap.put(OP_CHECKSEQUENCEVERIFY, "CHECKSEQUENCEVERIFY");
+        opCodeNameMap.put(OP_NOP4, "NOP4");
+        opCodeNameMap.put(OP_NOP5, "NOP5");
+        opCodeNameMap.put(OP_NOP6, "NOP6");
+        opCodeNameMap.put(OP_NOP7, "NOP7");
+        opCodeNameMap.put(OP_NOP8, "NOP8");
+        opCodeNameMap.put(OP_NOP9, "NOP9");
+        opCodeNameMap.put(OP_NOP10, "NOP10");
+
+        nameOpCodeMap = new HashMap<String, Integer>();
+        for(Map.Entry<Integer, String> e : opCodeNameMap.entrySet()) {
+            nameOpCodeMap.put(e.getValue(), e.getKey());
+        }
+        nameOpCodeMap.put("OP_FALSE", OP_FALSE);
+        nameOpCodeMap.put("OP_TRUE", OP_TRUE);
+        nameOpCodeMap.put("NOP2", OP_NOP2);
+        nameOpCodeMap.put("NOP3", OP_NOP3);
+    }
+
+    /**
+     * Converts the given OpCode into a string (eg "0", "PUSHDATA", or "NON_OP(10)")
+     */
+    public static String getOpCodeName(int opcode) {
+        if (opCodeNameMap.containsKey((Integer)opcode)) {
+            return opCodeNameMap.get(opcode);
+        }
+
+        return "NON_OP(" + opcode + ")";
+    }
+
+    /**
+     * Converts the given pushdata OpCode into a string (eg "PUSHDATA2", or "PUSHDATA(23)")
+     */
+    public static String getPushDataName(int opcode) {
+        if (opCodeNameMap.containsKey(opcode)) {
+            return opCodeNameMap.get(opcode);
+        }
+
+        return "PUSHDATA(" + opcode + ")";
+    }
+
+    /**
+     * Converts the given OpCodeName into an int
+     */
+    public static int getOpCode(String opCodeName) {
+        if (opCodeNameMap.containsKey(opCodeName)) {
+            return nameOpCodeMap.get(opCodeName);
+        }
+
+        return OP_INVALIDOPCODE;
+    }
 }

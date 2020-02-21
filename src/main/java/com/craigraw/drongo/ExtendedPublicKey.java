@@ -4,10 +4,10 @@ import com.craigraw.drongo.crypto.*;
 import com.craigraw.drongo.protocol.Base58;
 
 import java.nio.ByteBuffer;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.List;
+import java.util.*;
+
+import static com.craigraw.drongo.KeyDerivation.parsePath;
+import static com.craigraw.drongo.KeyDerivation.writePath;
 
 public class ExtendedPublicKey {
     private static final int bip32HeaderP2PKHXPub = 0x0488B21E; //The 4 byte header that serializes in base58 to "xpub".
@@ -15,22 +15,26 @@ public class ExtendedPublicKey {
     private static final int bip32HeaderP2WPKHZPub = 0x04B24746; // The 4 byte header that serializes in base58 to "zpub"
     private static final int bip32HeaderP2WHSHPub = 0x2AA7ED3; // The 4 byte header that serializes in base58 to "Zpub"
 
+    private KeyDerivation keyDerivation;
     private byte[] parentFingerprint;
-    private String keyDerivationPath;
     private DeterministicKey pubKey;
     private String childDerivationPath;
     private ChildNumber pubKeyChildNumber;
 
     private DeterministicHierarchy hierarchy;
 
-    public ExtendedPublicKey(byte[] parentFingerprint, String keyDerivationPath, DeterministicKey pubKey, String childDerivationPath, ChildNumber pubKeyChildNumber) {
+    public ExtendedPublicKey(String masterFingerprint, byte[] parentFingerprint, String keyDerivationPath, DeterministicKey pubKey, String childDerivationPath, ChildNumber pubKeyChildNumber) {
+        this.keyDerivation = new KeyDerivation(masterFingerprint, keyDerivationPath);
         this.parentFingerprint = parentFingerprint;
-        this.keyDerivationPath = keyDerivationPath;
         this.pubKey = pubKey;
         this.childDerivationPath = childDerivationPath;
         this.pubKeyChildNumber = pubKeyChildNumber;
 
         this.hierarchy = new DeterministicHierarchy(pubKey);
+    }
+
+    public String getMasterFingerprint() {
+        return keyDerivation.getMasterFingerprint();
     }
 
     public byte[] getParentFingerprint() {
@@ -41,8 +45,12 @@ public class ExtendedPublicKey {
         return pubKey.getFingerprint();
     }
 
+    public String getKeyDerivationPath() {
+        return keyDerivation.getDerivationPath();
+    }
+
     public List<ChildNumber> getKeyDerivation() {
-        return parsePath(keyDerivationPath);
+        return keyDerivation.getParsedDerivationPath();
     }
 
     public DeterministicKey getPubKey() {
@@ -101,27 +109,6 @@ public class ExtendedPublicKey {
         return hierarchy.get(path);
     }
 
-    public static List<ChildNumber> parsePath(String path) {
-        return parsePath(path, 0);
-    }
-
-    public static List<ChildNumber> parsePath(String path, int wildcardReplacement) {
-        String[] parsedNodes = path.replace("M", "").split("/");
-        List<ChildNumber> nodes = new ArrayList<>();
-
-        for (String n : parsedNodes) {
-            n = n.replaceAll(" ", "");
-            if (n.length() == 0) continue;
-            boolean isHard = n.endsWith("H") || n.endsWith("h") || n.endsWith("'");
-            if (isHard) n = n.substring(0, n.length() - 1);
-            if (n.equals("*")) n = Integer.toString(wildcardReplacement);
-            int nodeNumber = Integer.parseInt(n);
-            nodes.add(new ChildNumber(nodeNumber, isHard));
-        }
-
-        return nodes;
-    }
-
     public String toString() {
         StringBuilder builder = new StringBuilder();
         builder.append(getExtendedPublicKey());
@@ -151,7 +138,7 @@ public class ExtendedPublicKey {
         return buffer.array();
     }
 
-    static ExtendedPublicKey fromDescriptor(String keyDerivationPath, String extPubKey, String childDerivationPath) {
+    public static ExtendedPublicKey fromDescriptor(String masterFingerprint, String keyDerivationPath, String extPubKey, String childDerivationPath) {
         byte[] serializedKey = Base58.decodeChecked(extPubKey);
         ByteBuffer buffer = ByteBuffer.wrap(serializedKey);
         int header = buffer.getInt();
@@ -184,7 +171,24 @@ public class ExtendedPublicKey {
             throw new IllegalArgumentException("Found unexpected data in key");
         }
 
+        if(childDerivationPath == null) {
+            childDerivationPath = writePath(Collections.singletonList(childNumber));
+        }
+
         DeterministicKey pubKey = new DeterministicKey(path, chainCode, new LazyECPoint(ECKey.CURVE.getCurve(), data), depth, parentFingerprint);
-        return new ExtendedPublicKey(parentFingerprint, keyDerivationPath, pubKey, childDerivationPath, childNumber);
+        return new ExtendedPublicKey(masterFingerprint, parentFingerprint, keyDerivationPath, pubKey, childDerivationPath, childNumber);
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        ExtendedPublicKey that = (ExtendedPublicKey) o;
+        return that.toString().equals(this.toString());
+    }
+
+    @Override
+    public int hashCode() {
+        return toString().hashCode();
     }
 }

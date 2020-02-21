@@ -2,6 +2,7 @@ package com.craigraw.drongo.crypto;
 
 import org.bouncycastle.math.ec.ECCurve;
 import org.bouncycastle.math.ec.ECPoint;
+import org.bouncycastle.util.encoders.Hex;
 
 import java.util.Arrays;
 
@@ -11,6 +12,7 @@ public class LazyECPoint {
 
     private final ECCurve curve;
     private final byte[] bits;
+    private final boolean compressed;
 
     // This field is effectively final - once set it won't change again. However it can be set after
     // construction.
@@ -19,10 +21,12 @@ public class LazyECPoint {
     public LazyECPoint(ECCurve curve, byte[] bits) {
         this.curve = curve;
         this.bits = bits;
+        this.compressed = ECKey.isPubKeyCompressed(bits);
     }
 
-    public LazyECPoint(ECPoint point) {
+    public LazyECPoint(ECPoint point, boolean compressed) {
         this.point = point;
+        this.compressed = compressed;
         this.curve = null;
         this.bits = null;
     }
@@ -40,13 +44,40 @@ public class LazyECPoint {
     }
 
     public boolean isCompressed() {
-        return get().isCompressed();
+        return compressed;
     }
 
     public byte[] getEncoded() {
         if (bits != null)
             return Arrays.copyOf(bits, bits.length);
         else
-            return get().getEncoded();
+            return get().getEncoded(compressed);
+    }
+
+    public byte[] getEncoded(boolean compressed) {
+        if (compressed == isCompressed() && bits != null)
+            return Arrays.copyOf(bits, bits.length);
+        else
+            return get().getEncoded(compressed);
+    }
+
+    public String toString() {
+        return Hex.toHexString(getEncoded());
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        return Arrays.equals(getCanonicalEncoding(), ((LazyECPoint)o).getCanonicalEncoding());
+    }
+
+    @Override
+    public int hashCode() {
+        return Arrays.hashCode(getCanonicalEncoding());
+    }
+
+    private byte[] getCanonicalEncoding() {
+        return getEncoded(true);
     }
 }

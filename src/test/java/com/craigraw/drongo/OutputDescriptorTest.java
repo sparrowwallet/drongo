@@ -40,4 +40,12 @@ public class OutputDescriptorTest {
         OutputDescriptor descriptor = OutputDescriptor.getOutputDescriptor("ypub6XiW9nhToS1gjVsFKzgmtWZuqo6V1YY7xaCns37aR3oYhFyAsTehAqV1iW2UCNtgWFQFkz3aNSZZbkfe5d1tD8MzjZuFJQn2XnczsxtjoXr");
         Assert.assertEquals("sh(wpkh(xpub6CtEr82YekUCtCg8Vdu9gRUQfpx34vYd3Tga5eDh33RfeA9wcoV8YmpshJ4tCUEm6cHT1WT1unD1iU45MvbsQtgPsECpiVxYG4ZMVKEKqGP/0/*))", descriptor.toString());
     }
+
+    @Test
+    public void masterP2PKH() {
+        OutputDescriptor descriptor = OutputDescriptor.getOutputDescriptor("pkh([d34db33f/44'/0'/0']xpub6ERApfZwUNrhLCkDtcHTcxd75RbzS1ed54G1LkBUHQVHQKqhMkhgbmJbZRkrgZw4koxb5JaHWkY4ALHY2grBGRjaDMzQLcgJvLJuZZvRcEL/1/*)");
+        Assert.assertEquals("pkh(xpub6CY2xt3vG5BhUS7krcphJprmHCh3jHYB1A8bxtJocU8NyQttKUCLp5izorV1wdXbp7XSSEcaFiKzUroEAL5tD1de8iAUeHP76byTWZu79SD/1/*)", descriptor.toString());
+        Assert.assertEquals("d34db33f", descriptor.getSingletonExtendedPublicKey().getMasterFingerprint());
+        Assert.assertEquals("m/44'/0'/0'", descriptor.getSingletonExtendedPublicKey().getKeyDerivationPath());
+    }
 }
