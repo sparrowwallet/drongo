@@ -3,9 +3,6 @@ package com.craigraw.drongo.psbt;
 import com.craigraw.drongo.ExtendedPublicKey;
 import com.craigraw.drongo.KeyDerivation;
 import com.craigraw.drongo.Utils;
-import com.craigraw.drongo.crypto.ChildNumber;
-import com.craigraw.drongo.crypto.ECKey;
-import com.craigraw.drongo.crypto.LazyECPoint;
 import com.craigraw.drongo.protocol.*;
 import org.bouncycastle.util.encoders.Base64;
 import org.bouncycastle.util.encoders.Hex;
@@ -17,28 +14,13 @@ import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.*;
 
+import static com.craigraw.drongo.psbt.PSBTEntry.parseKeyDerivation;
+
 public class PSBT {
     public static final byte PSBT_GLOBAL_UNSIGNED_TX = 0x00;
     public static final byte PSBT_GLOBAL_BIP32_PUBKEY = 0x01;
     public static final byte PSBT_GLOBAL_VERSION = (byte)0xfb;
     public static final byte PSBT_GLOBAL_PROPRIETARY = (byte)0xfc;
-
-    public static final byte PSBT_IN_NON_WITNESS_UTXO = 0x00;
-    public static final byte PSBT_IN_WITNESS_UTXO = 0x01;
-    public static final byte PSBT_IN_PARTIAL_SIG = 0x02;
-    public static final byte PSBT_IN_SIGHASH_TYPE = 0x03;
-    public static final byte PSBT_IN_REDEEM_SCRIPT = 0x04;
-    public static final byte PSBT_IN_WITNESS_SCRIPT = 0x05;
-    public static final byte PSBT_IN_BIP32_DERIVATION = 0x06;
-    public static final byte PSBT_IN_FINAL_SCRIPTSIG = 0x07;
-    public static final byte PSBT_IN_FINAL_SCRIPTWITNESS = 0x08;
-    public static final byte PSBT_IN_POR_COMMITMENT = 0x09;
-    public static final byte PSBT_IN_PROPRIETARY = (byte)0xfc;
-
-    public static final byte PSBT_OUT_REDEEM_SCRIPT = 0x00;
-    public static final byte PSBT_OUT_WITNESS_SCRIPT = 0x01;
-    public static final byte PSBT_OUT_BIP32_DERIVATION = 0x02;
-    public static final byte PSBT_OUT_PROPRIETARY = (byte)0xfc;
 
     public static final String PSBT_MAGIC = "70736274";
 
@@ -51,11 +33,8 @@ public class PSBT {
 
     private int inputs = 0;
     private int outputs = 0;
-    private boolean parseOK = false;
 
-    private String strPSBT = null;
-    private byte[] psbtBytes = null;
-    private ByteBuffer psbtByteBuffer = null;
+    private byte[] psbtBytes;
 
     private Transaction transaction = null;
     private Integer version = null;
@@ -67,270 +46,120 @@ public class PSBT {
 
     private static final Logger log = LoggerFactory.getLogger(PSBT.class);
 
-    public PSBT(String strPSBT) throws Exception {
-        if (!isPSBT(strPSBT)) {
-            log.debug("Provided string is not a PSBT");
-            return;
-        }
-
-        if (Utils.isBase64(strPSBT) && !Utils.isHex(strPSBT)) {
-            this.strPSBT = Hex.toHexString(Base64.decode(strPSBT));
-        } else {
-            this.strPSBT = strPSBT;
-        }
-
-        psbtBytes = Hex.decode(this.strPSBT);
-        psbtByteBuffer = ByteBuffer.wrap(psbtBytes);
-
-        read();
+    public PSBT(byte[] psbt) {
+        this.psbtBytes = psbt;
+        parse();
     }
 
-    public PSBT(byte[] psbt) throws Exception {
-        this(Hex.toHexString(psbt));
-    }
-
-    public void read() throws Exception {
+    private void parse() {
         int seenInputs = 0;
         int seenOutputs = 0;
 
-        psbtBytes = Hex.decode(strPSBT);
-        psbtByteBuffer = ByteBuffer.wrap(psbtBytes);
-
-        log.debug("--- ***** START ***** ---");
-        log.debug("---  PSBT length:" + psbtBytes.length + "---");
-        log.debug("--- parsing header ---");
+        ByteBuffer psbtByteBuffer = ByteBuffer.wrap(psbtBytes);
 
         byte[] magicBuf = new byte[4];
         psbtByteBuffer.get(magicBuf);
-        if (!PSBT.PSBT_MAGIC.equalsIgnoreCase(Hex.toHexString(magicBuf))) {
-            throw new Exception("Invalid magic value");
+        if (!PSBT_MAGIC.equalsIgnoreCase(Hex.toHexString(magicBuf))) {
+            throw new IllegalStateException("PSBT has invalid magic value");
         }
 
         byte sep = psbtByteBuffer.get();
         if (sep != (byte) 0xff) {
-            throw new Exception("Bad 0xff separator:" + Hex.toHexString(new byte[]{sep}));
+            throw new IllegalStateException("PSBT has bad initial separator:" + Hex.toHexString(new byte[]{sep}));
         }
 
         int currentState = STATE_GLOBALS;
-        PSBTInput currentInput = new PSBTInput();
-        PSBTOutput currentOutput = new PSBTOutput();
+        List<PSBTEntry> globalEntries = new ArrayList<>();
+        List<List<PSBTEntry>> inputEntryLists = new ArrayList<>();
+        List<List<PSBTEntry>> outputEntryLists = new ArrayList<>();
+
+        List<PSBTEntry> inputEntries = new ArrayList<>();
+        List<PSBTEntry> outputEntries = new ArrayList<>();
 
         while (psbtByteBuffer.hasRemaining()) {
-            if (currentState == STATE_GLOBALS) {
-                log.debug("--- parsing globals ---");
-            } else if (currentState == STATE_INPUTS) {
-                log.debug("--- parsing inputs ---");
-            } else if (currentState == STATE_OUTPUTS) {
-                log.debug("--- parsing outputs ---");
-            }
+            PSBTEntry entry = parseEntry(psbtByteBuffer);
 
-            PSBTEntry entry = parse();
-            if (entry == null) {
-                log.debug("PSBT parse returned null entry");
-            }
-
-            if (entry.getKey() == null) {         // length == 0
+            if(entry.getKey() == null) {         // length == 0
                 switch (currentState) {
                     case STATE_GLOBALS:
                         currentState = STATE_INPUTS;
+                        parseGlobalEntries(globalEntries);
                         break;
                     case STATE_INPUTS:
-                        psbtInputs.add(currentInput);
-                        currentInput = new PSBTInput();
+                        inputEntryLists.add(inputEntries);
+                        inputEntries = new ArrayList<>();
 
                         seenInputs++;
                         if (seenInputs == inputs) {
                             currentState = STATE_OUTPUTS;
+                            parseInputEntries(inputEntryLists);
                         }
                         break;
                     case STATE_OUTPUTS:
-                        psbtOutputs.add(currentOutput);
-                        currentOutput = new PSBTOutput();
+                        outputEntryLists.add(outputEntries);
+                        outputEntries = new ArrayList<>();
 
                         seenOutputs++;
                         if (seenOutputs == outputs) {
                             currentState = STATE_END;
+                            parseOutputEntries(outputEntryLists);
                         }
                         break;
                     case STATE_END:
-                        parseOK = true;
                         break;
                     default:
-                        log.debug("PSBT read is in unknown state");
-                        break;
+                        throw new IllegalStateException("PSBT read is in unknown state");
                 }
             } else if (currentState == STATE_GLOBALS) {
-                switch (entry.getKeyType()[0]) {
-                    case PSBT.PSBT_GLOBAL_UNSIGNED_TX:
-                        Transaction transaction = new Transaction(entry.getData());
-                        inputs = transaction.getInputs().size();
-                        outputs = transaction.getOutputs().size();
-                        log.debug("Transaction with txid: " + transaction.getTxId() + " version " + transaction.getVersion() + " size " + transaction.getMessageSize() + " locktime " + transaction.getLockTime());
-                        for(TransactionInput input: transaction.getInputs()) {
-                            log.debug(" Transaction input references txid: " + input.getOutpoint().getHash() + " vout " + input.getOutpoint().getIndex() + " with script " + input.getScript());
-                        }
-                        for(TransactionOutput output: transaction.getOutputs()) {
-                            log.debug(" Transaction output value: " + output.getValue() + " to addresses " + Arrays.asList(output.getScript().getToAddresses()) + " with script hex " + Hex.toHexString(output.getScript().getProgram()) + " to script " + output.getScript());
-                        }
-                        setTransaction(transaction);
-                        break;
-                    case PSBT.PSBT_GLOBAL_BIP32_PUBKEY:
-                        KeyDerivation keyDerivation = parseKeyDerivation(entry.getData());
-                        ExtendedPublicKey pubKey = ExtendedPublicKey.fromDescriptor(keyDerivation.getMasterFingerprint(), keyDerivation.getDerivationPath(), Base58.encodeChecked(entry.getKeyData()), null);
-                        addExtendedPublicKey(pubKey, keyDerivation);
-                        log.debug("Pubkey with master fingerprint " + pubKey.getMasterFingerprint() + " at path " + pubKey.getKeyDerivationPath() + ": " + pubKey.getExtendedPublicKey());
-                        break;
-                    case PSBT.PSBT_GLOBAL_VERSION:
-                        int version = (int)Utils.readUint32(entry.getData(), 0);
-                        setVersion(version);
-                        log.debug("PSBT version: " + version);
-                        break;
-                    case PSBT.PSBT_GLOBAL_PROPRIETARY:
-                        addProprietary(Hex.toHexString(entry.getKeyData()), Hex.toHexString(entry.getData()));
-                        log.debug("PSBT global proprietary data: " + Hex.toHexString(entry.getData()));
-                        break;
-                    default:
-                        log.debug("PSBT global not recognized key type: " + entry.getKeyType()[0]);
-                        break;
-                }
+                globalEntries.add(entry);
             } else if (currentState == STATE_INPUTS) {
-                switch (entry.getKeyType()[0]) {
-                    case PSBT.PSBT_IN_NON_WITNESS_UTXO:
-                        Transaction nonWitnessTx = new Transaction(entry.getData());
-                        currentInput.setNonWitnessUtxo(nonWitnessTx);
-                        log.debug("Found input non witness utxo with txid: " + nonWitnessTx.getTxId() + " version " + nonWitnessTx.getVersion() + " size " + nonWitnessTx.getMessageSize() + " locktime " + nonWitnessTx.getLockTime());
-                        for(TransactionInput input: nonWitnessTx.getInputs()) {
-                            log.debug(" Transaction input references txid: " + input.getOutpoint().getHash() + " vout " + input.getOutpoint().getIndex() + " with script " + input.getScript());
-                        }
-                        for(TransactionOutput output: nonWitnessTx.getOutputs()) {
-                            log.debug(" Transaction output value: " + output.getValue() + " to addresses " + Arrays.asList(output.getScript().getToAddresses()) + " with script hex " + Hex.toHexString(output.getScript().getProgram()) + " to script " + output.getScript());
-                        }
-                        break;
-                    case PSBT.PSBT_IN_WITNESS_UTXO:
-                        TransactionOutput witnessTxOutput = new TransactionOutput(null, entry.getData(), 0);
-                        currentInput.setWitnessUtxo(witnessTxOutput);
-                        log.debug("Found input witness utxo amount " + witnessTxOutput.getValue() + " script hex " + Hex.toHexString(witnessTxOutput.getScript().getProgram()) + " script " + witnessTxOutput.getScript() + " addresses " + Arrays.asList(witnessTxOutput.getScript().getToAddresses()));
-                        break;
-                    case PSBT.PSBT_IN_PARTIAL_SIG:
-                        LazyECPoint sigPublicKey = new LazyECPoint(ECKey.CURVE.getCurve(), entry.getKeyData());
-                        currentInput.addPartialSignature(sigPublicKey, entry.getData());
-                        log.debug("Found input partial signature with public key " + sigPublicKey + " signature " + Hex.toHexString(entry.getData()));
-                        break;
-                    case PSBT.PSBT_IN_SIGHASH_TYPE:
-                        long sighashType = Utils.readUint32(entry.getData(), 0);
-                        Transaction.SigHash sigHash = Transaction.SigHash.fromInt((int)sighashType);
-                        currentInput.setSigHash(sigHash);
-                        log.debug("Found input sighash_type " + sigHash.toString());
-                        break;
-                    case PSBT.PSBT_IN_REDEEM_SCRIPT:
-                        Script redeemScript = new Script(entry.getData());
-                        currentInput.setRedeemScript(redeemScript);
-                        log.debug("Found input redeem script hex " + Hex.toHexString(redeemScript.getProgram()) + " script " + redeemScript);
-                        break;
-                    case PSBT.PSBT_IN_WITNESS_SCRIPT:
-                        Script witnessScript = new Script(entry.getData());
-                        currentInput.setWitnessScript(witnessScript);
-                        log.debug("Found input witness script hex " + Hex.toHexString(witnessScript.getProgram()) + " script " + witnessScript);
-                        break;
-                    case PSBT.PSBT_IN_BIP32_DERIVATION:
-                        LazyECPoint derivedPublicKey = new LazyECPoint(ECKey.CURVE.getCurve(), entry.getKeyData());
-                        KeyDerivation keyDerivation = parseKeyDerivation(entry.getData());
-                        currentInput.addDerivedPublicKey(derivedPublicKey, keyDerivation);
-                        log.debug("Found input bip32_derivation with master fingerprint " + keyDerivation.getMasterFingerprint() + " at path " + keyDerivation.getDerivationPath() + " public key " + derivedPublicKey);
-                        break;
-                    case PSBT.PSBT_IN_FINAL_SCRIPTSIG:
-                        Script finalScriptSig = new Script(entry.getData());
-                        currentInput.setFinalScriptSig(finalScriptSig);
-                        log.debug("Found input final scriptSig script hex " + Hex.toHexString(finalScriptSig.getProgram()) + " script " + finalScriptSig.toString());
-                        break;
-                    case PSBT.PSBT_IN_FINAL_SCRIPTWITNESS:
-                        Script finalScriptWitness = new Script(entry.getData());
-                        currentInput.setFinalScriptWitness(finalScriptWitness);
-                        log.debug("Found input final scriptWitness script hex " + Hex.toHexString(finalScriptWitness.getProgram()) + " script " + finalScriptWitness.toString());
-                        break;
-                    case PSBT.PSBT_IN_POR_COMMITMENT:
-                        String porMessage = new String(entry.getData(), "UTF-8");
-                        currentInput.setPorCommitment(porMessage);
-                        log.debug("Found input POR commitment message " + porMessage);
-                        break;
-                    case PSBT.PSBT_IN_PROPRIETARY:
-                        currentInput.addProprietary(Hex.toHexString(entry.getKeyData()), Hex.toHexString(entry.getData()));
-                        log.debug("Found proprietary input " + Hex.toHexString(entry.getKeyData()) + ": " + Hex.toHexString(entry.getData()));
-                        break;
-                    default:
-                        log.debug("PSBT input not recognized key type:" + entry.getKeyType()[0]);
-                        break;
-                }
+                inputEntries.add(entry);
             } else if (currentState == STATE_OUTPUTS) {
-                switch (entry.getKeyType()[0]) {
-                    case PSBT.PSBT_OUT_REDEEM_SCRIPT:
-                        Script redeemScript = new Script(entry.getData());
-                        currentOutput.setRedeemScript(redeemScript);
-                        log.debug("Found output redeem script hex " + Hex.toHexString(redeemScript.getProgram()) + " script " + redeemScript);
-                        break;
-                    case PSBT.PSBT_OUT_WITNESS_SCRIPT:
-                        Script witnessScript = new Script(entry.getData());
-                        currentOutput.setWitnessScript(witnessScript);
-                        log.debug("Found output witness script hex " + Hex.toHexString(witnessScript.getProgram()) + " script " + witnessScript);
-                        break;
-                    case PSBT.PSBT_OUT_BIP32_DERIVATION:
-                        LazyECPoint publicKey = new LazyECPoint(ECKey.CURVE.getCurve(), entry.getKeyData());
-                        KeyDerivation keyDerivation = parseKeyDerivation(entry.getData());
-                        currentOutput.addDerivedPublicKey(publicKey, keyDerivation);
-                        log.debug("Found output bip32_derivation with master fingerprint " + keyDerivation.getMasterFingerprint() + " at path " + keyDerivation.getDerivationPath() + " public key " + publicKey);
-                        break;
-                    case PSBT.PSBT_OUT_PROPRIETARY:
-                        currentOutput.addProprietary(Hex.toHexString(entry.getKeyData()), Hex.toHexString(entry.getData()));
-                        log.debug("Found proprietary output " + Hex.toHexString(entry.getKeyData()) + ": " + Hex.toHexString(entry.getData()));
-                        break;
-                    default:
-                        log.debug("PSBT output not recognized key type:" + entry.getKeyType()[0]);
-                        break;
-                }
+                outputEntries.add(entry);
             } else {
-                log.debug("PSBT structure invalid");
+                throw new IllegalStateException("PSBT structure invalid");
             }
-
         }
 
-        if (currentState == STATE_END) {
-            log.debug("--- ***** END ***** ---");
+        if(currentState != STATE_END) {
+            if(transaction == null) {
+                throw new IllegalStateException("Missing transaction");
+            }
+
+            if(currentState == STATE_INPUTS) {
+                throw new IllegalStateException("Missing inputs");
+            }
+
+            if(currentState == STATE_OUTPUTS) {
+                throw new IllegalStateException("Missing outputs");
+            }
         }
     }
 
-    private PSBTEntry parse() {
+    private PSBTEntry parseEntry(ByteBuffer psbtByteBuffer) {
         PSBTEntry entry = new PSBTEntry();
 
         try {
             int keyLen = PSBT.readCompactInt(psbtByteBuffer);
-            log.debug("PSBT entry key length: " + keyLen);
 
             if (keyLen == 0x00) {
-                log.debug("PSBT entry separator 0x00");
                 return entry;
             }
 
             byte[] key = new byte[keyLen];
             psbtByteBuffer.get(key);
-            log.debug("PSBT entry key: " + Hex.toHexString(key));
 
-            byte[] keyType = new byte[1];
-            keyType[0] = key[0];
-            log.debug("PSBT entry key type: " + Hex.toHexString(keyType));
+            byte keyType = key[0];
 
             byte[] keyData = null;
             if (key.length > 1) {
                 keyData = new byte[key.length - 1];
                 System.arraycopy(key, 1, keyData, 0, keyData.length);
-                log.debug("PSBT entry key data: " + Hex.toHexString(keyData));
             }
 
             int dataLen = PSBT.readCompactInt(psbtByteBuffer);
-            log.debug("PSBT entry data length: " + dataLen);
-
             byte[] data = new byte[dataLen];
             psbtByteBuffer.get(data);
-            log.debug("PSBT entry data: " + Hex.toHexString(data));
 
             entry.setKey(key);
             entry.setKeyType(keyType);
@@ -340,14 +169,13 @@ public class PSBT {
             return entry;
 
         } catch (Exception e) {
-            log.debug("Error parsing PSBT entry", e);
-            return null;
+            throw new IllegalStateException("Error parsing PSBT entry", e);
         }
     }
 
     private PSBTEntry populateEntry(byte type, byte[] keydata, byte[] data) throws Exception {
         PSBTEntry entry = new PSBTEntry();
-        entry.setKeyType(new byte[]{type});
+        entry.setKeyType(type);
         entry.setKey(new byte[]{type});
         if (keydata != null) {
             entry.setKeyData(keydata);
@@ -355,6 +183,89 @@ public class PSBT {
         entry.setData(data);
 
         return entry;
+    }
+
+    private void parseGlobalEntries(List<PSBTEntry> globalEntries) {
+        PSBTEntry duplicate = findDuplicateKey(globalEntries);
+        if(duplicate != null) {
+            throw new IllegalStateException("Found duplicate key for PSBT global: " + Hex.toHexString(duplicate.getKey()));
+        }
+
+        for(PSBTEntry entry : globalEntries) {
+            switch(entry.getKeyType()) {
+                case PSBT_GLOBAL_UNSIGNED_TX:
+                    entry.checkOneByteKey();
+                    Transaction transaction = new Transaction(entry.getData());
+                    inputs = transaction.getInputs().size();
+                    outputs = transaction.getOutputs().size();
+                    log.debug("Transaction with txid: " + transaction.getTxId() + " version " + transaction.getVersion() + " size " + transaction.getMessageSize() + " locktime " + transaction.getLockTime());
+                    for(TransactionInput input: transaction.getInputs()) {
+                        if(input.getScript().getProgram().length != 0) {
+                            throw new IllegalStateException("Unsigned tx input does not have empty scriptSig");
+                        }
+                        log.debug(" Transaction input references txid: " + input.getOutpoint().getHash() + " vout " + input.getOutpoint().getIndex() + " with script " + input.getScript());
+                    }
+                    for(TransactionOutput output: transaction.getOutputs()) {
+                        log.debug(" Transaction output value: " + output.getValue() + " to addresses " + Arrays.asList(output.getScript().getToAddresses()) + " with script hex " + Hex.toHexString(output.getScript().getProgram()) + " to script " + output.getScript());
+                    }
+                    this.transaction = transaction;
+                    break;
+                case PSBT_GLOBAL_BIP32_PUBKEY:
+                    entry.checkOneBytePlusXpubKey();
+                    KeyDerivation keyDerivation = parseKeyDerivation(entry.getData());
+                    ExtendedPublicKey pubKey = ExtendedPublicKey.fromDescriptor(keyDerivation.getMasterFingerprint(), keyDerivation.getDerivationPath(), Base58.encodeChecked(entry.getKeyData()), null);
+                    this.extendedPublicKeys.put(pubKey, keyDerivation);
+                    log.debug("Pubkey with master fingerprint " + pubKey.getMasterFingerprint() + " at path " + pubKey.getKeyDerivationPath() + ": " + pubKey.getExtendedPublicKey());
+                    break;
+                case PSBT_GLOBAL_VERSION:
+                    entry.checkOneByteKey();
+                    int version = (int)Utils.readUint32(entry.getData(), 0);
+                    this.version = version;
+                    log.debug("PSBT version: " + version);
+                    break;
+                case PSBT_GLOBAL_PROPRIETARY:
+                    globalProprietary.put(Hex.toHexString(entry.getKeyData()), Hex.toHexString(entry.getData()));
+                    log.debug("PSBT global proprietary data: " + Hex.toHexString(entry.getData()));
+                    break;
+                default:
+                    throw new IllegalStateException("PSBT global not recognized key type: " + entry.getKeyType());
+            }
+        }
+    }
+
+    private void parseInputEntries(List<List<PSBTEntry>> inputEntryLists) {
+        for(List<PSBTEntry> inputEntries : inputEntryLists) {
+            PSBTEntry duplicate = findDuplicateKey(inputEntries);
+            if(duplicate != null) {
+                throw new IllegalStateException("Found duplicate key for PSBT input: " + Hex.toHexString(duplicate.getKey()));
+            }
+
+            PSBTInput input = new PSBTInput(inputEntries);
+            this.psbtInputs.add(input);
+        }
+    }
+
+    private void parseOutputEntries(List<List<PSBTEntry>> outputEntryLists) {
+        for(List<PSBTEntry> outputEntries : outputEntryLists) {
+            PSBTEntry duplicate = findDuplicateKey(outputEntries);
+            if(duplicate != null) {
+                throw new IllegalStateException("Found duplicate key for PSBT output: " + Hex.toHexString(duplicate.getKey()));
+            }
+
+            PSBTOutput output = new PSBTOutput(outputEntries);
+            this.psbtOutputs.add(output);
+        }
+    }
+
+    private PSBTEntry findDuplicateKey(List<PSBTEntry> entries) {
+        Set checkSet = new HashSet();
+        for(PSBTEntry entry: entries) {
+            if(!checkSet.add(Hex.toHexString(entry.getKey())) ) {
+                return entry;
+            }
+        }
+
+        return null;
     }
 
     public byte[] serialize() throws IOException {
@@ -365,7 +276,7 @@ public class PSBT {
 
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
         // magic
-        baos.write(Hex.decode(PSBT.PSBT_MAGIC), 0, Hex.decode(PSBT.PSBT_MAGIC).length);
+        baos.write(Hex.decode(PSBT_MAGIC), 0, Hex.decode(PSBT_MAGIC).length);
         // separator
         baos.write((byte) 0xff);
 
@@ -412,8 +323,6 @@ public class PSBT {
         baos.write((byte) 0x00);
 
         psbtBytes = baos.toByteArray();
-        strPSBT = Hex.toHexString(psbtBytes);
-        log.debug("Wrote PSBT: " + strPSBT);
 
         return psbtBytes;
     }
@@ -430,18 +339,8 @@ public class PSBT {
         return transaction;
     }
 
-    public void setTransaction(Transaction transaction) {
-        testIfNull(this.transaction);
-        this.transaction = transaction;
-    }
-
     public Integer getVersion() {
         return version;
-    }
-
-    public void setVersion(Integer version) {
-        testIfNull(this.version);
-        this.version = version;
     }
 
     public KeyDerivation getKeyDerivation(ExtendedPublicKey publicKey) {
@@ -450,24 +349,6 @@ public class PSBT {
 
     public List<ExtendedPublicKey> getExtendedPublicKeys() {
         return new ArrayList<ExtendedPublicKey>(extendedPublicKeys.keySet());
-    }
-
-    public void addExtendedPublicKey(ExtendedPublicKey publicKey, KeyDerivation derivation) {
-        if(extendedPublicKeys.containsKey(publicKey)) {
-            throw new IllegalStateException("Duplicate public key in scope");
-        }
-
-        this.extendedPublicKeys.put(publicKey, derivation);
-    }
-
-    public void addProprietary(String key, String data) {
-        globalProprietary.put(key, data);
-    }
-
-    private void testIfNull(Object obj) {
-        if(obj != null) {
-            throw new IllegalStateException("Duplicate keys in scope");
-        }
     }
 
     public String toString() {
@@ -558,41 +439,6 @@ public class PSBT {
         return ret;
     }
 
-    public KeyDerivation parseKeyDerivation(byte[] data) {
-        String masterFingerprint = getMasterFingerprint(Arrays.copyOfRange(data, 0, 4));
-        List<ChildNumber> bip32pathList = readBIP32Derivation(Arrays.copyOfRange(data, 4, data.length));
-        String bip32path = KeyDerivation.writePath(bip32pathList);
-        return new KeyDerivation(masterFingerprint, bip32path);
-    }
-
-    public static String getMasterFingerprint(byte[] data) {
-        return Hex.toHexString(data);
-    }
-
-    public static List<ChildNumber> readBIP32Derivation(byte[] data) {
-        List<ChildNumber> path = new ArrayList<>();
-
-        ByteBuffer bb = ByteBuffer.wrap(data);
-        byte[] buf = new byte[4];
-
-        do {
-            bb.get(buf);
-            reverse(buf);
-            ByteBuffer pbuf = ByteBuffer.wrap(buf);
-            path.add(new ChildNumber(pbuf.getInt()));
-        } while(bb.hasRemaining());
-
-        return path;
-    }
-
-    private static void reverse(byte[] array) {
-        for (int i = 0; i < array.length / 2; i++) {
-            byte temp = array[i];
-            array[i] = array[array.length - i - 1];
-            array[array.length - i - 1] = temp;
-        }
-    }
-
     public static byte[] writeBIP32Derivation(byte[] fingerprint, int purpose, int type, int account, int chain, int index) {
         // fingerprint and integer values to BIP32 derivation buffer
         byte[] bip32buf = new byte[24];
@@ -634,17 +480,30 @@ public class PSBT {
     }
 
     public static boolean isPSBT(String s) {
-        if (Utils.isHex(s) && s.startsWith(PSBT.PSBT_MAGIC)) {
+        if (Utils.isHex(s) && s.startsWith(PSBT_MAGIC)) {
             return true;
-        } else if (Utils.isBase64(s) && Hex.toHexString(Base64.decode(s)).startsWith(PSBT.PSBT_MAGIC)) {
+        } else if (Utils.isBase64(s) && Hex.toHexString(Base64.decode(s)).startsWith(PSBT_MAGIC)) {
             return true;
         } else {
             return false;
         }
     }
 
+    public static PSBT fromString(String strPSBT) {
+        if (!isPSBT(strPSBT)) {
+            throw new IllegalArgumentException("Provided string is not a PSBT");
+        }
+
+        if (Utils.isBase64(strPSBT) && !Utils.isHex(strPSBT)) {
+            strPSBT = Hex.toHexString(Base64.decode(strPSBT));
+        }
+
+        byte[] psbtBytes = Hex.decode(strPSBT);
+        return new PSBT(psbtBytes);
+    }
+
     public static void main(String[] args) throws Exception {
-        String psbtBase64 = "cHNidP8BAMkCAAAAA3lxWr8zSZt5tiGZegyFWmd8b62cew6qi/4rTZGGif8OAAAAAAD/////td4T4zmwdQ8R2SbwRjRj+alAy1VX8mYZD2o9ZmefNIsAAAAAAP////+k9Xvvp9Lpap1TWd51NWu+MIfojG+MCqmguPyjII+5YgAAAAAA/////wKMz/AIAAAAABl2qRSE7GtWKUoaFcVQ8n9qfMYi41Yh0YisjM/wCAAAAAAZdqkUmka3O8TiIRG8h+a1mDLFQVTfJEiIrAAAAAAAAQBVAgAAAAGt3gAAAAAAAO++AAAAAAAAAAAAAAAAAAAAAAAAAAAAAEkAAAAA/////wEA4fUFAAAAABl2qRSvQiRNb8B3El3G+KdspA3+DRvH1IisAAAAACIGA383lPO+TErMCGrITWkCwCVxPqv4iQ8g9ErPCzTjwPD3DHSXSzsAAAAAAAAAAAABAFUCAAAAAa3eAAAAAAAA774AAAAAAAAAAAAAAAAAAAAAAAAAAAAASQAAAAD/////AQDh9QUAAAAAGXapFAn8nw1IXPh34v8wuhJrcu34Xg8qiKwAAAAAIgYDTr6iJ7sP/u+0gz4wi+Muuc4IxEoJaGYedN/uqwmSfbgMdJdLOwAAAAABAAAAAAEAVQIAAAABrd4AAAAAAADvvgAAAAAAAAAAAAAAAAAAAAAAAAAAAABJAAAAAP////8BAOH1BQAAAAAZdqkUGMIzFJsgyFIYzDbThZ5S2zTnvRiIrAAAAAAiBgK7oYu+Z/kEK6XK3urdEDW2ngkwnXD1gZBjEgRW0wD7Igx0l0s7AAAAAAIAAAAAACICAyw+nsM8JYHohVqRsQ2qilEwjZPh+OkGPqkO2kYZczCZEHSXSzsMAAAAIgAAADcBAAAA";
+        String psbtBase64 = "cHNidP8BAHUCAAAAASaBcTce3/KF6Tet7qSze3gADAVmy7OtZGQXE8pCFxv2AAAAAAD+////AtPf9QUAAAAAGXapFNDFmQPFusKGh2DpD9UhpGZap2UgiKwA4fUFAAAAABepFDVF5uM7gyxHBQ8k0+65PJwDlIvHh7MuEwAAAQD9pQEBAAAAAAECiaPHHqtNIOA3G7ukzGmPopXJRjr6Ljl/hTPMti+VZ+UBAAAAFxYAFL4Y0VKpsBIDna89p95PUzSe7LmF/////4b4qkOnHf8USIk6UwpyN+9rRgi7st0tAXHmOuxqSJC0AQAAABcWABT+Pp7xp0XpdNkCxDVZQ6vLNL1TU/////8CAMLrCwAAAAAZdqkUhc/xCX/Z4Ai7NK9wnGIZeziXikiIrHL++E4sAAAAF6kUM5cluiHv1irHU6m80GfWx6ajnQWHAkcwRAIgJxK+IuAnDzlPVoMR3HyppolwuAJf3TskAinwf4pfOiQCIAGLONfc0xTnNMkna9b7QPZzMlvEuqFEyADS8vAtsnZcASED0uFWdJQbrUqZY3LLh+GFbTZSYG2YVi/jnF6efkE/IQUCSDBFAiEA0SuFLYXc2WHS9fSrZgZU327tzHlMDDPOXMMJ/7X85Y0CIGczio4OFyXBl/saiK9Z9R5E5CVbIBZ8hoQDHAXR8lkqASECI7cr7vCWXRC+B3jv7NYfysb3mk6haTkzgHNEZPhPKrMAAAAAAAAA";
 
         PSBT psbt = null;
         String filename = "default.psbt";
@@ -656,7 +515,7 @@ public class PSBT {
             stream.close();
             psbt = new PSBT(psbtBytes);
         } else {
-            psbt = new PSBT(psbtBase64);
+            psbt = PSBT.fromString(psbtBase64);
         }
 
         System.out.println(psbt);

@@ -1,10 +1,12 @@
 package com.craigraw.drongo.protocol;
 
 import com.craigraw.drongo.Utils;
+import org.bouncycastle.util.encoders.Hex;
 
 import java.io.IOException;
 import java.io.OutputStream;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 public class TransactionWitness {
@@ -34,5 +36,43 @@ public class TransactionWitness {
             stream.write(new VarInt(push.length).encode());
             stream.write(push);
         }
+    }
+
+    @Override
+    public String toString() {
+        StringBuffer buffer = new StringBuffer();
+        for (byte[] push : pushes) {
+            if (push == null) {
+                buffer.append("NULL");
+            } else if (push.length == 0) {
+                buffer.append("EMPTY");
+            } else {
+                buffer.append(Hex.toHexString(push));
+            }
+            buffer.append(" ");
+        }
+
+        return buffer.toString().trim();
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        TransactionWitness other = (TransactionWitness) o;
+        if (pushes.size() != other.pushes.size()) return false;
+        for (int i = 0; i < pushes.size(); i++) {
+            if (!Arrays.equals(pushes.get(i), other.pushes.get(i))) return false;
+        }
+        return true;
+    }
+
+    @Override
+    public int hashCode() {
+        int hashCode = 1;
+        for (byte[] push : pushes) {
+            hashCode = 31 * hashCode + (push == null ? 0 : Arrays.hashCode(push));
+        }
+        return hashCode;
     }
 }

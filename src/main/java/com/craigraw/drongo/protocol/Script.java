@@ -2,6 +2,7 @@ package com.craigraw.drongo.protocol;
 
 import com.craigraw.drongo.Utils;
 import com.craigraw.drongo.address.*;
+import org.bouncycastle.util.encoders.Hex;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
@@ -99,6 +100,10 @@ public class Script {
         } catch (IOException e) {
             throw new RuntimeException(e);  // Cannot happen.
         }
+    }
+
+    public String getProgramAsHex() {
+        return Hex.toHexString(getProgram());
     }
 
     /**
