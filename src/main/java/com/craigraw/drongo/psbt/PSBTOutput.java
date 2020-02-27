@@ -52,7 +52,7 @@ public class PSBTOutput {
                     log.debug("Found proprietary output " + Hex.toHexString(entry.getKeyData()) + ": " + Hex.toHexString(entry.getData()));
                     break;
                 default:
-                    throw new IllegalStateException("PSBT output not recognized key type: " + entry.getKeyType());
+                    log.warn("PSBT output not recognized key type: " + entry.getKeyType());
             }
         }
     }

@@ -134,6 +134,8 @@ public class PSBT {
                 throw new IllegalStateException("Missing outputs");
             }
         }
+
+        log.debug("Calculated fee at " + getFee());
     }
 
     private PSBTEntry parseEntry(ByteBuffer psbtByteBuffer) {
@@ -206,7 +208,11 @@ public class PSBT {
                         log.debug(" Transaction input references txid: " + input.getOutpoint().getHash() + " vout " + input.getOutpoint().getIndex() + " with script " + input.getScript());
                     }
                     for(TransactionOutput output: transaction.getOutputs()) {
-                        log.debug(" Transaction output value: " + output.getValue() + " to addresses " + Arrays.asList(output.getScript().getToAddresses()) + " with script hex " + Hex.toHexString(output.getScript().getProgram()) + " to script " + output.getScript());
+                        try {
+                            log.debug(" Transaction output value: " + output.getValue() + " to addresses " + Arrays.asList(output.getScript().getToAddresses()) + " with script hex " + Hex.toHexString(output.getScript().getProgram()) + " to script " + output.getScript());
+                        } catch(ProtocolException e) {
+                            log.debug(" Transaction output value: " + output.getValue() + " with script hex " + Hex.toHexString(output.getScript().getProgram()) + " to script " + output.getScript());
+                        }
                     }
                     this.transaction = transaction;
                     break;
@@ -228,7 +234,7 @@ public class PSBT {
                     log.debug("PSBT global proprietary data: " + Hex.toHexString(entry.getData()));
                     break;
                 default:
-                    throw new IllegalStateException("PSBT global not recognized key type: " + entry.getKeyType());
+                    log.warn("PSBT global not recognized key type: " + entry.getKeyType());
             }
         }
     }
@@ -240,7 +246,7 @@ public class PSBT {
                 throw new IllegalStateException("Found duplicate key for PSBT input: " + Hex.toHexString(duplicate.getKey()));
             }
 
-            PSBTInput input = new PSBTInput(inputEntries);
+            PSBTInput input = new PSBTInput(inputEntries, transaction, this.psbtInputs.size());
             this.psbtInputs.add(input);
         }
     }
@@ -266,6 +272,30 @@ public class PSBT {
         }
 
         return null;
+    }
+
+    public Long getFee() {
+        long fee = 0L;
+
+        for (int i = 0; i < psbtInputs.size(); i++) {
+            PSBTInput input = psbtInputs.get(i);
+            if(input.getNonWitnessUtxo() != null) {
+                int index = (int)transaction.getInputs().get(i).getOutpoint().getIndex();
+                fee += input.getNonWitnessUtxo().getOutputs().get(index).getValue();
+            } else if(input.getWitnessUtxo() != null) {
+                fee += input.getWitnessUtxo().getValue();
+            } else {
+                log.error("Cannot determine fee - not enough information provided on inputs");
+                return null;
+            }
+        }
+
+        for (int i = 0; i < transaction.getOutputs().size(); i++) {
+            TransactionOutput output = transaction.getOutputs().get(i);
+            fee -= output.getValue();
+        }
+
+        return fee;
     }
 
     public byte[] serialize() throws IOException {
@@ -503,7 +533,7 @@ public class PSBT {
     }
 
     public static void main(String[] args) throws Exception {
-        String psbtBase64 = "cHNidP8BAHUCAAAAASaBcTce3/KF6Tet7qSze3gADAVmy7OtZGQXE8pCFxv2AAAAAAD+////AtPf9QUAAAAAGXapFNDFmQPFusKGh2DpD9UhpGZap2UgiKwA4fUFAAAAABepFDVF5uM7gyxHBQ8k0+65PJwDlIvHh7MuEwAAAQD9pQEBAAAAAAECiaPHHqtNIOA3G7ukzGmPopXJRjr6Ljl/hTPMti+VZ+UBAAAAFxYAFL4Y0VKpsBIDna89p95PUzSe7LmF/////4b4qkOnHf8USIk6UwpyN+9rRgi7st0tAXHmOuxqSJC0AQAAABcWABT+Pp7xp0XpdNkCxDVZQ6vLNL1TU/////8CAMLrCwAAAAAZdqkUhc/xCX/Z4Ai7NK9wnGIZeziXikiIrHL++E4sAAAAF6kUM5cluiHv1irHU6m80GfWx6ajnQWHAkcwRAIgJxK+IuAnDzlPVoMR3HyppolwuAJf3TskAinwf4pfOiQCIAGLONfc0xTnNMkna9b7QPZzMlvEuqFEyADS8vAtsnZcASED0uFWdJQbrUqZY3LLh+GFbTZSYG2YVi/jnF6efkE/IQUCSDBFAiEA0SuFLYXc2WHS9fSrZgZU327tzHlMDDPOXMMJ/7X85Y0CIGczio4OFyXBl/saiK9Z9R5E5CVbIBZ8hoQDHAXR8lkqASECI7cr7vCWXRC+B3jv7NYfysb3mk6haTkzgHNEZPhPKrMAAAAAAAAA";
+        String psbtBase64 = "cHNidP8BAJoCAAAAAljoeiG1ba8MI76OcHBFbDNvfLqlyHV5JPVFiHuyq911AAAAAAD/////g40EJ9DsZQpoqka7CwmK6kQiwHGyyng1Kgd5WdB86h0BAAAAAP////8CcKrwCAAAAAAWABTYXCtx0AYLCcmIauuBXlCZHdoSTQDh9QUAAAAAFgAUAK6pouXw+HaliN9VRuh0LR2HAI8AAAAAAAEAuwIAAAABqtc5MQGL0l+ErkALaISL4J23BurCrBgpi6vucatlb4sAAAAASEcwRAIgWPb8fGoz4bMVSNSByCbAFb0wE1qtQs1neQ2rZtKtJDsCIEoc7SYExnNbY5PltBaR3XiwDwxZQvufdRhW+qk4FX26Af7///8CgPD6AgAAAAAXqRQPuUY0IWlrgsgzryQceMF9295JNIfQ8gonAQAAABepFCnKdPigj4GZlCgYXJe12FLkBj9hh2UAAAABBEdSIQKVg785rgpgl0etGZrd1jT6YQhVnWxc05tMIYPxq5bgfyEC2rYf9JoU22p9ArDNH7t4/EsYMStbTlTa5Nui+/71NtdSriIGApWDvzmuCmCXR60Zmt3WNPphCFWdbFzTm0whg/GrluB/ENkMak8AAACAAAAAgAAAAIAiBgLath/0mhTban0CsM0fu3j8SxgxK1tOVNrk26L7/vU21xDZDGpPAAAAgAAAAIABAACAAAEBIADC6wsAAAAAF6kUt/X69A49QKWkWbHbNTXyty+pIeiHAQQiACCMI1MXN0O1ld+0oHtyuo5C43l9p06H/n2ddJfjsgKJAwEFR1IhAwidwQx6xttU+RMpr2FzM9s4jOrQwjH3IzedG5kDCwLcIQI63ZBPPW3PWd25BrDe4jUpt/+57VDl6GFRkmhgIh8Oc1KuIgYCOt2QTz1tz1nduQaw3uI1Kbf/ue1Q5ehhUZJoYCIfDnMQ2QxqTwAAAIAAAACAAwAAgCIGAwidwQx6xttU+RMpr2FzM9s4jOrQwjH3IzedG5kDCwLcENkMak8AAACAAAAAgAIAAIAAIgIDqaTDf1mW06ol26xrVwrwZQOUSSlCRgs1R1Ptnuylh3EQ2QxqTwAAAIAAAACABAAAgAAiAgJ/Y5l1fS7/VaE2rQLGhLGDi2VW5fG2s0KCqUtrUAUQlhDZDGpPAAAAgAAAAIAFAACAAA==";
 
         PSBT psbt = null;
         String filename = "default.psbt";

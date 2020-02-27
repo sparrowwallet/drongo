@@ -39,13 +39,7 @@ public class Transaction extends TransactionPart {
             if (!hasWitnesses() && cachedWTxId != null) {
                 cachedTxId = cachedWTxId;
             } else {
-                ByteArrayOutputStream stream = new UnsafeByteArrayOutputStream(length < 32 ? 32 : length + 32);
-                try {
-                    bitcoinSerializeToStream(stream, false);
-                } catch (IOException e) {
-                    throw new RuntimeException(e); // cannot happen
-                }
-                cachedTxId = Sha256Hash.wrapReversed(Sha256Hash.hashTwice(stream.toByteArray()));
+                cachedTxId = calculateTxId(false);
             }
         }
         return cachedTxId;
@@ -56,16 +50,20 @@ public class Transaction extends TransactionPart {
             if (!hasWitnesses() && cachedTxId != null) {
                 cachedWTxId = cachedTxId;
             } else {
-                ByteArrayOutputStream baos = new ByteArrayOutputStream();
-                try {
-                    bitcoinSerializeToStream(baos, hasWitnesses());
-                } catch (IOException e) {
-                    throw new RuntimeException(e); // cannot happen
-                }
-                cachedWTxId = Sha256Hash.wrapReversed(Sha256Hash.hashTwice(baos.toByteArray()));
+                cachedWTxId = calculateTxId(true);
             }
         }
         return cachedWTxId;
+    }
+
+    public Sha256Hash calculateTxId(boolean useWitnesses) {
+        ByteArrayOutputStream stream = new UnsafeByteArrayOutputStream(length < 32 ? 32 : length + 32);
+        try {
+            bitcoinSerializeToStream(stream, useWitnesses);
+        } catch (IOException e) {
+            throw new RuntimeException(e); // cannot happen
+        }
+        return Sha256Hash.wrapReversed(Sha256Hash.hashTwice(stream.toByteArray()));
     }
 
     public boolean hasWitnesses() {

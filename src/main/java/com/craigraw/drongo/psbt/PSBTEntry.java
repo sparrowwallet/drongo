@@ -48,7 +48,16 @@ public class PSBTEntry {
     }
 
     public static KeyDerivation parseKeyDerivation(byte[] data) {
+        if(data.length < 4) {
+            throw new IllegalStateException("Invalid master fingerprint specified: not enough bytes");
+        }
         String masterFingerprint = getMasterFingerprint(Arrays.copyOfRange(data, 0, 4));
+        if(masterFingerprint.length() != 8) {
+            throw new IllegalStateException("Invalid master fingerprint specified: " + masterFingerprint);
+        }
+        if(data.length < 8) {
+            throw new IllegalStateException("Invalid key derivation specified: not enough bytes");
+        }
         List<ChildNumber> bip32pathList = readBIP32Derivation(Arrays.copyOfRange(data, 4, data.length));
         String bip32path = KeyDerivation.writePath(bip32pathList);
         return new KeyDerivation(masterFingerprint, bip32path);

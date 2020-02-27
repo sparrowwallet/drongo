@@ -14,6 +14,7 @@ public class ExtendedPublicKey {
     private static final int bip32HeaderP2PKHYPub = 0x049D7CB2; //The 4 byte header that serializes in base58 to "ypub".
     private static final int bip32HeaderP2WPKHZPub = 0x04B24746; // The 4 byte header that serializes in base58 to "zpub"
     private static final int bip32HeaderP2WHSHPub = 0x2AA7ED3; // The 4 byte header that serializes in base58 to "Zpub"
+    private static final int bip32HeaderTestnetPub = 0x43587CF; // The 4 byte header that serializes in base58 to "tpub"
 
     private KeyDerivation keyDerivation;
     private byte[] parentFingerprint;
@@ -142,7 +143,7 @@ public class ExtendedPublicKey {
         byte[] serializedKey = Base58.decodeChecked(extPubKey);
         ByteBuffer buffer = ByteBuffer.wrap(serializedKey);
         int header = buffer.getInt();
-        if(!(header == bip32HeaderP2PKHXPub || header == bip32HeaderP2PKHYPub || header == bip32HeaderP2WPKHZPub || header == bip32HeaderP2WHSHPub)) {
+        if(!(header == bip32HeaderP2PKHXPub || header == bip32HeaderP2PKHYPub || header == bip32HeaderP2WPKHZPub || header == bip32HeaderP2WHSHPub || header == bip32HeaderTestnetPub)) {
             throw new IllegalArgumentException("Unknown header bytes: " + DeterministicKey.toBase58(serializedKey).substring(0, 4));
         }
 

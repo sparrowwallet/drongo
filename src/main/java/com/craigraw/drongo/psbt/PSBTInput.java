@@ -4,10 +4,7 @@ import com.craigraw.drongo.KeyDerivation;
 import com.craigraw.drongo.Utils;
 import com.craigraw.drongo.crypto.ECKey;
 import com.craigraw.drongo.crypto.LazyECPoint;
-import com.craigraw.drongo.protocol.Script;
-import com.craigraw.drongo.protocol.Transaction;
-import com.craigraw.drongo.protocol.TransactionInput;
-import com.craigraw.drongo.protocol.TransactionOutput;
+import com.craigraw.drongo.protocol.*;
 import org.bouncycastle.util.encoders.Hex;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -47,12 +44,21 @@ public class PSBTInput {
 
     private static final Logger log = LoggerFactory.getLogger(PSBTInput.class);
 
-    PSBTInput(List<PSBTEntry> inputEntries) {
+    PSBTInput(List<PSBTEntry> inputEntries, Transaction transaction, int index) {
         for(PSBTEntry entry : inputEntries) {
             switch(entry.getKeyType()) {
                 case PSBT_IN_NON_WITNESS_UTXO:
                     entry.checkOneByteKey();
+                    if(witnessUtxo != null) {
+                        throw new IllegalStateException("Cannot have both witness and non-witness utxos in PSBT input");
+                    }
                     Transaction nonWitnessTx = new Transaction(entry.getData());
+                    Sha256Hash inputHash = nonWitnessTx.calculateTxId(false);
+                    Sha256Hash outpointHash = transaction.getInputs().get(index).getOutpoint().getHash();
+                    if(!outpointHash.equals(inputHash)) {
+                        throw new IllegalStateException("Hash of provided non witness utxo transaction " + inputHash + " does not match transaction input outpoint hash " + outpointHash + " at index " + index);
+                    }
+
                     this.nonWitnessUtxo = nonWitnessTx;
                     log.debug("Found input non witness utxo with txid: " + nonWitnessTx.getTxId() + " version " + nonWitnessTx.getVersion() + " size " + nonWitnessTx.getMessageSize() + " locktime " + nonWitnessTx.getLockTime());
                     for(TransactionInput input: nonWitnessTx.getInputs()) {
@@ -64,13 +70,20 @@ public class PSBTInput {
                     break;
                 case PSBT_IN_WITNESS_UTXO:
                     entry.checkOneByteKey();
+                    if(nonWitnessUtxo != null) {
+                        throw new IllegalStateException("Cannot have both witness and non-witness utxos in PSBT input");
+                    }
                     TransactionOutput witnessTxOutput = new TransactionOutput(null, entry.getData(), 0);
+                    if(!ScriptPattern.isP2SH(witnessTxOutput.getScript()) && !ScriptPattern.isP2WPKH(witnessTxOutput.getScript()) && !ScriptPattern.isP2WSH(witnessTxOutput.getScript())) {
+                        throw new IllegalStateException("Witness UTXO provided for non-witness or unknown input");
+                    }
                     this.witnessUtxo = witnessTxOutput;
                     log.debug("Found input witness utxo amount " + witnessTxOutput.getValue() + " script hex " + Hex.toHexString(witnessTxOutput.getScript().getProgram()) + " script " + witnessTxOutput.getScript() + " addresses " + Arrays.asList(witnessTxOutput.getScript().getToAddresses()));
                     break;
                 case PSBT_IN_PARTIAL_SIG:
                     entry.checkOneBytePlusPubKey();
                     LazyECPoint sigPublicKey = new LazyECPoint(ECKey.CURVE.getCurve(), entry.getKeyData());
+                    //TODO: Verify signature
                     this.partialSignatures.put(sigPublicKey, entry.getData());
                     log.debug("Found input partial signature with public key " + sigPublicKey + " signature " + Hex.toHexString(entry.getData()));
                     break;
@@ -84,12 +97,39 @@ public class PSBTInput {
                 case PSBT_IN_REDEEM_SCRIPT:
                     entry.checkOneByteKey();
                     Script redeemScript = new Script(entry.getData());
+                    Script scriptPubKey = null;
+                    if(this.nonWitnessUtxo != null) {
+                        scriptPubKey = this.nonWitnessUtxo.getOutputs().get((int)transaction.getInputs().get(index).getOutpoint().getIndex()).getScript();
+                    } else if(this.witnessUtxo != null) {
+                        scriptPubKey = this.witnessUtxo.getScript();
+                        if(!ScriptPattern.isP2WPKH(redeemScript) && !ScriptPattern.isP2WSH(redeemScript)) { //Witness UTXO should only be provided for P2SH-P2WPKH or P2SH-P2WSH
+                            throw new IllegalStateException("Witness UTXO provided but redeem script is not P2WPKH or P2WSH");
+                        }
+                    }
+                    if(scriptPubKey == null || !ScriptPattern.isP2SH(scriptPubKey)) {
+                        throw new IllegalStateException("PSBT provided a redeem script for a transaction output that does not need one");
+                    }
+                    if(!Arrays.equals(Utils.sha256hash160(redeemScript.getProgram()), scriptPubKey.getPubKeyHash())) {
+                        throw new IllegalStateException("Redeem script hash does not match transaction output script pubkey hash " + Hex.toHexString(scriptPubKey.getPubKeyHash()));
+                    }
+
                     this.redeemScript = redeemScript;
                     log.debug("Found input redeem script hex " + Hex.toHexString(redeemScript.getProgram()) + " script " + redeemScript);
                     break;
                 case PSBT_IN_WITNESS_SCRIPT:
                     entry.checkOneByteKey();
                     Script witnessScript = new Script(entry.getData());
+                    byte[] pubKeyHash = null;
+                    if(this.redeemScript != null && ScriptPattern.isP2WSH(this.redeemScript)) { //P2SH-P2WSH
+                        pubKeyHash = this.redeemScript.getPubKeyHash();
+                    } else if(this.witnessUtxo != null && ScriptPattern.isP2WSH(this.witnessUtxo.getScript())) { //P2WSH
+                        pubKeyHash = this.witnessUtxo.getScript().getPubKeyHash();
+                    }
+                    if(pubKeyHash == null) {
+                        throw new IllegalStateException("Witness script provided without P2WSH witness utxo or P2SH redeem script");
+                    } else if(!Arrays.equals(Sha256Hash.hash(witnessScript.getProgram()), pubKeyHash)) {
+                        throw new IllegalStateException("Witness script hash does not match provided pay to script hash " + Hex.toHexString(pubKeyHash));
+                    }
                     this.witnessScript = witnessScript;
                     log.debug("Found input witness script hex " + Hex.toHexString(witnessScript.getProgram()) + " script " + witnessScript);
                     break;
@@ -123,7 +163,7 @@ public class PSBTInput {
                     log.debug("Found proprietary input " + Hex.toHexString(entry.getKeyData()) + ": " + Hex.toHexString(entry.getData()));
                     break;
                 default:
-                    throw new IllegalStateException("PSBT input not recognized key type: " + entry.getKeyType());
+                    log.warn("PSBT input not recognized key type: " + entry.getKeyType());
             }
         }
     }
