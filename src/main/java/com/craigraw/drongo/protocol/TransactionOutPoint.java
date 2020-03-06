@@ -1,6 +1,11 @@
 package com.craigraw.drongo.protocol;
 
+import com.craigraw.drongo.Utils;
 import com.craigraw.drongo.address.Address;
+
+import java.io.IOException;
+import java.io.OutputStream;
+import java.util.Objects;
 
 public class TransactionOutPoint extends TransactionPart {
 
@@ -38,5 +43,24 @@ public class TransactionOutPoint extends TransactionPart {
 
     public void setAddresses(Address[] addresses) {
         this.addresses = addresses;
+    }
+
+    @Override
+    protected void bitcoinSerializeToStream(OutputStream stream) throws IOException {
+        stream.write(hash.getReversedBytes());
+        Utils.uint32ToByteStreamLE(index, stream);
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        TransactionOutPoint other = (TransactionOutPoint) o;
+        return getIndex() == other.getIndex() && getHash().equals(other.getHash());
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(getIndex(), getHash());
     }
 }

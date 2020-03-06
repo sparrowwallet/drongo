@@ -103,17 +103,31 @@ public abstract class TransactionPart {
         return Sha256Hash.wrapReversed(readBytes(32));
     }
 
-    public final void bitcoinSerialize(OutputStream stream) throws IOException {
-        // 1st check for cached bytes.
-        if (rawtx != null && length != UNKNOWN_LENGTH) {
-            stream.write(rawtx, offset, length);
-            return;
-        }
-
-        bitcoinSerializeToStream(stream);
-    }
-
     protected void bitcoinSerializeToStream(OutputStream stream) throws IOException {
         log.error("Error: {} class has not implemented bitcoinSerializeToStream method.  Generating message with no payload", getClass());
+    }
+
+    protected void adjustLength(int adjustment) {
+        adjustLength(0, adjustment);
+    }
+
+    protected void adjustLength(int newArraySize, int adjustment) {
+        if (length == UNKNOWN_LENGTH)
+            return;
+        // Our own length is now unknown if we have an unknown length adjustment.
+        if (adjustment == UNKNOWN_LENGTH) {
+            length = UNKNOWN_LENGTH;
+            return;
+        }
+        length += adjustment;
+        // Check if we will need more bytes to encode the length prefix.
+        if (newArraySize == 1)
+            length++;  // The assumption here is we never call adjustLength with the same arraySize as before.
+        else if (newArraySize != 0)
+            length += VarInt.sizeOf(newArraySize) - VarInt.sizeOf(newArraySize - 1);
+
+        if (parent != null) {
+            parent.adjustLength(newArraySize, adjustment);
+        }
     }
 }

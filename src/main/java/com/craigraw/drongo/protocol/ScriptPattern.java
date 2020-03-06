@@ -1,6 +1,5 @@
 package com.craigraw.drongo.protocol;
 
-import com.craigraw.drongo.Utils;
 import com.craigraw.drongo.address.Address;
 import com.craigraw.drongo.address.P2PKAddress;
 

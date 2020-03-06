@@ -3,6 +3,9 @@ package com.craigraw.drongo.psbt;
 import com.craigraw.drongo.ExtendedPublicKey;
 import com.craigraw.drongo.KeyDerivation;
 import com.craigraw.drongo.Utils;
+import com.craigraw.drongo.address.Address;
+import com.craigraw.drongo.address.P2PKHAddress;
+import com.craigraw.drongo.crypto.ECKey;
 import com.craigraw.drongo.protocol.*;
 import org.bouncycastle.util.encoders.Base64;
 import org.bouncycastle.util.encoders.Hex;
@@ -198,14 +201,15 @@ public class PSBT {
                 case PSBT_GLOBAL_UNSIGNED_TX:
                     entry.checkOneByteKey();
                     Transaction transaction = new Transaction(entry.getData());
+                    transaction.verify();
                     inputs = transaction.getInputs().size();
                     outputs = transaction.getOutputs().size();
                     log.debug("Transaction with txid: " + transaction.getTxId() + " version " + transaction.getVersion() + " size " + transaction.getMessageSize() + " locktime " + transaction.getLockTime());
                     for(TransactionInput input: transaction.getInputs()) {
-                        if(input.getScript().getProgram().length != 0) {
+                        if(input.getScriptSig().getProgram().length != 0) {
                             throw new IllegalStateException("Unsigned tx input does not have empty scriptSig");
                         }
-                        log.debug(" Transaction input references txid: " + input.getOutpoint().getHash() + " vout " + input.getOutpoint().getIndex() + " with script " + input.getScript());
+                        log.debug(" Transaction input references txid: " + input.getOutpoint().getHash() + " vout " + input.getOutpoint().getIndex() + " with script " + input.getScriptSig());
                     }
                     for(TransactionOutput output: transaction.getOutputs()) {
                         try {
@@ -246,9 +250,62 @@ public class PSBT {
                 throw new IllegalStateException("Found duplicate key for PSBT input: " + Hex.toHexString(duplicate.getKey()));
             }
 
-            PSBTInput input = new PSBTInput(inputEntries, transaction, this.psbtInputs.size());
+            int inputIndex = this.psbtInputs.size();
+            PSBTInput input = new PSBTInput(inputEntries, transaction, inputIndex);
+
+            boolean verified = verifySignatures(input, inputIndex);
+            if(verified) {
+                log.debug("Verified signatures on input #" + inputIndex);
+            }
+
             this.psbtInputs.add(input);
         }
+    }
+
+    private boolean verifySignatures(PSBTInput input, int index) {
+        if(input.getSigHash() != null && (input.getNonWitnessUtxo() != null || input.getWitnessUtxo() != null)) {
+            int vout = (int)transaction.getInputs().get(index).getOutpoint().getIndex();
+            Script inputScript = input.getNonWitnessUtxo() != null ? input.getNonWitnessUtxo().getOutputs().get(vout).getScript() : input.getWitnessUtxo().getScript();
+
+            Script connectedScript = inputScript;
+            if(ScriptPattern.isP2SH(connectedScript)) {
+                if(input.getRedeemScript() == null) {
+                    return false;
+                } else {
+                    connectedScript = input.getRedeemScript();
+                }
+            }
+
+            if(ScriptPattern.isP2WPKH(connectedScript)) {
+                Address address = new P2PKHAddress(connectedScript.getPubKeyHash());
+                connectedScript = address.getOutputScript();
+            } else if(ScriptPattern.isP2WSH(connectedScript)) {
+                if(input.getWitnessScript() == null) {
+                    return false;
+                } else {
+                    connectedScript = input.getWitnessScript();
+                }
+            }
+
+            Sha256Hash hash = null;
+            if(input.getNonWitnessUtxo() != null) {
+                hash = transaction.hashForSignature(index, connectedScript, input.getSigHash(), false);
+            } else {
+                long prevValue = input.getWitnessUtxo().getValue();
+                hash = transaction.hashForWitnessSignature(index, connectedScript, prevValue, input.getSigHash(), false);
+            }
+
+            for(ECKey sigPublicKey : input.getPartialSignatures().keySet()) {
+                TransactionSignature signature = input.getPartialSignature(sigPublicKey);
+                if(!sigPublicKey.verify(hash, signature)) {
+                    throw new IllegalStateException("Partial signature does not verify against provided public key");
+                }
+            }
+
+            return true;
+        }
+
+        return false;
     }
 
     private void parseOutputEntries(List<List<PSBTEntry>> outputEntryLists) {
@@ -300,7 +357,7 @@ public class PSBT {
 
     public byte[] serialize() throws IOException {
         ByteArrayOutputStream transactionbaos = new ByteArrayOutputStream();
-        transaction.bitcoinSerialize(transactionbaos);
+        transaction.bitcoinSerializeToStream(transactionbaos);
         byte[] serialized = transactionbaos.toByteArray();
         byte[] txLen = PSBT.writeCompactInt(serialized.length);
 
@@ -533,7 +590,7 @@ public class PSBT {
     }
 
     public static void main(String[] args) throws Exception {
-        String psbtBase64 = "cHNidP8BAJoCAAAAAljoeiG1ba8MI76OcHBFbDNvfLqlyHV5JPVFiHuyq911AAAAAAD/////g40EJ9DsZQpoqka7CwmK6kQiwHGyyng1Kgd5WdB86h0BAAAAAP////8CcKrwCAAAAAAWABTYXCtx0AYLCcmIauuBXlCZHdoSTQDh9QUAAAAAFgAUAK6pouXw+HaliN9VRuh0LR2HAI8AAAAAAAEAuwIAAAABqtc5MQGL0l+ErkALaISL4J23BurCrBgpi6vucatlb4sAAAAASEcwRAIgWPb8fGoz4bMVSNSByCbAFb0wE1qtQs1neQ2rZtKtJDsCIEoc7SYExnNbY5PltBaR3XiwDwxZQvufdRhW+qk4FX26Af7///8CgPD6AgAAAAAXqRQPuUY0IWlrgsgzryQceMF9295JNIfQ8gonAQAAABepFCnKdPigj4GZlCgYXJe12FLkBj9hh2UAAAABBEdSIQKVg785rgpgl0etGZrd1jT6YQhVnWxc05tMIYPxq5bgfyEC2rYf9JoU22p9ArDNH7t4/EsYMStbTlTa5Nui+/71NtdSriIGApWDvzmuCmCXR60Zmt3WNPphCFWdbFzTm0whg/GrluB/ENkMak8AAACAAAAAgAAAAIAiBgLath/0mhTban0CsM0fu3j8SxgxK1tOVNrk26L7/vU21xDZDGpPAAAAgAAAAIABAACAAAEBIADC6wsAAAAAF6kUt/X69A49QKWkWbHbNTXyty+pIeiHAQQiACCMI1MXN0O1ld+0oHtyuo5C43l9p06H/n2ddJfjsgKJAwEFR1IhAwidwQx6xttU+RMpr2FzM9s4jOrQwjH3IzedG5kDCwLcIQI63ZBPPW3PWd25BrDe4jUpt/+57VDl6GFRkmhgIh8Oc1KuIgYCOt2QTz1tz1nduQaw3uI1Kbf/ue1Q5ehhUZJoYCIfDnMQ2QxqTwAAAIAAAACAAwAAgCIGAwidwQx6xttU+RMpr2FzM9s4jOrQwjH3IzedG5kDCwLcENkMak8AAACAAAAAgAIAAIAAIgIDqaTDf1mW06ol26xrVwrwZQOUSSlCRgs1R1Ptnuylh3EQ2QxqTwAAAIAAAACABAAAgAAiAgJ/Y5l1fS7/VaE2rQLGhLGDi2VW5fG2s0KCqUtrUAUQlhDZDGpPAAAAgAAAAIAFAACAAA==";
+        String psbtBase64 = "cHNidP8BAJoCAAAAAljoeiG1ba8MI76OcHBFbDNvfLqlyHV5JPVFiHuyq911AAAAAAD/////g40EJ9DsZQpoqka7CwmK6kQiwHGyyng1Kgd5WdB86h0BAAAAAP////8CcKrwCAAAAAAWABTYXCtx0AYLCcmIauuBXlCZHdoSTQDh9QUAAAAAFgAUAK6pouXw+HaliN9VRuh0LR2HAI8AAAAAAAEAuwIAAAABqtc5MQGL0l+ErkALaISL4J23BurCrBgpi6vucatlb4sAAAAASEcwRAIgWPb8fGoz4bMVSNSByCbAFb0wE1qtQs1neQ2rZtKtJDsCIEoc7SYExnNbY5PltBaR3XiwDwxZQvufdRhW+qk4FX26Af7///8CgPD6AgAAAAAXqRQPuUY0IWlrgsgzryQceMF9295JNIfQ8gonAQAAABepFCnKdPigj4GZlCgYXJe12FLkBj9hh2UAAAAiAgLath/0mhTban0CsM0fu3j8SxgxK1tOVNrk26L7/vU210gwRQIhAPYQOLMI3B2oZaNIUnRvAVdyk0IIxtJEVDk82ZvfIhd3AiAFbmdaZ1ptCgK4WxTl4pB02KJam1dgvqKBb2YZEKAG6gEBAwQBAAAAAQRHUiEClYO/Oa4KYJdHrRma3dY0+mEIVZ1sXNObTCGD8auW4H8hAtq2H/SaFNtqfQKwzR+7ePxLGDErW05U2uTbovv+9TbXUq4iBgKVg785rgpgl0etGZrd1jT6YQhVnWxc05tMIYPxq5bgfxDZDGpPAAAAgAAAAIAAAACAIgYC2rYf9JoU22p9ArDNH7t4/EsYMStbTlTa5Nui+/71NtcQ2QxqTwAAAIAAAACAAQAAgAABASAAwusLAAAAABepFLf1+vQOPUClpFmx2zU18rcvqSHohyICAjrdkE89bc9Z3bkGsN7iNSm3/7ntUOXoYVGSaGAiHw5zRzBEAiBl9FulmYtZon/+GnvtAWrx8fkNVLOqj3RQql9WolEDvQIgf3JHA60e25ZoCyhLVtT/y4j3+3Weq74IqjDym4UTg9IBAQMEAQAAAAEEIgAgjCNTFzdDtZXftKB7crqOQuN5fadOh/59nXSX47ICiQMBBUdSIQMIncEMesbbVPkTKa9hczPbOIzq0MIx9yM3nRuZAwsC3CECOt2QTz1tz1nduQaw3uI1Kbf/ue1Q5ehhUZJoYCIfDnNSriIGAjrdkE89bc9Z3bkGsN7iNSm3/7ntUOXoYVGSaGAiHw5zENkMak8AAACAAAAAgAMAAIAiBgMIncEMesbbVPkTKa9hczPbOIzq0MIx9yM3nRuZAwsC3BDZDGpPAAAAgAAAAIACAACAACICA6mkw39ZltOqJdusa1cK8GUDlEkpQkYLNUdT7Z7spYdxENkMak8AAACAAAAAgAQAAIAAIgICf2OZdX0u/1WhNq0CxoSxg4tlVuXxtrNCgqlLa1AFEJYQ2QxqTwAAAIAAAACABQAAgAA=";
 
         PSBT psbt = null;
         String filename = "default.psbt";

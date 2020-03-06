@@ -11,6 +11,7 @@ import org.bouncycastle.crypto.params.KeyParameter;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -173,6 +174,20 @@ public class Utils {
         stream.write((int) (0xFF & (val >> 40)));
         stream.write((int) (0xFF & (val >> 48)));
         stream.write((int) (0xFF & (val >> 56)));
+    }
+
+    /** Write 8 bytes to the output stream as unsigned 64-bit integer in little endian format. */
+    public static void uint64ToByteStreamLE(BigInteger val, OutputStream stream) throws IOException {
+        byte[] bytes = val.toByteArray();
+        if (bytes.length > 8) {
+            throw new RuntimeException("Input too large to encode into a uint64");
+        }
+        bytes = reverseBytes(bytes);
+        stream.write(bytes);
+        if (bytes.length < 8) {
+            for (int i = 0; i < 8 - bytes.length; i++)
+                stream.write(0);
+        }
     }
 
     /**

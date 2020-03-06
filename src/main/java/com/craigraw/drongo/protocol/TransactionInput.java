@@ -14,7 +14,7 @@ public class TransactionInput extends TransactionPart {
 
     private byte[] scriptBytes;
 
-    private Script script;
+    private Script scriptSig;
 
     private TransactionWitness witness;
 
@@ -36,12 +36,26 @@ public class TransactionInput extends TransactionPart {
         return scriptBytes;
     }
 
-    public Script getScript() {
-        if(script == null) {
-            script = new Script(scriptBytes);
+    public Script getScriptSig() {
+        if(scriptSig == null) {
+            scriptSig = new Script(scriptBytes);
         }
 
-        return script;
+        return scriptSig;
+    }
+
+    void setScriptBytes(byte[] scriptBytes) {
+        super.rawtx = null;
+        this.scriptSig = null;
+        int oldLength = length;
+        this.scriptBytes = scriptBytes;
+        // 40 = previous_outpoint (36) + sequence (4)
+        int newLength = 40 + (scriptBytes == null ? 1 : VarInt.sizeOf(scriptBytes.length) + scriptBytes.length);
+        adjustLength(newLength - oldLength);
+    }
+
+    public void clearScriptBytes() {
+        setScriptBytes(new byte[0]);
     }
 
     public TransactionWitness getWitness() {
@@ -77,7 +91,7 @@ public class TransactionInput extends TransactionPart {
     }
 
     protected void bitcoinSerializeToStream(OutputStream stream) throws IOException {
-        outpoint.bitcoinSerialize(stream);
+        outpoint.bitcoinSerializeToStream(stream);
         stream.write(new VarInt(scriptBytes.length).encode());
         stream.write(scriptBytes);
         Utils.uint32ToByteStreamLE(sequence, stream);

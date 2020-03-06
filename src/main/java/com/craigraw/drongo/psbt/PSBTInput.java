@@ -32,11 +32,11 @@ public class PSBTInput {
 
     private Transaction nonWitnessUtxo;
     private TransactionOutput witnessUtxo;
-    private Map<LazyECPoint, byte[]> partialSignatures = new LinkedHashMap<>();
+    private Map<ECKey, TransactionSignature> partialSignatures = new LinkedHashMap<>();
     private Transaction.SigHash sigHash;
     private Script redeemScript;
     private Script witnessScript;
-    private Map<LazyECPoint, KeyDerivation> derivedPublicKeys = new LinkedHashMap<>();
+    private Map<ECKey, KeyDerivation> derivedPublicKeys = new LinkedHashMap<>();
     private Script finalScriptSig;
     private Script finalScriptWitness;
     private String porCommitment;
@@ -53,6 +53,7 @@ public class PSBTInput {
                         throw new IllegalStateException("Cannot have both witness and non-witness utxos in PSBT input");
                     }
                     Transaction nonWitnessTx = new Transaction(entry.getData());
+                    nonWitnessTx.verify();
                     Sha256Hash inputHash = nonWitnessTx.calculateTxId(false);
                     Sha256Hash outpointHash = transaction.getInputs().get(index).getOutpoint().getHash();
                     if(!outpointHash.equals(inputHash)) {
@@ -62,7 +63,7 @@ public class PSBTInput {
                     this.nonWitnessUtxo = nonWitnessTx;
                     log.debug("Found input non witness utxo with txid: " + nonWitnessTx.getTxId() + " version " + nonWitnessTx.getVersion() + " size " + nonWitnessTx.getMessageSize() + " locktime " + nonWitnessTx.getLockTime());
                     for(TransactionInput input: nonWitnessTx.getInputs()) {
-                        log.debug(" Transaction input references txid: " + input.getOutpoint().getHash() + " vout " + input.getOutpoint().getIndex() + " with script " + input.getScript());
+                        log.debug(" Transaction input references txid: " + input.getOutpoint().getHash() + " vout " + input.getOutpoint().getIndex() + " with script " + input.getScriptSig());
                     }
                     for(TransactionOutput output: nonWitnessTx.getOutputs()) {
                         log.debug(" Transaction output value: " + output.getValue() + " to addresses " + Arrays.asList(output.getScript().getToAddresses()) + " with script hex " + Hex.toHexString(output.getScript().getProgram()) + " to script " + output.getScript());
@@ -82,9 +83,10 @@ public class PSBTInput {
                     break;
                 case PSBT_IN_PARTIAL_SIG:
                     entry.checkOneBytePlusPubKey();
-                    LazyECPoint sigPublicKey = new LazyECPoint(ECKey.CURVE.getCurve(), entry.getKeyData());
+                    ECKey sigPublicKey = ECKey.fromPublicOnly(entry.getKeyData());
                     //TODO: Verify signature
-                    this.partialSignatures.put(sigPublicKey, entry.getData());
+                    TransactionSignature signature = TransactionSignature.decodeFromBitcoin(entry.getData(), true, false);
+                    this.partialSignatures.put(sigPublicKey, signature);
                     log.debug("Found input partial signature with public key " + sigPublicKey + " signature " + Hex.toHexString(entry.getData()));
                     break;
                 case PSBT_IN_SIGHASH_TYPE:
@@ -135,7 +137,7 @@ public class PSBTInput {
                     break;
                 case PSBT_IN_BIP32_DERIVATION:
                     entry.checkOneBytePlusPubKey();
-                    LazyECPoint derivedPublicKey = new LazyECPoint(ECKey.CURVE.getCurve(), entry.getKeyData());
+                    ECKey derivedPublicKey = ECKey.fromPublicOnly(entry.getKeyData());
                     KeyDerivation keyDerivation = parseKeyDerivation(entry.getData());
                     this.derivedPublicKeys.put(derivedPublicKey, keyDerivation);
                     log.debug("Found input bip32_derivation with master fingerprint " + keyDerivation.getMasterFingerprint() + " at path " + keyDerivation.getDerivationPath() + " public key " + derivedPublicKey);
@@ -176,7 +178,7 @@ public class PSBTInput {
         return witnessUtxo;
     }
 
-    public byte[] getPartialSignature(LazyECPoint publicKey) {
+    public TransactionSignature getPartialSignature(ECKey publicKey) {
         return partialSignatures.get(publicKey);
     }
 
@@ -208,11 +210,11 @@ public class PSBTInput {
         return porCommitment;
     }
 
-    public Map<LazyECPoint, byte[]> getPartialSignatures() {
+    public Map<ECKey, TransactionSignature> getPartialSignatures() {
         return partialSignatures;
     }
 
-    public Map<LazyECPoint, KeyDerivation> getDerivedPublicKeys() {
+    public Map<ECKey, KeyDerivation> getDerivedPublicKeys() {
         return derivedPublicKeys;
     }
 

@@ -3,6 +3,7 @@ package com.craigraw.drongo.protocol;
 import com.craigraw.drongo.Utils;
 import com.craigraw.drongo.address.Address;
 
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 
@@ -16,18 +17,32 @@ public class TransactionOutput extends TransactionPart {
 
     private Script script;
 
-    private int scriptLen;
-
     private Address[] addresses = new Address[0];
 
-    public TransactionOutput(Transaction transaction, byte[] rawtx, int offset) {
+    public TransactionOutput(Transaction parent, byte[] rawtx, int offset) {
         super(rawtx, offset);
-        setParent(transaction);
+        setParent(parent);
+    }
+
+    public TransactionOutput(Transaction parent, long value, byte[] scriptBytes) {
+        super(new byte[0], 0);
+        this.value = value;
+        this.scriptBytes = scriptBytes;
+        setParent(parent);
+        length = 8 + VarInt.sizeOf(scriptBytes.length) + scriptBytes.length;
+
+        try {
+            ByteArrayOutputStream baos = new ByteArrayOutputStream();
+            bitcoinSerializeToStream(baos);
+            rawtx = baos.toByteArray();
+        } catch(IOException e) {
+            //ignore
+        }
     }
 
     protected void parse() throws ProtocolException {
         value = readInt64();
-        scriptLen = (int) readVarInt();
+        int scriptLen = (int) readVarInt();
         length = cursor - offset + scriptLen;
         scriptBytes = readBytes(scriptLen);
     }
