@@ -77,4 +77,9 @@ public class TransactionOutput extends TransactionPart {
     public void setAddresses(Address[] addresses) {
         this.addresses = addresses;
     }
+
+    public int getIndex() {
+        Transaction transaction = (Transaction)parent;
+        return transaction.getOutputs().indexOf(this);
+    }
 }

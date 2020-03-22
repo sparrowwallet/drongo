@@ -82,6 +82,11 @@ public class TransactionInput extends TransactionPart {
         this.sequence = sequence;
     }
 
+    public int getIndex() {
+        Transaction transaction = (Transaction)parent;
+        return transaction.getInputs().indexOf(this);
+    }
+
     /**
      * Coinbase transactions have special inputs with hashes of zero. If this is such an input, returns true.
      */
