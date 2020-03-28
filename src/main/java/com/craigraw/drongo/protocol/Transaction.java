@@ -24,6 +24,8 @@ public class Transaction extends TransactionPart {
 
     private long version;
     private long lockTime;
+    private boolean segwit;
+    private int segwitVersion;
 
     private Sha256Hash cachedTxId;
     private Sha256Hash cachedWTxId;
@@ -39,8 +41,16 @@ public class Transaction extends TransactionPart {
         return version;
     }
 
+    public void setVersion(long version) {
+        this.version = version;
+    }
+
     public long getLockTime() {
         return lockTime;
+    }
+
+    public void setLockTime(long lockTime) {
+        this.lockTime = lockTime;
     }
 
     public Sha256Hash getTxId() {
@@ -75,6 +85,18 @@ public class Transaction extends TransactionPart {
         return Sha256Hash.wrapReversed(Sha256Hash.hashTwice(stream.toByteArray()));
     }
 
+    public boolean isSegwit() {
+        return segwit;
+    }
+
+    public int getSegwitVersion() {
+        return segwitVersion;
+    }
+
+    public void setSegwitVersion(int segwitVersion) {
+        this.segwitVersion = segwitVersion;
+    }
+
     public boolean hasWitnesses() {
         for (TransactionInput in : inputs)
             if (in.hasWitness())
@@ -83,7 +105,7 @@ public class Transaction extends TransactionPart {
     }
 
     public void bitcoinSerializeToStream(OutputStream stream) throws IOException {
-        boolean useSegwit = hasWitnesses();
+        boolean useSegwit = isSegwit();
         bitcoinSerializeToStream(stream, useSegwit);
     }
 
@@ -98,7 +120,7 @@ public class Transaction extends TransactionPart {
         // marker, flag
         if (useSegwit) {
             stream.write(0);
-            stream.write(1);
+            stream.write(segwitVersion);
         }
         // txin_count, txins
         stream.write(new VarInt(inputs.size()).encode());
@@ -108,7 +130,7 @@ public class Transaction extends TransactionPart {
         stream.write(new VarInt(outputs.size()).encode());
         for (TransactionOutput out : outputs)
             out.bitcoinSerializeToStream(stream);
-        // script_witnisses
+        // script_witnesses
         if (useSegwit) {
             for (TransactionInput in : inputs) {
                 in.getWitness().bitcoinSerializeToStream(stream);
@@ -128,17 +150,18 @@ public class Transaction extends TransactionPart {
         version = readUint32();
         // peek at marker
         byte marker = rawtx[cursor];
-        boolean useSegwit = marker == 0;
+        segwit = (marker == 0);
         // marker, flag
-        if (useSegwit) {
-            readBytes(2);
+        if (segwit) {
+            byte[] segwitHeader = readBytes(2);
+            segwitVersion = segwitHeader[1];
         }
         // txin_count, txins
         parseInputs();
         // txout_count, txouts
         parseOutputs();
         // script_witnesses
-        if (useSegwit)
+        if (segwit)
             parseWitnesses();
         // lock_time
         lockTime = readUint32();
@@ -180,6 +203,39 @@ public class Transaction extends TransactionPart {
                 witness.setPush(y, push);
             }
         }
+    }
+
+    public int getSize() {
+        return length;
+    }
+
+    public int getVirtualSize() {
+        int wu = 0;
+
+        // version
+        wu += 4*4;
+        // marker, flag
+        if(isSegwit()) {
+            wu += 2;
+        }
+        // txin_count, txins
+        wu += new VarInt(inputs.size()).getSizeInBytes() * 4;
+        for (TransactionInput in : inputs)
+            wu += in.length * 4;
+        // txout_count, txouts
+        wu += new VarInt(outputs.size()).getSizeInBytes() * 4;
+        for (TransactionOutput out : outputs)
+            wu += out.length * 4;
+        // script_witnesses
+        if(isSegwit()) {
+            for (TransactionInput in : inputs) {
+                wu += in.getWitness().getLength();
+            }
+        }
+        // lock_time
+        wu += 4*4;
+
+        return (int)Math.ceil((double)wu / 4.0);
     }
 
     public List<TransactionInput> getInputs() {

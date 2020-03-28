@@ -29,6 +29,17 @@ public class TransactionWitness {
         return pushes.size();
     }
 
+    public int getLength() {
+        int length = new VarInt(pushes.size()).getSizeInBytes();
+        for (int i = 0; i < pushes.size(); i++) {
+            byte[] push = pushes.get(i);
+            length += new VarInt(push.length).getSizeInBytes();
+            length += push.length;
+        }
+
+        return length;
+    }
+
     protected void bitcoinSerializeToStream(OutputStream stream) throws IOException {
         stream.write(new VarInt(pushes.size()).encode());
         for (int i = 0; i < pushes.size(); i++) {

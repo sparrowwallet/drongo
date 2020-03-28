@@ -38,6 +38,14 @@ public abstract class TransactionPart {
         this.parent = parent;
     }
 
+    public int getOffset() {
+        return offset;
+    }
+
+    public int getLength() {
+        return length;
+    }
+
     /**
      * This returns a correct value by parsing the message.
      */
