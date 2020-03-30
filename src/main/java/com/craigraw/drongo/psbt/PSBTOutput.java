@@ -25,7 +25,7 @@ public class PSBTOutput {
 
     private static final Logger log = LoggerFactory.getLogger(PSBTOutput.class);
 
-    PSBTOutput(List<PSBTEntry> outputEntries) {
+    PSBTOutput(List<PSBTEntry> outputEntries) throws PSBTParseException {
         for(PSBTEntry entry : outputEntries) {
             switch (entry.getKeyType()) {
                 case PSBT_OUT_REDEEM_SCRIPT:

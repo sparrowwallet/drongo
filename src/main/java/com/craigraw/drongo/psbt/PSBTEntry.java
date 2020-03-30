@@ -47,16 +47,16 @@ public class PSBTEntry {
         this.data = data;
     }
 
-    public static KeyDerivation parseKeyDerivation(byte[] data) {
+    public static KeyDerivation parseKeyDerivation(byte[] data) throws PSBTParseException {
         if(data.length < 4) {
-            throw new IllegalStateException("Invalid master fingerprint specified: not enough bytes");
+            throw new PSBTParseException("Invalid master fingerprint specified: not enough bytes");
         }
         String masterFingerprint = getMasterFingerprint(Arrays.copyOfRange(data, 0, 4));
         if(masterFingerprint.length() != 8) {
-            throw new IllegalStateException("Invalid master fingerprint specified: " + masterFingerprint);
+            throw new PSBTParseException("Invalid master fingerprint specified: " + masterFingerprint);
         }
         if(data.length < 8) {
-            throw new IllegalStateException("Invalid key derivation specified: not enough bytes");
+            throw new PSBTParseException("Invalid key derivation specified: not enough bytes");
         }
         List<ChildNumber> bip32pathList = readBIP32Derivation(Arrays.copyOfRange(data, 4, data.length));
         String bip32path = KeyDerivation.writePath(bip32pathList);
@@ -91,21 +91,21 @@ public class PSBTEntry {
         }
     }
 
-    public void checkOneByteKey() {
+    public void checkOneByteKey() throws PSBTParseException {
         if(this.getKey().length != 1) {
-            throw new IllegalStateException("PSBT key type must be one byte");
+            throw new PSBTParseException("PSBT key type must be one byte");
         }
     }
 
-    public void checkOneBytePlusXpubKey() {
+    public void checkOneBytePlusXpubKey() throws PSBTParseException {
         if(this.getKey().length != 79) {
-            throw new IllegalStateException("PSBT key type must be one byte");
+            throw new PSBTParseException("PSBT key type must be one byte");
         }
     }
 
-    public void checkOneBytePlusPubKey() {
+    public void checkOneBytePlusPubKey() throws PSBTParseException {
         if(this.getKey().length != 34) {
-            throw new IllegalStateException("PSBT key type must be one byte");
+            throw new PSBTParseException("PSBT key type must be one byte");
         }
     }
 }

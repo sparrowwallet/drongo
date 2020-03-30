@@ -49,20 +49,20 @@ public class PSBTInput {
 
     private static final Logger log = LoggerFactory.getLogger(PSBTInput.class);
 
-    PSBTInput(List<PSBTEntry> inputEntries, Transaction transaction, int index) {
+    PSBTInput(List<PSBTEntry> inputEntries, Transaction transaction, int index) throws PSBTParseException {
         for(PSBTEntry entry : inputEntries) {
             switch(entry.getKeyType()) {
                 case PSBT_IN_NON_WITNESS_UTXO:
                     entry.checkOneByteKey();
                     if(witnessUtxo != null) {
-                        throw new IllegalStateException("Cannot have both witness and non-witness utxos in PSBT input");
+                        throw new PSBTParseException("Cannot have both witness and non-witness utxos in PSBT input");
                     }
                     Transaction nonWitnessTx = new Transaction(entry.getData());
                     nonWitnessTx.verify();
                     Sha256Hash inputHash = nonWitnessTx.calculateTxId(false);
                     Sha256Hash outpointHash = transaction.getInputs().get(index).getOutpoint().getHash();
                     if(!outpointHash.equals(inputHash)) {
-                        throw new IllegalStateException("Hash of provided non witness utxo transaction " + inputHash + " does not match transaction input outpoint hash " + outpointHash + " at index " + index);
+                        throw new PSBTParseException("Hash of provided non witness utxo transaction " + inputHash + " does not match transaction input outpoint hash " + outpointHash + " at index " + index);
                     }
 
                     this.nonWitnessUtxo = nonWitnessTx;
@@ -81,11 +81,11 @@ public class PSBTInput {
                 case PSBT_IN_WITNESS_UTXO:
                     entry.checkOneByteKey();
                     if(nonWitnessUtxo != null) {
-                        throw new IllegalStateException("Cannot have both witness and non-witness utxos in PSBT input");
+                        throw new PSBTParseException("Cannot have both witness and non-witness utxos in PSBT input");
                     }
                     TransactionOutput witnessTxOutput = new TransactionOutput(null, entry.getData(), 0);
                     if(!ScriptPattern.isP2SH(witnessTxOutput.getScript()) && !ScriptPattern.isP2WPKH(witnessTxOutput.getScript()) && !ScriptPattern.isP2WSH(witnessTxOutput.getScript())) {
-                        throw new IllegalStateException("Witness UTXO provided for non-witness or unknown input");
+                        throw new PSBTParseException("Witness UTXO provided for non-witness or unknown input");
                     }
                     this.witnessUtxo = witnessTxOutput;
                     try {
@@ -118,14 +118,14 @@ public class PSBTInput {
                     } else if(this.witnessUtxo != null) {
                         scriptPubKey = this.witnessUtxo.getScript();
                         if(!ScriptPattern.isP2WPKH(redeemScript) && !ScriptPattern.isP2WSH(redeemScript)) { //Witness UTXO should only be provided for P2SH-P2WPKH or P2SH-P2WSH
-                            throw new IllegalStateException("Witness UTXO provided but redeem script is not P2WPKH or P2WSH");
+                            throw new PSBTParseException("Witness UTXO provided but redeem script is not P2WPKH or P2WSH");
                         }
                     }
                     if(scriptPubKey == null || !ScriptPattern.isP2SH(scriptPubKey)) {
-                        throw new IllegalStateException("PSBT provided a redeem script for a transaction output that does not need one");
+                        throw new PSBTParseException("PSBT provided a redeem script for a transaction output that does not need one");
                     }
                     if(!Arrays.equals(Utils.sha256hash160(redeemScript.getProgram()), scriptPubKey.getPubKeyHash())) {
-                        throw new IllegalStateException("Redeem script hash does not match transaction output script pubkey hash " + Hex.toHexString(scriptPubKey.getPubKeyHash()));
+                        throw new PSBTParseException("Redeem script hash does not match transaction output script pubkey hash " + Hex.toHexString(scriptPubKey.getPubKeyHash()));
                     }
 
                     this.redeemScript = redeemScript;
@@ -141,9 +141,9 @@ public class PSBTInput {
                         pubKeyHash = this.witnessUtxo.getScript().getPubKeyHash();
                     }
                     if(pubKeyHash == null) {
-                        throw new IllegalStateException("Witness script provided without P2WSH witness utxo or P2SH redeem script");
+                        throw new PSBTParseException("Witness script provided without P2WSH witness utxo or P2SH redeem script");
                     } else if(!Arrays.equals(Sha256Hash.hash(witnessScript.getProgram()), pubKeyHash)) {
-                        throw new IllegalStateException("Witness script hash does not match provided pay to script hash " + Hex.toHexString(pubKeyHash));
+                        throw new PSBTParseException("Witness script hash does not match provided pay to script hash " + Hex.toHexString(pubKeyHash));
                     }
                     this.witnessScript = witnessScript;
                     log.debug("Found input witness script hex " + Hex.toHexString(witnessScript.getProgram()) + " script " + witnessScript);
@@ -210,7 +210,7 @@ public class PSBTInput {
         return witnessScript;
     }
 
-    public KeyDerivation getKeyDerivation(LazyECPoint publicKey) {
+    public KeyDerivation getKeyDerivation(ECKey publicKey) {
         return derivedPublicKeys.get(publicKey);
     }
 
@@ -245,7 +245,7 @@ public class PSBTInput {
         return sigs == reqSigs;
     }
 
-    boolean verifySignatures() {
+    boolean verifySignatures() throws PSBTParseException {
         Transaction.SigHash localSigHash = getSigHash();
         if(localSigHash == null) {
             //Assume SigHash.ALL
@@ -260,7 +260,7 @@ public class PSBTInput {
                 for(ECKey sigPublicKey : getPartialSignatures().keySet()) {
                     TransactionSignature signature = getPartialSignature(sigPublicKey);
                     if(!sigPublicKey.verify(hash, signature)) {
-                        throw new IllegalStateException("Partial signature does not verify against provided public key");
+                        throw new PSBTParseException("Partial signature does not verify against provided public key");
                     }
                 }
 

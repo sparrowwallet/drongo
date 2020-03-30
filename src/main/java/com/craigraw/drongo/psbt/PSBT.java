@@ -46,12 +46,12 @@ public class PSBT {
 
     private static final Logger log = LoggerFactory.getLogger(PSBT.class);
 
-    public PSBT(byte[] psbt) {
+    public PSBT(byte[] psbt) throws PSBTParseException {
         this.psbtBytes = psbt;
         parse();
     }
 
-    private void parse() {
+    private void parse() throws PSBTParseException {
         int seenInputs = 0;
         int seenOutputs = 0;
 
@@ -60,12 +60,12 @@ public class PSBT {
         byte[] magicBuf = new byte[4];
         psbtByteBuffer.get(magicBuf);
         if (!PSBT_MAGIC.equalsIgnoreCase(Hex.toHexString(magicBuf))) {
-            throw new IllegalStateException("PSBT has invalid magic value");
+            throw new PSBTParseException("PSBT has invalid magic value");
         }
 
         byte sep = psbtByteBuffer.get();
         if (sep != (byte) 0xff) {
-            throw new IllegalStateException("PSBT has bad initial separator:" + Hex.toHexString(new byte[]{sep}));
+            throw new PSBTParseException("PSBT has bad initial separator: " + Hex.toHexString(new byte[]{sep}));
         }
 
         int currentState = STATE_GLOBALS;
@@ -108,7 +108,7 @@ public class PSBT {
                     case STATE_END:
                         break;
                     default:
-                        throw new IllegalStateException("PSBT read is in unknown state");
+                        throw new PSBTParseException("PSBT structure invalid");
                 }
             } else if (currentState == STATE_GLOBALS) {
                 globalEntries.add(entry);
@@ -117,28 +117,28 @@ public class PSBT {
             } else if (currentState == STATE_OUTPUTS) {
                 outputEntries.add(entry);
             } else {
-                throw new IllegalStateException("PSBT structure invalid");
+                throw new PSBTParseException("PSBT structure invalid");
             }
         }
 
         if(currentState != STATE_END) {
             if(transaction == null) {
-                throw new IllegalStateException("Missing transaction");
+                throw new PSBTParseException("Missing transaction");
             }
 
             if(currentState == STATE_INPUTS) {
-                throw new IllegalStateException("Missing inputs");
+                throw new PSBTParseException("Missing inputs");
             }
 
             if(currentState == STATE_OUTPUTS) {
-                throw new IllegalStateException("Missing outputs");
+                throw new PSBTParseException("Missing outputs");
             }
         }
 
         log.debug("Calculated fee at " + getFee());
     }
 
-    private PSBTEntry parseEntry(ByteBuffer psbtByteBuffer) {
+    private PSBTEntry parseEntry(ByteBuffer psbtByteBuffer) throws PSBTParseException {
         PSBTEntry entry = new PSBTEntry();
 
         try {
@@ -171,7 +171,7 @@ public class PSBT {
             return entry;
 
         } catch (Exception e) {
-            throw new IllegalStateException("Error parsing PSBT entry", e);
+            throw new PSBTParseException("Error parsing PSBT entry", e);
         }
     }
 
@@ -187,10 +187,10 @@ public class PSBT {
         return entry;
     }
 
-    private void parseGlobalEntries(List<PSBTEntry> globalEntries) {
+    private void parseGlobalEntries(List<PSBTEntry> globalEntries) throws PSBTParseException {
         PSBTEntry duplicate = findDuplicateKey(globalEntries);
         if(duplicate != null) {
-            throw new IllegalStateException("Found duplicate key for PSBT global: " + Hex.toHexString(duplicate.getKey()));
+            throw new PSBTParseException("Found duplicate key for PSBT global: " + Hex.toHexString(duplicate.getKey()));
         }
 
         for(PSBTEntry entry : globalEntries) {
@@ -204,7 +204,7 @@ public class PSBT {
                     log.debug("Transaction with txid: " + transaction.getTxId() + " version " + transaction.getVersion() + " size " + transaction.getMessageSize() + " locktime " + transaction.getLockTime());
                     for(TransactionInput input: transaction.getInputs()) {
                         if(input.getScriptSig().getProgram().length != 0) {
-                            throw new IllegalStateException("Unsigned tx input does not have empty scriptSig");
+                            throw new PSBTParseException("Unsigned tx input does not have empty scriptSig");
                         }
                         log.debug(" Transaction input references txid: " + input.getOutpoint().getHash() + " vout " + input.getOutpoint().getIndex() + " with script " + input.getScriptSig());
                     }
@@ -240,11 +240,11 @@ public class PSBT {
         }
     }
 
-    private void parseInputEntries(List<List<PSBTEntry>> inputEntryLists) {
+    private void parseInputEntries(List<List<PSBTEntry>> inputEntryLists) throws PSBTParseException {
         for(List<PSBTEntry> inputEntries : inputEntryLists) {
             PSBTEntry duplicate = findDuplicateKey(inputEntries);
             if(duplicate != null) {
-                throw new IllegalStateException("Found duplicate key for PSBT input: " + Hex.toHexString(duplicate.getKey()));
+                throw new PSBTParseException("Found duplicate key for PSBT input: " + Hex.toHexString(duplicate.getKey()));
             }
 
             int inputIndex = this.psbtInputs.size();
@@ -252,18 +252,18 @@ public class PSBT {
 
             boolean verified = input.verifySignatures();
             if(!verified && input.getPartialSignatures().size() > 0) {
-                throw new IllegalStateException("Unverifiable partial signatures provided");
+                throw new PSBTParseException("Unverifiable partial signatures provided");
             }
 
             this.psbtInputs.add(input);
         }
     }
 
-    private void parseOutputEntries(List<List<PSBTEntry>> outputEntryLists) {
+    private void parseOutputEntries(List<List<PSBTEntry>> outputEntryLists) throws PSBTParseException {
         for(List<PSBTEntry> outputEntries : outputEntryLists) {
             PSBTEntry duplicate = findDuplicateKey(outputEntries);
             if(duplicate != null) {
-                throw new IllegalStateException("Found duplicate key for PSBT output: " + Hex.toHexString(duplicate.getKey()));
+                throw new PSBTParseException("Found duplicate key for PSBT output: " + Hex.toHexString(duplicate.getKey()));
             }
 
             PSBTOutput output = new PSBTOutput(outputEntries);
@@ -272,7 +272,7 @@ public class PSBT {
     }
 
     private PSBTEntry findDuplicateKey(List<PSBTEntry> entries) {
-        Set checkSet = new HashSet();
+        Set<String> checkSet = new HashSet<>();
         for(PSBTEntry entry: entries) {
             if(!checkSet.add(Hex.toHexString(entry.getKey())) ) {
                 return entry;
@@ -520,16 +520,14 @@ public class PSBT {
     public static boolean isPSBT(String s) {
         if (Utils.isHex(s) && s.startsWith(PSBT_MAGIC)) {
             return true;
-        } else if (Utils.isBase64(s) && Hex.toHexString(Base64.decode(s)).startsWith(PSBT_MAGIC)) {
-            return true;
         } else {
-            return false;
+            return Utils.isBase64(s) && Hex.toHexString(Base64.decode(s)).startsWith(PSBT_MAGIC);
         }
     }
 
-    public static PSBT fromString(String strPSBT) {
+    public static PSBT fromString(String strPSBT) throws PSBTParseException {
         if (!isPSBT(strPSBT)) {
-            throw new IllegalArgumentException("Provided string is not a PSBT");
+            throw new PSBTParseException("Provided string is not a PSBT");
         }
 
         if (Utils.isBase64(strPSBT) && !Utils.isHex(strPSBT)) {
