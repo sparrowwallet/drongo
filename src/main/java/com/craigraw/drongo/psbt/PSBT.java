@@ -22,7 +22,8 @@ public class PSBT {
     public static final byte PSBT_GLOBAL_VERSION = (byte)0xfb;
     public static final byte PSBT_GLOBAL_PROPRIETARY = (byte)0xfc;
 
-    public static final String PSBT_MAGIC = "70736274";
+    public static final String PSBT_MAGIC_HEX = "70736274";
+    public static final int PSBT_MAGIC_INT = 1886610036;
 
     private static final int STATE_GLOBALS = 1;
     private static final int STATE_INPUTS = 2;
@@ -59,7 +60,7 @@ public class PSBT {
 
         byte[] magicBuf = new byte[4];
         psbtByteBuffer.get(magicBuf);
-        if (!PSBT_MAGIC.equalsIgnoreCase(Hex.toHexString(magicBuf))) {
+        if (!PSBT_MAGIC_HEX.equalsIgnoreCase(Hex.toHexString(magicBuf))) {
             throw new PSBTParseException("PSBT has invalid magic value");
         }
 
@@ -314,7 +315,7 @@ public class PSBT {
 
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
         // magic
-        baos.write(Hex.decode(PSBT_MAGIC), 0, Hex.decode(PSBT_MAGIC).length);
+        baos.write(Hex.decode(PSBT_MAGIC_HEX), 0, Hex.decode(PSBT_MAGIC_HEX).length);
         // separator
         baos.write((byte) 0xff);
 
@@ -517,11 +518,17 @@ public class PSBT {
         return bip32buf;
     }
 
+    public static boolean isPSBT(byte[] b) {
+        ByteBuffer buffer = ByteBuffer.wrap(b);
+        int header = buffer.getInt();
+        return header == PSBT_MAGIC_INT;
+    }
+
     public static boolean isPSBT(String s) {
-        if (Utils.isHex(s) && s.startsWith(PSBT_MAGIC)) {
+        if (Utils.isHex(s) && s.startsWith(PSBT_MAGIC_HEX)) {
             return true;
         } else {
-            return Utils.isBase64(s) && Hex.toHexString(Base64.decode(s)).startsWith(PSBT_MAGIC);
+            return Utils.isBase64(s) && Hex.toHexString(Base64.decode(s)).startsWith(PSBT_MAGIC_HEX);
         }
     }
 
