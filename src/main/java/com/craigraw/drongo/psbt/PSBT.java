@@ -251,8 +251,8 @@ public class PSBT {
             PSBTInput input = new PSBTInput(inputEntries, transaction, inputIndex);
 
             boolean verified = input.verifySignatures();
-            if(verified) {
-                log.debug("Verified signatures on input #" + inputIndex);
+            if(!verified && input.getPartialSignatures().size() > 0) {
+                throw new IllegalStateException("Unverifiable partial signatures provided");
             }
 
             this.psbtInputs.add(input);

@@ -240,7 +240,7 @@ public class PSBTInput {
 
     public boolean isSigned() throws NonStandardScriptException {
         //All partial sigs are already verified
-        int reqSigs = getConnectedScript().getNumRequiredSignatures();
+        int reqSigs = getSigningScript().getNumRequiredSignatures();
         int sigs = getPartialSignatures().size();
         return sigs == reqSigs;
     }
@@ -253,9 +253,9 @@ public class PSBTInput {
         }
 
         if(getNonWitnessUtxo() != null || getWitnessUtxo() != null) {
-            Script connectedScript = getConnectedScript();
-            if(connectedScript != null) {
-                Sha256Hash hash = getHashForSignature(connectedScript, localSigHash);
+            Script signingScript = getSigningScript();
+            if(signingScript != null) {
+                Sha256Hash hash = getHashForSignature(signingScript, localSigHash);
 
                 for(ECKey sigPublicKey : getPartialSignatures().keySet()) {
                     TransactionSignature signature = getPartialSignature(sigPublicKey);
@@ -271,30 +271,30 @@ public class PSBTInput {
         return false;
     }
 
-    public Script getConnectedScript() {
+    public Script getSigningScript() {
         int vout = (int)transaction.getInputs().get(index).getOutpoint().getIndex();
-        Script connectedScript = getNonWitnessUtxo() != null ? getNonWitnessUtxo().getOutputs().get(vout).getScript() : getWitnessUtxo().getScript();
+        Script signingScript = getNonWitnessUtxo() != null ? getNonWitnessUtxo().getOutputs().get(vout).getScript() : getWitnessUtxo().getScript();
 
-        if(ScriptPattern.isP2SH(connectedScript)) {
+        if(ScriptPattern.isP2SH(signingScript)) {
             if(getRedeemScript() == null) {
                 return null;
             } else {
-                connectedScript = getRedeemScript();
+                signingScript = getRedeemScript();
             }
         }
 
-        if(ScriptPattern.isP2WPKH(connectedScript)) {
-            Address address = new P2PKHAddress(connectedScript.getPubKeyHash());
-            connectedScript = address.getOutputScript();
-        } else if(ScriptPattern.isP2WSH(connectedScript)) {
+        if(ScriptPattern.isP2WPKH(signingScript)) {
+            Address address = new P2PKHAddress(signingScript.getPubKeyHash());
+            signingScript = address.getOutputScript();
+        } else if(ScriptPattern.isP2WSH(signingScript)) {
             if(getWitnessScript() == null) {
                 return null;
             } else {
-                connectedScript = getWitnessScript();
+                signingScript = getWitnessScript();
             }
         }
 
-        return connectedScript;
+        return signingScript;
     }
 
     private Sha256Hash getHashForSignature(Script connectedScript, Transaction.SigHash localSigHash) {

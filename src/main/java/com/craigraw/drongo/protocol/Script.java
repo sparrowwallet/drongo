@@ -110,7 +110,7 @@ public class Script {
      * Returns true if this script has the required form to contain a destination address
      */
     public boolean containsToAddress() {
-        return ScriptPattern.isP2PK(this) || ScriptPattern.isP2PKH(this) || ScriptPattern.isP2SH(this) || ScriptPattern.isP2WPKH(this) || ScriptPattern.isP2WSH(this) || ScriptPattern.isSentToMultisig(this);
+        return ScriptPattern.isP2PK(this) || ScriptPattern.isP2PKH(this) || ScriptPattern.isP2SH(this) || ScriptPattern.isP2WPKH(this) || ScriptPattern.isP2WSH(this) || ScriptPattern.isMultisig(this);
     }
 
     /**
@@ -143,7 +143,7 @@ public class Script {
             return new Address[] { new P2WPKHAddress(ScriptPattern.extractHashFromP2WH(this)) };
         else if (ScriptPattern.isP2WSH(this))
             return new Address[] { new P2WSHAddress(ScriptPattern.extractHashFromP2WH(this)) };
-        else if (ScriptPattern.isSentToMultisig(this))
+        else if (ScriptPattern.isMultisig(this))
             return ScriptPattern.extractMultisigAddresses(this);
         else
             throw new NonStandardScriptException("Cannot find addresses in non standard script: " + toString());
@@ -154,7 +154,7 @@ public class Script {
             return 1;
         }
 
-        if(ScriptPattern.isSentToMultisig(this)) {
+        if(ScriptPattern.isMultisig(this)) {
             return ScriptPattern.extractMultisigThreshold(this);
         }
 

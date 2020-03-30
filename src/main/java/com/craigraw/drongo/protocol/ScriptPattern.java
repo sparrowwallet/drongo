@@ -110,7 +110,7 @@ public class ScriptPattern {
      * Returns whether this script matches the format used for multisig outputs:
      * {@code [n] [keys...] [m] CHECKMULTISIG}
      */
-    public static boolean isSentToMultisig(Script script) {
+    public static boolean isMultisig(Script script) {
         List<ScriptChunk> chunks = script.chunks;
         if (chunks.size() < 4) return false;
         ScriptChunk chunk = chunks.get(chunks.size() - 1);
