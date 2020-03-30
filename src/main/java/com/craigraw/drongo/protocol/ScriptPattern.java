@@ -134,6 +134,10 @@ public class ScriptPattern {
         return true;
     }
 
+    public static int extractMultisigThreshold(Script script) {
+        return decodeFromOpN(script.chunks.get(0).opcode);
+    }
+
     public static Address[] extractMultisigAddresses(Script script) {
         List<Address> addresses = new ArrayList<>();
 

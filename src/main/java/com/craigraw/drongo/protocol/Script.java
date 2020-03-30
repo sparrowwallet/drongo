@@ -132,7 +132,7 @@ public class Script {
     /**
      * Gets the destination address from this script, if it's in the required form.
      */
-    public Address[] getToAddresses() {
+    public Address[] getToAddresses() throws NonStandardScriptException {
         if (ScriptPattern.isP2PK(this))
             return new Address[] { new P2PKAddress( ScriptPattern.extractPKFromP2PK(this)) };
         else if (ScriptPattern.isP2PKH(this))
@@ -146,7 +146,19 @@ public class Script {
         else if (ScriptPattern.isSentToMultisig(this))
             return ScriptPattern.extractMultisigAddresses(this);
         else
-            throw new ProtocolException("Cannot cast this script to an address");
+            throw new NonStandardScriptException("Cannot find addresses in non standard script: " + toString());
+    }
+
+    public int getNumRequiredSignatures() throws NonStandardScriptException {
+        if(ScriptPattern.isP2PK(this) || ScriptPattern.isP2PKH(this) || ScriptPattern.isP2WPKH(this)) {
+            return 1;
+        }
+
+        if(ScriptPattern.isSentToMultisig(this)) {
+            return ScriptPattern.extractMultisigThreshold(this);
+        }
+
+        throw new NonStandardScriptException("Cannot find number of required signatures for non standard script: " + toString());
     }
 
     public static int decodeFromOpN(int opcode) {

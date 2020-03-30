@@ -3,9 +3,6 @@ package com.craigraw.drongo.psbt;
 import com.craigraw.drongo.ExtendedPublicKey;
 import com.craigraw.drongo.KeyDerivation;
 import com.craigraw.drongo.Utils;
-import com.craigraw.drongo.address.Address;
-import com.craigraw.drongo.address.P2PKHAddress;
-import com.craigraw.drongo.crypto.ECKey;
 import com.craigraw.drongo.protocol.*;
 import org.bouncycastle.util.encoders.Base64;
 import org.bouncycastle.util.encoders.Hex;
@@ -214,7 +211,7 @@ public class PSBT {
                     for(TransactionOutput output: transaction.getOutputs()) {
                         try {
                             log.debug(" Transaction output value: " + output.getValue() + " to addresses " + Arrays.asList(output.getScript().getToAddresses()) + " with script hex " + Hex.toHexString(output.getScript().getProgram()) + " to script " + output.getScript());
-                        } catch(ProtocolException e) {
+                        } catch(NonStandardScriptException e) {
                             log.debug(" Transaction output value: " + output.getValue() + " with script hex " + Hex.toHexString(output.getScript().getProgram()) + " to script " + output.getScript());
                         }
                     }
@@ -253,59 +250,13 @@ public class PSBT {
             int inputIndex = this.psbtInputs.size();
             PSBTInput input = new PSBTInput(inputEntries, transaction, inputIndex);
 
-            boolean verified = verifySignatures(input, inputIndex);
+            boolean verified = input.verifySignatures();
             if(verified) {
                 log.debug("Verified signatures on input #" + inputIndex);
             }
 
             this.psbtInputs.add(input);
         }
-    }
-
-    private boolean verifySignatures(PSBTInput input, int index) {
-        if(input.getSigHash() != null && (input.getNonWitnessUtxo() != null || input.getWitnessUtxo() != null)) {
-            int vout = (int)transaction.getInputs().get(index).getOutpoint().getIndex();
-            Script inputScript = input.getNonWitnessUtxo() != null ? input.getNonWitnessUtxo().getOutputs().get(vout).getScript() : input.getWitnessUtxo().getScript();
-
-            Script connectedScript = inputScript;
-            if(ScriptPattern.isP2SH(connectedScript)) {
-                if(input.getRedeemScript() == null) {
-                    return false;
-                } else {
-                    connectedScript = input.getRedeemScript();
-                }
-            }
-
-            if(ScriptPattern.isP2WPKH(connectedScript)) {
-                Address address = new P2PKHAddress(connectedScript.getPubKeyHash());
-                connectedScript = address.getOutputScript();
-            } else if(ScriptPattern.isP2WSH(connectedScript)) {
-                if(input.getWitnessScript() == null) {
-                    return false;
-                } else {
-                    connectedScript = input.getWitnessScript();
-                }
-            }
-
-            Sha256Hash hash = null;
-            if(input.getNonWitnessUtxo() != null) {
-                hash = transaction.hashForSignature(index, connectedScript, input.getSigHash(), false);
-            } else {
-                long prevValue = input.getWitnessUtxo().getValue();
-                hash = transaction.hashForWitnessSignature(index, connectedScript, prevValue, input.getSigHash(), false);
-            }
-
-            for(ECKey sigPublicKey : input.getPartialSignatures().keySet()) {
-                TransactionSignature signature = input.getPartialSignature(sigPublicKey);
-                if(!sigPublicKey.verify(hash, signature)) {
-                    throw new IllegalStateException("Partial signature does not verify against provided public key");
-                }
-            }
-
-            return true;
-        }
-
-        return false;
     }
 
     private void parseOutputEntries(List<List<PSBTEntry>> outputEntryLists) {

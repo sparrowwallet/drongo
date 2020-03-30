@@ -2,6 +2,8 @@ package com.craigraw.drongo.psbt;
 
 import com.craigraw.drongo.KeyDerivation;
 import com.craigraw.drongo.Utils;
+import com.craigraw.drongo.address.Address;
+import com.craigraw.drongo.address.P2PKHAddress;
 import com.craigraw.drongo.crypto.ECKey;
 import com.craigraw.drongo.crypto.LazyECPoint;
 import com.craigraw.drongo.protocol.*;
@@ -42,6 +44,9 @@ public class PSBTInput {
     private String porCommitment;
     private Map<String, String> proprietary = new LinkedHashMap<>();
 
+    private Transaction transaction;
+    private int index;
+
     private static final Logger log = LoggerFactory.getLogger(PSBTInput.class);
 
     PSBTInput(List<PSBTEntry> inputEntries, Transaction transaction, int index) {
@@ -66,7 +71,11 @@ public class PSBTInput {
                         log.debug(" Transaction input references txid: " + input.getOutpoint().getHash() + " vout " + input.getOutpoint().getIndex() + " with script " + input.getScriptSig());
                     }
                     for(TransactionOutput output: nonWitnessTx.getOutputs()) {
-                        log.debug(" Transaction output value: " + output.getValue() + " to addresses " + Arrays.asList(output.getScript().getToAddresses()) + " with script hex " + Hex.toHexString(output.getScript().getProgram()) + " to script " + output.getScript());
+                        try {
+                            log.debug(" Transaction output value: " + output.getValue() + " to addresses " + Arrays.asList(output.getScript().getToAddresses()) + " with script hex " + Hex.toHexString(output.getScript().getProgram()) + " to script " + output.getScript());
+                        } catch(NonStandardScriptException e) {
+                            log.error("Unknown script type", e);
+                        }
                     }
                     break;
                 case PSBT_IN_WITNESS_UTXO:
@@ -79,7 +88,11 @@ public class PSBTInput {
                         throw new IllegalStateException("Witness UTXO provided for non-witness or unknown input");
                     }
                     this.witnessUtxo = witnessTxOutput;
-                    log.debug("Found input witness utxo amount " + witnessTxOutput.getValue() + " script hex " + Hex.toHexString(witnessTxOutput.getScript().getProgram()) + " script " + witnessTxOutput.getScript() + " addresses " + Arrays.asList(witnessTxOutput.getScript().getToAddresses()));
+                    try {
+                        log.debug("Found input witness utxo amount " + witnessTxOutput.getValue() + " script hex " + Hex.toHexString(witnessTxOutput.getScript().getProgram()) + " script " + witnessTxOutput.getScript() + " addresses " + Arrays.asList(witnessTxOutput.getScript().getToAddresses()));
+                    } catch(NonStandardScriptException e) {
+                        log.error("Unknown script type", e);
+                    }
                     break;
                 case PSBT_IN_PARTIAL_SIG:
                     entry.checkOneBytePlusPubKey();
@@ -168,6 +181,9 @@ public class PSBTInput {
                     log.warn("PSBT input not recognized key type: " + entry.getKeyType());
             }
         }
+
+        this.transaction = transaction;
+        this.index = index;
     }
 
     public Transaction getNonWitnessUtxo() {
@@ -220,5 +236,76 @@ public class PSBTInput {
 
     public Map<String, String> getProprietary() {
         return proprietary;
+    }
+
+    public boolean isSigned() throws NonStandardScriptException {
+        //All partial sigs are already verified
+        int reqSigs = getConnectedScript().getNumRequiredSignatures();
+        int sigs = getPartialSignatures().size();
+        return sigs == reqSigs;
+    }
+
+    boolean verifySignatures() {
+        Transaction.SigHash localSigHash = getSigHash();
+        if(localSigHash == null) {
+            //Assume SigHash.ALL
+            localSigHash = Transaction.SigHash.ALL;
+        }
+
+        if(getNonWitnessUtxo() != null || getWitnessUtxo() != null) {
+            Script connectedScript = getConnectedScript();
+            if(connectedScript != null) {
+                Sha256Hash hash = getHashForSignature(connectedScript, localSigHash);
+
+                for(ECKey sigPublicKey : getPartialSignatures().keySet()) {
+                    TransactionSignature signature = getPartialSignature(sigPublicKey);
+                    if(!sigPublicKey.verify(hash, signature)) {
+                        throw new IllegalStateException("Partial signature does not verify against provided public key");
+                    }
+                }
+
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    public Script getConnectedScript() {
+        int vout = (int)transaction.getInputs().get(index).getOutpoint().getIndex();
+        Script connectedScript = getNonWitnessUtxo() != null ? getNonWitnessUtxo().getOutputs().get(vout).getScript() : getWitnessUtxo().getScript();
+
+        if(ScriptPattern.isP2SH(connectedScript)) {
+            if(getRedeemScript() == null) {
+                return null;
+            } else {
+                connectedScript = getRedeemScript();
+            }
+        }
+
+        if(ScriptPattern.isP2WPKH(connectedScript)) {
+            Address address = new P2PKHAddress(connectedScript.getPubKeyHash());
+            connectedScript = address.getOutputScript();
+        } else if(ScriptPattern.isP2WSH(connectedScript)) {
+            if(getWitnessScript() == null) {
+                return null;
+            } else {
+                connectedScript = getWitnessScript();
+            }
+        }
+
+        return connectedScript;
+    }
+
+    private Sha256Hash getHashForSignature(Script connectedScript, Transaction.SigHash localSigHash) {
+        Sha256Hash hash;
+        if (getNonWitnessUtxo() != null) {
+            hash = transaction.hashForSignature(index, connectedScript, localSigHash, false);
+        } else {
+            long prevValue = getWitnessUtxo().getValue();
+            hash = transaction.hashForWitnessSignature(index, connectedScript, prevValue, localSigHash, false);
+        }
+
+        return hash;
     }
 }

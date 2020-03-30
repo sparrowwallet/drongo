@@ -501,7 +501,7 @@ public class Transaction extends TransactionPart {
         }
     }
 
-    public static final void main(String[] args) {
+    public static final void main(String[] args) throws NonStandardScriptException {
         String hex = "0100000002fe3dc9208094f3ffd12645477b3dc56f60ec4fa8e6f5d67c565d1c6b9216b36e0000000000ffffffff0815cf020f013ed6cf91d29f4202e8a58726b1ac6c79da47c23d1bee0a6925f80000000000ffffffff0100f2052a010000001976a914a30741f8145e5acadf23f751864167f32e0963f788ac00000000";
         byte[] transactionBytes = Utils.hexToBytes(hex);
         Transaction transaction = new Transaction(transactionBytes);

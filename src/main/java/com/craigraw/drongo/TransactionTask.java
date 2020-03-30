@@ -44,9 +44,13 @@ public class TransactionTask implements Runnable {
 
                 TransactionOutput referencedOutput = referencedTransaction.getOutputs().get((int)referencedVout);
                 if(referencedOutput.getScript().containsToAddress()) {
-                    Address[] inputAddresses = referencedOutput.getScript().getToAddresses();
-                    input.getOutpoint().setAddresses(inputAddresses);
-                    inputJoiner.add((inputAddresses.length == 1 ? inputAddresses[0] : Arrays.asList(inputAddresses)) + ":" + vin);
+                    try {
+                        Address[] inputAddresses = referencedOutput.getScript().getToAddresses();
+                        input.getOutpoint().setAddresses(inputAddresses);
+                        inputJoiner.add((inputAddresses.length == 1 ? inputAddresses[0] : Arrays.asList(inputAddresses)) + ":" + vin);
+                    } catch(NonStandardScriptException e) {
+                        //Cannot happen
+                    }
                 } else {
                     log.warn("Could not determine nature of referenced input tx: " + referencedTxID + ":" + referencedVout);
                 }
@@ -62,9 +66,13 @@ public class TransactionTask implements Runnable {
         for(TransactionOutput output : transaction.getOutputs()) {
             try {
                 if(output.getScript().containsToAddress()) {
-                    Address[] outputAddresses = output.getScript().getToAddresses();
-                    output.setAddresses(outputAddresses);
-                    outputJoiner.add((outputAddresses.length == 1 ? outputAddresses[0] : Arrays.asList(outputAddresses)) + ":" + vout + " (" + output.getValue() + ")");
+                    try {
+                        Address[] outputAddresses = output.getScript().getToAddresses();
+                        output.setAddresses(outputAddresses);
+                        outputJoiner.add((outputAddresses.length == 1 ? outputAddresses[0] : Arrays.asList(outputAddresses)) + ":" + vout + " (" + output.getValue() + ")");
+                    } catch(NonStandardScriptException e) {
+                        //Cannot happen
+                    }
                 }
             } catch(ProtocolException e) {
                 log.debug("Invalid script for output " + vout + " detected (" + e.getMessage() + "). Skipping...");
