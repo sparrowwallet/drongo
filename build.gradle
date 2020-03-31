@@ -6,20 +6,31 @@ plugins {
 group 'com.craigraw'
 version '0.1'
 
-sourceCompatibility = 1.8
-targetCompatibility = 1.8
+sourceCompatibility = 1.9
+targetCompatibility = 1.9
 
 repositories {
     mavenCentral()
 }
 
 dependencies {
-    compile 'org.zeromq:jeromq:0.5.0'
-    compile 'com.googlecode.json-simple:json-simple:1.1.1'
-    compile 'org.bouncycastle:bcprov-jdk15on:1.60'
-    implementation 'org.slf4j:slf4j-api:1.7.25'
-    runtime 'org.slf4j:slf4j-log4j12:1.7.25'
-    testCompile group: 'junit', name: 'junit', version: '4.11'
+    implementation ('org.zeromq:jeromq:0.5.0') {
+        exclude group: 'org.hamcrest', module: 'hamcrest-core'
+    }
+    implementation ('com.googlecode.json-simple:json-simple:1.1.1') {
+        exclude group: 'org.hamcrest', module: 'hamcrest-core'
+        exclude group: 'junit', module: 'junit'
+    }
+    implementation ('org.bouncycastle:bcprov-jdk15on:1.60') {
+        exclude group: 'org.hamcrest', module: 'hamcrest-core'
+    }
+    implementation ('ch.qos.logback:logback-classic:1.2.3') {
+        exclude group: 'org.hamcrest', module: 'hamcrest-core'
+    }
+    testImplementation ('junit:junit:4.12') {
+        exclude group: 'org.hamcrest', module: 'hamcrest-core'
+    }
+    testImplementation group: 'org.hamcrest', name: 'hamcrest-core', version: '2.2'
 }
 
 task(runDrongo, dependsOn: 'classes', type: JavaExec) {
