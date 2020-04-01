@@ -1,0 +1,523 @@
+package com.sparrowwallet.drongo.protocol;
+
+import com.sparrowwallet.drongo.Utils;
+import com.sparrowwallet.drongo.address.Address;
+import com.sparrowwallet.drongo.address.P2PKHAddress;
+import com.sparrowwallet.drongo.crypto.ECKey;
+
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.OutputStream;
+import java.math.BigInteger;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.List;
+
+import static com.sparrowwallet.drongo.Utils.uint32ToByteStreamLE;
+import static com.sparrowwallet.drongo.Utils.uint64ToByteStreamLE;
+
+public class Transaction extends TransactionPart {
+    public static final int MAX_BLOCK_SIZE = 1000 * 1000;
+    public static final long MAX_BITCOIN = 21 * 1000 * 1000L;
+    public static final long SATOSHIS_PER_BITCOIN = 100 * 1000 * 1000L;
+
+    private long version;
+    private long lockTime;
+    private boolean segwit;
+    private int segwitVersion;
+
+    private Sha256Hash cachedTxId;
+    private Sha256Hash cachedWTxId;
+
+    private ArrayList<TransactionInput> inputs;
+    private ArrayList<TransactionOutput> outputs;
+
+    public Transaction(byte[] rawtx) {
+        super(rawtx, 0);
+    }
+
+    public long getVersion() {
+        return version;
+    }
+
+    public void setVersion(long version) {
+        this.version = version;
+    }
+
+    public long getLockTime() {
+        return lockTime;
+    }
+
+    public void setLockTime(long lockTime) {
+        this.lockTime = lockTime;
+    }
+
+    public Sha256Hash getTxId() {
+        if (cachedTxId == null) {
+            if (!hasWitnesses() && cachedWTxId != null) {
+                cachedTxId = cachedWTxId;
+            } else {
+                cachedTxId = calculateTxId(false);
+            }
+        }
+        return cachedTxId;
+    }
+
+    public Sha256Hash getWTxId() {
+        if (cachedWTxId == null) {
+            if (!hasWitnesses() && cachedTxId != null) {
+                cachedWTxId = cachedTxId;
+            } else {
+                cachedWTxId = calculateTxId(true);
+            }
+        }
+        return cachedWTxId;
+    }
+
+    public Sha256Hash calculateTxId(boolean useWitnesses) {
+        ByteArrayOutputStream stream = new UnsafeByteArrayOutputStream(length < 32 ? 32 : length + 32);
+        try {
+            bitcoinSerializeToStream(stream, useWitnesses);
+        } catch (IOException e) {
+            throw new RuntimeException(e); // cannot happen
+        }
+        return Sha256Hash.wrapReversed(Sha256Hash.hashTwice(stream.toByteArray()));
+    }
+
+    public boolean isSegwit() {
+        return segwit;
+    }
+
+    public int getSegwitVersion() {
+        return segwitVersion;
+    }
+
+    public void setSegwitVersion(int segwitVersion) {
+        this.segwitVersion = segwitVersion;
+    }
+
+    public boolean hasWitnesses() {
+        for (TransactionInput in : inputs)
+            if (in.hasWitness())
+                return true;
+        return false;
+    }
+
+    public void bitcoinSerializeToStream(OutputStream stream) throws IOException {
+        boolean useSegwit = isSegwit();
+        bitcoinSerializeToStream(stream, useSegwit);
+    }
+
+    /**
+     * Serialize according to <a href="https://github.com/bitcoin/bips/blob/master/bip-0144.mediawiki">BIP144</a> or the
+     * <a href="https://en.bitcoin.it/wiki/Protocol_documentation#tx">classic format</a>, depending on if segwit is
+     * desired.
+     */
+    protected void bitcoinSerializeToStream(OutputStream stream, boolean useSegwit) throws IOException {
+        // version
+        uint32ToByteStreamLE(version, stream);
+        // marker, flag
+        if (useSegwit) {
+            stream.write(0);
+            stream.write(segwitVersion);
+        }
+        // txin_count, txins
+        stream.write(new VarInt(inputs.size()).encode());
+        for (TransactionInput in : inputs)
+            in.bitcoinSerializeToStream(stream);
+        // txout_count, txouts
+        stream.write(new VarInt(outputs.size()).encode());
+        for (TransactionOutput out : outputs)
+            out.bitcoinSerializeToStream(stream);
+        // script_witnesses
+        if (useSegwit) {
+            for (TransactionInput in : inputs) {
+                in.getWitness().bitcoinSerializeToStream(stream);
+            }
+        }
+        // lock_time
+        uint32ToByteStreamLE(lockTime, stream);
+    }
+
+    /**
+     * Deserialize according to <a href="https://github.com/bitcoin/bips/blob/master/bip-0144.mediawiki">BIP144</a> or
+     * the <a href="https://en.bitcoin.it/wiki/Protocol_documentation#tx">classic format</a>, depending on if the
+     * transaction is segwit or not.
+     */
+    public void parse() {
+        // version
+        version = readUint32();
+        // peek at marker
+        byte marker = rawtx[cursor];
+        segwit = (marker == 0);
+        // marker, flag
+        if (segwit) {
+            byte[] segwitHeader = readBytes(2);
+            segwitVersion = segwitHeader[1];
+        }
+        // txin_count, txins
+        parseInputs();
+        // txout_count, txouts
+        parseOutputs();
+        // script_witnesses
+        if (segwit)
+            parseWitnesses();
+        // lock_time
+        lockTime = readUint32();
+
+        length = cursor - offset;
+    }
+
+    private void parseInputs() {
+        long numInputs = readVarInt();
+        inputs = new ArrayList<>(Math.min((int) numInputs, Utils.MAX_INITIAL_ARRAY_LENGTH));
+        for (long i = 0; i < numInputs; i++) {
+            TransactionInput input = new TransactionInput(this, rawtx, cursor);
+            inputs.add(input);
+            long scriptLen = readVarInt(TransactionOutPoint.MESSAGE_LENGTH);
+            cursor += scriptLen + 4;
+        }
+    }
+
+    private void parseOutputs() {
+        long numOutputs = readVarInt();
+        outputs = new ArrayList<>(Math.min((int) numOutputs, Utils.MAX_INITIAL_ARRAY_LENGTH));
+        for (long i = 0; i < numOutputs; i++) {
+            TransactionOutput output = new TransactionOutput(this, rawtx, cursor);
+            outputs.add(output);
+            long scriptLen = readVarInt(8);
+            cursor += scriptLen;
+        }
+    }
+
+    private void parseWitnesses() {
+        int numWitnesses = inputs.size();
+        for (int i = 0; i < numWitnesses; i++) {
+            long pushCount = readVarInt();
+            TransactionWitness witness = new TransactionWitness((int) pushCount);
+            inputs.get(i).setWitness(witness);
+            for (int y = 0; y < pushCount; y++) {
+                long pushSize = readVarInt();
+                byte[] push = readBytes((int) pushSize);
+                witness.setPush(y, push);
+            }
+        }
+    }
+
+    public int getSize() {
+        return length;
+    }
+
+    public int getVirtualSize() {
+        int wu = 0;
+
+        // version
+        wu += 4*4;
+        // marker, flag
+        if(isSegwit()) {
+            wu += 2;
+        }
+        // txin_count, txins
+        wu += new VarInt(inputs.size()).getSizeInBytes() * 4;
+        for (TransactionInput in : inputs)
+            wu += in.length * 4;
+        // txout_count, txouts
+        wu += new VarInt(outputs.size()).getSizeInBytes() * 4;
+        for (TransactionOutput out : outputs)
+            wu += out.length * 4;
+        // script_witnesses
+        if(isSegwit()) {
+            for (TransactionInput in : inputs) {
+                wu += in.getWitness().getLength();
+            }
+        }
+        // lock_time
+        wu += 4*4;
+
+        return (int)Math.ceil((double)wu / 4.0);
+    }
+
+    public List<TransactionInput> getInputs() {
+        return Collections.unmodifiableList(inputs);
+    }
+
+    public List<TransactionOutput> getOutputs() {
+        return Collections.unmodifiableList(outputs);
+    }
+
+    public void verify() throws VerificationException {
+        if (inputs.size() == 0 || outputs.size() == 0)
+            throw new VerificationException.EmptyInputsOrOutputs();
+        if (this.getMessageSize() > MAX_BLOCK_SIZE)
+            throw new VerificationException.LargerThanMaxBlockSize();
+
+        HashSet<TransactionOutPoint> outpoints = new HashSet<>();
+        for (TransactionInput input : inputs) {
+            if (outpoints.contains(input.getOutpoint()))
+                throw new VerificationException.DuplicatedOutPoint();
+            outpoints.add(input.getOutpoint());
+        }
+
+        long valueOut = 0L;
+        for (TransactionOutput output : outputs) {
+            long value = output.getValue();
+            if (value < 0)
+                throw new VerificationException.NegativeValueOutput();
+            try {
+                valueOut = Math.addExact(valueOut, value);
+            } catch (ArithmeticException e) {
+                throw new VerificationException.ExcessiveValue();
+            }
+            double bitcoin = (double)value/SATOSHIS_PER_BITCOIN;
+            if (bitcoin > MAX_BITCOIN) {
+                throw new VerificationException.ExcessiveValue();
+            }
+        }
+
+        if (isCoinBase()) {
+            if (inputs.get(0).getScriptBytes().length < 2 || inputs.get(0).getScriptBytes().length > 100)
+                throw new VerificationException.CoinbaseScriptSizeOutOfRange();
+        } else {
+            for (TransactionInput input : inputs)
+                if (input.isCoinBase())
+                    throw new VerificationException.UnexpectedCoinbaseInput();
+        }
+    }
+
+    public boolean isCoinBase() {
+        return inputs.size() == 1 && inputs.get(0).isCoinBase();
+    }
+
+    public Sha256Hash hashForSignature(int inputIndex, Script redeemScript, SigHash type, boolean anyoneCanPay) {
+        int sigHash = TransactionSignature.calcSigHashValue(type, anyoneCanPay);
+        return hashForSignature(inputIndex, redeemScript.getProgram(), (byte) sigHash);
+    }
+
+    public Sha256Hash hashForSignature(int inputIndex, byte[] connectedScript, byte sigHashType) {
+        try {
+            ByteArrayOutputStream baos = new ByteArrayOutputStream();
+            this.bitcoinSerializeToStream(baos);
+            Transaction tx = new Transaction(baos.toByteArray());
+
+            // Clear input scripts in preparation for signing. If we're signing a fresh
+            // transaction that step isn't very helpful, but it doesn't add much cost relative to the actual
+            // EC math so we'll do it anyway.
+            for (int i = 0; i < tx.inputs.size(); i++) {
+                TransactionInput input = tx.inputs.get(i);
+                input.clearScriptBytes();
+                input.setWitness(null);
+            }
+
+            // This step has no purpose beyond being synchronized with Bitcoin Core's bugs. OP_CODESEPARATOR
+            // is a legacy holdover from a previous, broken design of executing scripts that shipped in Bitcoin 0.1.
+            // It was seriously flawed and would have let anyone take anyone elses money. Later versions switched to
+            // the design we use today where scripts are executed independently but share a stack. This left the
+            // OP_CODESEPARATOR instruction having no purpose as it was only meant to be used internally, not actually
+            // ever put into scripts. Deleting OP_CODESEPARATOR is a step that should never be required but if we don't
+            // do it, we could split off the best chain.
+            connectedScript = Script.removeAllInstancesOfOp(connectedScript, ScriptOpCodes.OP_CODESEPARATOR);
+
+            TransactionInput input = tx.inputs.get(inputIndex);
+            input.setScriptBytes(connectedScript);
+
+            if ((sigHashType & 0x1f) == SigHash.NONE.value) {
+                // SIGHASH_NONE means no outputs are signed at all - the signature is effectively for a "blank cheque".
+                tx.outputs = new ArrayList<>(0);
+                // The signature isn't broken by new versions of the transaction issued by other parties.
+                for (int i = 0; i < tx.inputs.size(); i++)
+                    if (i != inputIndex)
+                        tx.inputs.get(i).setSequenceNumber(0);
+            } else if ((sigHashType & 0x1f) == SigHash.SINGLE.value) {
+                // SIGHASH_SINGLE means only sign the output at the same index as the input (ie, my output).
+                if (inputIndex >= tx.outputs.size()) {
+                    // The input index is beyond the number of outputs, it's a buggy signature made by a broken
+                    // Bitcoin implementation. Bitcoin Core also contains a bug in handling this case:
+                    // any transaction output that is signed in this case will result in both the signed output
+                    // and any future outputs to this public key being steal-able by anyone who has
+                    // the resulting signature and the public key (both of which are part of the signed tx input).
+
+                    // Bitcoin Core's bug is that SignatureHash was supposed to return a hash and on this codepath it
+                    // actually returns the constant "1" to indicate an error, which is never checked for. Oops.
+                    return Sha256Hash.wrap("0100000000000000000000000000000000000000000000000000000000000000");
+                }
+                // In SIGHASH_SINGLE the outputs after the matching input index are deleted, and the outputs before
+                // that position are "nulled out". Unintuitively, the value in a "null" transaction is set to -1.
+                tx.outputs = new ArrayList<>(tx.outputs.subList(0, inputIndex + 1));
+                for (int i = 0; i < inputIndex; i++)
+                    tx.outputs.set(i, new TransactionOutput(tx, -1L, new byte[] {}));
+                // The signature isn't broken by new versions of the transaction issued by other parties.
+                for (int i = 0; i < tx.inputs.size(); i++)
+                    if (i != inputIndex)
+                        tx.inputs.get(i).setSequenceNumber(0);
+            }
+
+            if ((sigHashType & SigHash.ANYONECANPAY.value) == SigHash.ANYONECANPAY.value) {
+                // SIGHASH_ANYONECANPAY means the signature in the input is not broken by changes/additions/removals
+                // of other inputs. For example, this is useful for building assurance contracts.
+                tx.inputs = new ArrayList<>();
+                tx.inputs.add(input);
+            }
+
+            ByteArrayOutputStream bos = new ByteArrayOutputStream(tx.length);
+            tx.bitcoinSerializeToStream(bos, false);
+            // We also have to write a hash type (sigHashType is actually an unsigned char)
+            uint32ToByteStreamLE(0x000000ff & sigHashType, bos);
+            // Note that this is NOT reversed to ensure it will be signed correctly. If it were to be printed out
+            // however then we would expect that it is IS reversed.
+            Sha256Hash hash = Sha256Hash.twiceOf(bos.toByteArray());
+            bos.close();
+
+            return hash;
+        } catch (IOException e) {
+            throw new RuntimeException(e);  // Cannot happen.
+        }
+    }
+
+    /**
+     * <p>Calculates a signature hash, that is, a hash of a simplified form of the transaction. How exactly the transaction
+     * is simplified is specified by the type and anyoneCanPay parameters.</p>
+     *
+     * (See BIP143: https://github.com/bitcoin/bips/blob/master/bip-0143.mediawiki)</p>
+     *
+     * @param inputIndex   input the signature is being calculated for. Tx signatures are always relative to an input.
+     * @param scriptCode   the script that should be in the given input during signing.
+     * @param prevValue    the value of the coin being spent
+     * @param type         Should be SigHash.ALL
+     * @param anyoneCanPay should be false.
+     */
+    public synchronized Sha256Hash hashForWitnessSignature(int inputIndex, Script scriptCode, long prevValue, SigHash type, boolean anyoneCanPay) {
+        int sigHash = TransactionSignature.calcSigHashValue(type, anyoneCanPay);
+        return hashForWitnessSignature(inputIndex, scriptCode.getProgram(), prevValue, (byte)sigHash);
+    }
+
+    public synchronized Sha256Hash hashForWitnessSignature(int inputIndex, byte[] scriptCode, long prevValue, byte sigHashType) {
+        ByteArrayOutputStream bos = new UnsafeByteArrayOutputStream(length == UNKNOWN_LENGTH ? 256 : length + 4);
+        try {
+            byte[] hashPrevouts = new byte[32];
+            byte[] hashSequence = new byte[32];
+            byte[] hashOutputs = new byte[32];
+            int basicSigHashType = sigHashType & 0x1f;
+            boolean anyoneCanPay = (sigHashType & SigHash.ANYONECANPAY.value) == SigHash.ANYONECANPAY.value;
+            boolean signAll = (basicSigHashType != SigHash.SINGLE.value) && (basicSigHashType != SigHash.NONE.value);
+
+            if (!anyoneCanPay) {
+                ByteArrayOutputStream bosHashPrevouts = new UnsafeByteArrayOutputStream(256);
+                for (int i = 0; i < this.inputs.size(); ++i) {
+                    bosHashPrevouts.write(this.inputs.get(i).getOutpoint().getHash().getReversedBytes());
+                    uint32ToByteStreamLE(this.inputs.get(i).getOutpoint().getIndex(), bosHashPrevouts);
+                }
+                hashPrevouts = Sha256Hash.hashTwice(bosHashPrevouts.toByteArray());
+            }
+
+            if (!anyoneCanPay && signAll) {
+                ByteArrayOutputStream bosSequence = new UnsafeByteArrayOutputStream(256);
+                for (int i = 0; i < this.inputs.size(); ++i) {
+                    uint32ToByteStreamLE(this.inputs.get(i).getSequenceNumber(), bosSequence);
+                }
+                hashSequence = Sha256Hash.hashTwice(bosSequence.toByteArray());
+            }
+
+            if (signAll) {
+                ByteArrayOutputStream bosHashOutputs = new UnsafeByteArrayOutputStream(256);
+                for (int i = 0; i < this.outputs.size(); ++i) {
+                    uint64ToByteStreamLE(BigInteger.valueOf(this.outputs.get(i).getValue()), bosHashOutputs);
+                    bosHashOutputs.write(new VarInt(this.outputs.get(i).getScriptBytes().length).encode());
+                    bosHashOutputs.write(this.outputs.get(i).getScriptBytes());
+                }
+                hashOutputs = Sha256Hash.hashTwice(bosHashOutputs.toByteArray());
+            } else if (basicSigHashType == SigHash.SINGLE.value && inputIndex < outputs.size()) {
+                ByteArrayOutputStream bosHashOutputs = new UnsafeByteArrayOutputStream(256);
+                uint64ToByteStreamLE(BigInteger.valueOf(this.outputs.get(inputIndex).getValue()), bosHashOutputs);
+                bosHashOutputs.write(new VarInt(this.outputs.get(inputIndex).getScriptBytes().length).encode());
+                bosHashOutputs.write(this.outputs.get(inputIndex).getScriptBytes());
+                hashOutputs = Sha256Hash.hashTwice(bosHashOutputs.toByteArray());
+            }
+            uint32ToByteStreamLE(version, bos);
+            bos.write(hashPrevouts);
+            bos.write(hashSequence);
+            bos.write(inputs.get(inputIndex).getOutpoint().getHash().getReversedBytes());
+            uint32ToByteStreamLE(inputs.get(inputIndex).getOutpoint().getIndex(), bos);
+            VarInt scriptLength = new VarInt(scriptCode.length);
+            bos.write(scriptLength.encode());
+            bos.write(scriptCode);
+            uint64ToByteStreamLE(BigInteger.valueOf(prevValue), bos);
+            uint32ToByteStreamLE(inputs.get(inputIndex).getSequenceNumber(), bos);
+            bos.write(hashOutputs);
+            uint32ToByteStreamLE(this.lockTime, bos);
+            uint32ToByteStreamLE(0x000000ff & sigHashType, bos);
+        } catch (IOException e) {
+            throw new RuntimeException(e);  // Cannot happen.
+        }
+
+        return Sha256Hash.twiceOf(bos.toByteArray());
+    }
+
+    /**
+     * These constants are a part of a scriptSig signature on the inputs. They define the details of how a
+     * transaction can be redeemed, specifically, they control how the hash of the transaction is calculated.
+     */
+    public enum SigHash {
+        ALL(1),
+        NONE(2),
+        SINGLE(3),
+        ANYONECANPAY(0x80), // Caution: Using this type in isolation is non-standard. Treated similar to ANYONECANPAY_ALL.
+        ANYONECANPAY_ALL(0x81),
+        ANYONECANPAY_NONE(0x82),
+        ANYONECANPAY_SINGLE(0x83),
+        UNSET(0); // Caution: Using this type in isolation is non-standard. Treated similar to ALL.
+
+        public final int value;
+
+        /**
+         * @param value
+         */
+        private SigHash(final int value) {
+            this.value = value;
+        }
+
+        /**
+         * @return the value as a int
+         */
+        public int intValue() {
+            return this.value;
+        }
+
+        /**
+         * @return the value as a byte
+         */
+        public byte byteValue() {
+            return (byte) this.value;
+        }
+
+        public static SigHash fromInt(int sigHashInt) {
+            for(SigHash value : SigHash.values()) {
+                if(sigHashInt == value.intValue()) {
+                    return value;
+                }
+            }
+
+            throw new IllegalArgumentException("No defined sighash value for int " + sigHashInt);
+        }
+    }
+
+    public static final void main(String[] args) throws NonStandardScriptException {
+        String hex = "0100000002fe3dc9208094f3ffd12645477b3dc56f60ec4fa8e6f5d67c565d1c6b9216b36e0000000000ffffffff0815cf020f013ed6cf91d29f4202e8a58726b1ac6c79da47c23d1bee0a6925f80000000000ffffffff0100f2052a010000001976a914a30741f8145e5acadf23f751864167f32e0963f788ac00000000";
+        byte[] transactionBytes = Utils.hexToBytes(hex);
+        Transaction transaction = new Transaction(transactionBytes);
+
+        ECKey pubKey = ECKey.fromPublicOnly(Utils.hexToBytes("026dccc749adc2a9d0d89497ac511f760f45c47dc5ed9cf352a58ac706453880ae"));
+        P2PKHAddress address = new P2PKHAddress(pubKey.getPubKeyHash());
+        System.out.println(address.getOutputScript().getProgram().length);
+        Script script = new Script(Utils.hexToBytes("21026dccc749adc2a9d0d89497ac511f760f45c47dc5ed9cf352a58ac706453880aeadab210255a9626aebf5e29c0e6538428ba0d1dcf6ca98ffdf086aa8ced5e0d0215ea465ac"));
+        Sha256Hash hash = transaction.hashForWitnessSignature(1, script,4900000000L, SigHash.SINGLE, false);
+        System.out.println("Sighash: " + hash.toString());
+        TransactionSignature signature = TransactionSignature.decodeFromBitcoin(Utils.hexToBytes("3044022027dc95ad6b740fe5129e7e62a75dd00f291a2aeb1200b84b09d9e3789406b6c002201a9ecd315dd6a0e632ab20bbb98948bc0c6fb204f2c286963bb48517a7058e2703"), true, true);
+        if(pubKey.verify(hash, signature)) {
+            System.out.println("Verified!");
+        }
+
+        Address[] addresses = transaction.getOutputs().get(0).getScript().getToAddresses();
+        System.out.println(addresses[0]);
+    }
+}

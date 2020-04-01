@@ -23,7 +23,7 @@ if(hasPlugin) {
     apply plugin: "org.javamodularity.moduleplugin"
 }
 
-group 'com.craigraw'
+group 'com.sparrowwallet'
 version '0.1'
 
 sourceCompatibility = 1.9
@@ -54,14 +54,14 @@ dependencies {
 }
 
 task(runDrongo, dependsOn: 'classes', type: JavaExec) {
-    main = 'com.craigraw.drongo.Main'
+    main = 'com.sparrowwallet.drongo.Main'
     classpath = sourceSets.main.runtimeClasspath
     args 'drongo.properties'
 }
 
 jar {
     manifest {
-        attributes "Main-Class": "com.craigraw.drongo.Main"
+        attributes "Main-Class": "com.sparrowwallet.drongo.Main"
     }
 
     baseName = 'drongo'

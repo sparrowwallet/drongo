@@ -1,8 +1,8 @@
-module com.craigraw.drongo {
+module com.sparrowwallet.drongo {
     requires org.bouncycastle.provider;
     requires slf4j.api;
-    exports com.craigraw.drongo;
-    exports com.craigraw.drongo.psbt;
-    exports com.craigraw.drongo.protocol;
-    exports com.craigraw.drongo.address;
+    exports com.sparrowwallet.drongo;
+    exports com.sparrowwallet.drongo.psbt;
+    exports com.sparrowwallet.drongo.protocol;
+    exports com.sparrowwallet.drongo.address;
 }
