@@ -61,21 +61,8 @@ public class ECKey {
      * Utility for compressing an elliptic curve point. Returns the same point if it's already compressed.
      * See the ECKey class docs for a discussion of point compression.
      */
-    public static ECPoint compressPoint(ECPoint point) {
-        return getPointWithCompression(point, true);
-    }
-
     public static LazyECPoint compressPoint(LazyECPoint point) {
-        return point.isCompressed() ? point : new LazyECPoint(compressPoint(point.get()), true);
-    }
-
-    private static ECPoint getPointWithCompression(ECPoint point, boolean compressed) {
-        if (point.isCompressed() == compressed)
-            return point;
-        point = point.normalize();
-        BigInteger x = point.getAffineXCoord().toBigInteger();
-        BigInteger y = point.getAffineYCoord().toBigInteger();
-        return CURVE.getCurve().createPoint(x, y, compressed);
+        return point.isCompressed() ? point : new LazyECPoint(point.get(), true);
     }
 
     /**

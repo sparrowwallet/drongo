@@ -1,6 +1,26 @@
+buildscript {
+    repositories {
+        maven {
+            url "https://plugins.gradle.org/m2/"
+        }
+    }
+    dependencies {
+        classpath "org.javamodularity:moduleplugin:1.6.0"
+    }
+}
+
 plugins {
     id 'java'
     id 'com.github.johnrengelman.shadow' version '4.0.2'
+}
+
+def javamodularityPluginId = 'org.javamodularity.moduleplugin'
+final hasPlugin = project.getPlugins().hasPlugin(javamodularityPluginId);
+if(hasPlugin) {
+    final Plugin plugin = project.getPlugins().getPlugin(javamodularityPluginId)
+    println 'Plugin already applied - version ' + plugin.properties['javamodularityPluginId']
+} else {
+    apply plugin: "org.javamodularity.moduleplugin"
 }
 
 group 'com.craigraw'
@@ -21,7 +41,7 @@ dependencies {
         exclude group: 'org.hamcrest', module: 'hamcrest-core'
         exclude group: 'junit', module: 'junit'
     }
-    implementation ('org.bouncycastle:bcprov-jdk15on:1.60') {
+    implementation ('org.bouncycastle:bcprov-jdk15on:1.64') {
         exclude group: 'org.hamcrest', module: 'hamcrest-core'
     }
     implementation ('ch.qos.logback:logback-classic:1.2.3') {
