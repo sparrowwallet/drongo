@@ -11,7 +11,7 @@ buildscript {
 
 plugins {
     id 'java'
-    id 'com.github.johnrengelman.shadow' version '4.0.2'
+    id 'com.github.johnrengelman.shadow' version '5.2.0'
 }
 
 def javamodularityPluginId = 'org.javamodularity.moduleplugin'
@@ -64,11 +64,11 @@ jar {
         attributes "Main-Class": "com.sparrowwallet.drongo.Main"
     }
 
-    baseName = 'drongo'
-    version = '0.1'
+    archiveBaseName = 'drongo'
+    archiveVersion = '0.1'
 }
 
 shadowJar {
-    version = '0.1'
+    archiveVersion = '0.1'
     classifier = 'all'
 }
