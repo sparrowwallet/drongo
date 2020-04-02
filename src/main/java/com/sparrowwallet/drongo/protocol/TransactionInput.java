@@ -6,6 +6,8 @@ import java.io.IOException;
 import java.io.OutputStream;
 
 public class TransactionInput extends TransactionPart {
+    public static final long SEQUENCE_LOCKTIME_DISABLED = 0xFFFFFFFF;
+
     // Allows for altering transactions after they were broadcast. Values below NO_SEQUENCE-1 mean it can be altered.
     private long sequence;
 

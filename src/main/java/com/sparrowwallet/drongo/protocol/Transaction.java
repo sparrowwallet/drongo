@@ -53,6 +53,18 @@ public class Transaction extends TransactionPart {
         this.lockTime = lockTime;
     }
 
+    public boolean isLockTimeEnabled() {
+        if(lockTime == 0) return false;
+
+        for(TransactionInput input : inputs) {
+            if(input.getSequenceNumber() != TransactionInput.SEQUENCE_LOCKTIME_DISABLED) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     public Sha256Hash getTxId() {
         if (cachedTxId == null) {
             if (!hasWitnesses() && cachedWTxId != null) {
