@@ -145,6 +145,16 @@ public class ScriptChunk {
         return opcodeLength + pushDataSizeLength + dataLength;
     }
 
+    static int getOpcodeForLength(int length) {
+        if(length <= 0xFF) {
+            return OP_PUSHDATA1;
+        }
+        if(length <= 0xFFFF) {
+            return OP_PUSHDATA2;
+        }
+        return OP_PUSHDATA4;
+    }
+
     public String toString() {
         if (data == null) {
             return "OP_" + getOpCodeName(opcode);

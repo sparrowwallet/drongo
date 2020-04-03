@@ -56,19 +56,28 @@ public class TransactionWitness {
 
     @Override
     public String toString() {
-        StringBuffer buffer = new StringBuffer();
+        StringBuilder builder = new StringBuilder();
         for (byte[] push : pushes) {
             if (push == null) {
-                buffer.append("NULL");
+                builder.append("NULL");
             } else if (push.length == 0) {
-                buffer.append("EMPTY");
+                builder.append("EMPTY");
             } else {
-                buffer.append(Hex.toHexString(push));
+                builder.append(Hex.toHexString(push));
             }
-            buffer.append(" ");
+            builder.append(" ");
         }
 
-        return buffer.toString().trim();
+        return builder.toString().trim();
+    }
+
+    public String toDisplayString() {
+        List<ScriptChunk> scriptChunks = new ArrayList<>(pushes.size());
+        for(byte[] push : pushes) {
+           scriptChunks.add(new ScriptChunk(ScriptChunk.getOpcodeForLength(push.length), push));
+        }
+
+        return Script.toDisplayString(scriptChunks);
     }
 
     @Override

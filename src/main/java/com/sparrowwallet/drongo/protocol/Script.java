@@ -246,10 +246,14 @@ public class Script {
     }
 
     public String toDisplayString() {
+        return toDisplayString(chunks);
+    }
+
+    static String toDisplayString(List<ScriptChunk> scriptChunks) {
         StringBuilder builder = new StringBuilder();
         int signatureCount = 1;
         int pubKeyCount = 1;
-        for(ScriptChunk chunk : chunks) {
+        for(ScriptChunk chunk : scriptChunks) {
             if(chunk.isSignature()) {
                 builder.append("<signature").append(signatureCount++).append(">");
             } else if(chunk.isScript()) {
