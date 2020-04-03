@@ -7,6 +7,7 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 
 public class TransactionWitness {
@@ -16,6 +17,10 @@ public class TransactionWitness {
 
     public TransactionWitness(int pushCount) {
         pushes = new ArrayList<>(Math.min(pushCount, Utils.MAX_INITIAL_ARRAY_LENGTH));
+    }
+
+    public List<byte[]> getPushes() {
+        return Collections.unmodifiableList(pushes);
     }
 
     public void setPush(int i, byte[] value) {

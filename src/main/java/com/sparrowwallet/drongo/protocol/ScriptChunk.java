@@ -1,6 +1,7 @@
 package com.sparrowwallet.drongo.protocol;
 
 import com.sparrowwallet.drongo.Utils;
+import com.sparrowwallet.drongo.crypto.ECKey;
 import org.bouncycastle.util.encoders.Hex;
 
 import java.io.ByteArrayOutputStream;
@@ -73,6 +74,50 @@ public class ScriptChunk {
         }
     }
 
+    public int getOpcode() {
+        return opcode;
+    }
+
+    public byte[] getData() {
+        return data;
+    }
+
+    public boolean isSignature() {
+        if(data == null || data.length == 0) {
+            return false;
+        }
+
+        try {
+            ECKey.ECDSASignature.decodeFromDER(data);
+        } catch(SignatureDecodeException e) {
+            return false;
+        }
+
+        return true;
+    }
+
+    public boolean isScript() {
+        if(data == null || data.length == 0) {
+            return false;
+        }
+
+        try {
+            new Script(data);
+        } catch(ProtocolException e) {
+            return false;
+        }
+
+        return true;
+    }
+
+    public boolean isPubKey() {
+        if(data == null || data.length == 0) {
+            return false;
+        }
+
+        return ECKey.isPubKey(data);
+    }
+
     public byte[] toByteArray() {
         ByteArrayOutputStream stream = new ByteArrayOutputStream();
         try {
@@ -105,7 +150,7 @@ public class ScriptChunk {
             return "OP_" + getOpCodeName(opcode);
         }
         if (data.length == 0) {
-            return "0";
+            return "OP_0";
         }
 
         return Hex.toHexString(data);

@@ -117,6 +117,18 @@ public class ECKey {
     }
 
     /**
+     * Returns true if the given bytes represent a public key.
+     */
+    public static boolean isPubKey(byte[] encoded) {
+        if (encoded.length == 33 && (encoded[0] == 0x02 || encoded[0] == 0x03))
+            return true;
+        else if (encoded.length == 65 && encoded[0] == 0x04)
+            return true;
+        else
+            return false;
+    }
+
+    /**
      * Creates an ECKey that cannot be used for signing, only verifying signatures, from the given encoded point.
      * The compression state of pub will be preserved.
      */

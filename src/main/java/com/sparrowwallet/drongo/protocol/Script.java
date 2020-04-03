@@ -106,6 +106,10 @@ public class Script {
         return Hex.toHexString(getProgram());
     }
 
+    public List<ScriptChunk> getChunks() {
+        return Collections.unmodifiableList(chunks);
+    }
+
     /**
      * Returns true if this script has the required form to contain a destination address
      */
@@ -235,6 +239,34 @@ public class Script {
         StringBuilder builder = new StringBuilder();
         for(ScriptChunk chunk : chunks) {
             builder.append(chunk.toString());
+            builder.append(" ");
+        }
+
+        return builder.toString().trim();
+    }
+
+    public String toDisplayString() {
+        StringBuilder builder = new StringBuilder();
+        int signatureCount = 1;
+        int pubKeyCount = 1;
+        for(ScriptChunk chunk : chunks) {
+            if(chunk.isSignature()) {
+                builder.append("<signature").append(signatureCount++).append(">");
+            } else if(chunk.isScript()) {
+                Script nestedScript = new Script(chunk.getData());
+                if(ScriptPattern.isP2WPKH(nestedScript)) {
+                    builder.append("(OP_0 <wpkh>)");
+                } else if(ScriptPattern.isP2WSH(nestedScript)) {
+                    builder.append("(OP_0 <wsh>)");
+                } else {
+                    builder.append("(").append(nestedScript.toDisplayString()).append(")");
+                }
+            } else if(chunk.isPubKey()) {
+                builder.append("<pubkey").append(pubKeyCount++).append(">");
+            } else {
+                builder.append(chunk.toString());
+            }
+
             builder.append(" ");
         }
 
