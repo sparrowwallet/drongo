@@ -42,7 +42,7 @@ public class ScriptChunk {
      * If this chunk is a single byte of non-pushdata content (could be OP_RESERVED or some invalid Opcode)
      */
     public boolean isOpCode() {
-        return opcode > OP_PUSHDATA4;
+        return opcode == ScriptOpCodes.OP_0 || opcode > OP_PUSHDATA4;
     }
 
     public void write(OutputStream stream) throws IOException {
@@ -146,6 +146,9 @@ public class ScriptChunk {
     }
 
     static int getOpcodeForLength(int length) {
+        if(length == 0) {
+            return OP_0;
+        }
         if(length <= 0xFF) {
             return OP_PUSHDATA1;
         }

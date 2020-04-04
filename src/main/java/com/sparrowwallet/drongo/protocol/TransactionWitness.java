@@ -71,13 +71,13 @@ public class TransactionWitness {
         return builder.toString().trim();
     }
 
-    public String toDisplayString() {
+    public List<ScriptChunk> asScriptChunks() {
         List<ScriptChunk> scriptChunks = new ArrayList<>(pushes.size());
         for(byte[] push : pushes) {
            scriptChunks.add(new ScriptChunk(ScriptChunk.getOpcodeForLength(push.length), push));
         }
 
-        return Script.toDisplayString(scriptChunks);
+        return scriptChunks;
     }
 
     @Override

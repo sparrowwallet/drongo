@@ -106,6 +106,10 @@ public class Script {
         return Hex.toHexString(getProgram());
     }
 
+    public boolean isEmpty() {
+        return chunks.isEmpty();
+    }
+
     public List<ScriptChunk> getChunks() {
         return Collections.unmodifiableList(chunks);
     }
@@ -163,6 +167,16 @@ public class Script {
         }
 
         throw new NonStandardScriptException("Cannot find number of required signatures for non standard script: " + toString());
+    }
+
+    public Script getFirstNestedScript() {
+        for(ScriptChunk chunk : chunks) {
+            if(chunk.isScript()) {
+                return new Script(chunk.getData());
+            }
+        }
+
+        return null;
     }
 
     public static int decodeFromOpN(int opcode) {
