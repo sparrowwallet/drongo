@@ -202,7 +202,7 @@ public class PSBT {
                     transaction.verify();
                     inputs = transaction.getInputs().size();
                     outputs = transaction.getOutputs().size();
-                    log.debug("Transaction with txid: " + transaction.getTxId() + " version " + transaction.getVersion() + " size " + transaction.getMessageSize() + " locktime " + transaction.getLockTime());
+                    log.debug("Transaction with txid: " + transaction.getTxId() + " version " + transaction.getVersion() + " size " + transaction.getMessageSize() + " locktime " + transaction.getLocktime());
                     for(TransactionInput input: transaction.getInputs()) {
                         if(input.getScriptSig().getProgram().length != 0) {
                             throw new PSBTParseException("Unsigned tx input does not have empty scriptSig");

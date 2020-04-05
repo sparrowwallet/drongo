@@ -21,9 +21,10 @@ public class Transaction extends TransactionPart {
     public static final int MAX_BLOCK_SIZE = 1000 * 1000;
     public static final long MAX_BITCOIN = 21 * 1000 * 1000L;
     public static final long SATOSHIS_PER_BITCOIN = 100 * 1000 * 1000L;
+    public static final long MAX_BLOCK_LOCKTIME = 500000000L;
 
     private long version;
-    private long lockTime;
+    private long locktime;
     private boolean segwit;
     private int segwitVersion;
 
@@ -45,19 +46,34 @@ public class Transaction extends TransactionPart {
         this.version = version;
     }
 
-    public long getLockTime() {
-        return lockTime;
+    public long getLocktime() {
+        return locktime;
     }
 
-    public void setLockTime(long lockTime) {
-        this.lockTime = lockTime;
+    public void setLocktime(long locktime) {
+        this.locktime = locktime;
     }
 
-    public boolean isLockTimeEnabled() {
-        if(lockTime == 0) return false;
+    public boolean isLocktimeEnabled() {
+        if(locktime == 0) return false;
+        return isLocktimeSequenceEnabled();
+    }
+
+    public boolean isLocktimeSequenceEnabled() {
+        for(TransactionInput input : inputs) {
+            if(!input.isAbsoluteTimeLockDisabled()) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    public boolean isReplaceByFee() {
+        if(locktime == 0) return false;
 
         for(TransactionInput input : inputs) {
-            if(input.getSequenceNumber() != TransactionInput.SEQUENCE_LOCKTIME_DISABLED) {
+            if(input.isReplaceByFeeEnabled()) {
                 return true;
             }
         }
@@ -149,7 +165,7 @@ public class Transaction extends TransactionPart {
             }
         }
         // lock_time
-        uint32ToByteStreamLE(lockTime, stream);
+        uint32ToByteStreamLE(locktime, stream);
     }
 
     /**
@@ -176,7 +192,7 @@ public class Transaction extends TransactionPart {
         if (segwit)
             parseWitnesses();
         // lock_time
-        lockTime = readUint32();
+        locktime = readUint32();
 
         length = cursor - offset;
     }
@@ -456,7 +472,7 @@ public class Transaction extends TransactionPart {
             uint64ToByteStreamLE(BigInteger.valueOf(prevValue), bos);
             uint32ToByteStreamLE(inputs.get(inputIndex).getSequenceNumber(), bos);
             bos.write(hashOutputs);
-            uint32ToByteStreamLE(this.lockTime, bos);
+            uint32ToByteStreamLE(this.locktime, bos);
             uint32ToByteStreamLE(0x000000ff & sigHashType, bos);
         } catch (IOException e) {
             throw new RuntimeException(e);  // Cannot happen.

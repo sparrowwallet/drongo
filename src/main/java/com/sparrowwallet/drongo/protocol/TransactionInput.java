@@ -6,7 +6,10 @@ import java.io.IOException;
 import java.io.OutputStream;
 
 public class TransactionInput extends TransactionPart {
-    public static final long SEQUENCE_LOCKTIME_DISABLED = 0xFFFFFFFF;
+    public static final long SEQUENCE_LOCKTIME_DISABLED = 4294967295L;
+    public static final long SEQUENCE_RBF_ENABLED = 4294967293L;
+    public static final long MAX_RELATIVE_TIMELOCK = 0x40FFFF;
+    public static final long MAX_RELATIVE_TIMELOCK_IN_BLOCKS = 0xFFFF;
 
     // Allows for altering transactions after they were broadcast. Values below NO_SEQUENCE-1 mean it can be altered.
     private long sequence;
@@ -95,6 +98,30 @@ public class TransactionInput extends TransactionPart {
     public boolean isCoinBase() {
         return outpoint.getHash().equals(Sha256Hash.ZERO_HASH) &&
                 (outpoint.getIndex() & 0xFFFFFFFFL) == 0xFFFFFFFFL;  // -1 but all is serialized to the wire as unsigned int.
+    }
+
+    public boolean isReplaceByFeeEnabled() {
+        return sequence <= SEQUENCE_RBF_ENABLED;
+    }
+
+    public boolean isAbsoluteTimeLockDisabled() {
+        return sequence >= SEQUENCE_LOCKTIME_DISABLED;
+    }
+
+    public boolean isAbsoluteTimeLocked() {
+        return !isAbsoluteTimeLockDisabled() && !isRelativeTimeLocked();
+    }
+
+    public boolean isRelativeTimeLocked() {
+        return sequence <= MAX_RELATIVE_TIMELOCK;
+    }
+
+    public boolean isRelativeTimeLockedInBlocks() {
+        return sequence <= MAX_RELATIVE_TIMELOCK_IN_BLOCKS;
+    }
+
+    public long getRelativeLocktime() {
+        return sequence & MAX_RELATIVE_TIMELOCK_IN_BLOCKS;
     }
 
     protected void bitcoinSerializeToStream(OutputStream stream) throws IOException {
