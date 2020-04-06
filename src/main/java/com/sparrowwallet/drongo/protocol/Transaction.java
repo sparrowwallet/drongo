@@ -69,6 +69,10 @@ public class Transaction extends TransactionPart {
         return false;
     }
 
+    public boolean isRelativeLocktimeAllowed() {
+        return version >= 2L;
+    }
+
     public boolean isReplaceByFee() {
         if(locktime == 0) return false;
 

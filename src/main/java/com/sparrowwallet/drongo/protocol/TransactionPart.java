@@ -34,6 +34,10 @@ public abstract class TransactionPart {
 
     protected abstract void parse() throws ProtocolException;
 
+    public TransactionPart getParent() {
+        return parent;
+    }
+
     public final void setParent(TransactionPart parent) {
         this.parent = parent;
     }

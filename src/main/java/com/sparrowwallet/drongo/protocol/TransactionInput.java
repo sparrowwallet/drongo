@@ -8,8 +8,10 @@ import java.io.OutputStream;
 public class TransactionInput extends TransactionPart {
     public static final long SEQUENCE_LOCKTIME_DISABLED = 4294967295L;
     public static final long SEQUENCE_RBF_ENABLED = 4294967293L;
-    public static final long MAX_RELATIVE_TIMELOCK = 0x40FFFF;
-    public static final long MAX_RELATIVE_TIMELOCK_IN_BLOCKS = 0xFFFF;
+    public static final long MAX_RELATIVE_TIMELOCK = 2147483647L;
+    public static final long RELATIVE_TIMELOCK_VALUE_MASK = 0xFFFF;
+    public static final long RELATIVE_TIMELOCK_TYPE_FLAG = 0x400000;
+    public static final int RELATIVE_TIMELOCK_SECONDS_INCREMENT = 512;
 
     // Allows for altering transactions after they were broadcast. Values below NO_SEQUENCE-1 mean it can be altered.
     private long sequence;
@@ -113,15 +115,19 @@ public class TransactionInput extends TransactionPart {
     }
 
     public boolean isRelativeTimeLocked() {
-        return sequence <= MAX_RELATIVE_TIMELOCK;
+        return getTransaction().isRelativeLocktimeAllowed() && sequence <= MAX_RELATIVE_TIMELOCK;
     }
 
     public boolean isRelativeTimeLockedInBlocks() {
-        return sequence <= MAX_RELATIVE_TIMELOCK_IN_BLOCKS;
+        return isRelativeTimeLocked() && ((sequence & RELATIVE_TIMELOCK_TYPE_FLAG) == 0);
     }
 
     public long getRelativeLocktime() {
-        return sequence & MAX_RELATIVE_TIMELOCK_IN_BLOCKS;
+        return sequence & RELATIVE_TIMELOCK_VALUE_MASK;
+    }
+
+    public Transaction getTransaction() {
+        return (Transaction)getParent();
     }
 
     protected void bitcoinSerializeToStream(OutputStream stream) throws IOException {
