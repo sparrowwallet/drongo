@@ -142,7 +142,7 @@ public class Script {
      */
     public Address[] getToAddresses() throws NonStandardScriptException {
         if (ScriptPattern.isP2PK(this))
-            return new Address[] { new P2PKAddress( ScriptPattern.extractPKFromP2PK(this)) };
+            return new Address[] { new P2PKAddress( ScriptPattern.extractPKFromP2PK(this).getPubKey()) };
         else if (ScriptPattern.isP2PKH(this))
             return new Address[] { new P2PKHAddress( ScriptPattern.extractHashFromP2PKH(this)) };
         else if (ScriptPattern.isP2SH(this))
@@ -177,6 +177,17 @@ public class Script {
         }
 
         return null;
+    }
+
+    public List<TransactionSignature> getSignatures() {
+        List<TransactionSignature> signatures = new ArrayList<>();
+        for(ScriptChunk chunk : chunks) {
+            if(chunk.isSignature()) {
+                signatures.add(chunk.getSignature());
+            }
+        }
+
+        return signatures;
     }
 
     public static int decodeFromOpN(int opcode) {
@@ -271,7 +282,7 @@ public class Script {
             if(chunk.isSignature()) {
                 builder.append("<signature").append(signatureCount++).append(">");
             } else if(chunk.isScript()) {
-                Script nestedScript = new Script(chunk.getData());
+                Script nestedScript = chunk.getScript();
                 if(ScriptPattern.isP2WPKH(nestedScript)) {
                     builder.append("(OP_0 <wpkh>)");
                 } else if(ScriptPattern.isP2WSH(nestedScript)) {

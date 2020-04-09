@@ -11,10 +11,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.nio.charset.StandardCharsets;
-import java.util.Arrays;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 import static com.sparrowwallet.drongo.psbt.PSBTEntry.parseKeyDerivation;
 
@@ -39,7 +36,7 @@ public class PSBTInput {
     private Script witnessScript;
     private Map<ECKey, KeyDerivation> derivedPublicKeys = new LinkedHashMap<>();
     private Script finalScriptSig;
-    private Script finalScriptWitness;
+    private TransactionWitness finalScriptWitness;
     private String porCommitment;
     private Map<String, String> proprietary = new LinkedHashMap<>();
 
@@ -162,9 +159,9 @@ public class PSBTInput {
                     break;
                 case PSBT_IN_FINAL_SCRIPTWITNESS:
                     entry.checkOneByteKey();
-                    Script finalScriptWitness = new Script(entry.getData());
+                    TransactionWitness finalScriptWitness = new TransactionWitness(null, entry.getData(), 0);
                     this.finalScriptWitness = finalScriptWitness;
-                    log.debug("Found input final scriptWitness script hex " + Hex.toHexString(finalScriptWitness.getProgram()) + " script " + finalScriptWitness.toString());
+                    log.debug("Found input final scriptWitness " + finalScriptWitness.toString());
                     break;
                 case PSBT_IN_POR_COMMITMENT:
                     entry.checkOneByteKey();
@@ -217,7 +214,7 @@ public class PSBTInput {
         return finalScriptSig;
     }
 
-    public Script getFinalScriptWitness() {
+    public TransactionWitness getFinalScriptWitness() {
         return finalScriptWitness;
     }
 
@@ -227,6 +224,18 @@ public class PSBTInput {
 
     public Map<ECKey, TransactionSignature> getPartialSignatures() {
         return partialSignatures;
+    }
+
+    public ECKey getKeyForSignature(TransactionSignature signature) {
+        if(partialSignatures != null) {
+            for(Map.Entry<ECKey, TransactionSignature> entry : partialSignatures.entrySet()) {
+                if(entry.getValue().equals(signature)) {
+                    return entry.getKey();
+                }
+            }
+        }
+
+        return null;
     }
 
     public Map<ECKey, KeyDerivation> getDerivedPublicKeys() {
@@ -263,6 +272,8 @@ public class PSBTInput {
                     }
                 }
 
+                //TODO: Implement Bitcoin Script engine to verify finalScriptSig and finalScriptWitness
+
                 return true;
             }
         }
@@ -275,10 +286,12 @@ public class PSBTInput {
         Script signingScript = getNonWitnessUtxo() != null ? getNonWitnessUtxo().getOutputs().get(vout).getScript() : getWitnessUtxo().getScript();
 
         if(ScriptPattern.isP2SH(signingScript)) {
-            if(getRedeemScript() == null) {
-                return null;
-            } else {
+            if(getRedeemScript() != null) {
                 signingScript = getRedeemScript();
+            } else if(getFinalScriptSig() != null) {
+                signingScript = getFinalScriptSig().getFirstNestedScript();
+            } else {
+                return null;
             }
         }
 
@@ -286,10 +299,15 @@ public class PSBTInput {
             Address address = new P2PKHAddress(signingScript.getPubKeyHash());
             signingScript = address.getOutputScript();
         } else if(ScriptPattern.isP2WSH(signingScript)) {
-            if(getWitnessScript() == null) {
-                return null;
-            } else {
+            if(getWitnessScript() != null) {
                 signingScript = getWitnessScript();
+            } else if(getFinalScriptWitness() != null) {
+                List<ScriptChunk> witnessChunks = getFinalScriptWitness().asScriptChunks();
+                if(witnessChunks.get(witnessChunks.size() - 1).isScript()) {
+                    return witnessChunks.get(witnessChunks.size() - 1).getScript();
+                }
+            } else {
+                return null;
             }
         }
 

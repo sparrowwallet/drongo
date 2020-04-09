@@ -165,7 +165,9 @@ public class Transaction extends TransactionPart {
         // script_witnesses
         if (useSegwit) {
             for (TransactionInput in : inputs) {
-                in.getWitness().bitcoinSerializeToStream(stream);
+                if (in.hasWitness()) {
+                    in.getWitness().bitcoinSerializeToStream(stream);
+                }
             }
         }
         // lock_time
@@ -226,14 +228,9 @@ public class Transaction extends TransactionPart {
     private void parseWitnesses() {
         int numWitnesses = inputs.size();
         for (int i = 0; i < numWitnesses; i++) {
-            long pushCount = readVarInt();
-            TransactionWitness witness = new TransactionWitness((int) pushCount);
+            TransactionWitness witness = new TransactionWitness(this, rawtx, cursor);
             inputs.get(i).setWitness(witness);
-            for (int y = 0; y < pushCount; y++) {
-                long pushSize = readVarInt();
-                byte[] push = readBytes((int) pushSize);
-                witness.setPush(y, push);
-            }
+            cursor += witness.getLength();
         }
     }
 
@@ -261,7 +258,9 @@ public class Transaction extends TransactionPart {
         // script_witnesses
         if(isSegwit()) {
             for (TransactionInput in : inputs) {
-                wu += in.getWitness().getLength();
+                if (in.hasWitness()) {
+                    wu += in.getWitness().getLength();
+                }
             }
         }
         // lock_time

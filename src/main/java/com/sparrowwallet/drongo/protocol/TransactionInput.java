@@ -66,7 +66,7 @@ public class TransactionInput extends TransactionPart {
     }
 
     public TransactionWitness getWitness() {
-        return witness != null ? witness : TransactionWitness.EMPTY;
+        return witness;
     }
 
     public void setWitness(TransactionWitness witness) {

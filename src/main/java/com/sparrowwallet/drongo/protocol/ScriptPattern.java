@@ -2,6 +2,7 @@ package com.sparrowwallet.drongo.protocol;
 
 import com.sparrowwallet.drongo.address.Address;
 import com.sparrowwallet.drongo.address.P2PKAddress;
+import com.sparrowwallet.drongo.crypto.ECKey;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -34,8 +35,8 @@ public class ScriptPattern {
      * Extract the pubkey from a P2PK scriptPubKey. It's important that the script is in the correct form, so you
      * will want to guard calls to this method with {@link #isP2PK(Script)}.
      */
-    public static byte[] extractPKFromP2PK(Script script) {
-        return script.chunks.get(0).data;
+    public static ECKey extractPKFromP2PK(Script script) {
+        return ECKey.fromPublicOnly(script.chunks.get(0).data);
     }
 
     /**
@@ -107,6 +108,14 @@ public class ScriptPattern {
     }
 
     /**
+     * Extract the script hash from a P2SH scriptPubKey. It's important that the script is in the correct form, so you
+     * will want to guard calls to this method with {@link #isP2SH(Script)}.
+     */
+    public static byte[] extractHashFromP2SH(Script script) {
+        return script.chunks.get(1).data;
+    }
+
+    /**
      * Returns whether this script matches the format used for multisig outputs:
      * {@code [n] [keys...] [m] CHECKMULTISIG}
      */
@@ -148,14 +157,6 @@ public class ScriptPattern {
         }
 
         return addresses.toArray(new Address[addresses.size()]);
-    }
-
-    /**
-     * Extract the script hash from a P2SH scriptPubKey. It's important that the script is in the correct form, so you
-     * will want to guard calls to this method with {@link #isP2SH(Script)}.
-     */
-    public static byte[] extractHashFromP2SH(Script script) {
-        return script.chunks.get(1).data;
     }
 
     /**

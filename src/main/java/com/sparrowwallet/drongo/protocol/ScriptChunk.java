@@ -96,6 +96,14 @@ public class ScriptChunk {
         return true;
     }
 
+    public TransactionSignature getSignature() {
+        try {
+            return TransactionSignature.decodeFromBitcoin(data, false, false);
+        } catch(SignatureDecodeException e) {
+            throw new ProtocolException("Could not decode signature", e);
+        }
+    }
+
     public boolean isScript() {
         if(data == null || data.length == 0) {
             return false;
@@ -110,12 +118,20 @@ public class ScriptChunk {
         return true;
     }
 
+    public Script getScript() {
+        return new Script(data);
+    }
+
     public boolean isPubKey() {
         if(data == null || data.length == 0) {
             return false;
         }
 
         return ECKey.isPubKey(data);
+    }
+
+    public ECKey getPubKey() {
+        return ECKey.fromPublicOnly(data);
     }
 
     public byte[] toByteArray() {

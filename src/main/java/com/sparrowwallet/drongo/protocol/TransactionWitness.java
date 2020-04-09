@@ -1,8 +1,8 @@
 package com.sparrowwallet.drongo.protocol;
 
-import com.sparrowwallet.drongo.Utils;
 import org.bouncycastle.util.encoders.Hex;
 
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.util.ArrayList;
@@ -10,20 +10,35 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 
-public class TransactionWitness {
-    public static final TransactionWitness EMPTY = new TransactionWitness(0);
+public class TransactionWitness extends TransactionPart {
+    private List<byte[]> pushes;
 
-    private final List<byte[]> pushes;
+    public TransactionWitness(Transaction parent, byte[] rawtx, int offset) {
+        super(rawtx, offset);
+        setParent(parent);
+        if(pushes == null) {
+            pushes = new ArrayList<>();
+        }
+    }
 
-    public TransactionWitness(int pushCount) {
-        pushes = new ArrayList<>(Math.min(pushCount, Utils.MAX_INITIAL_ARRAY_LENGTH));
+    protected void parse() throws ProtocolException {
+        long pushCount = readVarInt();
+        for (int y = 0; y < pushCount; y++) {
+            long pushSize = readVarInt();
+            byte[] push = readBytes((int)pushSize);
+            setPush(y, push);
+        }
     }
 
     public List<byte[]> getPushes() {
         return Collections.unmodifiableList(pushes);
     }
 
-    public void setPush(int i, byte[] value) {
+    protected void setPush(int i, byte[] value) {
+        if(pushes == null) {
+            pushes = new ArrayList<>();
+        }
+
         while (i >= pushes.size()) {
             pushes.add(new byte[]{});
         }
@@ -54,6 +69,15 @@ public class TransactionWitness {
         }
     }
 
+    public byte[] toByteArray() {
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        try {
+            bitcoinSerializeToStream(baos);
+        } catch(IOException e) { }
+
+        return baos.toByteArray();
+    }
+
     @Override
     public String toString() {
         StringBuilder builder = new StringBuilder();
@@ -78,6 +102,27 @@ public class TransactionWitness {
         }
 
         return scriptChunks;
+    }
+
+    public List<TransactionSignature> getSignatures() {
+        List<TransactionSignature> signatures = new ArrayList<>();
+        List<ScriptChunk> scriptChunks = this.asScriptChunks();
+        for(ScriptChunk chunk : scriptChunks) {
+            if(chunk.isSignature()) {
+                signatures.add(chunk.getSignature());
+            }
+        }
+
+        return signatures;
+    }
+
+    public Script getWitnessScript() {
+        List<ScriptChunk> scriptChunks = this.asScriptChunks();
+        if(scriptChunks.get(scriptChunks.size() - 1).isScript()) {
+            return scriptChunks.get(scriptChunks.size() - 1).getScript();
+        }
+
+        return null;
     }
 
     @Override
