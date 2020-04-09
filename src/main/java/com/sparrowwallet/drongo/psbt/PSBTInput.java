@@ -301,11 +301,8 @@ public class PSBTInput {
         } else if(ScriptPattern.isP2WSH(signingScript)) {
             if(getWitnessScript() != null) {
                 signingScript = getWitnessScript();
-            } else if(getFinalScriptWitness() != null) {
-                List<ScriptChunk> witnessChunks = getFinalScriptWitness().asScriptChunks();
-                if(witnessChunks.get(witnessChunks.size() - 1).isScript()) {
-                    return witnessChunks.get(witnessChunks.size() - 1).getScript();
-                }
+            } else if(getFinalScriptWitness() != null && getFinalScriptWitness().getWitnessScript() != null) {
+                return getFinalScriptWitness().getWitnessScript();
             } else {
                 return null;
             }
