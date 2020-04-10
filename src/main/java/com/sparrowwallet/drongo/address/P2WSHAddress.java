@@ -8,8 +8,8 @@ import java.util.List;
 import static com.sparrowwallet.drongo.address.P2WPKHAddress.HRP;
 
 public class P2WSHAddress extends Address {
-    public P2WSHAddress(byte[] pubKeyHash) {
-        super(pubKeyHash);
+    public P2WSHAddress(byte[] scriptHash) {
+        super(scriptHash);
     }
 
     public int getVersion() {
@@ -17,15 +17,25 @@ public class P2WSHAddress extends Address {
     }
 
     public String getAddress() {
-        return Bech32.encode(HRP, getVersion(), pubKeyHash);
+        return Bech32.encode(HRP, getVersion(), hash);
     }
 
     public Script getOutputScript() {
         List<ScriptChunk> chunks = new ArrayList<>();
         chunks.add(new ScriptChunk(Script.encodeToOpN(getVersion()), null));
-        chunks.add(new ScriptChunk(pubKeyHash.length, pubKeyHash));
+        chunks.add(new ScriptChunk(hash.length, hash));
 
         return new Script(chunks);
+    }
+
+    @Override
+    public byte[] getOutputScriptData() {
+        return hash;
+    }
+
+    @Override
+    public String getOutputScriptDataType() {
+        return "Witness Script Hash";
     }
 
     public static P2WSHAddress fromProgram(byte[] program) {

@@ -19,14 +19,24 @@ public class P2WPKHAddress extends Address {
     }
 
     public String getAddress() {
-        return Bech32.encode(HRP, getVersion(), pubKeyHash);
+        return Bech32.encode(HRP, getVersion(), hash);
     }
 
     public Script getOutputScript() {
         List<ScriptChunk> chunks = new ArrayList<>();
         chunks.add(new ScriptChunk(Script.encodeToOpN(getVersion()), null));
-        chunks.add(new ScriptChunk(pubKeyHash.length, pubKeyHash));
+        chunks.add(new ScriptChunk(hash.length, hash));
 
         return new Script(chunks);
+    }
+
+    @Override
+    public byte[] getOutputScriptData() {
+        return hash;
+    }
+
+    @Override
+    public String getOutputScriptDataType() {
+        return "Witness Public Key Hash";
     }
 }

@@ -20,10 +20,20 @@ public class P2PKHAddress extends Address {
         List<ScriptChunk> chunks = new ArrayList<>();
         chunks.add(new ScriptChunk(ScriptOpCodes.OP_DUP, null));
         chunks.add(new ScriptChunk(ScriptOpCodes.OP_HASH160, null));
-        chunks.add(new ScriptChunk(pubKeyHash.length, pubKeyHash));
+        chunks.add(new ScriptChunk(hash.length, hash));
         chunks.add(new ScriptChunk(ScriptOpCodes.OP_EQUALVERIFY, null));
         chunks.add(new ScriptChunk(ScriptOpCodes.OP_CHECKSIG, null));
 
         return new Script(chunks);
+    }
+
+    @Override
+    public byte[] getOutputScriptData() {
+        return hash;
+    }
+
+    @Override
+    public String getOutputScriptDataType() {
+        return "Public Key Hash";
     }
 }

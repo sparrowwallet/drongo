@@ -27,4 +27,14 @@ public class P2PKAddress extends Address {
 
         return new Script(chunks);
     }
+
+    @Override
+    public byte[] getOutputScriptData() {
+        return pubKey;
+    }
+
+    @Override
+    public String getOutputScriptDataType() {
+        return "Public Key";
+    }
 }

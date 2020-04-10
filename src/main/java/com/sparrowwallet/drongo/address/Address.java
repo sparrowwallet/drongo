@@ -4,18 +4,18 @@ import com.sparrowwallet.drongo.protocol.Base58;
 import com.sparrowwallet.drongo.protocol.Script;
 
 public abstract class Address {
-    protected final byte[] pubKeyHash;
+    protected final byte[] hash;
 
-    public Address(byte[] pubKeyHash) {
-        this.pubKeyHash = pubKeyHash;
+    public Address(byte[] hash) {
+        this.hash = hash;
     }
 
-    public byte[] getPubKeyHash() {
-        return pubKeyHash;
+    public byte[] getHash() {
+        return hash;
     }
 
     public String getAddress() {
-        return Base58.encodeChecked(getVersion(), pubKeyHash);
+        return Base58.encodeChecked(getVersion(), hash);
     }
 
     public String toString() {
@@ -25,6 +25,10 @@ public abstract class Address {
     public abstract int getVersion();
 
     public abstract Script getOutputScript();
+
+    public abstract byte[] getOutputScriptData();
+
+    public abstract String getOutputScriptDataType();
 
     public boolean equals(Object obj) {
         if(!(obj instanceof Address)) {
@@ -37,5 +41,10 @@ public abstract class Address {
 
     public int hashCode() {
         return getAddress().hashCode();
+    }
+
+    public String getScriptType() {
+        String className = this.getClass().getSimpleName();
+        return className.replace("Address", "");
     }
 }

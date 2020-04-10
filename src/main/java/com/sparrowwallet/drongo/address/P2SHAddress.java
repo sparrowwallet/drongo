@@ -9,8 +9,8 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class P2SHAddress extends Address {
-    public P2SHAddress(byte[] pubKeyHash) {
-        super(pubKeyHash);
+    public P2SHAddress(byte[] scriptHash) {
+        super(scriptHash);
     }
 
     public int getVersion() {
@@ -20,10 +20,20 @@ public class P2SHAddress extends Address {
     public Script getOutputScript() {
         List<ScriptChunk> chunks = new ArrayList<>();
         chunks.add(new ScriptChunk(ScriptOpCodes.OP_HASH160, null));
-        chunks.add(new ScriptChunk(pubKeyHash.length, pubKeyHash));
+        chunks.add(new ScriptChunk(hash.length, hash));
         chunks.add(new ScriptChunk(ScriptOpCodes.OP_EQUAL, null));
 
         return new Script(chunks);
+    }
+
+    @Override
+    public byte[] getOutputScriptData() {
+        return hash;
+    }
+
+    @Override
+    public String getOutputScriptDataType() {
+        return "Script Hash";
     }
 
     public static P2SHAddress fromProgram(byte[] program) {
