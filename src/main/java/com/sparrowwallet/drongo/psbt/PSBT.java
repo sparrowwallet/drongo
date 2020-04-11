@@ -519,9 +519,15 @@ public class PSBT {
     }
 
     public static boolean isPSBT(byte[] b) {
-        ByteBuffer buffer = ByteBuffer.wrap(b);
-        int header = buffer.getInt();
-        return header == PSBT_MAGIC_INT;
+        try {
+            ByteBuffer buffer = ByteBuffer.wrap(b);
+            int header = buffer.getInt();
+            return header == PSBT_MAGIC_INT;
+        } catch (Exception e) {
+            //ignore
+        }
+
+        return false;
     }
 
     public static boolean isPSBT(String s) {

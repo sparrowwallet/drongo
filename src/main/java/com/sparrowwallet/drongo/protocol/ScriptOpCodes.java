@@ -291,25 +291,25 @@ public class ScriptOpCodes {
     }
 
     /**
-     * Converts the given OpCode into a string (eg "0", "PUSHDATA", or "NON_OP(10)")
+     * Converts the given OpCode into a string (eg "0", "PUSHDATA", or "RETURN_10")
      */
     public static String getOpCodeName(int opcode) {
         if (opCodeNameMap.containsKey((Integer)opcode)) {
             return opCodeNameMap.get(opcode);
         }
 
-        return "NON_OP(" + opcode + ")";
+        return "RETURN_" + opcode;
     }
 
     /**
-     * Converts the given pushdata OpCode into a string (eg "PUSHDATA2", or "PUSHDATA(23)")
+     * Converts the given pushdata OpCode into a string (eg "PUSHDATA_2", or "PUSHDATA_23")
      */
     public static String getPushDataName(int opcode) {
         if (opCodeNameMap.containsKey(opcode)) {
             return opCodeNameMap.get(opcode);
         }
 
-        return "PUSHDATA(" + opcode + ")";
+        return "PUSHDATA_" + opcode;
     }
 
     /**

@@ -110,12 +110,18 @@ public class ScriptChunk {
         }
 
         try {
-            new Script(data);
+            Script script = new Script(data);
+            //Flaky: Test if contains a non-zero opcode, otherwise not a script
+            for(ScriptChunk chunk : script.getChunks()) {
+                if(chunk.getOpcode() != OP_0) {
+                    return true;
+                }
+            }
         } catch(ProtocolException e) {
             return false;
         }
 
-        return true;
+        return false;
     }
 
     public Script getScript() {

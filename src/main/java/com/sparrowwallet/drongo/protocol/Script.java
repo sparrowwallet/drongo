@@ -23,8 +23,14 @@ public class Script {
     protected byte[] program;
 
     public Script(byte[] programBytes) {
+        this(programBytes, true);
+    }
+
+    Script(byte[] programBytes, boolean parse) {
         program = programBytes;
-        parse(programBytes);
+        if(parse) {
+            parse();
+        }
     }
 
     public Script(List<ScriptChunk> chunks) {
@@ -38,7 +44,7 @@ public class Script {
             new ScriptChunk(ScriptOpCodes.OP_CHECKSIG, null, 24),
     };
 
-    private void parse(byte[] program) {
+    void parse() {
         chunks = new ArrayList<>(5);   // Common size.
         ByteArrayInputStream bis = new ByteArrayInputStream(program);
         int initialSize = bis.available();

@@ -320,6 +320,12 @@ public class Transaction extends TransactionPart {
         return inputs.size() == 1 && inputs.get(0).isCoinBase();
     }
 
+    public static boolean isTransaction(byte[] bytes) {
+        //Incomplete quick test
+        long version = Utils.readUint32(bytes, 0);
+        return version > 0 && version < 5;
+    }
+
     public Sha256Hash hashForSignature(int inputIndex, Script redeemScript, SigHash type, boolean anyoneCanPay) {
         int sigHash = TransactionSignature.calcSigHashValue(type, anyoneCanPay);
         return hashForSignature(inputIndex, redeemScript.getProgram(), (byte) sigHash);

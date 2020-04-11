@@ -45,7 +45,17 @@ public class TransactionInput extends TransactionPart {
 
     public Script getScriptSig() {
         if(scriptSig == null) {
-            scriptSig = new Script(scriptBytes);
+            if(isCoinBase()) {
+                //ScriptSig may be invalid, attempt to parse
+                scriptSig = new Script(scriptBytes, false);
+                try {
+                    scriptSig.parse();
+                } catch (ProtocolException e) {
+                    scriptSig = new Script(scriptSig.getChunks());
+                }
+            } else {
+                scriptSig = new Script(scriptBytes);
+            }
         }
 
         return scriptSig;
