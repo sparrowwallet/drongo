@@ -2,6 +2,7 @@ package com.sparrowwallet.drongo.protocol;
 
 import com.sparrowwallet.drongo.Utils;
 import com.sparrowwallet.drongo.address.*;
+import com.sparrowwallet.drongo.crypto.ECKey;
 import org.bouncycastle.util.encoders.Hex;
 
 import java.io.ByteArrayInputStream;
@@ -11,6 +12,8 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+
+import static com.sparrowwallet.drongo.protocol.ScriptType.*;
 
 import static com.sparrowwallet.drongo.protocol.ScriptOpCodes.*;
 
@@ -124,7 +127,13 @@ public class Script {
      * Returns true if this script has the required form to contain a destination address
      */
     public boolean containsToAddress() {
-        return ScriptPattern.isP2PK(this) || ScriptPattern.isP2PKH(this) || ScriptPattern.isP2SH(this) || ScriptPattern.isP2WPKH(this) || ScriptPattern.isP2WSH(this) || ScriptPattern.isMultisig(this);
+        for(ScriptType scriptType : ScriptType.values()) {
+            if(scriptType.isScriptType(this)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**
@@ -133,46 +142,52 @@ public class Script {
      * <p>Otherwise this method throws a ScriptException.</p>
      */
     public byte[] getPubKeyHash() throws ProtocolException {
-        if (ScriptPattern.isP2PKH(this))
-            return ScriptPattern.extractHashFromP2PKH(this);
-        else if (ScriptPattern.isP2SH(this))
-            return ScriptPattern.extractHashFromP2SH(this);
-        else if (ScriptPattern.isP2WPKH(this) || ScriptPattern.isP2WSH(this))
-            return ScriptPattern.extractHashFromP2WH(this);
-        else
-            throw new ProtocolException("Script not in the standard scriptPubKey form");
+        for(ScriptType scriptType : SINGLE_HASH_TYPES) {
+            if(scriptType.isScriptType(this)) {
+                return scriptType.getHashFromScript(this);
+            }
+        }
+
+        throw new ProtocolException("Script not a standard form that contains a single hash");
     }
 
     /**
      * Gets the destination address from this script, if it's in the required form.
      */
     public Address[] getToAddresses() throws NonStandardScriptException {
-        if (ScriptPattern.isP2PK(this))
-            return new Address[] { new P2PKAddress( ScriptPattern.extractPKFromP2PK(this).getPubKey()) };
-        else if (ScriptPattern.isP2PKH(this))
-            return new Address[] { new P2PKHAddress( ScriptPattern.extractHashFromP2PKH(this)) };
-        else if (ScriptPattern.isP2SH(this))
-            return new Address[] { new P2SHAddress(ScriptPattern.extractHashFromP2SH(this)) };
-        else if (ScriptPattern.isP2WPKH(this))
-            return new Address[] { new P2WPKHAddress(ScriptPattern.extractHashFromP2WH(this)) };
-        else if (ScriptPattern.isP2WSH(this))
-            return new Address[] { new P2WSHAddress(ScriptPattern.extractHashFromP2WH(this)) };
-        else if (ScriptPattern.isMultisig(this))
-            return ScriptPattern.extractMultisigAddresses(this);
-        else
-            throw new NonStandardScriptException("Cannot find addresses in non standard script: " + toString());
+        for(ScriptType scriptType : SINGLE_HASH_TYPES) {
+            if(scriptType.isScriptType(this)) {
+                return new Address[] { scriptType.getAddress(scriptType.getHashFromScript(this)) };
+            }
+        }
+
+        if(P2PK.isScriptType(this)) {
+            return new Address[] { P2PK.getAddress(P2PK.getPublicKeyFromScript(this).getPubKey()) };
+        }
+
+        if(MULTISIG.isScriptType(this)) {
+            List<Address> addresses = new ArrayList<>();
+            ECKey[] pubKeys = MULTISIG.getPublicKeysFromScript(this);
+            for(ECKey pubKey : pubKeys) {
+                addresses.add(new P2PKAddress(pubKey.getPubKey()));
+            }
+
+            return addresses.toArray(new Address[addresses.size()]);
+        }
+
+        throw new NonStandardScriptException("Cannot find addresses in non standard script: " + toString());
     }
 
     public int getNumRequiredSignatures() throws NonStandardScriptException {
-        if(ScriptPattern.isP2PK(this) || ScriptPattern.isP2PKH(this) || ScriptPattern.isP2WPKH(this)) {
+        if(P2PK.isScriptType(this) || P2PKH.isScriptType(this) || P2WPKH.isScriptType(this)) {
             return 1;
         }
 
-        if(ScriptPattern.isMultisig(this)) {
-            return ScriptPattern.extractMultisigThreshold(this);
+        if(MULTISIG.isScriptType(this)) {
+            return MULTISIG.getThreshold(this);
         }
 
-        throw new NonStandardScriptException("Cannot find number of required signatures for non standard script: " + toString());
+        throw new NonStandardScriptException("Cannot find number of required signatures for script: " + toString());
     }
 
     public Script getFirstNestedScript() {
@@ -289,9 +304,9 @@ public class Script {
                 builder.append("<signature").append(signatureCount++).append(">");
             } else if(chunk.isScript()) {
                 Script nestedScript = chunk.getScript();
-                if(ScriptPattern.isP2WPKH(nestedScript)) {
+                if(P2WPKH.isScriptType(nestedScript)) {
                     builder.append("(OP_0 <wpkh>)");
-                } else if(ScriptPattern.isP2WSH(nestedScript)) {
+                } else if(P2WSH.isScriptType(nestedScript)) {
                     builder.append("(OP_0 <wsh>)");
                 } else {
                     builder.append("(").append(nestedScript.toDisplayString()).append(")");

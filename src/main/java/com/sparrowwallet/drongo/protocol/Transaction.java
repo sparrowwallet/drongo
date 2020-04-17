@@ -544,8 +544,7 @@ public class Transaction extends TransactionPart {
         Transaction transaction = new Transaction(transactionBytes);
 
         ECKey pubKey = ECKey.fromPublicOnly(Utils.hexToBytes("026dccc749adc2a9d0d89497ac511f760f45c47dc5ed9cf352a58ac706453880ae"));
-        P2PKHAddress address = new P2PKHAddress(pubKey.getPubKeyHash());
-        System.out.println(address.getOutputScript().getProgram().length);
+        System.out.println(ScriptType.P2PKH.getOutputScript(pubKey.getPubKeyHash()).getProgram().length);
         Script script = new Script(Utils.hexToBytes("21026dccc749adc2a9d0d89497ac511f760f45c47dc5ed9cf352a58ac706453880aeadab210255a9626aebf5e29c0e6538428ba0d1dcf6ca98ffdf086aa8ced5e0d0215ea465ac"));
         Sha256Hash hash = transaction.hashForWitnessSignature(1, script,4900000000L, SigHash.SINGLE, false);
         System.out.println("Sighash: " + hash.toString());

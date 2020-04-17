@@ -14,8 +14,7 @@ public class TransactionTest {
         Transaction transaction = new Transaction(Utils.hexToBytes(hex));
 
         ECKey pubKey = ECKey.fromPublicOnly(Utils.hexToBytes("025476c2e83188368da1ff3e292e7acafcdb3566bb0ad253f62fc70f07aeee6357"));
-        P2PKHAddress address = new P2PKHAddress(pubKey.getPubKeyHash());
-        Sha256Hash hash = transaction.hashForWitnessSignature(1, address.getOutputScript(),600000000L, Transaction.SigHash.ALL, false);
+        Sha256Hash hash = transaction.hashForWitnessSignature(1, ScriptType.P2PKH.getOutputScript(pubKey.getPubKeyHash()),600000000L, Transaction.SigHash.ALL, false);
         TransactionSignature signature = TransactionSignature.decodeFromBitcoin(Utils.hexToBytes("304402203609e17b84f6a7d30c80bfa610b5b4542f32a8a0d5447a12fb1366d7f01cc44a0220573a954c4518331561406f90300e8f3358f51928d43c212a8caed02de67eebee"), false, true);
         Assert.assertTrue(pubKey.verify(hash, signature));
     }
@@ -26,8 +25,7 @@ public class TransactionTest {
         Transaction transaction = new Transaction(Utils.hexToBytes(hex));
 
         ECKey pubKey = ECKey.fromPublicOnly(Utils.hexToBytes("03ad1d8e89212f0b92c74d23bb710c00662ad1470198ac48c43f7d6f93a2a26873"));
-        Address address = new P2PKHAddress(pubKey.getPubKeyHash());
-        Sha256Hash hash = transaction.hashForWitnessSignature(0, address.getOutputScript(),1000000000L, Transaction.SigHash.ALL, false);
+        Sha256Hash hash = transaction.hashForWitnessSignature(0, ScriptType.P2PKH.getOutputScript(pubKey.getPubKeyHash()),1000000000L, Transaction.SigHash.ALL, false);
         TransactionSignature signature = TransactionSignature.decodeFromBitcoin(Utils.hexToBytes("3044022047ac8e878352d3ebbde1c94ce3a10d057c24175747116f8288e5d794d12d482f0220217f36a485cae903c713331d877c1f64677e3622ad4010726870540656fe9dcb01"), true, true);
         Assert.assertTrue(pubKey.verify(hash, signature));
     }

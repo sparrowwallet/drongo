@@ -2,8 +2,6 @@ package com.sparrowwallet.drongo.psbt;
 
 import com.sparrowwallet.drongo.KeyDerivation;
 import com.sparrowwallet.drongo.Utils;
-import com.sparrowwallet.drongo.address.Address;
-import com.sparrowwallet.drongo.address.P2PKHAddress;
 import com.sparrowwallet.drongo.crypto.ECKey;
 import com.sparrowwallet.drongo.protocol.*;
 import org.bouncycastle.util.encoders.Hex;
@@ -13,6 +11,7 @@ import org.slf4j.LoggerFactory;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
 
+import static com.sparrowwallet.drongo.protocol.ScriptType.*;
 import static com.sparrowwallet.drongo.psbt.PSBTEntry.parseKeyDerivation;
 
 public class PSBTInput {
@@ -80,7 +79,7 @@ public class PSBTInput {
                         throw new PSBTParseException("Cannot have both witness and non-witness utxos in PSBT input");
                     }
                     TransactionOutput witnessTxOutput = new TransactionOutput(null, entry.getData(), 0);
-                    if(!ScriptPattern.isP2SH(witnessTxOutput.getScript()) && !ScriptPattern.isP2WPKH(witnessTxOutput.getScript()) && !ScriptPattern.isP2WSH(witnessTxOutput.getScript())) {
+                    if(!P2SH.isScriptType(witnessTxOutput.getScript()) && !P2WPKH.isScriptType(witnessTxOutput.getScript()) && !P2WSH.isScriptType(witnessTxOutput.getScript())) {
                         throw new PSBTParseException("Witness UTXO provided for non-witness or unknown input");
                     }
                     this.witnessUtxo = witnessTxOutput;
@@ -113,11 +112,11 @@ public class PSBTInput {
                         scriptPubKey = this.nonWitnessUtxo.getOutputs().get((int)transaction.getInputs().get(index).getOutpoint().getIndex()).getScript();
                     } else if(this.witnessUtxo != null) {
                         scriptPubKey = this.witnessUtxo.getScript();
-                        if(!ScriptPattern.isP2WPKH(redeemScript) && !ScriptPattern.isP2WSH(redeemScript)) { //Witness UTXO should only be provided for P2SH-P2WPKH or P2SH-P2WSH
+                        if(!P2WPKH.isScriptType(redeemScript) && !P2WSH.isScriptType(redeemScript)) { //Witness UTXO should only be provided for P2SH-P2WPKH or P2SH-P2WSH
                             throw new PSBTParseException("Witness UTXO provided but redeem script is not P2WPKH or P2WSH");
                         }
                     }
-                    if(scriptPubKey == null || !ScriptPattern.isP2SH(scriptPubKey)) {
+                    if(scriptPubKey == null || !P2SH.isScriptType(scriptPubKey)) {
                         throw new PSBTParseException("PSBT provided a redeem script for a transaction output that does not need one");
                     }
                     if(!Arrays.equals(Utils.sha256hash160(redeemScript.getProgram()), scriptPubKey.getPubKeyHash())) {
@@ -131,9 +130,9 @@ public class PSBTInput {
                     entry.checkOneByteKey();
                     Script witnessScript = new Script(entry.getData());
                     byte[] pubKeyHash = null;
-                    if(this.redeemScript != null && ScriptPattern.isP2WSH(this.redeemScript)) { //P2SH-P2WSH
+                    if(this.redeemScript != null && P2WSH.isScriptType(this.redeemScript)) { //P2SH-P2WSH
                         pubKeyHash = this.redeemScript.getPubKeyHash();
-                    } else if(this.witnessUtxo != null && ScriptPattern.isP2WSH(this.witnessUtxo.getScript())) { //P2WSH
+                    } else if(this.witnessUtxo != null && P2WSH.isScriptType(this.witnessUtxo.getScript())) { //P2WSH
                         pubKeyHash = this.witnessUtxo.getScript().getPubKeyHash();
                     }
                     if(pubKeyHash == null) {
@@ -285,7 +284,7 @@ public class PSBTInput {
         int vout = (int)transaction.getInputs().get(index).getOutpoint().getIndex();
         Script signingScript = getNonWitnessUtxo() != null ? getNonWitnessUtxo().getOutputs().get(vout).getScript() : getWitnessUtxo().getScript();
 
-        if(ScriptPattern.isP2SH(signingScript)) {
+        if(P2SH.isScriptType(signingScript)) {
             if(getRedeemScript() != null) {
                 signingScript = getRedeemScript();
             } else if(getFinalScriptSig() != null) {
@@ -295,10 +294,9 @@ public class PSBTInput {
             }
         }
 
-        if(ScriptPattern.isP2WPKH(signingScript)) {
-            Address address = new P2PKHAddress(signingScript.getPubKeyHash());
-            signingScript = address.getOutputScript();
-        } else if(ScriptPattern.isP2WSH(signingScript)) {
+        if(P2WPKH.isScriptType(signingScript)) {
+            signingScript = ScriptType.P2PKH.getOutputScript(signingScript.getPubKeyHash());
+        } else if(P2WSH.isScriptType(signingScript)) {
             if(getWitnessScript() != null) {
                 signingScript = getWitnessScript();
             } else if(getFinalScriptWitness() != null && getFinalScriptWitness().getWitnessScript() != null) {

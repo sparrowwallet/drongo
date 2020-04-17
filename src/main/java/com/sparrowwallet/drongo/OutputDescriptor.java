@@ -6,6 +6,7 @@ import com.sparrowwallet.drongo.crypto.DeterministicKey;
 import com.sparrowwallet.drongo.protocol.Script;
 import com.sparrowwallet.drongo.protocol.ScriptChunk;
 import com.sparrowwallet.drongo.protocol.ScriptOpCodes;
+import com.sparrowwallet.drongo.protocol.ScriptType;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -117,8 +118,7 @@ public class OutputDescriptor {
         if(script.equals("pkh")) {
             address = new P2PKHAddress(childKey.getPubKeyHash());
         } else if(script.equals("sh(wpkh")) {
-            Address p2wpkhAddress = new P2WPKHAddress(childKey.getPubKeyHash());
-            Script receivingP2wpkhScript = p2wpkhAddress.getOutputScript();
+            Script receivingP2wpkhScript = ScriptType.P2WPKH.getOutputScript(childKey.getPubKeyHash());
             address = P2SHAddress.fromProgram(receivingP2wpkhScript.getProgram());
         } else if(script.equals("wpkh")) {
             address = new P2WPKHAddress(childKey.getPubKeyHash());
