@@ -1,7 +1,7 @@
 package com.sparrowwallet.drongo.address;
 
 import com.sparrowwallet.drongo.protocol.Base58;
-import com.sparrowwallet.drongo.protocol.Script;
+import com.sparrowwallet.drongo.protocol.ScriptType;
 
 public abstract class Address {
     protected final byte[] hash;
@@ -24,7 +24,7 @@ public abstract class Address {
 
     public abstract int getVersion();
 
-    public abstract Script getOutputScript();
+    public abstract ScriptType getScriptType();
 
     public abstract byte[] getOutputScriptData();
 
@@ -41,10 +41,5 @@ public abstract class Address {
 
     public int hashCode() {
         return getAddress().hashCode();
-    }
-
-    public String getScriptType() {
-        String className = this.getClass().getSimpleName();
-        return className.replace("Address", "");
     }
 }

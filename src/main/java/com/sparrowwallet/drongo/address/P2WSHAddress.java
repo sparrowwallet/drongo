@@ -2,9 +2,6 @@ package com.sparrowwallet.drongo.address;
 
 import com.sparrowwallet.drongo.protocol.*;
 
-import java.util.ArrayList;
-import java.util.List;
-
 import static com.sparrowwallet.drongo.address.P2WPKHAddress.HRP;
 
 public class P2WSHAddress extends Address {
@@ -20,12 +17,8 @@ public class P2WSHAddress extends Address {
         return Bech32.encode(HRP, getVersion(), hash);
     }
 
-    public Script getOutputScript() {
-        List<ScriptChunk> chunks = new ArrayList<>();
-        chunks.add(new ScriptChunk(Script.encodeToOpN(getVersion()), null));
-        chunks.add(new ScriptChunk(hash.length, hash));
-
-        return new Script(chunks);
+    public ScriptType getScriptType() {
+        return ScriptType.P2WSH;
     }
 
     @Override

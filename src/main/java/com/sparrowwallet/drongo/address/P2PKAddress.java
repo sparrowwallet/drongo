@@ -1,9 +1,7 @@
 package com.sparrowwallet.drongo.address;
 
 import com.sparrowwallet.drongo.Utils;
-import com.sparrowwallet.drongo.protocol.Script;
-import com.sparrowwallet.drongo.protocol.ScriptChunk;
-import com.sparrowwallet.drongo.protocol.ScriptOpCodes;
+import com.sparrowwallet.drongo.protocol.ScriptType;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -20,12 +18,8 @@ public class P2PKAddress extends Address {
         return 0;
     }
 
-    public Script getOutputScript() {
-        List<ScriptChunk> chunks = new ArrayList<>();
-        chunks.add(new ScriptChunk(pubKey.length, pubKey));
-        chunks.add(new ScriptChunk(ScriptOpCodes.OP_CHECKSIG, null));
-
-        return new Script(chunks);
+    public ScriptType getScriptType() {
+        return ScriptType.P2PK;
     }
 
     @Override
