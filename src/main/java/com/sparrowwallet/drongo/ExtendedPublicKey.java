@@ -16,16 +16,13 @@ public class ExtendedPublicKey {
     private static final int bip32HeaderP2WHSHPub = 0x2AA7ED3; // The 4 byte header that serializes in base58 to "Zpub"
     private static final int bip32HeaderTestnetPub = 0x43587CF; // The 4 byte header that serializes in base58 to "tpub"
 
-    private KeyDerivation keyDerivation;
-    private byte[] parentFingerprint;
-    private DeterministicKey pubKey;
-    private String childDerivationPath;
-    private ChildNumber pubKeyChildNumber;
+    private final byte[] parentFingerprint;
+    private final DeterministicKey pubKey;
+    private final String childDerivationPath;
+    private final ChildNumber pubKeyChildNumber;
+    private final DeterministicHierarchy hierarchy;
 
-    private DeterministicHierarchy hierarchy;
-
-    public ExtendedPublicKey(String masterFingerprint, byte[] parentFingerprint, String keyDerivationPath, DeterministicKey pubKey, String childDerivationPath, ChildNumber pubKeyChildNumber) {
-        this.keyDerivation = new KeyDerivation(masterFingerprint, keyDerivationPath);
+    public ExtendedPublicKey(DeterministicKey pubKey, byte[] parentFingerprint, String childDerivationPath, ChildNumber pubKeyChildNumber) {
         this.parentFingerprint = parentFingerprint;
         this.pubKey = pubKey;
         this.childDerivationPath = childDerivationPath;
@@ -34,24 +31,12 @@ public class ExtendedPublicKey {
         this.hierarchy = new DeterministicHierarchy(pubKey);
     }
 
-    public String getMasterFingerprint() {
-        return keyDerivation.getMasterFingerprint();
-    }
-
     public byte[] getParentFingerprint() {
         return parentFingerprint;
     }
 
     public byte[] getFingerprint() {
         return pubKey.getFingerprint();
-    }
-
-    public String getKeyDerivationPath() {
-        return keyDerivation.getDerivationPath();
-    }
-
-    public List<ChildNumber> getKeyDerivation() {
-        return keyDerivation.getParsedDerivationPath();
     }
 
     public DeterministicKey getPubKey() {
@@ -139,7 +124,7 @@ public class ExtendedPublicKey {
         return buffer.array();
     }
 
-    public static ExtendedPublicKey fromDescriptor(String masterFingerprint, String keyDerivationPath, String extPubKey, String childDerivationPath) {
+    public static ExtendedPublicKey fromDescriptor(String extPubKey, String childDerivationPath) {
         byte[] serializedKey = Base58.decodeChecked(extPubKey);
         ByteBuffer buffer = ByteBuffer.wrap(serializedKey);
         int header = buffer.getInt();
@@ -177,7 +162,17 @@ public class ExtendedPublicKey {
         }
 
         DeterministicKey pubKey = new DeterministicKey(path, chainCode, new LazyECPoint(ECKey.CURVE.getCurve(), data), depth, parentFingerprint);
-        return new ExtendedPublicKey(masterFingerprint, parentFingerprint, keyDerivationPath, pubKey, childDerivationPath, childNumber);
+        return new ExtendedPublicKey(pubKey, parentFingerprint, childDerivationPath, childNumber);
+    }
+
+    public static boolean isValid(String extPubKey) {
+        try {
+            ExtendedPublicKey.fromDescriptor(extPubKey, null);
+        } catch (Exception e) {
+            return false;
+        }
+
+        return true;
     }
 
     @Override

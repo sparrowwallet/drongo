@@ -1,5 +1,7 @@
 package com.sparrowwallet.drongo.psbt;
 
+import com.sparrowwallet.drongo.ExtendedPublicKey;
+import com.sparrowwallet.drongo.KeyDerivation;
 import com.sparrowwallet.drongo.protocol.NonStandardScriptException;
 import com.sparrowwallet.drongo.protocol.Transaction;
 import org.bouncycastle.util.encoders.Hex;
@@ -214,8 +216,10 @@ public class PSBTTest {
         String psbt = "cHNidP8BAJ0BAAAAAnEOp2q0XFy2Q45gflnMA3YmmBgFrp4N/ZCJASq7C+U1AQAAAAD/////GQmU1qizyMgsy8+y+6QQaqBmObhyqNRHRlwNQliNbWcAAAAAAP////8CAOH1BQAAAAAZdqkUtrwsDuVlWoQ9ea/t0MzD991kNAmIrGBa9AUAAAAAFgAUEYjvjkzgRJ6qyPsUHL9aEXbmoIgAAAAATwEEiLIeA55TDKyAAAAAPbyKXJdp8DGxfnf+oVGGAyIaGP0Y8rmlTGyMGsdcvDUC8jBYSxVdHH8c1FEgplPEjWULQxtnxbLBPyfXFCA3wWkQJ1acUDEAAIAAAACAAAAAgAABAR8A4fUFAAAAABYAFDO5gvkbKPFgySC0q5XljOUN2jpKIgIDMJaA8zx9446mpHzU7NZvH1pJdHxv+4gI7QkDkkPjrVxHMEQCIC1wTO2DDFapCTRL10K2hS3M0QPpY7rpLTjnUlTSu0JFAiAthsQ3GV30bAztoITyopHD2i1kBw92v5uQsZXn7yj3cgEiBgMwloDzPH3jjqakfNTs1m8fWkl0fG/7iAjtCQOSQ+OtXBgnVpxQMQAAgAAAAIAAAACAAAAAAAEAAAAAAQEfAOH1BQAAAAAWABQ4j7lEMH63fvRRl9CwskXgefAR3iICAsd3Fh9z0LfHK57nveZQKT0T8JW8dlatH1Jdpf0uELEQRzBEAiBMsftfhpyULg4mEAV2ElQ5F5rojcqKncO6CPeVOYj6pgIgUh9JynkcJ9cOJzybFGFphZCTYeJb4nTqIA1+CIJ+UU0BIgYCx3cWH3PQt8crnue95lApPRPwlbx2Vq0fUl2l/S4QsRAYJ1acUDEAAIAAAACAAAAAgAAAAAAAAAAAAAAiAgLSDKUC7iiWhtIYFb1DqAY3sGmOH7zb5MrtRF9sGgqQ7xgnVpxQMQAAgAAAAIAAAACAAAAAAAQAAAAA";
         PSBT psbt1 = PSBT.fromString(psbt);
 
-        Assert.assertEquals("27569c50", psbt1.getExtendedPublicKeys().get(0).getMasterFingerprint());
-        Assert.assertEquals("m/49'/0'/0'", psbt1.getExtendedPublicKeys().get(0).getKeyDerivationPath());
+        ExtendedPublicKey extendedPublicKey = psbt1.getExtendedPublicKeys().get(0);
+        KeyDerivation keyDerivation = psbt1.getKeyDerivation(extendedPublicKey);
+        Assert.assertEquals("27569c50", keyDerivation.getMasterFingerprint());
+        Assert.assertEquals("m/49'/0'/0'", keyDerivation.getDerivationPath());
         Assert.assertEquals(2, psbt1.getPsbtInputs().size());
     }
 

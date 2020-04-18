@@ -1,5 +1,6 @@
 package com.sparrowwallet.drongo.wallet;
 
+import com.sparrowwallet.drongo.policy.Policy;
 import com.sparrowwallet.drongo.policy.PolicyType;
 import com.sparrowwallet.drongo.protocol.ScriptType;
 
@@ -9,7 +10,7 @@ import java.util.List;
 public class Wallet {
     private PolicyType policyType;
     private ScriptType scriptType;
-    private String policy;
+    private Policy defaultPolicy;
     private List<Keystore> keystores = new ArrayList<>();
 
     public PolicyType getPolicyType() {
@@ -28,12 +29,12 @@ public class Wallet {
         this.scriptType = scriptType;
     }
 
-    public String getPolicy() {
-        return policy;
+    public Policy getDefaultPolicy() {
+        return defaultPolicy;
     }
 
-    public void setPolicy(String policy) {
-        this.policy = policy;
+    public void setDefaultPolicy(Policy defaultPolicy) {
+        this.defaultPolicy = defaultPolicy;
     }
 
     public List<Keystore> getKeystores() {

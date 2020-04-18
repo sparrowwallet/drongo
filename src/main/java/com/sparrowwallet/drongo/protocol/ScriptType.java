@@ -6,14 +6,16 @@ import com.sparrowwallet.drongo.policy.PolicyType;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
+import java.util.stream.Collectors;
 
 import static com.sparrowwallet.drongo.policy.PolicyType.*;
 import static com.sparrowwallet.drongo.protocol.Script.decodeFromOpN;
 import static com.sparrowwallet.drongo.protocol.ScriptOpCodes.*;
 
 public enum ScriptType {
-    P2PK("P2PK", new PolicyType[]{SINGLE}) {
+    P2PK("P2PK") {
         @Override
         public Address getAddress(byte[] pubKey) {
             return new P2PKAddress(pubKey);
@@ -59,8 +61,13 @@ public enum ScriptType {
         public ECKey getPublicKeyFromScript(Script script) {
             return ECKey.fromPublicOnly(script.chunks.get(0).data);
         }
+
+        @Override
+        public List<PolicyType> getAllowedPolicyTypes() {
+            return List.of(SINGLE);
+        }
     },
-    P2PKH("P2PKH", new PolicyType[]{SINGLE}) {
+    P2PKH("P2PKH") {
         @Override
         public Address getAddress(byte[] pubKeyHash) {
             return new P2PKHAddress(pubKeyHash);
@@ -103,8 +110,13 @@ public enum ScriptType {
         public byte[] getHashFromScript(Script script) {
             return script.chunks.get(2).data;
         }
+
+        @Override
+        public List<PolicyType> getAllowedPolicyTypes() {
+            return List.of(SINGLE);
+        }
     },
-    MULTISIG("Bare Multisig", new PolicyType[]{MULTI}) {
+    MULTISIG("Bare Multisig") {
         @Override
         public Address getAddress(byte[] bytes) {
             throw new ProtocolException("No single address for multisig script type");
@@ -178,8 +190,13 @@ public enum ScriptType {
         public int getThreshold(Script script) {
             return decodeFromOpN(script.chunks.get(0).opcode);
         }
+
+        @Override
+        public List<PolicyType> getAllowedPolicyTypes() {
+            return List.of(MULTI);
+        }
     },
-    P2SH("P2SH", new PolicyType[]{MULTI}) {
+    P2SH("P2SH") {
         @Override
         public Address getAddress(byte[] bytes) {
             return new P2SHAddress(bytes);
@@ -224,8 +241,13 @@ public enum ScriptType {
         public byte[] getHashFromScript(Script script) {
             return script.chunks.get(1).data;
         }
+
+        @Override
+        public List<PolicyType> getAllowedPolicyTypes() {
+            return List.of(MULTI);
+        }
     },
-    P2SH_P2WPKH("P2SH-P2WPKH", new PolicyType[]{SINGLE}) {
+    P2SH_P2WPKH("P2SH-P2WPKH") {
         @Override
         public Address getAddress(byte[] bytes) {
             return P2SH.getAddress(bytes);
@@ -245,8 +267,13 @@ public enum ScriptType {
         public byte[] getHashFromScript(Script script) {
             return P2SH.getHashFromScript(script);
         }
+
+        @Override
+        public List<PolicyType> getAllowedPolicyTypes() {
+            return List.of(SINGLE);
+        }
     },
-    P2SH_P2WSH("P2SH-P2WSH", new PolicyType[]{MULTI, CUSTOM}) {
+    P2SH_P2WSH("P2SH-P2WSH") {
         @Override
         public Address getAddress(byte[] bytes) {
             return P2SH.getAddress(bytes);
@@ -266,8 +293,13 @@ public enum ScriptType {
         public byte[] getHashFromScript(Script script) {
             return P2SH.getHashFromScript(script);
         }
+
+        @Override
+        public List<PolicyType> getAllowedPolicyTypes() {
+            return List.of(MULTI, CUSTOM);
+        }
     },
-    P2WPKH("P2WPKH", new PolicyType[]{SINGLE}) {
+    P2WPKH("P2WPKH") {
         @Override
         public Address getAddress(byte[] bytes) {
             return new P2WPKHAddress(bytes);
@@ -301,8 +333,13 @@ public enum ScriptType {
         public byte[] getHashFromScript(Script script) {
             return script.chunks.get(1).data;
         }
+
+        @Override
+        public List<PolicyType> getAllowedPolicyTypes() {
+            return List.of(SINGLE);
+        }
     },
-    P2WSH("P2WSH", new PolicyType[]{MULTI, CUSTOM}) {
+    P2WSH("P2WSH") {
         @Override
         public Address getAddress(byte[] bytes) {
             return new P2WSHAddress(bytes);
@@ -336,22 +373,27 @@ public enum ScriptType {
         public byte[] getHashFromScript(Script script) {
             return script.chunks.get(1).data;
         }
+
+        @Override
+        public List<PolicyType> getAllowedPolicyTypes() {
+            return List.of(MULTI, CUSTOM);
+        }
     };
 
     private final String name;
-    private final PolicyType[] allowedPolicyTypes;
 
-    ScriptType(String name, PolicyType[] allowedPolicyTypes) {
+    ScriptType(String name) {
         this.name = name;
-        this.allowedPolicyTypes = allowedPolicyTypes;
     }
 
     public String getName() {
         return name;
     }
 
-    public PolicyType[] getAllowedPolicyTypes() {
-        return allowedPolicyTypes;
+    public abstract List<PolicyType> getAllowedPolicyTypes();
+
+    public boolean isAllowed(PolicyType policyType) {
+        return getAllowedPolicyTypes().contains(policyType);
     }
 
     public abstract Address getAddress(byte[] bytes);
@@ -379,6 +421,10 @@ public enum ScriptType {
     }
 
     public static final ScriptType[] SINGLE_HASH_TYPES = {P2PKH, P2SH, P2SH_P2WPKH, P2SH_P2WSH, P2WPKH, P2WSH};
+
+    public static List<ScriptType> getScriptTypesForPolicyType(PolicyType policyType) {
+        return Arrays.stream(values()).filter(scriptType -> scriptType.isAllowed(policyType)).collect(Collectors.toList());
+    }
 
     @Override
     public String toString() {

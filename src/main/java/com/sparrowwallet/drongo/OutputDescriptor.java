@@ -8,10 +8,7 @@ import com.sparrowwallet.drongo.protocol.ScriptChunk;
 import com.sparrowwallet.drongo.protocol.ScriptOpCodes;
 import com.sparrowwallet.drongo.protocol.ScriptType;
 
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import java.util.StringJoiner;
+import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -20,26 +17,30 @@ public class OutputDescriptor {
     private static final Pattern MULTI_PATTERN = Pattern.compile("multi\\(([\\d+])");
     private static final Pattern KEY_ORIGIN_PATTERN = Pattern.compile("\\[([a-f0-9]+)([/\\d']+)\\]");
 
-    private String script;
-    private int multisigThreshold;
-    private List<ExtendedPublicKey> extendedPublicKeys;
+    private final String script;
+    private final int multisigThreshold;
+    private final Map<ExtendedPublicKey, KeyDerivation> extendedPublicKeys;
 
-    public OutputDescriptor(String script, ExtendedPublicKey extendedPublicKey) {
-        this(script, Collections.singletonList(extendedPublicKey));
+    public OutputDescriptor(String script, ExtendedPublicKey extendedPublicKey, KeyDerivation keyDerivation) {
+        this(script, Collections.singletonMap(extendedPublicKey, keyDerivation));
     }
 
-    public OutputDescriptor(String script, List<ExtendedPublicKey> extendedPublicKeys) {
+    public OutputDescriptor(String script, Map<ExtendedPublicKey, KeyDerivation> extendedPublicKeys) {
         this(script, 0, extendedPublicKeys);
     }
 
-    public OutputDescriptor(String script, int multisigThreshold, List<ExtendedPublicKey> extendedPublicKeys) {
+    public OutputDescriptor(String script, int multisigThreshold, Map<ExtendedPublicKey, KeyDerivation> extendedPublicKeys) {
         this.script = script;
         this.multisigThreshold = multisigThreshold;
         this.extendedPublicKeys = extendedPublicKeys;
     }
 
-    public List<ExtendedPublicKey> getExtendedPublicKeys() {
-        return extendedPublicKeys;
+    public Set<ExtendedPublicKey> getExtendedPublicKeys() {
+        return Collections.unmodifiableSet(extendedPublicKeys.keySet());
+    }
+
+    public KeyDerivation getKeyDerivation(ExtendedPublicKey extendedPublicKey) {
+        return extendedPublicKeys.get(extendedPublicKey);
     }
 
     public boolean isMultisig() {
@@ -51,7 +52,7 @@ public class OutputDescriptor {
             throw new IllegalStateException("Output descriptor contains multiple public keys but singleton requested");
         }
 
-        return extendedPublicKeys.get(0);
+        return extendedPublicKeys.keySet().iterator().next();
     }
 
     public String getScript() {
@@ -59,7 +60,7 @@ public class OutputDescriptor {
     }
 
     public boolean describesMultipleAddresses() {
-        for(ExtendedPublicKey pubKey : extendedPublicKeys) {
+        for(ExtendedPublicKey pubKey : extendedPublicKeys.keySet()) {
             if(!pubKey.describesMultipleAddresses()) {
                 return false;
             }
@@ -70,7 +71,7 @@ public class OutputDescriptor {
 
     public List<ChildNumber> getChildDerivation() {
         List<ChildNumber> lastDerivation = null;
-        for(ExtendedPublicKey pubKey : extendedPublicKeys) {
+        for(ExtendedPublicKey pubKey : extendedPublicKeys.keySet()) {
             List<ChildNumber> derivation = pubKey.getChildDerivation();
             if(lastDerivation != null && !lastDerivation.subList(1, lastDerivation.size()).equals(derivation.subList(1, derivation.size()))) {
                 throw new IllegalStateException("Cannot determine multisig derivation: constituent derivations do not match");
@@ -146,7 +147,7 @@ public class OutputDescriptor {
         List<ScriptChunk> chunks = new ArrayList<>();
         chunks.add(new ScriptChunk(Script.encodeToOpN(multisigThreshold), null));
 
-        for(ExtendedPublicKey pubKey : extendedPublicKeys) {
+        for(ExtendedPublicKey pubKey : extendedPublicKeys.keySet()) {
             List<ChildNumber> keyPath = null;
             if(path.get(0).num() == 0) {
                 keyPath = pubKey.getReceivingDerivation(path.get(1).num());
@@ -193,8 +194,8 @@ public class OutputDescriptor {
         }
     }
 
-    private static List<ExtendedPublicKey> getExtendedPublicKeys(String descriptor) {
-        List<ExtendedPublicKey> keys = new ArrayList<>();
+    private static Map<ExtendedPublicKey, KeyDerivation> getExtendedPublicKeys(String descriptor) {
+        Map<ExtendedPublicKey, KeyDerivation> keys = new LinkedHashMap<>();
         Matcher matcher = XPUB_PATTERN.matcher(descriptor);
         while(matcher.find()) {
             String masterFingerprint = null;
@@ -216,8 +217,9 @@ public class OutputDescriptor {
                 childDerivationPath = matcher.group(3);
             }
 
-            ExtendedPublicKey extendedPublicKey = ExtendedPublicKey.fromDescriptor(masterFingerprint, keyDerivationPath, extPubKey, childDerivationPath);
-            keys.add(extendedPublicKey);
+            KeyDerivation keyDerivation = new KeyDerivation(masterFingerprint, keyDerivationPath);
+            ExtendedPublicKey extendedPublicKey = ExtendedPublicKey.fromDescriptor(extPubKey, childDerivationPath);
+            keys.put(extendedPublicKey, keyDerivation);
         }
 
         return keys;
@@ -231,7 +233,7 @@ public class OutputDescriptor {
         if(isMultisig()) {
             StringJoiner joiner = new StringJoiner(",");
             joiner.add(Integer.toString(multisigThreshold));
-            for(ExtendedPublicKey pubKey : extendedPublicKeys) {
+            for(ExtendedPublicKey pubKey : extendedPublicKeys.keySet()) {
                 joiner.add(pubKey.toString());
             }
             builder.append(joiner.toString());

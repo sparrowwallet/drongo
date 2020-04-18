@@ -3,15 +3,18 @@ package com.sparrowwallet.drongo;
 import com.sparrowwallet.drongo.crypto.ChildNumber;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 public class KeyDerivation {
-    private String masterFingerprint;
-    private String derivationPath;
+    private final String masterFingerprint;
+    private final String derivationPath;
+    private final List<ChildNumber> derivation;
 
     public KeyDerivation(String masterFingerprint, String derivationPath) {
         this.masterFingerprint = masterFingerprint;
         this.derivationPath = derivationPath;
+        this.derivation = parsePath(derivationPath);
     }
 
     public String getMasterFingerprint() {
@@ -22,8 +25,8 @@ public class KeyDerivation {
         return derivationPath;
     }
 
-    public List<ChildNumber> getParsedDerivationPath() {
-        return parsePath(derivationPath);
+    public List<ChildNumber> getDerivation() {
+        return Collections.unmodifiableList(derivation);
     }
 
     public static List<ChildNumber> parsePath(String path) {
@@ -31,9 +34,12 @@ public class KeyDerivation {
     }
 
     public static List<ChildNumber> parsePath(String path, int wildcardReplacement) {
-        String[] parsedNodes = path.replace("M", "").replace("m", "").split("/");
         List<ChildNumber> nodes = new ArrayList<>();
+        if(path == null) {
+            return nodes;
+        }
 
+        String[] parsedNodes = path.replace("M", "").replace("m", "").split("/");
         for (String n : parsedNodes) {
             n = n.replaceAll(" ", "");
             if (n.length() == 0) continue;
@@ -55,6 +61,16 @@ public class KeyDerivation {
         }
 
         return path;
+    }
+
+    public static boolean isValid(String derivationPath) {
+        try {
+            parsePath(derivationPath);
+        } catch (Exception e) {
+            return false;
+        }
+
+        return true;
     }
 
     public String toString() {
