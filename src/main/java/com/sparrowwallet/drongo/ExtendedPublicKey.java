@@ -18,16 +18,13 @@ public class ExtendedPublicKey {
 
     private final byte[] parentFingerprint;
     private final DeterministicKey pubKey;
-    private final String childDerivationPath;
     private final ChildNumber pubKeyChildNumber;
     private final DeterministicHierarchy hierarchy;
 
-    public ExtendedPublicKey(DeterministicKey pubKey, byte[] parentFingerprint, String childDerivationPath, ChildNumber pubKeyChildNumber) {
+    public ExtendedPublicKey(DeterministicKey pubKey, byte[] parentFingerprint, ChildNumber pubKeyChildNumber) {
         this.parentFingerprint = parentFingerprint;
         this.pubKey = pubKey;
-        this.childDerivationPath = childDerivationPath;
         this.pubKeyChildNumber = pubKeyChildNumber;
-
         this.hierarchy = new DeterministicHierarchy(pubKey);
     }
 
@@ -35,60 +32,8 @@ public class ExtendedPublicKey {
         return parentFingerprint;
     }
 
-    public byte[] getFingerprint() {
-        return pubKey.getFingerprint();
-    }
-
     public DeterministicKey getPubKey() {
         return pubKey;
-    }
-
-    public List<ChildNumber> getChildDerivation() {
-        return getChildDerivation(0);
-    }
-
-    public List<ChildNumber> getChildDerivation(int wildCardReplacement) {
-        return getChildDerivation(getPubKey().getChildNumber(), childDerivationPath, wildCardReplacement);
-    }
-
-    public boolean describesMultipleAddresses() {
-        return childDerivationPath.endsWith("/*");
-    }
-
-    public List<ChildNumber> getReceivingDerivation(int wildCardReplacement) {
-        if(describesMultipleAddresses()) {
-            if(childDerivationPath.endsWith("0/*")) {
-                return getChildDerivation(getPubKey().getChildNumber(), childDerivationPath, wildCardReplacement);
-            }
-
-            if(pubKeyChildNumber.num() == 0 && childDerivationPath.endsWith("/*")) {
-                return getChildDerivation(new ChildNumber(0, getPubKey().getChildNumber().isHardened()), childDerivationPath, wildCardReplacement);
-            }
-        }
-
-        throw new IllegalStateException("Cannot derive receiving address from output descriptor " + this.toString());
-    }
-
-    public List<ChildNumber> getChangeDerivation(int wildCardReplacement) {
-        if(describesMultipleAddresses()) {
-            if(childDerivationPath.endsWith("0/*")) {
-                return getChildDerivation(getPubKey().getChildNumber(), childDerivationPath.replace("0/*", "1/*"), wildCardReplacement);
-            }
-
-            if(pubKeyChildNumber.num() == 1 && childDerivationPath.endsWith("/*")) {
-                return getChildDerivation(new ChildNumber(1, getPubKey().getChildNumber().isHardened()), childDerivationPath, wildCardReplacement);
-            }
-        }
-
-        throw new IllegalStateException("Cannot derive change address from output descriptor " + this.toString());
-    }
-
-    private List<ChildNumber> getChildDerivation(ChildNumber firstChild, String derivationPath, int wildCardReplacement) {
-        List<ChildNumber> path = new ArrayList<>();
-        path.add(firstChild);
-        path.addAll(parsePath(derivationPath, wildCardReplacement));
-
-        return path;
     }
 
     public DeterministicKey getKey(List<ChildNumber> path) {
@@ -98,7 +43,6 @@ public class ExtendedPublicKey {
     public String toString() {
         StringBuilder builder = new StringBuilder();
         builder.append(getExtendedPublicKey());
-        builder.append(childDerivationPath);
         return builder.toString();
     }
 
@@ -106,25 +50,23 @@ public class ExtendedPublicKey {
         return Base58.encodeChecked(getExtendedPublicKeyBytes());
     }
 
+    public ChildNumber getPubKeyChildNumber() {
+        return pubKeyChildNumber;
+    }
+
     public byte[] getExtendedPublicKeyBytes() {
         ByteBuffer buffer = ByteBuffer.allocate(78);
         buffer.putInt(bip32HeaderP2PKHXPub);
-
-        List<ChildNumber> childPath = parsePath(childDerivationPath);
-        int depth = 5 - childPath.size();
-        buffer.put((byte)depth);
-
+        buffer.put((byte)pubKey.getDepth());
         buffer.put(parentFingerprint);
-
         buffer.putInt(pubKeyChildNumber.i());
-
         buffer.put(pubKey.getChainCode());
         buffer.put(pubKey.getPubKey());
 
         return buffer.array();
     }
 
-    public static ExtendedPublicKey fromDescriptor(String extPubKey, String childDerivationPath) {
+    public static ExtendedPublicKey fromDescriptor(String extPubKey) {
         byte[] serializedKey = Base58.decodeChecked(extPubKey);
         ByteBuffer buffer = ByteBuffer.wrap(serializedKey);
         int header = buffer.getInt();
@@ -147,7 +89,7 @@ public class ExtendedPublicKey {
         } else {
             childNumber = new ChildNumber(i, false);
         }
-        path = Collections.unmodifiableList(new ArrayList<>(Arrays.asList(childNumber)));
+        path = List.of(childNumber);
 
         byte[] chainCode = new byte[32];
         buffer.get(chainCode);
@@ -157,17 +99,13 @@ public class ExtendedPublicKey {
             throw new IllegalArgumentException("Found unexpected data in key");
         }
 
-        if(childDerivationPath == null) {
-            childDerivationPath = writePath(Collections.singletonList(childNumber));
-        }
-
         DeterministicKey pubKey = new DeterministicKey(path, chainCode, new LazyECPoint(ECKey.CURVE.getCurve(), data), depth, parentFingerprint);
-        return new ExtendedPublicKey(pubKey, parentFingerprint, childDerivationPath, childNumber);
+        return new ExtendedPublicKey(pubKey, parentFingerprint, childNumber);
     }
 
     public static boolean isValid(String extPubKey) {
         try {
-            ExtendedPublicKey.fromDescriptor(extPubKey, null);
+            ExtendedPublicKey.fromDescriptor(extPubKey);
         } catch (Exception e) {
             return false;
         }

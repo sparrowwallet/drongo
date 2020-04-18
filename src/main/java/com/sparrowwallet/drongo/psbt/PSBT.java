@@ -221,7 +221,7 @@ public class PSBT {
                 case PSBT_GLOBAL_BIP32_PUBKEY:
                     entry.checkOneBytePlusXpubKey();
                     KeyDerivation keyDerivation = parseKeyDerivation(entry.getData());
-                    ExtendedPublicKey pubKey = ExtendedPublicKey.fromDescriptor(Base58.encodeChecked(entry.getKeyData()), null);
+                    ExtendedPublicKey pubKey = ExtendedPublicKey.fromDescriptor(Base58.encodeChecked(entry.getKeyData()));
                     this.extendedPublicKeys.put(pubKey, keyDerivation);
                     log.debug("Pubkey with master fingerprint " + keyDerivation.getMasterFingerprint() + " at path " + keyDerivation.getDerivationPath() + ": " + pubKey.getExtendedPublicKey());
                     break;

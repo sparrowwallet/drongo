@@ -8,7 +8,7 @@ public class OutputDescriptorTest {
     @Test
     public void electrumP2PKH() {
         OutputDescriptor descriptor = OutputDescriptor.getOutputDescriptor("xpub661MyMwAqRbcFT5HwyRoP5hebbeRDvy2RGDTH2uxFyDPaf5FLtu4njuishddViQxTABZKzoWKuwpy6MsgfPvTw9pKnRGDL5eBxDej9kF54Z");
-        Assert.assertEquals("pkh(xpub6BemYiVEULcbpkxh3wp6KUzfzGPFL7JNcxbfQcXxGnJ6sPugTkR69neX8RT9iXdMHFV1FCge72a21WpoHjgoeBTcZju3JKyFf9DztGT2FhE/0/*)", descriptor.toString());
+        Assert.assertEquals("pkh(xpub661MyMwAqRbcFT5HwyRoP5hebbeRDvy2RGDTH2uxFyDPaf5FLtu4njuishddViQxTABZKzoWKuwpy6MsgfPvTw9pKnRGDL5eBxDej9kF54Z/0/*)", descriptor.toString());
     }
 
     @Test
@@ -20,7 +20,7 @@ public class OutputDescriptorTest {
     @Test
     public void electrumP2WPKH() {
         OutputDescriptor descriptor = OutputDescriptor.getOutputDescriptor("zpub6njbcfTHEfK4U96Z8dBaTULdb1LGWMtj73yYZ76kfmE9nuf3KhNSsXfzDefz5KV6TreWjnQbgvnSmSttudzTugesV2HFunYu7gWYJUD4eoR");
-        Assert.assertEquals("wpkh(xpub6CqLiu9VMua6V5yFXtXrfZgJqWsG2a8dQdBuk34KFdCCYXvCtx41CmWugPJVZNzBXyHCWy8uHgVUMpePCxh2S3VXueYG8dWLDh49dQ9MJGu/0/*)", descriptor.toString());
+        Assert.assertEquals("wpkh(xpub69551L7SwJE6mYiKTucL3J9dF53Nd7ujGpw6zKJyukUPgi2apP3KdQMiBEkp5WBFeaQuEqDUmc5LzsfmUFASKDHfkLtQjxuvaEPFXNDF4Kg/0/*)", descriptor.toString());
     }
 
     @Test
@@ -44,7 +44,7 @@ public class OutputDescriptorTest {
     @Test
     public void masterP2PKH() {
         OutputDescriptor descriptor = OutputDescriptor.getOutputDescriptor("pkh([d34db33f/44'/0'/0']xpub6ERApfZwUNrhLCkDtcHTcxd75RbzS1ed54G1LkBUHQVHQKqhMkhgbmJbZRkrgZw4koxb5JaHWkY4ALHY2grBGRjaDMzQLcgJvLJuZZvRcEL/1/*)");
-        Assert.assertEquals("pkh(xpub6CY2xt3vG5BhUS7krcphJprmHCh3jHYB1A8bxtJocU8NyQttKUCLp5izorV1wdXbp7XSSEcaFiKzUroEAL5tD1de8iAUeHP76byTWZu79SD/1/*)", descriptor.toString());
+        Assert.assertEquals("pkh(xpub6ERApfZwUNrhLCkDtcHTcxd75RbzS1ed54G1LkBUHQVHQKqhMkhgbmJbZRkrgZw4koxb5JaHWkY4ALHY2grBGRjaDMzQLcgJvLJuZZvRcEL/1/*)", descriptor.toString());
         ExtendedPublicKey extendedPublicKey = descriptor.getSingletonExtendedPublicKey();
         KeyDerivation derivation = descriptor.getKeyDerivation(extendedPublicKey);
         Assert.assertEquals("d34db33f", derivation.getMasterFingerprint());
