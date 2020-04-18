@@ -41,9 +41,7 @@ public class ExtendedPublicKey {
     }
 
     public String toString() {
-        StringBuilder builder = new StringBuilder();
-        builder.append(getExtendedPublicKey());
-        return builder.toString();
+        return getExtendedPublicKey();
     }
 
     public String getExtendedPublicKey() {

@@ -8,7 +8,6 @@ import com.sparrowwallet.drongo.protocol.ScriptChunk;
 import com.sparrowwallet.drongo.protocol.ScriptOpCodes;
 import com.sparrowwallet.drongo.protocol.ScriptType;
 
-import java.security.KeyPair;
 import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
