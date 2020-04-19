@@ -111,6 +111,11 @@ public class ExtendedPublicKey {
         return true;
     }
 
+    public ExtendedPublicKey copy() {
+        //DeterministicKey is effectively final
+        return new ExtendedPublicKey(pubKey, Arrays.copyOf(parentFingerprint, parentFingerprint.length), pubKeyChildNumber);
+    }
+
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;

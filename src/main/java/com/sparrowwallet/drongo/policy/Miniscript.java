@@ -35,4 +35,8 @@ public class Miniscript {
             throw new IllegalArgumentException("Could not find multisig threshold in " + this);
         }
     }
+
+    public Miniscript copy() {
+        return new Miniscript(script);
+    }
 }

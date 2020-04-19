@@ -9,7 +9,7 @@ import java.util.List;
 public class KeyDerivation {
     private final String masterFingerprint;
     private final String derivationPath;
-    private final List<ChildNumber> derivation;
+    private final transient List<ChildNumber> derivation;
 
     public KeyDerivation(String masterFingerprint, String derivationPath) {
         this.masterFingerprint = masterFingerprint;
@@ -71,6 +71,10 @@ public class KeyDerivation {
         }
 
         return true;
+    }
+
+    public KeyDerivation copy() {
+        return new KeyDerivation(masterFingerprint, derivationPath);
     }
 
     public String toString() {

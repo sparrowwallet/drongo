@@ -6,13 +6,14 @@ import com.sparrowwallet.drongo.protocol.Base58;
 import com.sparrowwallet.drongo.protocol.Sha256Hash;
 
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 
 public class DeterministicKey extends ECKey {
     private final DeterministicKey parent;
     private final List<ChildNumber> childNumberPath;
     private final int depth;
-    private byte[] parentFingerprint; // 0 if this key is root node of key hierarchy
+    private final byte[] parentFingerprint; // 0 if this key is root node of key hierarchy
 
     /** 32 bytes */
     private final byte[] chainCode;
@@ -80,7 +81,7 @@ public class DeterministicKey extends ECKey {
      * the first child of that node.
      */
     public List<ChildNumber> getPath() {
-        return childNumberPath;
+        return Collections.unmodifiableList(childNumberPath);
     }
 
     public DeterministicKey getParent() {

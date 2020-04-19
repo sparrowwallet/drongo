@@ -55,4 +55,8 @@ public class Policy {
 
         throw new PolicyException("No standard policy for " + policyType + " policy with script type " + scriptType);
     }
+
+    public Policy copy() {
+        return new Policy(name, miniscript.copy());
+    }
 }
