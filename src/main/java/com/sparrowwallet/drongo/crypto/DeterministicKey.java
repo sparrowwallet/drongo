@@ -28,7 +28,7 @@ public class DeterministicKey extends ECKey {
                             LazyECPoint publicAsPoint,
                             int depth,
                             byte[] parentFingerprint) {
-        super(compressPoint(publicAsPoint));
+        super(null, compressPoint(publicAsPoint));
         if(chainCode.length != 32) {
             throw new IllegalArgumentException("Chaincode not 32 bytes in length");
         }
@@ -43,7 +43,7 @@ public class DeterministicKey extends ECKey {
                             byte[] chainCode,
                             LazyECPoint publicAsPoint,
                             DeterministicKey parent) {
-        super(compressPoint(publicAsPoint));
+        super(null, compressPoint(publicAsPoint));
         if(chainCode.length != 32) {
             throw new IllegalArgumentException("Chaincode not 32 bytes in length");
         }
