@@ -133,7 +133,7 @@ public class ScriptChunk {
             return false;
         }
 
-        return ECKey.isPubKey(data);
+        return ECKey.isPubKeyCanonical(data);
     }
 
     public ECKey getPubKey() {
