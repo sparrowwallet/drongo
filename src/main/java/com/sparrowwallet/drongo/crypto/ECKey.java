@@ -7,11 +7,15 @@ import org.bouncycastle.asn1.*;
 import org.bouncycastle.asn1.x9.X9ECParameters;
 import org.bouncycastle.crypto.AsymmetricCipherKeyPair;
 import org.bouncycastle.crypto.digests.SHA256Digest;
+import org.bouncycastle.crypto.digests.SHA512Digest;
 import org.bouncycastle.crypto.ec.CustomNamedCurves;
 import org.bouncycastle.crypto.generators.ECKeyPairGenerator;
+import org.bouncycastle.crypto.generators.PKCS5S2ParametersGenerator;
+import org.bouncycastle.crypto.macs.HMac;
 import org.bouncycastle.crypto.params.*;
 import org.bouncycastle.crypto.signers.ECDSASigner;
 import org.bouncycastle.crypto.signers.HMacDSAKCalculator;
+import org.bouncycastle.jce.provider.BouncyCastleProvider;
 import org.bouncycastle.math.ec.ECPoint;
 import org.bouncycastle.math.ec.FixedPointCombMultiplier;
 import org.bouncycastle.math.ec.FixedPointUtil;
@@ -20,11 +24,17 @@ import org.bouncycastle.util.encoders.Hex;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.crypto.Cipher;
+import javax.crypto.spec.IvParameterSpec;
+import javax.crypto.spec.SecretKeySpec;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.math.BigInteger;
-import java.security.SecureRandom;
+import java.nio.charset.StandardCharsets;
+import java.security.*;
+import java.security.spec.AlgorithmParameterSpec;
 import java.util.Arrays;
+import java.util.Base64;
 import java.util.Objects;
 
 /**
@@ -79,6 +89,8 @@ public class ECKey {
                 CURVE_PARAMS.getH());
         HALF_CURVE_ORDER = CURVE_PARAMS.getN().shiftRight(1);
         secureRandom = new SecureRandom();
+
+        Security.addProvider(new BouncyCastleProvider());
     }
 
     // The two parts of the key. If "pub" is set but not "priv", we can only verify signatures, not make them.
@@ -120,9 +132,6 @@ public class ECKey {
 
     protected ECKey(BigInteger priv, LazyECPoint pub) {
         if(priv != null) {
-            if(priv.bitLength() > 32 * 8) {
-                throw new IllegalArgumentException("Private key exceeds 32 bytes: " + priv.bitLength() + " bits");
-            }
             if(priv.equals(BigInteger.ZERO) || priv.equals(BigInteger.ONE)) {
                 throw new IllegalArgumentException("Private key is illegal: " + priv);
             }
@@ -607,10 +616,131 @@ public class ECKey {
         return Utils.bigIntegerToBytes(getPrivKey(), 32);
     }
 
+    public static ECKey createKeyPbkdf2HmacSha512(String password) {
+        return createKeyPbkdf2HmacSha512(password, new byte[0], 1024);
+    }
+
+    public static ECKey createKeyPbkdf2HmacSha512(String password, byte[] salt, int iterationCount) {
+        PKCS5S2ParametersGenerator gen = new PKCS5S2ParametersGenerator(new SHA512Digest());
+        gen.init(password.getBytes(StandardCharsets.UTF_8), salt, iterationCount);
+        byte[] secret = ((KeyParameter) gen.generateDerivedParameters(512)).getKey();
+        return ECKey.fromPrivate(secret);
+    }
+
+    public byte[] encryptEcies(byte[] message, byte[] magic) {
+        ECKey ephemeral = new ECKey();
+        byte[] ecdh_key = this.getPubKeyPoint().multiply(ephemeral.getPrivKey()).getEncoded(true);
+        byte[] hash = sha512(ecdh_key);
+
+        byte[] iv = new byte[16];
+        System.arraycopy(hash, 0, iv, 0, 16);
+        byte[] key_e = new byte[16];
+        System.arraycopy(hash, 16, key_e, 0, 16);
+        byte[] key_m = new byte[hash.length-32];
+        System.arraycopy(hash, 32, key_m, 0, hash.length-32);
+
+        byte[] ciphertext = encryptAesCbcPkcs7(message, iv, key_e);
+        byte[] encrypted = concat(magic, ephemeral.getPubKey(), ciphertext);
+        byte[] result = hmac256(key_m, encrypted);
+        return Base64.getEncoder().encode(concat(encrypted, result));
+    }
+
+    private byte[] encryptAesCbcPkcs7(byte[] message, byte[] iv, byte[] key_e) {
+        try {
+            Cipher cipher = Cipher.getInstance("AES/CBC/PKCS7Padding");
+            SecretKeySpec secretKeySpec = new SecretKeySpec(key_e, "AES");
+            AlgorithmParameterSpec paramSpec = new IvParameterSpec(iv);
+            cipher.init(Cipher.ENCRYPT_MODE, secretKeySpec, paramSpec);
+            return cipher.doFinal(message);
+        } catch(Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    public byte[] decryptEcies(byte[] message, byte[] magic) {
+        byte[] decoded = Base64.getDecoder().decode(message);
+        if(decoded.length < 85) {
+            throw new IllegalArgumentException("Ciphertext is too short at " + decoded.length + " bytes");
+        }
+        byte[] magicFound = new byte[4];
+        System.arraycopy(decoded, 0, magicFound, 0, 4);
+        byte[] ephemeralPubKeyBytes = new byte[33];
+        System.arraycopy(decoded, 4, ephemeralPubKeyBytes, 0, 33);
+        int ciphertextlength = decoded.length - 37 - 32;
+        byte[] ciphertext = new byte[ciphertextlength];
+        System.arraycopy(decoded, 37, ciphertext, 0, ciphertextlength);
+        byte[] mac = new byte[32];
+        System.arraycopy(decoded, decoded.length - 32, mac, 0, 32);
+
+        if(!Arrays.equals(magic, magicFound)) {
+            throw new IllegalArgumentException("Invalid ciphertext: invalid magic bytes");
+        }
+
+        ECKey ephemeralPubKey = ECKey.fromPublicOnly(ephemeralPubKeyBytes);
+        byte[] ecdh_key = ephemeralPubKey.getPubKeyPoint().multiply(this.getPrivKey()).getEncoded(true);
+        byte[] hash = sha512(ecdh_key);
+
+        byte[] iv = new byte[16];
+        System.arraycopy(hash, 0, iv, 0, 16);
+        byte[] key_e = new byte[16];
+        System.arraycopy(hash, 16, key_e, 0, 16);
+        byte[] key_m = new byte[hash.length-32];
+        System.arraycopy(hash, 32, key_m, 0, hash.length-32);
+        byte[] hmacInput = new byte[decoded.length-32];
+        System.arraycopy(decoded, 0, hmacInput, 0, decoded.length - 32);
+
+        if(!Arrays.equals(mac, hmac256(key_m, hmacInput))) {
+            throw new InvalidPasswordException();
+        }
+
+        return decryptAesCbcPkcs7(ciphertext, iv, key_e);
+    }
+
+    private byte[] decryptAesCbcPkcs7(byte[] ciphertext, byte[] iv, byte[] key_e) {
+        try {
+            Cipher cipher = Cipher.getInstance("AES/CBC/PKCS7Padding");
+            SecretKeySpec secretKeySpec = new SecretKeySpec(key_e, "AES");
+            AlgorithmParameterSpec paramSpec = new IvParameterSpec(iv);
+            cipher.init(Cipher.DECRYPT_MODE, secretKeySpec, paramSpec);
+            return cipher.doFinal(ciphertext);
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    private byte[] sha512(byte[] input) {
+        SHA512Digest digest = new SHA512Digest();
+        byte[] hash = new byte[digest.getDigestSize()];
+        digest.update(input, 0, input.length);
+        digest.doFinal(hash, 0);
+        return hash;
+    }
+
+    private byte[] hmac256(byte[] key, byte[] input) {
+        HMac hmac = new HMac(new SHA256Digest());
+        hmac.init(new KeyParameter(key));
+        byte[] result = new byte[hmac.getMacSize()];
+        hmac.update(input, 0, input.length);
+        hmac.doFinal(result, 0);
+        return result;
+    }
+
+    private byte[] concat(byte[] ...bytes) {
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        try {
+            for(byte[] byteArray : bytes) {
+                out.write(byteArray);
+            }
+        } catch (IOException e) {
+            //can't happen
+        }
+        return out.toByteArray();
+    }
+
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
-        if (o == null || !(o instanceof ECKey)) return false;
+        if (!(o instanceof ECKey)) return false;
         ECKey other = (ECKey) o;
         return Objects.equals(this.priv, other.priv)
                 && Objects.equals(this.pub, other.pub);
@@ -627,5 +757,8 @@ public class ECKey {
     }
 
     public static class MissingPrivateKeyException extends RuntimeException {
+    }
+
+    public static class InvalidPasswordException extends RuntimeException {
     }
 }
