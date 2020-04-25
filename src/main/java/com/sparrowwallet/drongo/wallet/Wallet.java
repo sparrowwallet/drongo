@@ -10,20 +10,33 @@ import java.util.List;
 
 public class Wallet {
 
+    private String name;
     private PolicyType policyType;
     private ScriptType scriptType;
     private Policy defaultPolicy;
     private List<Keystore> keystores = new ArrayList<>();
 
     public Wallet() {
-
     }
 
-    public Wallet(PolicyType policyType, ScriptType scriptType) {
+    public Wallet(String name) {
+        this.name = name;
+    }
+
+    public Wallet(String name, PolicyType policyType, ScriptType scriptType) {
+        this.name = name;
         this.policyType = policyType;
         this.scriptType = scriptType;
         this.keystores = Collections.singletonList(new Keystore());
         this.defaultPolicy = Policy.getPolicy(policyType, scriptType, keystores, null);
+    }
+
+    public String getName() {
+        return name;
+    }
+
+    public void setName(String name) {
+        this.name = name;
     }
 
     public PolicyType getPolicyType() {
@@ -58,8 +71,41 @@ public class Wallet {
         this.keystores = keystores;
     }
 
+    public boolean isValid() {
+        if(policyType == null || scriptType == null || defaultPolicy == null || keystores.isEmpty()) {
+            return false;
+        }
+
+        if(!ScriptType.getScriptTypesForPolicyType(policyType).contains(scriptType)) {
+            return false;
+        }
+
+        int numSigs;
+        try {
+            numSigs = defaultPolicy.getNumSignaturesRequired();
+        } catch (Exception e) {
+            return false;
+        }
+
+        if(policyType.equals(PolicyType.SINGLE) && (numSigs != 1 || keystores.size() != 1)) {
+            return false;
+        }
+
+        if(policyType.equals(PolicyType.MULTI) && (numSigs <= 1 || numSigs > keystores.size())) {
+            return false;
+        }
+
+        for(Keystore keystore : keystores) {
+            if(!keystore.isValid()) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
     public Wallet copy() {
-        Wallet copy = new Wallet();
+        Wallet copy = new Wallet(name);
         copy.setPolicyType(policyType);
         copy.setScriptType(scriptType);
         copy.setDefaultPolicy(defaultPolicy.copy());

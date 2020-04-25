@@ -12,7 +12,7 @@ public class KeyDerivation {
     private final transient List<ChildNumber> derivation;
 
     public KeyDerivation(String masterFingerprint, String derivationPath) {
-        this.masterFingerprint = masterFingerprint;
+        this.masterFingerprint = masterFingerprint == null ? null : masterFingerprint.toLowerCase();
         this.derivationPath = derivationPath;
         this.derivation = parsePath(derivationPath);
     }

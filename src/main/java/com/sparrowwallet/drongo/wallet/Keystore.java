@@ -2,6 +2,7 @@ package com.sparrowwallet.drongo.wallet;
 
 import com.sparrowwallet.drongo.ExtendedPublicKey;
 import com.sparrowwallet.drongo.KeyDerivation;
+import com.sparrowwallet.drongo.Utils;
 
 public class Keystore {
     public static final String DEFAULT_LABEL = "Keystore 1";
@@ -44,6 +45,22 @@ public class Keystore {
 
     public void setExtendedPublicKey(ExtendedPublicKey extendedPublicKey) {
         this.extendedPublicKey = extendedPublicKey;
+    }
+
+    public boolean isValid() {
+        if(label == null || keyDerivation == null || extendedPublicKey == null) {
+            return false;
+        }
+
+        if(keyDerivation.getDerivationPath() == null || !KeyDerivation.isValid(keyDerivation.getDerivationPath())) {
+            return false;
+        }
+
+        if(keyDerivation.getMasterFingerprint() == null || keyDerivation.getMasterFingerprint().length() != 8 || !Utils.isHex(keyDerivation.getMasterFingerprint())) {
+            return false;
+        }
+
+        return true;
     }
 
     public Keystore copy() {

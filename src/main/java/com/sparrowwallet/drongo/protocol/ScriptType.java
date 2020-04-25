@@ -15,7 +15,7 @@ import static com.sparrowwallet.drongo.protocol.Script.decodeFromOpN;
 import static com.sparrowwallet.drongo.protocol.ScriptOpCodes.*;
 
 public enum ScriptType {
-    P2PK("P2PK") {
+    P2PK("P2PK", "m/44'/0'/0'") {
         @Override
         public Address getAddress(byte[] pubKey) {
             return new P2PKAddress(pubKey);
@@ -67,7 +67,7 @@ public enum ScriptType {
             return List.of(SINGLE);
         }
     },
-    P2PKH("P2PKH") {
+    P2PKH("P2PKH", "m/44'/0'/0'") {
         @Override
         public Address getAddress(byte[] pubKeyHash) {
             return new P2PKHAddress(pubKeyHash);
@@ -116,7 +116,7 @@ public enum ScriptType {
             return List.of(SINGLE);
         }
     },
-    MULTISIG("Bare Multisig") {
+    MULTISIG("Bare Multisig", "m/44'/0'/0'") {
         @Override
         public Address getAddress(byte[] bytes) {
             throw new ProtocolException("No single address for multisig script type");
@@ -196,7 +196,7 @@ public enum ScriptType {
             return List.of(MULTI);
         }
     },
-    P2SH("P2SH") {
+    P2SH("P2SH", "m/45'/0'/0'") {
         @Override
         public Address getAddress(byte[] bytes) {
             return new P2SHAddress(bytes);
@@ -247,7 +247,7 @@ public enum ScriptType {
             return List.of(MULTI);
         }
     },
-    P2SH_P2WPKH("P2SH-P2WPKH") {
+    P2SH_P2WPKH("P2SH-P2WPKH", "m/49'/0'/0'") {
         @Override
         public Address getAddress(byte[] bytes) {
             return P2SH.getAddress(bytes);
@@ -273,7 +273,7 @@ public enum ScriptType {
             return List.of(SINGLE);
         }
     },
-    P2SH_P2WSH("P2SH-P2WSH") {
+    P2SH_P2WSH("P2SH-P2WSH", "m/48'/0'/0'/1'") {
         @Override
         public Address getAddress(byte[] bytes) {
             return P2SH.getAddress(bytes);
@@ -299,7 +299,7 @@ public enum ScriptType {
             return List.of(MULTI, CUSTOM);
         }
     },
-    P2WPKH("P2WPKH") {
+    P2WPKH("P2WPKH", "m/84'/0'/0'") {
         @Override
         public Address getAddress(byte[] bytes) {
             return new P2WPKHAddress(bytes);
@@ -339,7 +339,7 @@ public enum ScriptType {
             return List.of(SINGLE);
         }
     },
-    P2WSH("P2WSH") {
+    P2WSH("P2WSH", "m/48'/0'/0'/2'") {
         @Override
         public Address getAddress(byte[] bytes) {
             return new P2WSHAddress(bytes);
@@ -381,13 +381,19 @@ public enum ScriptType {
     };
 
     private final String name;
+    private final String defaultDerivation;
 
-    ScriptType(String name) {
+    ScriptType(String name, String defaultDerivation) {
         this.name = name;
+        this.defaultDerivation = defaultDerivation;
     }
 
     public String getName() {
         return name;
+    }
+
+    public String getDefaultDerivation() {
+        return defaultDerivation;
     }
 
     public abstract List<PolicyType> getAllowedPolicyTypes();

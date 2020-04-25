@@ -39,4 +39,9 @@ public class Miniscript {
     public Miniscript copy() {
         return new Miniscript(script);
     }
+
+    @Override
+    public String toString() {
+        return getScript();
+    }
 }
