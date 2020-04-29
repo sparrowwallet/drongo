@@ -15,6 +15,16 @@ public enum WalletModel {
         return this.toString();
     }
 
+    public static WalletModel fromType(String type) {
+        for(WalletModel model : values()) {
+            if(model.getType().equals(type)) {
+                return model;
+            }
+        }
+
+        return null;
+    }
+
     public String toDisplayString() {
         String line = this.toString().toLowerCase();
         String[] words = line.split("_");

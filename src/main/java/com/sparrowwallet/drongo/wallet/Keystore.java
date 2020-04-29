@@ -66,7 +66,7 @@ public class Keystore {
     }
 
     public boolean isValid() {
-        if(label == null || keyDerivation == null || extendedPublicKey == null) {
+        if(label == null || source == null || walletModel == null || keyDerivation == null || extendedPublicKey == null) {
             return false;
         }
 
@@ -85,6 +85,8 @@ public class Keystore {
 
     public Keystore copy() {
         Keystore copy = new Keystore(label);
+        copy.setSource(source);
+        copy.setWalletModel(walletModel);
         if(keyDerivation != null) {
             copy.setKeyDerivation(keyDerivation.copy());
         }
