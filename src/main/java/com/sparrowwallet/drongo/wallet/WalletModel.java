@@ -7,6 +7,14 @@ public enum WalletModel {
         return valueOf(model.toUpperCase());
     }
 
+    public String getType() {
+        if(this == TREZOR_1 || this == TREZOR_T) {
+            return "trezor";
+        }
+
+        return this.toString();
+    }
+
     public String toDisplayString() {
         String line = this.toString().toLowerCase();
         String[] words = line.split("_");
