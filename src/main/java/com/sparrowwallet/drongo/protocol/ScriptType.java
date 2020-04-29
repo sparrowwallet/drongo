@@ -1,6 +1,8 @@
 package com.sparrowwallet.drongo.protocol;
 
+import com.sparrowwallet.drongo.KeyDerivation;
 import com.sparrowwallet.drongo.address.*;
+import com.sparrowwallet.drongo.crypto.ChildNumber;
 import com.sparrowwallet.drongo.crypto.ECKey;
 import com.sparrowwallet.drongo.policy.PolicyType;
 
@@ -381,19 +383,30 @@ public enum ScriptType {
     };
 
     private final String name;
-    private final String defaultDerivation;
+    private final String defaultDerivationPath;
 
-    ScriptType(String name, String defaultDerivation) {
+    ScriptType(String name, String defaultDerivationPath) {
         this.name = name;
-        this.defaultDerivation = defaultDerivation;
+        this.defaultDerivationPath = defaultDerivationPath;
     }
 
     public String getName() {
         return name;
     }
 
-    public String getDefaultDerivation() {
-        return defaultDerivation;
+    public String getDefaultDerivationPath() {
+        return defaultDerivationPath;
+    }
+
+    public List<ChildNumber> getDefaultDerivation() {
+        return KeyDerivation.parsePath(defaultDerivationPath);
+    }
+
+    public List<ChildNumber> getDefaultDerivation(int account) {
+        List<ChildNumber> copy = new ArrayList<>(KeyDerivation.parsePath(defaultDerivationPath));
+        ChildNumber accountChildNumber = new ChildNumber(account, true);
+        copy.set(2, accountChildNumber);
+        return Collections.unmodifiableList(copy);
     }
 
     public abstract List<PolicyType> getAllowedPolicyTypes();
