@@ -12,12 +12,12 @@ public enum WalletModel {
             return "trezor";
         }
 
-        return this.toString();
+        return this.toString().toLowerCase();
     }
 
     public static WalletModel fromType(String type) {
         for(WalletModel model : values()) {
-            if(model.getType().equals(type)) {
+            if(model.getType().equalsIgnoreCase(type)) {
                 return model;
             }
         }
