@@ -621,9 +621,7 @@ public class ECKey {
     }
 
     public static ECKey createKeyPbkdf2HmacSha512(String password, byte[] salt, int iterationCount) {
-        PKCS5S2ParametersGenerator gen = new PKCS5S2ParametersGenerator(new SHA512Digest());
-        gen.init(password.getBytes(StandardCharsets.UTF_8), salt, iterationCount);
-        byte[] secret = ((KeyParameter) gen.generateDerivedParameters(512)).getKey();
+        byte[] secret = Utils.getPbkdf2HmacSha512Hash(password.getBytes(StandardCharsets.UTF_8), salt, iterationCount);
         return ECKey.fromPrivate(secret);
     }
 

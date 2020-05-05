@@ -5,6 +5,7 @@ import com.sparrowwallet.drongo.protocol.ProtocolException;
 import com.sparrowwallet.drongo.protocol.Ripemd160;
 import com.sparrowwallet.drongo.protocol.Sha256Hash;
 import org.bouncycastle.crypto.digests.SHA512Digest;
+import org.bouncycastle.crypto.generators.PKCS5S2ParametersGenerator;
 import org.bouncycastle.crypto.macs.HMac;
 import org.bouncycastle.crypto.params.KeyParameter;
 
@@ -264,14 +265,18 @@ public class Utils {
         return Collections.unmodifiableList(childPath);
     }
 
-    static HMac createHmacSha512Digest(byte[] key) {
+    public static byte[] getHmacSha512Hash(byte[] key, byte[] data) {
+        return getHmacSha512Hash(createHmacSha512Digest(key), data);
+    }
+
+    private static HMac createHmacSha512Digest(byte[] key) {
         SHA512Digest digest = new SHA512Digest();
         HMac hMac = new HMac(digest);
         hMac.init(new KeyParameter(key));
         return hMac;
     }
 
-    public static byte[] hmacSha512(HMac hmacSha512, byte[] input) {
+    private static byte[] getHmacSha512Hash(HMac hmacSha512, byte[] input) {
         hmacSha512.reset();
         hmacSha512.update(input, 0, input.length);
         byte[] out = new byte[64];
@@ -279,7 +284,9 @@ public class Utils {
         return out;
     }
 
-    public static byte[] hmacSha512(byte[] key, byte[] data) {
-        return hmacSha512(createHmacSha512Digest(key), data);
+    public static byte[] getPbkdf2HmacSha512Hash(byte[] preimage, byte[] salt, int iterationCount) {
+        PKCS5S2ParametersGenerator gen = new PKCS5S2ParametersGenerator(new SHA512Digest());
+        gen.init(preimage, salt, iterationCount);
+        return ((KeyParameter) gen.generateDerivedParameters(512)).getKey();
     }
 }

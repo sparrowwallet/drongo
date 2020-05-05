@@ -26,7 +26,7 @@ public class HDKeyDerivation {
         ByteBuffer data = ByteBuffer.allocate(37);
         data.put(parentPublicKey);
         data.putInt(childNumber.i());
-        byte[] i = Utils.hmacSha512(parent.getChainCode(), data.array());
+        byte[] i = Utils.getHmacSha512Hash(parent.getChainCode(), data.array());
         if(i.length != 64) {
             throw new IllegalStateException("HmacSHA512 output must be 64 bytes, is" + i.length);
         }
