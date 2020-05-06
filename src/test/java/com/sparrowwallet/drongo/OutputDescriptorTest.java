@@ -45,7 +45,7 @@ public class OutputDescriptorTest {
     public void masterP2PKH() {
         OutputDescriptor descriptor = OutputDescriptor.getOutputDescriptor("pkh([d34db33f/44'/0'/0']xpub6ERApfZwUNrhLCkDtcHTcxd75RbzS1ed54G1LkBUHQVHQKqhMkhgbmJbZRkrgZw4koxb5JaHWkY4ALHY2grBGRjaDMzQLcgJvLJuZZvRcEL/1/*)");
         Assert.assertEquals("pkh(xpub6ERApfZwUNrhLCkDtcHTcxd75RbzS1ed54G1LkBUHQVHQKqhMkhgbmJbZRkrgZw4koxb5JaHWkY4ALHY2grBGRjaDMzQLcgJvLJuZZvRcEL/1/*)", descriptor.toString());
-        ExtendedPublicKey extendedPublicKey = descriptor.getSingletonExtendedPublicKey();
+        ExtendedKey extendedPublicKey = descriptor.getSingletonExtendedPublicKey();
         KeyDerivation derivation = descriptor.getKeyDerivation(extendedPublicKey);
         Assert.assertEquals("d34db33f", derivation.getMasterFingerprint());
         Assert.assertEquals("m/44'/0'/0'", derivation.getDerivationPath());

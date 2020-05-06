@@ -10,7 +10,7 @@ import java.nio.charset.StandardCharsets;
 import java.text.Normalizer;
 import java.util.*;
 
-public class Bip39 {
+public class Bip39Calculator {
     private Map<String, Integer> wordlistIndex;
 
     public byte[] getSeed(List<String> mnemonicWords, String passphrase) {

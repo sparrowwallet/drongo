@@ -7,27 +7,25 @@ import com.sparrowwallet.drongo.protocol.ScriptType;
 import java.nio.ByteBuffer;
 import java.util.*;
 
-import static com.sparrowwallet.drongo.KeyDerivation.parsePath;
-
-public class ExtendedPublicKey {
+public class ExtendedKey {
     private final byte[] parentFingerprint;
-    private final DeterministicKey pubKey;
-    private final ChildNumber pubKeyChildNumber;
+    private final DeterministicKey key;
+    private final ChildNumber keyChildNumber;
     private final DeterministicHierarchy hierarchy;
 
-    public ExtendedPublicKey(DeterministicKey pubKey, byte[] parentFingerprint, ChildNumber pubKeyChildNumber) {
+    public ExtendedKey(DeterministicKey key, byte[] parentFingerprint, ChildNumber keyChildNumber) {
         this.parentFingerprint = parentFingerprint;
-        this.pubKey = pubKey;
-        this.pubKeyChildNumber = pubKeyChildNumber;
-        this.hierarchy = new DeterministicHierarchy(pubKey);
+        this.key = key;
+        this.keyChildNumber = keyChildNumber;
+        this.hierarchy = new DeterministicHierarchy(key);
     }
 
     public byte[] getParentFingerprint() {
         return parentFingerprint;
     }
 
-    public DeterministicKey getPubKey() {
-        return pubKey;
+    public DeterministicKey getKey() {
+        return key;
     }
 
     public DeterministicKey getKey(List<ChildNumber> path) {
@@ -35,46 +33,51 @@ public class ExtendedPublicKey {
     }
 
     public String toString() {
-        return getExtendedPublicKey();
+        return getExtendedKey();
     }
 
-    public String toString(XpubHeader xpubHeader) {
-        return getExtendedPublicKey(xpubHeader);
+    public String toString(Header extendedKeyHeader) {
+        return getExtendedKey(extendedKeyHeader);
     }
 
-    public String getExtendedPublicKey() {
-        return Base58.encodeChecked(getExtendedPublicKeyBytes());
+    public String getExtendedKey() {
+        return Base58.encodeChecked(getExtendedKeyBytes());
     }
 
-    public String getExtendedPublicKey(XpubHeader xpubHeader) {
-        return Base58.encodeChecked(getExtendedPublicKeyBytes(xpubHeader));
+    public String getExtendedKey(Header extendedKeyHeader) {
+        return Base58.encodeChecked(getExtendedKeyBytes(extendedKeyHeader));
     }
 
-    public ChildNumber getPubKeyChildNumber() {
-        return pubKeyChildNumber;
+    public ChildNumber getKeyChildNumber() {
+        return keyChildNumber;
     }
 
-    public byte[] getExtendedPublicKeyBytes() {
-        return getExtendedPublicKeyBytes(XpubHeader.xpub);
+    public byte[] getExtendedKeyBytes() {
+        return getExtendedKeyBytes(key.isPubKeyOnly() ? Header.xpub : Header.xprv);
     }
 
-    public byte[] getExtendedPublicKeyBytes(XpubHeader xpubHeader) {
+    public byte[] getExtendedKeyBytes(Header extendedKeyHeader) {
         ByteBuffer buffer = ByteBuffer.allocate(78);
-        buffer.putInt(xpubHeader.header);
-        buffer.put((byte)pubKey.getDepth());
+        buffer.putInt(extendedKeyHeader.header);
+        buffer.put((byte) key.getDepth());
         buffer.put(parentFingerprint);
-        buffer.putInt(pubKeyChildNumber.i());
-        buffer.put(pubKey.getChainCode());
-        buffer.put(pubKey.getPubKey());
+        buffer.putInt(keyChildNumber.i());
+        buffer.put(key.getChainCode());
+        if(key.isPubKeyOnly()) {
+            buffer.put(key.getPubKey());
+        } else {
+            buffer.put((byte)0);
+            buffer.put(key.getPrivKeyBytes());
+        }
 
         return buffer.array();
     }
 
-    public static ExtendedPublicKey fromDescriptor(String extPubKey) {
+    public static ExtendedKey fromDescriptor(String extPubKey) {
         byte[] serializedKey = Base58.decodeChecked(extPubKey);
         ByteBuffer buffer = ByteBuffer.wrap(serializedKey);
         int header = buffer.getInt();
-        if(!XpubHeader.isValidHeader(header)) {
+        if(!Header.isValidHeader(header)) {
             throw new IllegalArgumentException("Unknown header bytes: " + DeterministicKey.toBase58(serializedKey).substring(0, 4));
         }
 
@@ -86,7 +89,7 @@ public class ExtendedPublicKey {
         List<ChildNumber> path;
 
         if(depth == 0) {
-            //Poorly formatted extended public key, add first child path element
+            //Poorly formatted extended key, add first child path element
             childNumber = new ChildNumber(0, false);
         } else if ((i & ChildNumber.HARDENED_BIT) != 0) {
             childNumber = new ChildNumber(i ^ ChildNumber.HARDENED_BIT, true); //already hardened
@@ -104,12 +107,12 @@ public class ExtendedPublicKey {
         }
 
         DeterministicKey pubKey = new DeterministicKey(path, chainCode, new LazyECPoint(ECKey.CURVE.getCurve(), data), depth, parentFingerprint);
-        return new ExtendedPublicKey(pubKey, parentFingerprint, childNumber);
+        return new ExtendedKey(pubKey, parentFingerprint, childNumber);
     }
 
     public static boolean isValid(String extPubKey) {
         try {
-            ExtendedPublicKey.fromDescriptor(extPubKey);
+            ExtendedKey.fromDescriptor(extPubKey);
         } catch (Exception e) {
             return false;
         }
@@ -117,16 +120,16 @@ public class ExtendedPublicKey {
         return true;
     }
 
-    public ExtendedPublicKey copy() {
+    public ExtendedKey copy() {
         //DeterministicKey is effectively final
-        return new ExtendedPublicKey(pubKey, Arrays.copyOf(parentFingerprint, parentFingerprint.length), pubKeyChildNumber);
+        return new ExtendedKey(key, Arrays.copyOf(parentFingerprint, parentFingerprint.length), keyChildNumber);
     }
 
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
-        ExtendedPublicKey that = (ExtendedPublicKey) o;
+        ExtendedKey that = (ExtendedKey) o;
         return that.toString().equals(this.toString());
     }
 
@@ -135,13 +138,15 @@ public class ExtendedPublicKey {
         return toString().hashCode();
     }
 
-    public enum XpubHeader {
+    public enum Header {
+        xprv("xprv", 0x0488ADE4, null),
         xpub("xpub", 0x0488B21E, ScriptType.P2PKH),
         ypub("ypub", 0x049D7CB2, ScriptType.P2SH_P2WPKH),
         zpub("zpub", 0x04B24746, ScriptType.P2WPKH),
         Ypub("Ypub", 0x0295b43f, ScriptType.P2SH_P2WSH),
         Zpub("Zpub", 0x02aa7ed3, ScriptType.P2WSH),
         tpub("tpub", 0x043587cf, ScriptType.P2PKH),
+        tprv("tprv", 0x04358394, null),
         upub("upub", 0x044a5262, ScriptType.P2SH_P2WPKH),
         vpub("vpub", 0x045f1cf6, ScriptType.P2WPKH),
         Upub("Upub", 0x024289ef, ScriptType.P2SH_P2WSH),
@@ -151,7 +156,7 @@ public class ExtendedPublicKey {
         private final int header;
         private final ScriptType defaultScriptType;
 
-        XpubHeader(String name, int header, ScriptType defaultScriptType) {
+        Header(String name, int header, ScriptType defaultScriptType) {
             this.name = name;
             this.header = header;
             this.defaultScriptType = defaultScriptType;
@@ -169,29 +174,29 @@ public class ExtendedPublicKey {
             return defaultScriptType;
         }
 
-        public static XpubHeader fromXpub(String xpub) {
-            for(XpubHeader xpubHeader : XpubHeader.values()) {
-                if(xpub.startsWith(xpubHeader.name)) {
-                    return xpubHeader;
+        public static Header fromExtendedKey(String xkey) {
+            for(Header extendedKeyHeader : Header.values()) {
+                if(xkey.startsWith(extendedKeyHeader.name)) {
+                    return extendedKeyHeader;
                 }
             }
 
-            throw new IllegalArgumentException("Unrecognised xpub header for xpub: " + xpub);
+            throw new IllegalArgumentException("Unrecognised extended key header for extended key: " + xpub);
         }
 
-        public static XpubHeader fromScriptType(ScriptType scriptType) {
-            for(XpubHeader xpubHeader : XpubHeader.values()) {
-                if(xpubHeader.defaultScriptType.equals(scriptType)) {
-                    return xpubHeader;
+        public static Header fromScriptType(ScriptType scriptType) {
+            for(Header extendedKeyHeader : Header.values()) {
+                if(extendedKeyHeader.defaultScriptType != null && extendedKeyHeader.defaultScriptType.equals(scriptType)) {
+                    return extendedKeyHeader;
                 }
             }
 
-            return XpubHeader.xpub;
+            return Header.xpub;
         }
 
         public static boolean isValidHeader(int header) {
-            for(XpubHeader xpubHeader : XpubHeader.values()) {
-                if(header == xpubHeader.header) {
+            for(Header extendedKeyHeader : Header.values()) {
+                if(header == extendedKeyHeader.header) {
                     return true;
                 }
             }

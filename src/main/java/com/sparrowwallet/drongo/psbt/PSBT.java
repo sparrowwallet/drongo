@@ -1,6 +1,6 @@
 package com.sparrowwallet.drongo.psbt;
 
-import com.sparrowwallet.drongo.ExtendedPublicKey;
+import com.sparrowwallet.drongo.ExtendedKey;
 import com.sparrowwallet.drongo.KeyDerivation;
 import com.sparrowwallet.drongo.Utils;
 import com.sparrowwallet.drongo.protocol.*;
@@ -39,7 +39,7 @@ public class PSBT {
 
     private Transaction transaction = null;
     private Integer version = null;
-    private Map<ExtendedPublicKey, KeyDerivation> extendedPublicKeys = new LinkedHashMap<>();
+    private Map<ExtendedKey, KeyDerivation> extendedPublicKeys = new LinkedHashMap<>();
     private Map<String, String> globalProprietary = new LinkedHashMap<>();
 
     private List<PSBTInput> psbtInputs = new ArrayList<>();
@@ -221,9 +221,9 @@ public class PSBT {
                 case PSBT_GLOBAL_BIP32_PUBKEY:
                     entry.checkOneBytePlusXpubKey();
                     KeyDerivation keyDerivation = parseKeyDerivation(entry.getData());
-                    ExtendedPublicKey pubKey = ExtendedPublicKey.fromDescriptor(Base58.encodeChecked(entry.getKeyData()));
+                    ExtendedKey pubKey = ExtendedKey.fromDescriptor(Base58.encodeChecked(entry.getKeyData()));
                     this.extendedPublicKeys.put(pubKey, keyDerivation);
-                    log.debug("Pubkey with master fingerprint " + keyDerivation.getMasterFingerprint() + " at path " + keyDerivation.getDerivationPath() + ": " + pubKey.getExtendedPublicKey());
+                    log.debug("Pubkey with master fingerprint " + keyDerivation.getMasterFingerprint() + " at path " + keyDerivation.getDerivationPath() + ": " + pubKey.getExtendedKey());
                     break;
                 case PSBT_GLOBAL_VERSION:
                     entry.checkOneByteKey();
@@ -382,12 +382,12 @@ public class PSBT {
         return version;
     }
 
-    public KeyDerivation getKeyDerivation(ExtendedPublicKey publicKey) {
+    public KeyDerivation getKeyDerivation(ExtendedKey publicKey) {
         return extendedPublicKeys.get(publicKey);
     }
 
-    public List<ExtendedPublicKey> getExtendedPublicKeys() {
-        return new ArrayList<ExtendedPublicKey>(extendedPublicKeys.keySet());
+    public List<ExtendedKey> getExtendedPublicKeys() {
+        return new ArrayList<ExtendedKey>(extendedPublicKeys.keySet());
     }
 
     public String toString() {

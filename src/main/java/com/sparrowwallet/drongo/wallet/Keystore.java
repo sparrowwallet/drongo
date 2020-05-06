@@ -1,8 +1,11 @@
 package com.sparrowwallet.drongo.wallet;
 
-import com.sparrowwallet.drongo.ExtendedPublicKey;
+import com.sparrowwallet.drongo.ExtendedKey;
 import com.sparrowwallet.drongo.KeyDerivation;
 import com.sparrowwallet.drongo.Utils;
+import com.sparrowwallet.drongo.crypto.ChildNumber;
+import com.sparrowwallet.drongo.crypto.DeterministicKey;
+import com.sparrowwallet.drongo.crypto.HDKeyDerivation;
 
 public class Keystore {
     public static final String DEFAULT_LABEL = "Keystore 1";
@@ -11,7 +14,8 @@ public class Keystore {
     private KeystoreSource source = KeystoreSource.SW_WATCH;
     private WalletModel walletModel = WalletModel.SPARROW;
     private KeyDerivation keyDerivation;
-    private ExtendedPublicKey extendedPublicKey;
+    private ExtendedKey extendedPublicKey;
+    private byte[] seed;
 
     public Keystore() {
         this(DEFAULT_LABEL);
@@ -57,12 +61,32 @@ public class Keystore {
         this.keyDerivation = keyDerivation;
     }
 
-    public ExtendedPublicKey getExtendedPublicKey() {
+    public ExtendedKey getExtendedPublicKey() {
         return extendedPublicKey;
     }
 
-    public void setExtendedPublicKey(ExtendedPublicKey extendedPublicKey) {
+    public void setExtendedPublicKey(ExtendedKey extendedPublicKey) {
         this.extendedPublicKey = extendedPublicKey;
+    }
+
+    public byte[] getSeed() {
+        return seed;
+    }
+
+    public void setSeed(byte[] seed) {
+        this.seed = seed;
+    }
+
+    public DeterministicKey getMasterPrivateKey() {
+        if(seed == null) {
+            throw new IllegalArgumentException("Keystore does not contain a seed");
+        }
+
+        return HDKeyDerivation.createMasterPrivateKey(seed);
+    }
+
+    public ExtendedKey getExtendedPrivateKey() {
+        return new ExtendedKey(getMasterPrivateKey(), new byte[4], ChildNumber.ZERO);
     }
 
     public boolean isValid() {

@@ -5,6 +5,7 @@ import com.sparrowwallet.drongo.Utils;
 import com.sparrowwallet.drongo.protocol.Base58;
 import com.sparrowwallet.drongo.protocol.Sha256Hash;
 
+import java.math.BigInteger;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
@@ -47,6 +48,18 @@ public class DeterministicKey extends ECKey {
         if(chainCode.length != 32) {
             throw new IllegalArgumentException("Chaincode not 32 bytes in length");
         }
+        this.parent = parent;
+        this.childNumberPath = childNumberPath;
+        this.chainCode = Arrays.copyOf(chainCode, chainCode.length);
+        this.depth = parent == null ? 0 : parent.depth + 1;
+        this.parentFingerprint = (parent != null) ? parent.getFingerprint() : new byte[4];
+    }
+
+    public DeterministicKey(List<ChildNumber> childNumberPath,
+                            byte[] chainCode,
+                            BigInteger priv,
+                            DeterministicKey parent) {
+        super(priv, ECKey.publicPointFromPrivate(priv), true);
         this.parent = parent;
         this.childNumberPath = childNumberPath;
         this.chainCode = Arrays.copyOf(chainCode, chainCode.length);

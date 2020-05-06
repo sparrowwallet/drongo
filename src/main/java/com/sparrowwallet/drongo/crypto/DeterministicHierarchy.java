@@ -30,9 +30,9 @@ public class DeterministicHierarchy {
      *
      * @param path the path to the key
      * @return next newly created key using the child derivation function
-     * @throws IllegalArgumentException if create is false and the path was not found.
+     * @throws HDDerivationException if create is false and the path was not found.
      */
-    public DeterministicKey get(List<ChildNumber> path) {
+    public DeterministicKey get(List<ChildNumber> path) throws HDDerivationException {
         if(!keys.containsKey(path)) {
             if(path.size() == 0) {
                 throw new IllegalArgumentException("Can't derive the master key: nothing to derive from.");
