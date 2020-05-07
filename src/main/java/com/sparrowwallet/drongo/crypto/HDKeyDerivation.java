@@ -39,13 +39,57 @@ public class HDKeyDerivation {
     }
 
     public static DeterministicKey deriveChildKey(DeterministicKey parent, ChildNumber childNumber) throws HDDerivationException {
-        RawKeyBytes rawKey = deriveChildKeyBytesFromPublic(parent, childNumber);
-        return new DeterministicKey(Utils.appendChild(parent.getPath(), childNumber), rawKey.chainCode, new LazyECPoint(ECKey.CURVE.getCurve(), rawKey.keyBytes), parent);
+        if(parent.isPubKeyOnly()) {
+            RawKeyBytes rawKey = deriveChildKeyBytesFromPublic(parent, childNumber);
+            return new DeterministicKey(Utils.appendChild(parent.getPath(), childNumber), rawKey.chainCode, new LazyECPoint(ECKey.CURVE.getCurve(), rawKey.keyBytes), null, parent);
+        } else {
+            RawKeyBytes rawKey = deriveChildKeyBytesFromPrivate(parent, childNumber);
+            return new DeterministicKey(Utils.appendChild(parent.getPath(), childNumber), rawKey.chainCode, new BigInteger(1, rawKey.keyBytes), parent);
+        }
+    }
+
+    public static RawKeyBytes deriveChildKeyBytesFromPrivate(DeterministicKey parent, ChildNumber childNumber) throws HDDerivationException {
+        if(parent.isPubKeyOnly()) {
+            throw new HDDerivationException("Parent key must have private key bytes for this method");
+        }
+
+        byte[] parentPublicKey = parent.getPubKeyPoint().getEncoded(true);
+        if(parentPublicKey.length != 33) {
+            throw new HDDerivationException("Parent pubkey must be 33 bytes, but is " + parentPublicKey.length);
+        }
+
+        ByteBuffer data = ByteBuffer.allocate(37);
+        if (childNumber.isHardened()) {
+            data.put(parent.getPrivKeyBytes33());
+        } else {
+            data.put(parentPublicKey);
+        }
+
+        data.putInt(childNumber.i());
+        byte[] i = Utils.getHmacSha512Hash(parent.getChainCode(), data.array());
+        if(i.length != 64) {
+            throw new HDDerivationException("HmacSHA512 output must be 64 bytes, is " + i.length);
+        }
+
+        byte[] il = Arrays.copyOfRange(i, 0, 32);
+        byte[] chainCode = Arrays.copyOfRange(i, 32, 64);
+        BigInteger ilInt = new BigInteger(1, il);
+        if(ilInt.compareTo(ECKey.CURVE.getN()) > 0) {
+            throw new HDDerivationException("Illegal derived key: I_L >= n");
+        }
+
+        final BigInteger priv = parent.getPrivKey();
+        BigInteger ki = priv.add(ilInt).mod(ECKey.CURVE.getN());
+        if(ki.equals(BigInteger.ZERO)) {
+            throw new HDDerivationException("Illegal derived key: derived private key equals 0");
+        }
+
+        return new RawKeyBytes(ki.toByteArray(), chainCode);
     }
 
     public static RawKeyBytes deriveChildKeyBytesFromPublic(DeterministicKey parent, ChildNumber childNumber) throws HDDerivationException {
         if(childNumber.isHardened()) {
-            throw new HDDerivationException("Can't use private derivation with public keys only.");
+            throw new HDDerivationException("Can't use private derivation with public keys only");
         }
 
         byte[] parentPublicKey = parent.getPubKeyPoint().getEncoded(true);
@@ -58,15 +102,21 @@ public class HDKeyDerivation {
         data.putInt(childNumber.i());
         byte[] i = Utils.getHmacSha512Hash(parent.getChainCode(), data.array());
         if(i.length != 64) {
-            throw new HDDerivationException("HmacSHA512 output must be 64 bytes, is" + i.length);
+            throw new HDDerivationException("HmacSHA512 output must be 64 bytes, is " + i.length);
         }
 
         byte[] il = Arrays.copyOfRange(i, 0, 32);
         byte[] chainCode = Arrays.copyOfRange(i, 32, 64);
         BigInteger ilInt = new BigInteger(1, il);
+        if(ilInt.compareTo(ECKey.CURVE.getN()) > 0) {
+            throw new HDDerivationException("Illegal derived key: I_L >= n");
+        }
 
         final BigInteger N = ECKey.CURVE.getN();
         ECPoint Ki = ECKey.publicPointFromPrivate(ilInt).add(parent.getPubKeyPoint());
+        if(Ki.equals(ECKey.CURVE.getCurve().getInfinity())) {
+            throw new HDDerivationException("Illegal derived key: derived public key equals infinity");
+        }
 
         return new RawKeyBytes(Ki.getEncoded(true), chainCode);
     }

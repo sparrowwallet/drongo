@@ -7,6 +7,8 @@ import com.sparrowwallet.drongo.crypto.ChildNumber;
 import com.sparrowwallet.drongo.crypto.DeterministicKey;
 import com.sparrowwallet.drongo.crypto.HDKeyDerivation;
 
+import java.util.List;
+
 public class Keystore {
     public static final String DEFAULT_LABEL = "Keystore 1";
 
@@ -118,5 +120,23 @@ public class Keystore {
             copy.setExtendedPublicKey(extendedPublicKey.copy());
         }
         return copy;
+    }
+
+    public static Keystore fromSeed(byte[] seed, List<ChildNumber> derivation) {
+        Keystore keystore = new Keystore();
+        keystore.setSeed(seed);
+        ExtendedKey xprv = keystore.getExtendedPrivateKey();
+        String masterFingerprint = Utils.bytesToHex(xprv.getKey().getFingerprint());
+        DeterministicKey derivedKey = xprv.getKey(derivation);
+        DeterministicKey derivedKeyPublicOnly = derivedKey.dropPrivateBytes().dropParent();
+        ExtendedKey xpub = new ExtendedKey(derivedKeyPublicOnly, derivedKey.getParentFingerprint(), derivation.get(derivation.size() - 1));
+
+        keystore.setLabel(masterFingerprint);
+        keystore.setSource(KeystoreSource.SW_SEED);
+        keystore.setWalletModel(WalletModel.SPARROW);
+        keystore.setKeyDerivation(new KeyDerivation(masterFingerprint, KeyDerivation.writePath(derivation)));
+        keystore.setExtendedPublicKey(ExtendedKey.fromDescriptor(xpub.toString()));
+
+        return keystore;
     }
 }

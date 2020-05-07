@@ -13,8 +13,8 @@ import java.util.List;
 public class DeterministicKey extends ECKey {
     private final DeterministicKey parent;
     private final List<ChildNumber> childNumberPath;
-    private final int depth;
-    private final byte[] parentFingerprint; // 0 if this key is root node of key hierarchy
+    private int depth;
+    private byte[] parentFingerprint; // 0 if this key is root node of key hierarchy
 
     /** 32 bytes */
     private final byte[] chainCode;
@@ -43,8 +43,9 @@ public class DeterministicKey extends ECKey {
     public DeterministicKey(List<ChildNumber> childNumberPath,
                             byte[] chainCode,
                             LazyECPoint publicAsPoint,
+                            BigInteger priv,
                             DeterministicKey parent) {
-        super(null, compressPoint(publicAsPoint));
+        super(priv, compressPoint(publicAsPoint));
         if(chainCode.length != 32) {
             throw new IllegalArgumentException("Chaincode not 32 bytes in length");
         }
@@ -99,6 +100,54 @@ public class DeterministicKey extends ECKey {
 
     public DeterministicKey getParent() {
         return parent;
+    }
+
+    /**
+     * Return the fingerprint of the key from which this key was derived, if this is a
+     * child key, or else an array of four zero-value bytes.
+     */
+    public byte[] getParentFingerprint() {
+        return parentFingerprint;
+    }
+
+    /**
+     * Returns private key bytes, padded with zeros to 33 bytes.
+     * @throws java.lang.IllegalStateException if the private key bytes are missing.
+     */
+    public byte[] getPrivKeyBytes33() {
+        byte[] bytes33 = new byte[33];
+        byte[] priv = getPrivKeyBytes();
+        System.arraycopy(priv, 0, bytes33, 33 - priv.length, priv.length);
+        return bytes33;
+    }
+    /**
+     * Returns the same key with the private bytes removed. May return the same instance. The purpose of this is to save
+     * memory: the private key can always be very efficiently rederived from a parent that a private key, so storing
+     * all the private keys in RAM is a poor tradeoff especially on constrained devices. This means that the returned
+     * key may still be usable for signing and so on, so don't expect it to be a true pubkey-only object! If you want
+     * that then you should follow this call with a call to {@link #dropParent()}.
+     */
+    public DeterministicKey dropPrivateBytes() {
+        if (isPubKeyOnly()) {
+            return this;
+        } else {
+            return new DeterministicKey(getPath(), getChainCode(), pub, null, parent);
+        }
+    }
+
+    /**
+     * <p>Returns the same key with the parent pointer removed (it still knows its own path and the parent fingerprint).</p>
+     *
+     * <p>If this key doesn't have private key bytes stored/cached itself, but could rederive them from the parent, then
+     * the new key returned by this method won't be able to do that. Thus, using dropPrivateBytes().dropParent() on a
+     * regular DeterministicKey will yield a new DeterministicKey that cannot sign or do other things involving the
+     * private key at all.</p>
+     */
+    public DeterministicKey dropParent() {
+        DeterministicKey key = new DeterministicKey(getPath(), getChainCode(), pub, priv, null);
+        key.parentFingerprint = parentFingerprint;
+        key.depth = depth;
+        return key;
     }
 
     /** Returns the last element of the path returned by {@link DeterministicKey#getPath()} */
