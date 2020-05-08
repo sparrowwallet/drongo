@@ -19,6 +19,15 @@ public class Bip39CalculatorTest {
         Assert.assertEquals("727ecfcf0bce9d8ec0ef066f7aeb845c271bdd4ee06a37398cebd40dc810140bb620b6c10a8ad671afdceaf37aa55d92d6478f747e8b92430dd938ab5be961dd", Utils.bytesToHex(seed));
     }
 
+    @Test(expected = IllegalArgumentException.class)
+    public void bip39TwelveWordsInvalidTest() {
+        String words = "absent absent absent absent absent absent absent absent absent absent absent absent";
+        List<String> wordlist = Arrays.asList(words.split(" "));
+
+        Bip39Calculator bip39Calculator = new Bip39Calculator();
+        byte[] seed = bip39Calculator.getSeed(wordlist, "");
+    }
+
     @Test
     public void bip39TwelveWordsPassphraseTest() {
         String words = "arch easily near social civil image seminar monkey engine party promote turtle";

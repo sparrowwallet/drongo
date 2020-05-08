@@ -11,7 +11,7 @@ import java.text.Normalizer;
 import java.util.*;
 
 public class Bip39Calculator {
-    private Map<String, Integer> wordlistIndex;
+    private static Map<String, Integer> wordlistIndex;
 
     public byte[] getSeed(List<String> mnemonicWords, String passphrase) {
         loadWordlistIndex();
@@ -85,7 +85,7 @@ public class Bip39Calculator {
         }
     }
 
-    private void loadWordlistIndex() {
+    private synchronized void loadWordlistIndex() {
         if(wordlistIndex == null) {
             wordlistIndex = new HashMap<>();
 
@@ -99,5 +99,10 @@ public class Bip39Calculator {
                 throw new RuntimeException(e);
             }
         }
+    }
+
+    public List<String> getWordList() {
+        loadWordlistIndex();
+        return Collections.unmodifiableList(new ArrayList<>(wordlistIndex.keySet()));
     }
 }
