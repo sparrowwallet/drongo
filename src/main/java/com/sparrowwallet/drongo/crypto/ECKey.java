@@ -10,7 +10,6 @@ import org.bouncycastle.crypto.digests.SHA256Digest;
 import org.bouncycastle.crypto.digests.SHA512Digest;
 import org.bouncycastle.crypto.ec.CustomNamedCurves;
 import org.bouncycastle.crypto.generators.ECKeyPairGenerator;
-import org.bouncycastle.crypto.generators.PKCS5S2ParametersGenerator;
 import org.bouncycastle.crypto.macs.HMac;
 import org.bouncycastle.crypto.params.*;
 import org.bouncycastle.crypto.signers.ECDSASigner;
@@ -24,17 +23,14 @@ import org.bouncycastle.util.encoders.Hex;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.crypto.Cipher;
-import javax.crypto.spec.IvParameterSpec;
-import javax.crypto.spec.SecretKeySpec;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.math.BigInteger;
 import java.nio.charset.StandardCharsets;
 import java.security.*;
-import java.security.spec.AlgorithmParameterSpec;
 import java.util.Arrays;
 import java.util.Base64;
+import java.util.Comparator;
 import java.util.Objects;
 
 /**
@@ -65,8 +61,20 @@ import java.util.Objects;
  * this class so round-tripping preserves state. Unless you're working with old software or doing unusual things, you
  * can usually ignore the compressed/uncompressed distinction.</p>
  */
-public class ECKey {
+public class ECKey implements EncryptableItem {
     private static final Logger log = LoggerFactory.getLogger(ECKey.class);
+
+    /** Sorts oldest keys first, newest last. */
+    public static final Comparator<ECKey> AGE_COMPARATOR = new Comparator<ECKey>() {
+
+        @Override
+        public int compare(ECKey k1, ECKey k2) {
+            if (k1.creationTimeSeconds == k2.creationTimeSeconds)
+                return 0;
+            else
+                return k1.creationTimeSeconds > k2.creationTimeSeconds ? 1 : -1;
+        }
+    };
 
     // The parameters of the secp256k1 curve that Bitcoin uses.
     private static final X9ECParameters CURVE_PARAMS = CustomNamedCurves.getByName("secp256k1");
@@ -100,6 +108,9 @@ public class ECKey {
     // Creation time of the key in seconds since the epoch, or zero if the key was deserialized from a version that did
     // not have this field.
     protected long creationTimeSeconds;
+
+    protected KeyCrypter keyCrypter;
+    protected EncryptedData encryptedPrivateKey;
 
     private byte[] pubKeyHash;
 
@@ -143,6 +154,18 @@ public class ECKey {
 
         this.priv = priv;
         this.pub = pub;
+    }
+
+    /**
+     * Constructs a key that has an encrypted private component. The given object wraps encrypted bytes and an
+     * initialization vector. Note that the key will not be decrypted during this call: the returned ECKey is
+     * unusable for signing unless a decryption key is supplied.
+     */
+    public static ECKey fromEncrypted(EncryptedData encryptedPrivateKey, KeyCrypter crypter, byte[] pubKey) {
+        ECKey key = fromPublicOnly(pubKey);
+        key.encryptedPrivateKey = encryptedPrivateKey;
+        key.keyCrypter = crypter;
+        return key;
     }
 
     /**
@@ -235,6 +258,19 @@ public class ECKey {
     }
 
     /**
+     * Returns true if this key has unencrypted access to private key bytes. Does the opposite of
+     * {@link #isPubKeyOnly()}.
+     */
+    public boolean hasPrivKey() {
+        return priv != null;
+    }
+
+    /** Returns true if this key is watch only, meaning it has a public key but no private key. */
+    public boolean isWatching() {
+        return isPubKeyOnly() && !isEncrypted();
+    }
+
+    /**
      * Output this ECKey as an ASN.1 encoded private key, as understood by OpenSSL or used by Bitcoin Core
      * in its wallet storage format.
      * @throws MissingPrivateKeyException if the private key is missing or encrypted.
@@ -313,8 +349,10 @@ public class ECKey {
      * @throws java.lang.IllegalStateException if the private key bytes are not available.
      */
     public BigInteger getPrivKey() {
-        if (priv == null)
+        if (priv == null) {
             throw new MissingPrivateKeyException();
+        }
+
         return priv;
     }
 
@@ -447,8 +485,35 @@ public class ECKey {
      * usually encoded using ASN.1 format, so you want {@link ECKey.ECDSASignature#toASN1()}
      * instead. However sometimes the independent components can be useful, for instance, if you're going to do
      * further EC maths on them.
+     * @throws KeyCrypterException if this ECKey doesn't have a private part.
      */
-    public ECDSASignature sign(Sha256Hash input) {
+    public ECDSASignature sign(Sha256Hash input) throws KeyCrypterException {
+        return sign(input, null);
+    }
+
+    /**
+     * Signs the given hash and returns the R and S components as BigIntegers. In the Bitcoin protocol, they are
+     * usually encoded using DER format, so you want {@link ECKey.ECDSASignature#encodeToDER()}
+     * instead. However sometimes the independent components can be useful, for instance, if you're doing to do further
+     * EC maths on them.
+     *
+     * @param aesKey The AES key to use for decryption of the private key. If null then no decryption is required.
+     * @throws KeyCrypterException if there's something wrong with aesKey.
+     * @throws ECKey.MissingPrivateKeyException if this key cannot sign because it's pubkey only.
+     */
+    public ECDSASignature sign(Sha256Hash input, KeyParameter aesKey) throws KeyCrypterException {
+        KeyCrypter crypter = getKeyCrypter();
+        if (crypter != null) {
+            if (aesKey == null) {
+                throw new KeyIsEncryptedException();
+            }
+            return decrypt(aesKey).sign(input);
+        } else {
+            // No decryption of private key required.
+            if (priv == null) {
+                throw new MissingPrivateKeyException();
+            }
+        }
         return doSign(input, priv);
     }
 
@@ -516,6 +581,29 @@ public class ECKey {
      */
     public boolean verify(Sha256Hash sigHash, ECDSASignature signature) {
         return ECKey.verify(sigHash.getBytes(), signature, getPubKey());
+    }
+
+    /**
+     * Verifies the given ASN.1 encoded ECDSA signature against a hash using the public key, and throws an exception
+     * if the signature doesn't match
+     * @throws SignatureDecodeException if the signature is unparseable in some way.
+     * @throws java.security.SignatureException if the signature does not match.
+     */
+    public void verifyOrThrow(byte[] hash, byte[] signature) throws SignatureDecodeException, SignatureException {
+        if (!verify(hash, signature)) {
+            throw new SignatureException();
+        }
+    }
+
+    /**
+     * Verifies the given R/S pair (signature) against a hash using the public key, and throws an exception
+     * if the signature doesn't match
+     * @throws java.security.SignatureException if the signature does not match.
+     */
+    public void verifyOrThrow(Sha256Hash sigHash, ECDSASignature signature) throws SignatureException {
+        if (!ECKey.verify(sigHash.getBytes(), signature, getPubKey())) {
+            throw new SignatureException();
+        }
     }
 
     /**
@@ -616,6 +704,184 @@ public class ECKey {
         return Utils.bigIntegerToBytes(getPrivKey(), 32);
     }
 
+    /**
+     * Returns the creation time of this key or zero if the key was deserialized from a version that did not store
+     * that data.
+     */
+    @Override
+    public long getCreationTimeSeconds() {
+        return creationTimeSeconds;
+    }
+
+    /**
+     * Sets the creation time of this key. Zero is a convention to mean "unavailable". This method can be useful when
+     * you have a raw key you are importing from somewhere else.
+     */
+    public void setCreationTimeSeconds(long newCreationTimeSeconds) {
+        if (newCreationTimeSeconds < 0) {
+            throw new IllegalArgumentException("Cannot set creation time to negative value: " + newCreationTimeSeconds);
+        }
+        creationTimeSeconds = newCreationTimeSeconds;
+    }
+
+    /**
+     * Create an encrypted private key with the keyCrypter and the AES key supplied.
+     * This method returns a new encrypted key and leaves the original unchanged.
+     *
+     * @param keyCrypter The keyCrypter that specifies exactly how the encrypted bytes are created.
+     * @param aesKey The KeyParameter with the AES encryption key (usually constructed with keyCrypter#deriveKey and cached as it is slow to create).
+     * @return encryptedKey
+     */
+    public ECKey encrypt(KeyCrypter keyCrypter, KeyParameter aesKey) throws KeyCrypterException {
+        if(keyCrypter == null) {
+            throw new KeyCrypterException("Keycrypter cannot be null");
+        }
+
+        final byte[] privKeyBytes = getPrivKeyBytes();
+        EncryptedData encryptedPrivateKey = keyCrypter.encrypt(privKeyBytes, null, aesKey);
+        ECKey result = ECKey.fromEncrypted(encryptedPrivateKey, keyCrypter, getPubKey());
+        result.setCreationTimeSeconds(creationTimeSeconds);
+        return result;
+    }
+
+    /**
+     * Create a decrypted private key with the keyCrypter and AES key supplied. Note that if the aesKey is wrong, this
+     * has some chance of throwing KeyCrypterException due to the corrupted padding that will result, but it can also
+     * just yield a garbage key.
+     *
+     * @param keyCrypter The keyCrypter that specifies exactly how the decrypted bytes are created.
+     * @param aesKey The KeyParameter with the AES encryption key (usually constructed with keyCrypter#deriveKey and cached).
+     */
+    public ECKey decrypt(KeyCrypter keyCrypter, KeyParameter aesKey) throws KeyCrypterException {
+        if(keyCrypter == null) {
+            throw new KeyCrypterException("Keycrypter cannot be null");
+        }
+
+        // Check that the keyCrypter matches the one used to encrypt the keys, if set.
+        if (this.keyCrypter != null && !this.keyCrypter.equals(keyCrypter)) {
+            throw new KeyCrypterException("The keyCrypter being used to decrypt the key is different to the one that was used to encrypt it");
+        }
+
+        if(encryptedPrivateKey == null) {
+            throw new IllegalArgumentException("This key is not encrypted");
+        }
+
+        byte[] unencryptedPrivateKey = keyCrypter.decrypt(encryptedPrivateKey, aesKey);
+        ECKey key = ECKey.fromPrivate(unencryptedPrivateKey);
+
+        if (!Arrays.equals(key.getPubKey(), getPubKey())) {
+            throw new KeyCrypterException("Provided AES key is wrong");
+        }
+
+        key.setCreationTimeSeconds(creationTimeSeconds);
+        return key;
+    }
+
+    /**
+     * Create a decrypted private key with AES key. Note that if the AES key is wrong, this
+     * has some chance of throwing KeyCrypterException due to the corrupted padding that will result, but it can also
+     * just yield a garbage key.
+     *
+     * @param aesKey The KeyParameter with the AES encryption key (usually constructed with keyCrypter#deriveKey and cached).
+     */
+    public ECKey decrypt(KeyParameter aesKey) throws KeyCrypterException {
+        final KeyCrypter crypter = getKeyCrypter();
+        if (crypter == null) {
+            throw new KeyCrypterException("No key crypter available");
+        }
+
+        return decrypt(crypter, aesKey);
+    }
+
+    /**
+     * Creates decrypted private key if needed.
+     */
+    public ECKey maybeDecrypt(KeyParameter aesKey) throws KeyCrypterException {
+        return isEncrypted() && aesKey != null ? decrypt(aesKey) : this;
+    }
+
+    /**
+     * <p>Check that it is possible to decrypt the key with the keyCrypter and that the original key is returned.</p>
+     *
+     * <p>Because it is a critical failure if the private keys cannot be decrypted successfully (resulting of loss of all
+     * bitcoins controlled by the private key) you can use this method to check when you *encrypt* a wallet that
+     * it can definitely be decrypted successfully.</p>
+     *
+     * @return true if the encrypted key can be decrypted back to the original key successfully.
+     */
+    public static boolean encryptionIsReversible(ECKey originalKey, ECKey encryptedKey, KeyCrypter keyCrypter, KeyParameter aesKey) {
+        try {
+            ECKey rebornUnencryptedKey = encryptedKey.decrypt(keyCrypter, aesKey);
+            byte[] originalPrivateKeyBytes = originalKey.getPrivKeyBytes();
+            byte[] rebornKeyBytes = rebornUnencryptedKey.getPrivKeyBytes();
+            if (!Arrays.equals(originalPrivateKeyBytes, rebornKeyBytes)) {
+                log.error("The check that encryption could be reversed failed for {}", originalKey);
+                return false;
+            }
+            return true;
+        } catch (KeyCrypterException kce) {
+            log.error(kce.getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Indicates whether the private key is encrypted (true) or not (false).
+     * A private key is deemed to be encrypted when there is both a KeyCrypter and the encryptedPrivateKey is non-zero.
+     */
+    @Override
+    public boolean isEncrypted() {
+        return keyCrypter != null && encryptedPrivateKey != null && encryptedPrivateKey.getEncryptedBytes().length > 0;
+    }
+
+    @Override
+    public EncryptionType getEncryptionType() {
+        return keyCrypter != null ? keyCrypter.getUnderstoodEncryptionType() : EncryptionType.UNENCRYPTED;
+    }
+
+    /**
+     * A wrapper for {@link #getPrivKeyBytes()} that returns null if the private key bytes are missing or would have
+     * to be derived (for the HD key case).
+     */
+    @Override
+    public byte[] getSecretBytes() {
+        if (hasPrivKey()) {
+            return getPrivKeyBytes();
+        } else {
+            return null;
+        }
+    }
+
+    /** An alias for {@link #getEncryptedPrivateKey()} */
+    @Override
+    public EncryptedData getEncryptedData() {
+        return getEncryptedPrivateKey();
+    }
+
+    /**
+     * Returns the the encrypted private key bytes and initialisation vector for this ECKey, or null if the ECKey
+     * is not encrypted.
+     */
+    public EncryptedData getEncryptedPrivateKey() {
+        return encryptedPrivateKey;
+    }
+
+    /**
+     * Returns the KeyCrypter that was used to encrypt to encrypt this ECKey. You need this to decrypt the ECKey.
+     */
+    public KeyCrypter getKeyCrypter() {
+        return keyCrypter;
+    }
+
+    public static class MissingPrivateKeyException extends RuntimeException {
+    }
+
+    public static class KeyIsEncryptedException extends MissingPrivateKeyException {
+    }
+
+    public static class InvalidPasswordException extends RuntimeException {
+    }
+
     public static ECKey createKeyPbkdf2HmacSha512(String password) {
         return createKeyPbkdf2HmacSha512(password, new byte[0], 1024);
     }
@@ -637,22 +903,11 @@ public class ECKey {
         byte[] key_m = new byte[hash.length-32];
         System.arraycopy(hash, 32, key_m, 0, hash.length-32);
 
-        byte[] ciphertext = encryptAesCbcPkcs7(message, iv, key_e);
+        AESKeyCrypter aesKeyCrypter = new AESKeyCrypter();
+        byte[] ciphertext = aesKeyCrypter.encrypt(message, iv, new KeyParameter(key_e)).getEncryptedBytes();
         byte[] encrypted = concat(magic, ephemeral.getPubKey(), ciphertext);
         byte[] result = hmac256(key_m, encrypted);
         return Base64.getEncoder().encode(concat(encrypted, result));
-    }
-
-    private byte[] encryptAesCbcPkcs7(byte[] message, byte[] iv, byte[] key_e) {
-        try {
-            Cipher cipher = Cipher.getInstance("AES/CBC/PKCS7Padding");
-            SecretKeySpec secretKeySpec = new SecretKeySpec(key_e, "AES");
-            AlgorithmParameterSpec paramSpec = new IvParameterSpec(iv);
-            cipher.init(Cipher.ENCRYPT_MODE, secretKeySpec, paramSpec);
-            return cipher.doFinal(message);
-        } catch(Exception e) {
-            throw new RuntimeException(e);
-        }
     }
 
     public byte[] decryptEcies(byte[] message, byte[] magic) {
@@ -691,19 +946,8 @@ public class ECKey {
             throw new InvalidPasswordException();
         }
 
-        return decryptAesCbcPkcs7(ciphertext, iv, key_e);
-    }
-
-    private byte[] decryptAesCbcPkcs7(byte[] ciphertext, byte[] iv, byte[] key_e) {
-        try {
-            Cipher cipher = Cipher.getInstance("AES/CBC/PKCS7Padding");
-            SecretKeySpec secretKeySpec = new SecretKeySpec(key_e, "AES");
-            AlgorithmParameterSpec paramSpec = new IvParameterSpec(iv);
-            cipher.init(Cipher.DECRYPT_MODE, secretKeySpec, paramSpec);
-            return cipher.doFinal(ciphertext);
-        } catch (Exception e) {
-            throw new RuntimeException(e);
-        }
+        AESKeyCrypter aesKeyCrypter = new AESKeyCrypter();
+        return aesKeyCrypter.decrypt(new EncryptedData(iv, ciphertext), new KeyParameter(key_e));
     }
 
     private byte[] sha512(byte[] input) {
@@ -752,11 +996,5 @@ public class ECKey {
     @Override
     public String toString() {
         return pub.toString();
-    }
-
-    public static class MissingPrivateKeyException extends RuntimeException {
-    }
-
-    public static class InvalidPasswordException extends RuntimeException {
     }
 }
