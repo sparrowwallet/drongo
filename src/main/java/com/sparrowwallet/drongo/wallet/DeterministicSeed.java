@@ -9,19 +9,16 @@ import org.bouncycastle.crypto.params.KeyParameter;
 
 import java.nio.charset.StandardCharsets;
 import java.security.SecureRandom;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Objects;
-import java.util.StringJoiner;
+import java.util.*;
 
 public class DeterministicSeed implements EncryptableItem {
     public static final int DEFAULT_SEED_ENTROPY_BITS = 128;
     public static final int MAX_SEED_ENTROPY_BITS = 512;
 
     private final byte[] seed;
-    private final EncryptedData encryptedSeed;
-
     private final List<String> mnemonicCode;
+
+    private final EncryptedData encryptedSeed;
     private final EncryptedData encryptedMnemonicCode;
 
     private long creationTimeSeconds;
@@ -247,5 +244,13 @@ public class DeterministicSeed implements EncryptableItem {
 
     private static List<String> decodeMnemonicCode(String mnemonicCode) {
         return Arrays.asList(mnemonicCode.split(" "));
+    }
+
+    public DeterministicSeed copy() {
+        if(isEncrypted()) {
+            return new DeterministicSeed(encryptedMnemonicCode.copy(), encryptedSeed.copy(), creationTimeSeconds);
+        }
+
+        return new DeterministicSeed(Arrays.copyOf(seed, seed.length), new ArrayList<>(mnemonicCode), creationTimeSeconds);
     }
 }

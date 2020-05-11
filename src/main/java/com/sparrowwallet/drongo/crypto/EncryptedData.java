@@ -45,4 +45,9 @@ public final class EncryptedData {
         return "EncryptedData [initialisationVector=" + Arrays.toString(initialisationVector)
                 + ", encryptedPrivateKey=" + Arrays.toString(encryptedBytes) + "]";
     }
+
+    public EncryptedData copy() {
+        return new EncryptedData(Arrays.copyOf(initialisationVector, initialisationVector.length),
+                Arrays.copyOf(encryptedBytes, encryptedBytes.length));
+    }
 }

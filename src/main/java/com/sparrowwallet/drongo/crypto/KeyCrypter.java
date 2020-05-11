@@ -38,7 +38,7 @@ public interface KeyCrypter {
      *
      * @throws KeyCrypterException if decryption was unsuccessful.
      */
-    byte[] decrypt(EncryptedData encryptedBytesToDecode, KeyParameter aesKey) throws KeyCrypterException;
+    byte[] decrypt(EncryptedData encryptedBytesToDecode, KeyParameter key) throws KeyCrypterException;
 
     /**
      * Encrypt the supplied bytes, converting them into ciphertext.
@@ -46,5 +46,5 @@ public interface KeyCrypter {
      * @return encryptedPrivateKey An encryptedPrivateKey containing the encrypted bytes and an initialisation vector.
      * @throws KeyCrypterException if encryption was unsuccessful
      */
-    EncryptedData encrypt(byte[] plainBytes, byte[] initializationVector, KeyParameter aesKey) throws KeyCrypterException;
+    EncryptedData encrypt(byte[] plainBytes, byte[] initializationVector, KeyParameter key) throws KeyCrypterException;
 }

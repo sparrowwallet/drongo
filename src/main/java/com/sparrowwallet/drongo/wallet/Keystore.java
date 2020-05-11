@@ -17,7 +17,7 @@ public class Keystore {
     private WalletModel walletModel = WalletModel.SPARROW;
     private KeyDerivation keyDerivation;
     private ExtendedKey extendedPublicKey;
-    private byte[] seed;
+    private DeterministicSeed seed;
 
     public Keystore() {
         this(DEFAULT_LABEL);
@@ -71,11 +71,11 @@ public class Keystore {
         this.extendedPublicKey = extendedPublicKey;
     }
 
-    public byte[] getSeed() {
+    public DeterministicSeed getSeed() {
         return seed;
     }
 
-    public void setSeed(byte[] seed) {
+    public void setSeed(DeterministicSeed seed) {
         this.seed = seed;
     }
 
@@ -84,7 +84,11 @@ public class Keystore {
             throw new IllegalArgumentException("Keystore does not contain a seed");
         }
 
-        return HDKeyDerivation.createMasterPrivateKey(seed);
+        if(seed.isEncrypted()) {
+            throw new IllegalArgumentException("Seed is encrypted");
+        }
+
+        return HDKeyDerivation.createMasterPrivateKey(seed.getSeedBytes());
     }
 
     public ExtendedKey getExtendedPrivateKey() {
@@ -119,10 +123,13 @@ public class Keystore {
         if(extendedPublicKey != null) {
             copy.setExtendedPublicKey(extendedPublicKey.copy());
         }
+        if(seed != null) {
+            copy.setSeed(seed.copy());
+        }
         return copy;
     }
 
-    public static Keystore fromSeed(byte[] seed, List<ChildNumber> derivation) {
+    public static Keystore fromSeed(DeterministicSeed seed, List<ChildNumber> derivation) {
         Keystore keystore = new Keystore();
         keystore.setSeed(seed);
         ExtendedKey xprv = keystore.getExtendedPrivateKey();

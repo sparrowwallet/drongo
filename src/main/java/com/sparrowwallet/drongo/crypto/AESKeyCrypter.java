@@ -1,67 +1,101 @@
 package com.sparrowwallet.drongo.crypto;
 
-import com.sparrowwallet.drongo.Utils;
+import org.bouncycastle.crypto.BufferedBlockCipher;
+import org.bouncycastle.crypto.InvalidCipherTextException;
+import org.bouncycastle.crypto.engines.AESEngine;
+import org.bouncycastle.crypto.modes.CBCBlockCipher;
+import org.bouncycastle.crypto.paddings.PaddedBufferedBlockCipher;
 import org.bouncycastle.crypto.params.KeyParameter;
+import org.bouncycastle.crypto.params.ParametersWithIV;
 
-import javax.crypto.Cipher;
-import javax.crypto.spec.IvParameterSpec;
-import javax.crypto.spec.SecretKeySpec;
-import java.nio.charset.StandardCharsets;
-import java.security.spec.AlgorithmParameterSpec;
+import java.security.SecureRandom;
+import java.util.Arrays;
 
+/*
+ * 
+ */
 public class AESKeyCrypter implements KeyCrypter {
+    /**
+     * The size of an AES block in bytes.
+     * This is also the length of the initialisation vector.
+     */
+    public static final int BLOCK_LENGTH = 16;  // = 128 bits.
+
+    private static final SecureRandom secureRandom = new SecureRandom();
 
     @Override
     public EncryptionType getUnderstoodEncryptionType() {
-        return null;
+        return EncryptionType.ENCRYPTED_AES;
     }
 
     @Override
     public KeyParameter deriveKey(CharSequence password) throws KeyCrypterException {
-        return createKeyPbkdf2HmacSha512(password.toString());
+        throw new UnsupportedOperationException("AESKeyCrypter does not define a key derivation function, but keys must be either 128, 192 or 256 bits long");
     }
 
-    public static KeyParameter createKeyPbkdf2HmacSha512(String password) {
-        return createKeyPbkdf2HmacSha512(password, new byte[0], 1024);
-    }
-
-    public static KeyParameter createKeyPbkdf2HmacSha512(String password, byte[] salt, int iterationCount) {
-        byte[] secret = Utils.getPbkdf2HmacSha512Hash(password.getBytes(StandardCharsets.UTF_8), salt, iterationCount);
-        return new KeyParameter(secret);
-    }
-
+    /**
+     * Decrypt bytes previously encrypted with this class.
+     *
+     * @param dataToDecrypt    The data to decrypt
+     * @param aesKey           The AES key to use for decryption
+     * @return                 The decrypted bytes
+     * @throws                 KeyCrypterException if bytes could not be decrypted
+     */
     @Override
-    public byte[] decrypt(EncryptedData encryptedBytesToDecode, KeyParameter aesKey) throws KeyCrypterException {
-        return decryptAesCbcPkcs7(encryptedBytesToDecode.getEncryptedBytes(), encryptedBytesToDecode.getInitialisationVector(), aesKey.getKey());
-    }
+    public byte[] decrypt(EncryptedData dataToDecrypt, KeyParameter aesKey) throws KeyCrypterException {
+        if(dataToDecrypt == null || aesKey == null) {
+            throw new KeyCrypterException("Data and key to decrypt cannot be null");
+        }
 
-    private byte[] decryptAesCbcPkcs7(byte[] ciphertext, byte[] iv, byte[] key_e) {
         try {
-            Cipher cipher = Cipher.getInstance("AES/CBC/PKCS7Padding");
-            SecretKeySpec secretKeySpec = new SecretKeySpec(key_e, "AES");
-            AlgorithmParameterSpec paramSpec = new IvParameterSpec(iv);
-            cipher.init(Cipher.DECRYPT_MODE, secretKeySpec, paramSpec);
-            return cipher.doFinal(ciphertext);
-        } catch (Exception e) {
-            throw new KeyCrypterException("Error decrypting", e);
+            ParametersWithIV keyWithIv = new ParametersWithIV(new KeyParameter(aesKey.getKey()), dataToDecrypt.getInitialisationVector());
+
+            // Decrypt the message.
+            BufferedBlockCipher cipher = new PaddedBufferedBlockCipher(new CBCBlockCipher(new AESEngine()));
+            cipher.init(false, keyWithIv);
+
+            byte[] cipherBytes = dataToDecrypt.getEncryptedBytes();
+            byte[] decryptedBytes = new byte[cipher.getOutputSize(cipherBytes.length)];
+            final int length1 = cipher.processBytes(cipherBytes, 0, cipherBytes.length, decryptedBytes, 0);
+            final int length2 = cipher.doFinal(decryptedBytes, length1);
+
+            return Arrays.copyOf(decryptedBytes, length1 + length2);
+        } catch (InvalidCipherTextException e) {
+            throw new KeyCrypterException.InvalidCipherText("Could not decrypt bytes", e);
+        } catch (RuntimeException e) {
+            throw new KeyCrypterException("Could not decrypt bytes", e);
         }
     }
 
+    /**
+     * Password based encryption using AES - CBC 256 bits.
+     */
     @Override
     public EncryptedData encrypt(byte[] plainBytes, byte[] initializationVector, KeyParameter aesKey) throws KeyCrypterException {
-        byte[] encryptedData = encryptAesCbcPkcs7(plainBytes, initializationVector, aesKey.getKey());
-        return new EncryptedData(initializationVector, encryptedData);
-    }
+        if(plainBytes == null || aesKey == null) {
+            throw new KeyCrypterException("Data and key to encrypt cannot be null");
+        }
 
-    private byte[] encryptAesCbcPkcs7(byte[] message, byte[] iv, byte[] key_e) {
         try {
-            Cipher cipher = Cipher.getInstance("AES/CBC/PKCS7Padding");
-            SecretKeySpec secretKeySpec = new SecretKeySpec(key_e, "AES");
-            AlgorithmParameterSpec paramSpec = new IvParameterSpec(iv);
-            cipher.init(Cipher.ENCRYPT_MODE, secretKeySpec, paramSpec);
-            return cipher.doFinal(message);
-        } catch(Exception e) {
-            throw new KeyCrypterException("Could not encrypt", e);
+            // Generate iv - each encryption call has a different iv.
+            byte[] iv = initializationVector;
+            if(iv == null) {
+                iv = new byte[BLOCK_LENGTH];
+                secureRandom.nextBytes(iv);
+            }
+
+            ParametersWithIV keyWithIv = new ParametersWithIV(aesKey, iv);
+
+            // Encrypt using AES.
+            BufferedBlockCipher cipher = new PaddedBufferedBlockCipher(new CBCBlockCipher(new AESEngine()));
+            cipher.init(true, keyWithIv);
+            byte[] encryptedBytes = new byte[cipher.getOutputSize(plainBytes.length)];
+            final int length1 = cipher.processBytes(plainBytes, 0, plainBytes.length, encryptedBytes, 0);
+            final int length2 = cipher.doFinal(encryptedBytes, length1);
+
+            return new EncryptedData(iv, Arrays.copyOf(encryptedBytes, length1 + length2));
+        } catch (Exception e) {
+            throw new KeyCrypterException("Could not encrypt bytes.", e);
         }
     }
 }
