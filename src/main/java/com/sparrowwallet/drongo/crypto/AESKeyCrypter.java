@@ -12,7 +12,7 @@ import java.security.SecureRandom;
 import java.util.Arrays;
 
 /*
- *
+ * Performs AES/CBC/PKCS7 encryption and decryption
  */
 public class AESKeyCrypter implements KeyCrypter {
     /**
@@ -68,7 +68,7 @@ public class AESKeyCrypter implements KeyCrypter {
     }
 
     /**
-     * Password based encryption using AES - CBC 256 bits.
+     * Password based encryption using AES - CBC - PKCS7
      */
     @Override
     public EncryptedData encrypt(byte[] plainBytes, byte[] initializationVector, KeyParameter aesKey) throws KeyCrypterException {

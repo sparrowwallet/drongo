@@ -43,15 +43,10 @@ public class ECIESKeyCrypter implements AsymmetricKeyCrypter {
         if(decoded.length < 85) {
             throw new IllegalArgumentException("Ciphertext is too short at " + decoded.length + " bytes");
         }
-        byte[] magicFound = Arrays.copyOfRange(decoded, 0, 4); //new byte[4];
-        //System.arraycopy(decoded, 0, magicFound, 0, 4);
-        byte[] ephemeralPubKeyBytes = Arrays.copyOfRange(decoded, 4, 37); //new byte[33];
-        //System.arraycopy(decoded, 4, ephemeralPubKeyBytes, 0, 33);
-        int ciphertextlength = decoded.length - 37 - 32;
-        byte[] ciphertext = Arrays.copyOfRange(decoded, 37, decoded.length - 32); //new byte[ciphertextlength];
-        //System.arraycopy(decoded, 37, ciphertext, 0, ciphertextlength);
-        byte[] mac = Arrays.copyOfRange(decoded, decoded.length - 32, decoded.length); //new byte[32];
-        //System.arraycopy(decoded, decoded.length - 32, mac, 0, 32);
+        byte[] magicFound = Arrays.copyOfRange(decoded, 0, 4);
+        byte[] ephemeralPubKeyBytes = Arrays.copyOfRange(decoded, 4, 37);
+        byte[] ciphertext = Arrays.copyOfRange(decoded, 37, decoded.length - 32);
+        byte[] mac = Arrays.copyOfRange(decoded, decoded.length - 32, decoded.length);
 
         if(!Arrays.equals(magic, magicFound)) {
             throw new IllegalArgumentException("Invalid ciphertext: invalid magic bytes");

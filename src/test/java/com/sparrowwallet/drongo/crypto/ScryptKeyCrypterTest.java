@@ -12,10 +12,8 @@ import java.security.Security;
 public class ScryptKeyCrypterTest {
     @Test
     public void testScrypt() {
-        Security.addProvider(new BouncyCastleProvider());
-
-        KeyCrypter keyDeriver = new AESKeyCrypter();
-        KeyParameter keyParameter = keyDeriver.deriveKey("password");
+        ScryptKeyCrypter scryptKeyCrypter = new ScryptKeyCrypter();
+        KeyParameter keyParameter = scryptKeyCrypter.deriveKey("password");
 
         String message = "testastringmessage";
         byte[] messageBytes = message.getBytes(StandardCharsets.UTF_8);
@@ -24,7 +22,6 @@ public class ScryptKeyCrypterTest {
         SecureRandom secureRandom = new SecureRandom();
         secureRandom.nextBytes(iv);
 
-        ScryptKeyCrypter scryptKeyCrypter = new ScryptKeyCrypter();
         EncryptedData scrypted = scryptKeyCrypter.encrypt(messageBytes, iv, keyParameter);
 
         AESKeyCrypter aesKeyCrypter = new AESKeyCrypter();
@@ -36,5 +33,9 @@ public class ScryptKeyCrypterTest {
         byte[] aesdecrypted = aesKeyCrypter.decrypt(aescrypted, keyParameter);
 
         Assert.assertArrayEquals(sdecrypted, aesdecrypted);
+
+        String decryptedMessage = new String(sdecrypted, StandardCharsets.UTF_8);
+
+        Assert.assertEquals(message, decryptedMessage);
     }
 }
