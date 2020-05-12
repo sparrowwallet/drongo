@@ -117,7 +117,4 @@ public class ECIESKeyCrypter implements AsymmetricKeyCrypter {
         }
         return out.toByteArray();
     }
-
-    public static class InvalidPasswordException extends RuntimeException {
-    }
 }
