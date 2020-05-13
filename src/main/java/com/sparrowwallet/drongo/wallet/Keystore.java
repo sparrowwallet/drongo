@@ -3,9 +3,8 @@ package com.sparrowwallet.drongo.wallet;
 import com.sparrowwallet.drongo.ExtendedKey;
 import com.sparrowwallet.drongo.KeyDerivation;
 import com.sparrowwallet.drongo.Utils;
-import com.sparrowwallet.drongo.crypto.ChildNumber;
-import com.sparrowwallet.drongo.crypto.DeterministicKey;
-import com.sparrowwallet.drongo.crypto.HDKeyDerivation;
+import com.sparrowwallet.drongo.crypto.*;
+import org.bouncycastle.crypto.params.KeyParameter;
 
 import java.util.List;
 
@@ -145,5 +144,31 @@ public class Keystore {
         keystore.setExtendedPublicKey(ExtendedKey.fromDescriptor(xpub.toString()));
 
         return keystore;
+    }
+
+    public boolean isEncrypted() {
+        return seed != null && seed.isEncrypted();
+    }
+
+    public void encrypt(String password) {
+        KeyCrypter keyCrypter = new ScryptKeyCrypter();
+        encrypt(keyCrypter, keyCrypter.deriveKey(password));
+    }
+
+    public void encrypt(KeyCrypter keyCrypter, KeyParameter key) {
+        if(seed != null && !seed.isEncrypted()) {
+            seed = seed.encrypt(keyCrypter, key);
+        }
+    }
+
+    public void decrypt(String password, String passphrase) {
+        KeyCrypter keyCrypter = new ScryptKeyCrypter();
+        decrypt(keyCrypter, passphrase, keyCrypter.deriveKey(password));
+    }
+
+    public void decrypt(KeyCrypter keyCrypter, String passphrase, KeyParameter key) {
+        if(seed != null && seed.isEncrypted()) {
+            seed = seed.decrypt(keyCrypter, passphrase, key);
+        }
     }
 }

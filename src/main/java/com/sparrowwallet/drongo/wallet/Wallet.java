@@ -1,8 +1,11 @@
 package com.sparrowwallet.drongo.wallet;
 
+import com.sparrowwallet.drongo.crypto.KeyCrypter;
+import com.sparrowwallet.drongo.crypto.ScryptKeyCrypter;
 import com.sparrowwallet.drongo.policy.Policy;
 import com.sparrowwallet.drongo.policy.PolicyType;
 import com.sparrowwallet.drongo.protocol.ScriptType;
+import org.bouncycastle.crypto.params.KeyParameter;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -113,5 +116,31 @@ public class Wallet {
             copy.getKeystores().add(keystore.copy());
         }
         return copy;
+    }
+
+    public boolean isEncrypted() {
+        for(Keystore keystore : keystores) {
+            if(keystore.isEncrypted()) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    public void encrypt(String password) {
+        KeyCrypter keyCrypter = new ScryptKeyCrypter();
+        KeyParameter key = keyCrypter.deriveKey(password);
+        for(Keystore keystore : keystores) {
+            keystore.encrypt(keyCrypter, key);
+        }
+    }
+
+    public void decrypt(String password, String passphrase) {
+        KeyCrypter keyCrypter = new ScryptKeyCrypter();
+        KeyParameter key = keyCrypter.deriveKey(password);
+        for(Keystore keystore : keystores) {
+            keystore.decrypt(keyCrypter, passphrase, key);
+        }
     }
 }
