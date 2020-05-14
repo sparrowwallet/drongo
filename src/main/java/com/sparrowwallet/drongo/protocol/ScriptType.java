@@ -409,6 +409,21 @@ public enum ScriptType {
         return Collections.unmodifiableList(copy);
     }
 
+    public int getAccount(String derivationPath) {
+        if(KeyDerivation.isValid(derivationPath)) {
+            List<ChildNumber> derivation = new ArrayList<>(KeyDerivation.parsePath(derivationPath));
+            if(derivation.size() > 2) {
+                int account = derivation.get(2).num();
+                List<ChildNumber> defaultDerivation = getDefaultDerivation(account);
+                if(defaultDerivation.equals(derivation)) {
+                    return account;
+                }
+            }
+        }
+
+        return -1;
+    }
+
     public abstract List<PolicyType> getAllowedPolicyTypes();
 
     public boolean isAllowed(PolicyType policyType) {
