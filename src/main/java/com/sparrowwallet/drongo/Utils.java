@@ -1,6 +1,9 @@
 package com.sparrowwallet.drongo;
 
+import com.sparrowwallet.drongo.crypto.AESKeyCrypter;
 import com.sparrowwallet.drongo.crypto.ChildNumber;
+import com.sparrowwallet.drongo.crypto.EncryptedData;
+import com.sparrowwallet.drongo.crypto.KeyCrypter;
 import com.sparrowwallet.drongo.protocol.ProtocolException;
 import com.sparrowwallet.drongo.protocol.Ripemd160;
 import com.sparrowwallet.drongo.protocol.Sha256Hash;
@@ -13,10 +16,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.math.BigInteger;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import java.util.StringJoiner;
+import java.util.*;
 
 public class Utils {
     public static final int MAX_INITIAL_ARRAY_LENGTH = 20;
@@ -246,6 +246,20 @@ public class Utils {
     public static byte[] sha256hash160(byte[] input) {
         byte[] sha256 = Sha256Hash.hash(input);
         return Ripemd160.getHash(sha256);
+    }
+
+    /**
+     * Calculates RIPEMD160(SHA256(input)). This is used in Address calculations.
+     */
+    public static byte[] sha256sha256(byte[] input) {
+        byte[] sha256 = Sha256Hash.hash(input);
+        return Sha256Hash.hash(sha256);
+    }
+
+    public static byte[] decryptAesCbcPkcs7(byte[] initializationVector, byte[] encryptedBytes, byte[] keyBytes) {
+        KeyCrypter keyCrypter = new AESKeyCrypter();
+        EncryptedData data = new EncryptedData(initializationVector, encryptedBytes);
+        return keyCrypter.decrypt(data, new KeyParameter(keyBytes));
     }
 
     /** Convert to a string path, starting with "M/" */

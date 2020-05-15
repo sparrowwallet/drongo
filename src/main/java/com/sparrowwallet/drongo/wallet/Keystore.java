@@ -172,14 +172,6 @@ public class Keystore {
         return keystore;
     }
 
-    public void setPassphrase(String passphrase) {
-        if(seed != null) {
-            seed = seed.setPassphrase(passphrase);
-        } else {
-            throw new UnsupportedOperationException("Cannot set passphrase on a keystore without a seed");
-        }
-    }
-
     public boolean hasSeed() {
         return seed != null;
     }

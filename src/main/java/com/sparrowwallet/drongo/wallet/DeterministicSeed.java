@@ -15,6 +15,8 @@ public class DeterministicSeed implements EncryptableItem {
     public static final int DEFAULT_SEED_ENTROPY_BITS = 128;
     public static final int MAX_SEED_ENTROPY_BITS = 512;
 
+    private final Type type;
+
     private final byte[] seed;
     private final List<String> mnemonicCode;
 
@@ -23,40 +25,45 @@ public class DeterministicSeed implements EncryptableItem {
 
     private long creationTimeSeconds;
 
-    public DeterministicSeed(String mnemonicString, byte[] seed, String passphrase, long creationTimeSeconds) {
-        this(decodeMnemonicCode(mnemonicString), seed, passphrase, creationTimeSeconds);
+    //Session only storage
+    private transient String passphrase;
+
+    public DeterministicSeed(String mnemonicString, byte[] seed, String passphrase, long creationTimeSeconds, Type type) {
+        this(decodeMnemonicCode(mnemonicString), seed, passphrase, creationTimeSeconds, type);
     }
 
-    public DeterministicSeed(byte[] seed, List<String> mnemonic, long creationTimeSeconds) {
+    public DeterministicSeed(byte[] seed, List<String> mnemonic, long creationTimeSeconds, Type type) {
         this.seed = seed;
         this.encryptedSeed = null;
         this.mnemonicCode = mnemonic;
         this.encryptedMnemonicCode = null;
         this.creationTimeSeconds = creationTimeSeconds;
+        this.type = type;
     }
 
-    public DeterministicSeed(EncryptedData encryptedMnemonic, EncryptedData encryptedSeed, long creationTimeSeconds) {
+    public DeterministicSeed(EncryptedData encryptedMnemonic, EncryptedData encryptedSeed, long creationTimeSeconds, Type type) {
         this.seed = null;
         this.encryptedSeed = encryptedSeed;
         this.mnemonicCode = null;
         this.encryptedMnemonicCode = encryptedMnemonic;
         this.creationTimeSeconds = creationTimeSeconds;
+        this.type = type;
     }
 
     /**
-     * Constructs a seed from a BIP 39 mnemonic code. See {@link Bip39MnemonicCode} for more
+     * Constructs a seed from a mnemonic code. See {@link Bip39MnemonicCode} or {@link ElectrumMnemonicCode} for more
      * details on this scheme.
      * @param mnemonicCode A list of words.
      * @param seed The derived seed, or pass null to derive it from mnemonicCode (slow)
      * @param passphrase A user supplied passphrase, or an empty string if there is no passphrase
      * @param creationTimeSeconds When the seed was originally created, UNIX time.
      */
-    public DeterministicSeed(List<String> mnemonicCode, byte[] seed, String passphrase, long creationTimeSeconds) {
-        this((seed != null ? seed : Bip39MnemonicCode.toSeed(mnemonicCode, passphrase)), mnemonicCode, creationTimeSeconds);
+    public DeterministicSeed(List<String> mnemonicCode, byte[] seed, String passphrase, long creationTimeSeconds, Type type) {
+        this((seed != null ? seed : type.toSeed(mnemonicCode, passphrase)), mnemonicCode, creationTimeSeconds, type);
     }
 
     /**
-     * Constructs a seed from a BIP 39 mnemonic code. See {@link Bip39MnemonicCode} for more
+     * Constructs a new BIP39 seed. See {@link Bip39MnemonicCode} for more
      * details on this scheme.
      * @param random Entropy source
      * @param bits number of bits, must be divisible by 32
@@ -67,7 +74,7 @@ public class DeterministicSeed implements EncryptableItem {
     }
 
     /**
-     * Constructs a seed from a BIP 39 mnemonic code. See {@link Bip39MnemonicCode} for more
+     * Constructs a BIP39 seed from provided entropy. See {@link Bip39MnemonicCode} for more
      * details on this scheme.
      * @param entropy entropy bits, length must be divisible by 32
      * @param passphrase A user supplied passphrase, or an empty string if there is no passphrase
@@ -96,14 +103,15 @@ public class DeterministicSeed implements EncryptableItem {
         this.encryptedMnemonicCode = null;
         this.encryptedSeed = null;
         this.creationTimeSeconds = creationTimeSeconds;
+        this.type = Type.BIP39;
     }
 
-    public boolean needPassphrase() {
+    public boolean usesPassphrase() {
         if(isEncrypted()) {
             throw new IllegalArgumentException("Cannot determine if passphrase is required in encrypted state");
         }
 
-        byte[] mnemonicOnlySeed = Bip39MnemonicCode.toSeed(mnemonicCode, "");
+        byte[] mnemonicOnlySeed = type.toSeed(mnemonicCode, "");
         return Arrays.equals(mnemonicOnlySeed, seed);
     }
 
@@ -172,6 +180,10 @@ public class DeterministicSeed implements EncryptableItem {
         this.creationTimeSeconds = creationTimeSeconds;
     }
 
+    public Type getType() {
+        return type;
+    }
+
     public DeterministicSeed encrypt(KeyCrypter keyCrypter, KeyParameter aesKey) {
         if(encryptedSeed != null) {
             throw new IllegalArgumentException("Trying to encrypt seed twice");
@@ -181,7 +193,7 @@ public class DeterministicSeed implements EncryptableItem {
         }
         EncryptedData encryptedMnemonic = keyCrypter.encrypt(getMnemonicAsBytes(), null, aesKey);
         EncryptedData encryptedSeed = keyCrypter.encrypt(seed, null, aesKey);
-        return new DeterministicSeed(encryptedMnemonic, encryptedSeed, creationTimeSeconds);
+        return new DeterministicSeed(encryptedMnemonic, encryptedSeed, creationTimeSeconds, type);
     }
 
     private byte[] getMnemonicAsBytes() {
@@ -194,15 +206,15 @@ public class DeterministicSeed implements EncryptableItem {
         }
         List<String> mnemonic = decodeMnemonicCode(crypter.decrypt(encryptedMnemonicCode, aesKey));
         byte[] seed = encryptedSeed == null ? null : crypter.decrypt(encryptedSeed, aesKey);
-        return new DeterministicSeed(mnemonic, seed, passphrase, creationTimeSeconds);
+        return new DeterministicSeed(mnemonic, seed, passphrase, creationTimeSeconds, type);
     }
 
-    public DeterministicSeed setPassphrase(String passphrase) {
-        if(isEncrypted()) {
-            throw new UnsupportedOperationException("Cannot set passphrase on encrypted seed");
-        }
+    public String getPassphrase() {
+        return passphrase;
+    }
 
-        return new DeterministicSeed(mnemonicCode, seed, passphrase, creationTimeSeconds);
+    public void setPassphrase(String passphrase) {
+        this.passphrase = passphrase;
     }
 
     @Override
@@ -227,13 +239,13 @@ public class DeterministicSeed implements EncryptableItem {
      * @throws MnemonicException if check fails
      */
     public void check() throws MnemonicException {
-        if (mnemonicCode != null) {
-            Bip39MnemonicCode.INSTANCE.check(mnemonicCode);
+        if(mnemonicCode != null) {
+            type.check(mnemonicCode);
         }
     }
 
     byte[] getEntropyBytes() throws MnemonicException {
-        return Bip39MnemonicCode.INSTANCE.toEntropy(mnemonicCode);
+        return type.getEntropyBytes(mnemonicCode);
     }
 
     /** Get the mnemonic code, or null if unknown. */
@@ -265,9 +277,44 @@ public class DeterministicSeed implements EncryptableItem {
 
     public DeterministicSeed copy() {
         if(isEncrypted()) {
-            return new DeterministicSeed(encryptedMnemonicCode.copy(), encryptedSeed.copy(), creationTimeSeconds);
+            return new DeterministicSeed(encryptedMnemonicCode.copy(), encryptedSeed.copy(), creationTimeSeconds, type);
         }
 
-        return new DeterministicSeed(Arrays.copyOf(seed, seed.length), new ArrayList<>(mnemonicCode), creationTimeSeconds);
+        return new DeterministicSeed(Arrays.copyOf(seed, seed.length), new ArrayList<>(mnemonicCode), creationTimeSeconds, type);
+    }
+
+    public enum Type {
+        BIP39() {
+            public byte[] getEntropyBytes(List<String> mnemonicCode) throws MnemonicException {
+                return Bip39MnemonicCode.INSTANCE.toEntropy(mnemonicCode);
+            }
+
+            public void check(List<String> mnemonicCode) throws MnemonicException {
+                Bip39MnemonicCode.INSTANCE.check(mnemonicCode);
+            }
+
+            public byte[] toSeed(List<String> mnemonicCode, String passphrase) {
+                return Bip39MnemonicCode.toSeed(mnemonicCode, passphrase);
+            }
+        },
+        ELECTRUM() {
+            public byte[] getEntropyBytes(List<String> mnemonicCode) throws MnemonicException {
+                throw new MnemonicException("Electrum seeds do not provide entropy bytes");
+            }
+
+            public void check(List<String> mnemonicCode) throws MnemonicException {
+                ElectrumMnemonicCode.INSTANCE.check(mnemonicCode);
+            }
+
+            public byte[] toSeed(List<String> mnemonicCode, String passphrase) {
+                return ElectrumMnemonicCode.toSeed(mnemonicCode, passphrase);
+            }
+        };
+
+        public abstract byte[] getEntropyBytes(List<String> mnemonicCode) throws MnemonicException;
+
+        public abstract void check(List<String> mnemonicCode) throws MnemonicException;
+
+        public abstract byte[] toSeed(List<String> mnemonicCode, String passphrase);
     }
 }
