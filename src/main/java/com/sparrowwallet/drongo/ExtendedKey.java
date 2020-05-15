@@ -139,17 +139,25 @@ public class ExtendedKey {
     }
 
     public enum Header {
-        xprv("xprv", 0x0488ADE4, null),
+        xprv("xprv", 0x0488ADE4, ScriptType.P2PKH),
         xpub("xpub", 0x0488B21E, ScriptType.P2PKH),
+        yprv("yprv", 0x049D7878, ScriptType.P2SH_P2WPKH),
         ypub("ypub", 0x049D7CB2, ScriptType.P2SH_P2WPKH),
+        zprv("zprv", 0x04b2430c, ScriptType.P2WPKH),
         zpub("zpub", 0x04B24746, ScriptType.P2WPKH),
+        Yprv("Yprv", 0x0295b005, ScriptType.P2SH_P2WSH),
         Ypub("Ypub", 0x0295b43f, ScriptType.P2SH_P2WSH),
+        Zprv("Zprv", 0x02aa7a99, ScriptType.P2WSH),
         Zpub("Zpub", 0x02aa7ed3, ScriptType.P2WSH),
         tpub("tpub", 0x043587cf, ScriptType.P2PKH),
-        tprv("tprv", 0x04358394, null),
+        tprv("tprv", 0x04358394, ScriptType.P2PKH),
+        uprv("uprv", 0x044a4e28, ScriptType.P2SH_P2WPKH),
         upub("upub", 0x044a5262, ScriptType.P2SH_P2WPKH),
+        vprv("vprv", 0x045f18bc, ScriptType.P2WPKH),
         vpub("vpub", 0x045f1cf6, ScriptType.P2WPKH),
+        Uprv("Uprv", 0x024285b5, ScriptType.P2SH_P2WSH),
         Upub("Upub", 0x024289ef, ScriptType.P2SH_P2WSH),
+        Vprv("Vprv", 0x02575048, ScriptType.P2WSH),
         Vpub("Vpub", 0x02575483, ScriptType.P2WSH);
 
         private final String name;
@@ -184,14 +192,18 @@ public class ExtendedKey {
             throw new IllegalArgumentException("Unrecognised extended key header for extended key: " + xpub);
         }
 
-        public static Header fromScriptType(ScriptType scriptType) {
-            for(Header extendedKeyHeader : Header.values()) {
-                if(extendedKeyHeader.defaultScriptType != null && extendedKeyHeader.defaultScriptType.equals(scriptType)) {
-                    return extendedKeyHeader;
+        public static Header fromScriptType(ScriptType scriptType, boolean privateKey) {
+            for(Header header : Header.values()) {
+                if(header.defaultScriptType != null && header.defaultScriptType.equals(scriptType) && header.isPrivate() == privateKey) {
+                    return header;
                 }
             }
 
             return Header.xpub;
+        }
+
+        private boolean isPrivate() {
+            return name.endsWith("prv");
         }
 
         public static boolean isValidHeader(int header) {

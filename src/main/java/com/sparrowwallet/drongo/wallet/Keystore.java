@@ -90,8 +90,18 @@ public class Keystore {
         return HDKeyDerivation.createMasterPrivateKey(seed.getSeedBytes());
     }
 
-    public ExtendedKey getExtendedPrivateKey() {
+    public ExtendedKey getExtendedMasterPrivateKey() {
         return new ExtendedKey(getMasterPrivateKey(), new byte[4], ChildNumber.ZERO);
+    }
+
+    public ExtendedKey getExtendedMasterPublicKey() {
+        return new ExtendedKey(getMasterPrivateKey().dropPrivateBytes(), new byte[4], ChildNumber.ZERO);
+    }
+
+    public ExtendedKey getExtendedPrivateKey() {
+        List<ChildNumber> derivation = getKeyDerivation().getDerivation();
+        DeterministicKey derivedKey = getExtendedMasterPrivateKey().getKey(derivation);
+        return new ExtendedKey(derivedKey, derivedKey.getParentFingerprint(), derivation.get(derivation.size() - 1));
     }
 
     public boolean isValid() {
@@ -107,7 +117,19 @@ public class Keystore {
             return false;
         }
 
-        //TODO: If source is SW_SEED, check seed field is filled
+        if(source == KeystoreSource.SW_SEED) {
+            if(seed == null) {
+                return false;
+            }
+
+            List<ChildNumber> derivation = getKeyDerivation().getDerivation();
+            DeterministicKey derivedKey = getExtendedMasterPrivateKey().getKey(derivation);
+            DeterministicKey derivedKeyPublicOnly = derivedKey.dropPrivateBytes().dropParent();
+            ExtendedKey xpub = new ExtendedKey(derivedKeyPublicOnly, derivedKey.getParentFingerprint(), derivation.get(derivation.size() - 1));
+            if(!xpub.equals(getExtendedPublicKey())) {
+                return false;
+            }
+        }
 
         return true;
     }
@@ -131,7 +153,7 @@ public class Keystore {
     public static Keystore fromSeed(DeterministicSeed seed, List<ChildNumber> derivation) {
         Keystore keystore = new Keystore();
         keystore.setSeed(seed);
-        ExtendedKey xprv = keystore.getExtendedPrivateKey();
+        ExtendedKey xprv = keystore.getExtendedMasterPrivateKey();
         String masterFingerprint = Utils.bytesToHex(xprv.getKey().getFingerprint());
         DeterministicKey derivedKey = xprv.getKey(derivation);
         DeterministicKey derivedKeyPublicOnly = derivedKey.dropPrivateBytes().dropParent();
@@ -144,6 +166,18 @@ public class Keystore {
         keystore.setExtendedPublicKey(ExtendedKey.fromDescriptor(xpub.toString()));
 
         return keystore;
+    }
+
+    public void setPassphrase(String passphrase) {
+        if(seed != null) {
+            seed = seed.setPassphrase(passphrase);
+        } else {
+            throw new UnsupportedOperationException("Cannot set passphrase on a keystore without a seed");
+        }
+    }
+
+    public boolean hasSeed() {
+        return seed != null;
     }
 
     public boolean isEncrypted() {

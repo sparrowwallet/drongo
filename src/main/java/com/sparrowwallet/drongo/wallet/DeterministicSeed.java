@@ -98,6 +98,15 @@ public class DeterministicSeed implements EncryptableItem {
         this.creationTimeSeconds = creationTimeSeconds;
     }
 
+    public boolean needPassphrase() {
+        if(isEncrypted()) {
+            throw new IllegalArgumentException("Cannot determine if passphrase is required in encrypted state");
+        }
+
+        byte[] mnemonicOnlySeed = Bip39MnemonicCode.toSeed(mnemonicCode, "");
+        return Arrays.equals(mnemonicOnlySeed, seed);
+    }
+
     private static byte[] getEntropy(SecureRandom random, int bits) {
         if(bits > MAX_SEED_ENTROPY_BITS) {
             throw new IllegalArgumentException("Requested entropy size too large");
@@ -186,6 +195,14 @@ public class DeterministicSeed implements EncryptableItem {
         List<String> mnemonic = decodeMnemonicCode(crypter.decrypt(encryptedMnemonicCode, aesKey));
         byte[] seed = encryptedSeed == null ? null : crypter.decrypt(encryptedSeed, aesKey);
         return new DeterministicSeed(mnemonic, seed, passphrase, creationTimeSeconds);
+    }
+
+    public DeterministicSeed setPassphrase(String passphrase) {
+        if(isEncrypted()) {
+            throw new UnsupportedOperationException("Cannot set passphrase on encrypted seed");
+        }
+
+        return new DeterministicSeed(mnemonicCode, seed, passphrase, creationTimeSeconds);
     }
 
     @Override

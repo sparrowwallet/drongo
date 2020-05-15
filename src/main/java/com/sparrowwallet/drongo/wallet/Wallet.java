@@ -8,6 +8,7 @@ import com.sparrowwallet.drongo.protocol.ScriptType;
 import org.bouncycastle.crypto.params.KeyParameter;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 
@@ -102,9 +103,20 @@ public class Wallet {
             if(!keystore.isValid()) {
                 return false;
             }
+            if(derivationMatchesAnotherScriptType(keystore.getKeyDerivation().getDerivationPath())) {
+                return false;
+            }
         }
 
         return true;
+    }
+
+    public boolean derivationMatchesAnotherScriptType(String derivationPath) {
+        if(scriptType != null && scriptType.getAccount(derivationPath) > -1) {
+            return false;
+        }
+
+        return Arrays.stream(ScriptType.values()).anyMatch(scriptType -> !scriptType.equals(this.scriptType) && scriptType.getAccount(derivationPath) > -1);
     }
 
     public Wallet copy() {
