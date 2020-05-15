@@ -7,10 +7,7 @@ import com.sparrowwallet.drongo.policy.PolicyType;
 import com.sparrowwallet.drongo.protocol.ScriptType;
 import org.bouncycastle.crypto.params.KeyParameter;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.List;
+import java.util.*;
 
 public class Wallet {
 
@@ -99,6 +96,10 @@ public class Wallet {
             return false;
         }
 
+        if(containsDuplicateKeystoreLabels()) {
+            return false;
+        }
+
         for(Keystore keystore : keystores) {
             if(!keystore.isValid()) {
                 return false;
@@ -117,6 +118,14 @@ public class Wallet {
         }
 
         return Arrays.stream(ScriptType.values()).anyMatch(scriptType -> !scriptType.equals(this.scriptType) && scriptType.getAccount(derivationPath) > -1);
+    }
+
+    public boolean containsDuplicateKeystoreLabels() {
+        if(keystores.size() <= 1) {
+            return false;
+        }
+
+        return !keystores.stream().map(Keystore::getLabel).allMatch(new HashSet<>()::add);
     }
 
     public Wallet copy() {

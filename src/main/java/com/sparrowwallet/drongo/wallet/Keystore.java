@@ -109,7 +109,11 @@ public class Keystore {
             return false;
         }
 
-        if(keyDerivation.getDerivationPath() == null || !KeyDerivation.isValid(keyDerivation.getDerivationPath())) {
+        if(label.isEmpty() || label.replace(" ", "").length() > 16) {
+            return false;
+        }
+
+        if(keyDerivation.getDerivationPath() == null || keyDerivation.getDerivationPath().isEmpty() || !KeyDerivation.isValid(keyDerivation.getDerivationPath())) {
             return false;
         }
 
