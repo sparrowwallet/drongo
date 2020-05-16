@@ -1,7 +1,6 @@
 package com.sparrowwallet.drongo.crypto;
 
 import org.bouncycastle.crypto.generators.SCrypt;
-import org.bouncycastle.crypto.params.KeyParameter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -55,6 +54,13 @@ public class ScryptKeyCrypter extends AESKeyCrypter {
     }
 
     /**
+     * Encryption/Decryption using default parameters and provided salt.
+     */
+    public ScryptKeyCrypter(byte[] salt) {
+        this.scryptParameters = new ScryptParameters(salt);
+    }
+
+    /**
      * Encryption/Decryption using custom number of iterations parameters and a random salt.
      * As of August 2016, a useful value for mobile devices is 4096 (derivation takes about 1 second).
      *
@@ -84,11 +90,11 @@ public class ScryptKeyCrypter extends AESKeyCrypter {
      * This is a very slow operation compared to encrypt/ decrypt so it is normally worth caching the result.
      *
      * @param password    The password to use in key generation
-     * @return            The KeyParameter containing the created AES key
+     * @return            The Key containing the created AES key
      * @throws            KeyCrypterException
      */
     @Override
-    public KeyParameter deriveKey(CharSequence password) throws KeyCrypterException {
+    public Key deriveKey(CharSequence password) throws KeyCrypterException {
         byte[] passwordBytes = null;
         try {
             passwordBytes = convertToByteArray(password);
@@ -100,7 +106,7 @@ public class ScryptKeyCrypter extends AESKeyCrypter {
             }
 
             byte[] keyBytes = SCrypt.generate(passwordBytes, salt, (int) scryptParameters.getN(), scryptParameters.getR(), scryptParameters.getP(), KEY_LENGTH);
-            return new KeyParameter(keyBytes);
+            return new Key(keyBytes, scryptParameters.getSalt());
         } catch (Exception e) {
             throw new KeyCrypterException("Could not generate key from password and salt.", e);
         } finally {

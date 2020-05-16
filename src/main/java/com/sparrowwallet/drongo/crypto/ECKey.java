@@ -7,14 +7,11 @@ import org.bouncycastle.asn1.*;
 import org.bouncycastle.asn1.x9.X9ECParameters;
 import org.bouncycastle.crypto.AsymmetricCipherKeyPair;
 import org.bouncycastle.crypto.digests.SHA256Digest;
-import org.bouncycastle.crypto.digests.SHA512Digest;
 import org.bouncycastle.crypto.ec.CustomNamedCurves;
 import org.bouncycastle.crypto.generators.ECKeyPairGenerator;
-import org.bouncycastle.crypto.macs.HMac;
 import org.bouncycastle.crypto.params.*;
 import org.bouncycastle.crypto.signers.ECDSASigner;
 import org.bouncycastle.crypto.signers.HMacDSAKCalculator;
-import org.bouncycastle.jce.provider.BouncyCastleProvider;
 import org.bouncycastle.math.ec.ECPoint;
 import org.bouncycastle.math.ec.FixedPointCombMultiplier;
 import org.bouncycastle.math.ec.FixedPointUtil;
@@ -499,7 +496,7 @@ public class ECKey implements EncryptableItem {
      * @throws KeyCrypterException if there's something wrong with aesKey.
      * @throws ECKey.MissingPrivateKeyException if this key cannot sign because it's pubkey only.
      */
-    public ECDSASignature sign(Sha256Hash input, KeyParameter aesKey) throws KeyCrypterException {
+    public ECDSASignature sign(Sha256Hash input, Key aesKey) throws KeyCrypterException {
         KeyCrypter crypter = getKeyCrypter();
         if (crypter != null) {
             if (aesKey == null) {
@@ -727,10 +724,10 @@ public class ECKey implements EncryptableItem {
      * This method returns a new encrypted key and leaves the original unchanged.
      *
      * @param keyCrypter The keyCrypter that specifies exactly how the encrypted bytes are created.
-     * @param aesKey The KeyParameter with the AES encryption key (usually constructed with keyCrypter#deriveKey and cached as it is slow to create).
+     * @param aesKey The Key with the AES encryption key (usually constructed with keyCrypter#deriveKey and cached as it is slow to create).
      * @return encryptedKey
      */
-    public ECKey encrypt(KeyCrypter keyCrypter, KeyParameter aesKey) throws KeyCrypterException {
+    public ECKey encrypt(KeyCrypter keyCrypter, Key aesKey) throws KeyCrypterException {
         if(keyCrypter == null) {
             throw new KeyCrypterException("Keycrypter cannot be null");
         }
@@ -748,9 +745,9 @@ public class ECKey implements EncryptableItem {
      * just yield a garbage key.
      *
      * @param keyCrypter The keyCrypter that specifies exactly how the decrypted bytes are created.
-     * @param aesKey The KeyParameter with the AES encryption key (usually constructed with keyCrypter#deriveKey and cached).
+     * @param aesKey The Key with the AES encryption key (usually constructed with keyCrypter#deriveKey and cached).
      */
-    public ECKey decrypt(KeyCrypter keyCrypter, KeyParameter aesKey) throws KeyCrypterException {
+    public ECKey decrypt(KeyCrypter keyCrypter, Key aesKey) throws KeyCrypterException {
         if(keyCrypter == null) {
             throw new KeyCrypterException("Keycrypter cannot be null");
         }
@@ -780,9 +777,9 @@ public class ECKey implements EncryptableItem {
      * has some chance of throwing KeyCrypterException due to the corrupted padding that will result, but it can also
      * just yield a garbage key.
      *
-     * @param aesKey The KeyParameter with the AES encryption key (usually constructed with keyCrypter#deriveKey and cached).
+     * @param aesKey The Key with the AES encryption key (usually constructed with keyCrypter#deriveKey and cached).
      */
-    public ECKey decrypt(KeyParameter aesKey) throws KeyCrypterException {
+    public ECKey decrypt(Key aesKey) throws KeyCrypterException {
         final KeyCrypter crypter = getKeyCrypter();
         if (crypter == null) {
             throw new KeyCrypterException("No key crypter available");
@@ -794,7 +791,7 @@ public class ECKey implements EncryptableItem {
     /**
      * Creates decrypted private key if needed.
      */
-    public ECKey maybeDecrypt(KeyParameter aesKey) throws KeyCrypterException {
+    public ECKey maybeDecrypt(Key aesKey) throws KeyCrypterException {
         return isEncrypted() && aesKey != null ? decrypt(aesKey) : this;
     }
 
@@ -807,7 +804,7 @@ public class ECKey implements EncryptableItem {
      *
      * @return true if the encrypted key can be decrypted back to the original key successfully.
      */
-    public static boolean encryptionIsReversible(ECKey originalKey, ECKey encryptedKey, KeyCrypter keyCrypter, KeyParameter aesKey) {
+    public static boolean encryptionIsReversible(ECKey originalKey, ECKey encryptedKey, KeyCrypter keyCrypter, Key aesKey) {
         try {
             ECKey rebornUnencryptedKey = encryptedKey.decrypt(keyCrypter, aesKey);
             byte[] originalPrivateKeyBytes = originalKey.getPrivKeyBytes();

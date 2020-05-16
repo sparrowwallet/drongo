@@ -29,7 +29,7 @@ public class AESKeyCrypter implements KeyCrypter {
     }
 
     @Override
-    public KeyParameter deriveKey(CharSequence password) throws KeyCrypterException {
+    public Key deriveKey(CharSequence password) throws KeyCrypterException {
         throw new UnsupportedOperationException("AESKeyCrypter does not define a key derivation function, but keys must be either 128, 192 or 256 bits long");
     }
 
@@ -42,13 +42,13 @@ public class AESKeyCrypter implements KeyCrypter {
      * @throws                 KeyCrypterException if bytes could not be decrypted
      */
     @Override
-    public byte[] decrypt(EncryptedData dataToDecrypt, KeyParameter aesKey) throws KeyCrypterException {
+    public byte[] decrypt(EncryptedData dataToDecrypt, Key aesKey) throws KeyCrypterException {
         if(dataToDecrypt == null || aesKey == null) {
             throw new KeyCrypterException("Data and key to decrypt cannot be null");
         }
 
         try {
-            ParametersWithIV keyWithIv = new ParametersWithIV(new KeyParameter(aesKey.getKey()), dataToDecrypt.getInitialisationVector());
+            ParametersWithIV keyWithIv = new ParametersWithIV(new KeyParameter(aesKey.getKeyBytes()), dataToDecrypt.getInitialisationVector());
 
             // Decrypt the message.
             BufferedBlockCipher cipher = new PaddedBufferedBlockCipher(new CBCBlockCipher(new AESEngine()));
@@ -71,7 +71,7 @@ public class AESKeyCrypter implements KeyCrypter {
      * Password based encryption using AES - CBC - PKCS7
      */
     @Override
-    public EncryptedData encrypt(byte[] plainBytes, byte[] initializationVector, KeyParameter aesKey) throws KeyCrypterException {
+    public EncryptedData encrypt(byte[] plainBytes, byte[] initializationVector, Key aesKey) throws KeyCrypterException {
         if(plainBytes == null || aesKey == null) {
             throw new KeyCrypterException("Data and key to encrypt cannot be null");
         }
@@ -84,7 +84,7 @@ public class AESKeyCrypter implements KeyCrypter {
                 secureRandom.nextBytes(iv);
             }
 
-            ParametersWithIV keyWithIv = new ParametersWithIV(aesKey, iv);
+            ParametersWithIV keyWithIv = new ParametersWithIV(new KeyParameter(aesKey.getKeyBytes()), iv);
 
             // Encrypt using AES.
             BufferedBlockCipher cipher = new PaddedBufferedBlockCipher(new CBCBlockCipher(new AESEngine()));
@@ -93,7 +93,7 @@ public class AESKeyCrypter implements KeyCrypter {
             final int length1 = cipher.processBytes(plainBytes, 0, plainBytes.length, encryptedBytes, 0);
             final int length2 = cipher.doFinal(encryptedBytes, length1);
 
-            return new EncryptedData(iv, Arrays.copyOf(encryptedBytes, length1 + length2));
+            return new EncryptedData(iv, Arrays.copyOf(encryptedBytes, length1 + length2), aesKey.getSalt());
         } catch (Exception e) {
             throw new KeyCrypterException("Could not encrypt bytes.", e);
         }

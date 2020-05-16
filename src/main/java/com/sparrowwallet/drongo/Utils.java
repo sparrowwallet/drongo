@@ -1,9 +1,6 @@
 package com.sparrowwallet.drongo;
 
-import com.sparrowwallet.drongo.crypto.AESKeyCrypter;
-import com.sparrowwallet.drongo.crypto.ChildNumber;
-import com.sparrowwallet.drongo.crypto.EncryptedData;
-import com.sparrowwallet.drongo.crypto.KeyCrypter;
+import com.sparrowwallet.drongo.crypto.*;
 import com.sparrowwallet.drongo.protocol.ProtocolException;
 import com.sparrowwallet.drongo.protocol.Ripemd160;
 import com.sparrowwallet.drongo.protocol.Sha256Hash;
@@ -258,8 +255,8 @@ public class Utils {
 
     public static byte[] decryptAesCbcPkcs7(byte[] initializationVector, byte[] encryptedBytes, byte[] keyBytes) {
         KeyCrypter keyCrypter = new AESKeyCrypter();
-        EncryptedData data = new EncryptedData(initializationVector, encryptedBytes);
-        return keyCrypter.decrypt(data, new KeyParameter(keyBytes));
+        EncryptedData data = new EncryptedData(initializationVector, encryptedBytes, null);
+        return keyCrypter.decrypt(data, new Key(keyBytes, null));
     }
 
     /** Convert to a string path, starting with "M/" */

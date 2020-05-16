@@ -8,9 +8,9 @@ public interface AsymmetricKeyCrypter {
     EncryptionType getUnderstoodEncryptionType();
 
     /**
-     * Create a KeyParameter (which typically contains an AES key)
+     * Create a ECKey based on the provided password
      * @param password
-     * @return KeyParameter The KeyParameter which typically contains the AES key to use for encrypting and decrypting
+     * @return ECKey The ECKey to use for encrypting and decrypting
      * @throws KeyCrypterException
      */
     ECKey deriveECKey(CharSequence password) throws KeyCrypterException;

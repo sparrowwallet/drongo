@@ -65,13 +65,13 @@ public class ECIESKeyCrypter implements AsymmetricKeyCrypter {
             throw new InvalidPasswordException();
         }
 
-        return aesKeyCrypter.decrypt(new EncryptedData(iv, ciphertext), new KeyParameter(key_e));
+        return aesKeyCrypter.decrypt(new EncryptedData(iv, ciphertext, null), new Key(key_e, null));
     }
 
     @Override
     public EncryptedData encrypt(byte[] plainBytes, byte[] initializationVector, ECKey key) throws KeyCrypterException {
         byte[] encryptedBytes = encryptEcies(key, plainBytes, initializationVector);
-        return new EncryptedData(initializationVector, encryptedBytes);
+        return new EncryptedData(initializationVector, encryptedBytes, null);
     }
 
     public byte[] encryptEcies(ECKey key, byte[] message, byte[] magic) {
@@ -83,7 +83,7 @@ public class ECIESKeyCrypter implements AsymmetricKeyCrypter {
         byte[] key_e = Arrays.copyOfRange(hash, 16, 32);
         byte[] key_m = Arrays.copyOfRange(hash, 32, 64);
 
-        byte[] ciphertext = aesKeyCrypter.encrypt(message, iv, new KeyParameter(key_e)).getEncryptedBytes();
+        byte[] ciphertext = aesKeyCrypter.encrypt(message, iv, new Key(key_e, null)).getEncryptedBytes();
         byte[] encrypted = concat(magic, ephemeral.getPubKey(), ciphertext);
         byte[] result = hmac256(key_m, encrypted);
         return Base64.getEncoder().encode(concat(encrypted, result));

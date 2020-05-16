@@ -4,7 +4,6 @@ import com.sparrowwallet.drongo.ExtendedKey;
 import com.sparrowwallet.drongo.KeyDerivation;
 import com.sparrowwallet.drongo.Utils;
 import com.sparrowwallet.drongo.crypto.*;
-import org.bouncycastle.crypto.params.KeyParameter;
 
 import java.util.List;
 
@@ -78,7 +77,7 @@ public class Keystore {
         this.seed = seed;
     }
 
-    public DeterministicKey getMasterPrivateKey() {
+    public DeterministicKey getMasterPrivateKey() throws MnemonicException {
         if(seed == null) {
             throw new IllegalArgumentException("Keystore does not contain a seed");
         }
@@ -90,15 +89,15 @@ public class Keystore {
         return HDKeyDerivation.createMasterPrivateKey(seed.getSeedBytes());
     }
 
-    public ExtendedKey getExtendedMasterPrivateKey() {
+    public ExtendedKey getExtendedMasterPrivateKey() throws MnemonicException {
         return new ExtendedKey(getMasterPrivateKey(), new byte[4], ChildNumber.ZERO);
     }
 
-    public ExtendedKey getExtendedMasterPublicKey() {
+    public ExtendedKey getExtendedMasterPublicKey() throws MnemonicException {
         return new ExtendedKey(getMasterPrivateKey().dropPrivateBytes(), new byte[4], ChildNumber.ZERO);
     }
 
-    public ExtendedKey getExtendedPrivateKey() {
+    public ExtendedKey getExtendedPrivateKey() throws MnemonicException {
         List<ChildNumber> derivation = getKeyDerivation().getDerivation();
         DeterministicKey derivedKey = getExtendedMasterPrivateKey().getKey(derivation);
         return new ExtendedKey(derivedKey, derivedKey.getParentFingerprint(), derivation.get(derivation.size() - 1));
@@ -126,12 +125,18 @@ public class Keystore {
                 return false;
             }
 
-            List<ChildNumber> derivation = getKeyDerivation().getDerivation();
-            DeterministicKey derivedKey = getExtendedMasterPrivateKey().getKey(derivation);
-            DeterministicKey derivedKeyPublicOnly = derivedKey.dropPrivateBytes().dropParent();
-            ExtendedKey xpub = new ExtendedKey(derivedKeyPublicOnly, derivedKey.getParentFingerprint(), derivation.get(derivation.size() - 1));
-            if(!xpub.equals(getExtendedPublicKey())) {
-                return false;
+            if(!seed.isEncrypted()) {
+                try {
+                    List<ChildNumber> derivation = getKeyDerivation().getDerivation();
+                    DeterministicKey derivedKey = getExtendedMasterPrivateKey().getKey(derivation);
+                    DeterministicKey derivedKeyPublicOnly = derivedKey.dropPrivateBytes().dropParent();
+                    ExtendedKey xpub = new ExtendedKey(derivedKeyPublicOnly, derivedKey.getParentFingerprint(), derivation.get(derivation.size() - 1));
+                    if(!xpub.equals(getExtendedPublicKey())) {
+                        return false;
+                    }
+                } catch(MnemonicException e) {
+                    return false;
+                }
             }
         }
 
@@ -154,7 +159,7 @@ public class Keystore {
         return copy;
     }
 
-    public static Keystore fromSeed(DeterministicSeed seed, List<ChildNumber> derivation) {
+    public static Keystore fromSeed(DeterministicSeed seed, List<ChildNumber> derivation) throws MnemonicException {
         Keystore keystore = new Keystore();
         keystore.setSeed(seed);
         ExtendedKey xprv = keystore.getExtendedMasterPrivateKey();
@@ -181,24 +186,16 @@ public class Keystore {
     }
 
     public void encrypt(String password) {
-        KeyCrypter keyCrypter = new ScryptKeyCrypter();
-        encrypt(keyCrypter, keyCrypter.deriveKey(password));
-    }
-
-    public void encrypt(KeyCrypter keyCrypter, KeyParameter key) {
         if(seed != null && !seed.isEncrypted()) {
-            seed = seed.encrypt(keyCrypter, key);
+            KeyCrypter keyCrypter = new ScryptKeyCrypter();
+            seed = seed.encrypt(keyCrypter, keyCrypter.deriveKey(password));
         }
     }
 
-    public void decrypt(String password, String passphrase) {
-        KeyCrypter keyCrypter = new ScryptKeyCrypter();
-        decrypt(keyCrypter, passphrase, keyCrypter.deriveKey(password));
-    }
-
-    public void decrypt(KeyCrypter keyCrypter, String passphrase, KeyParameter key) {
+    public void decrypt(String password) {
         if(seed != null && seed.isEncrypted()) {
-            seed = seed.decrypt(keyCrypter, passphrase, key);
+            KeyCrypter keyCrypter = new ScryptKeyCrypter(seed.getEncryptedData().getKeySalt());
+            seed = seed.decrypt(keyCrypter, keyCrypter.deriveKey(password));
         }
     }
 }

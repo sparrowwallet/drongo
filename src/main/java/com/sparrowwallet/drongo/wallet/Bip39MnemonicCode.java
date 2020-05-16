@@ -95,7 +95,7 @@ public class Bip39MnemonicCode {
      */
     public static byte[] toSeed(List<String> words, String passphrase) {
         if(passphrase == null) {
-            throw new IllegalArgumentException("A null passphrase is not allowed.");
+            passphrase = "";
         }
 
         // To create binary seed from mnemonic, we use PBKDF2 function
