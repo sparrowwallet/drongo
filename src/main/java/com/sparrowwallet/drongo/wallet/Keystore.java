@@ -187,15 +187,13 @@ public class Keystore {
 
     public void encrypt(String password) {
         if(seed != null && !seed.isEncrypted()) {
-            KeyCrypter keyCrypter = new ScryptKeyCrypter();
-            seed = seed.encrypt(keyCrypter, keyCrypter.deriveKey(password));
+            seed = seed.encrypt(password);
         }
     }
 
     public void decrypt(String password) {
         if(seed != null && seed.isEncrypted()) {
-            KeyCrypter keyCrypter = new ScryptKeyCrypter(seed.getEncryptedData().getKeySalt());
-            seed = seed.decrypt(keyCrypter, keyCrypter.deriveKey(password));
+            seed = seed.decrypt(password);
         }
     }
 }

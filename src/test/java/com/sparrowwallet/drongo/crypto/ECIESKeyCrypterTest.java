@@ -12,9 +12,10 @@ public class ECIESKeyCrypterTest {
         byte[] testMessageBytes = testMessage.getBytes(StandardCharsets.UTF_8);
         byte[] initializationVector = "BIE1".getBytes(StandardCharsets.UTF_8);
 
-        AsymmetricKeyCrypter keyCrypter = new ECIESKeyCrypter();
+        AsymmetricKeyDeriver keyDeriver = new Pbkdf2KeyDeriver();
+        ECKey key = keyDeriver.deriveECKey("iampassword");
 
-        ECKey key = keyCrypter.deriveECKey("iampassword");
+        AsymmetricKeyCrypter keyCrypter = new ECIESKeyCrypter();
         EncryptedData encryptedData = keyCrypter.encrypt(testMessageBytes, initializationVector, key);
         byte[] crypterDecrypted = keyCrypter.decrypt(encryptedData, key);
 

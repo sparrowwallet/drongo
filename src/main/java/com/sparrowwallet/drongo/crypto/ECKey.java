@@ -831,7 +831,7 @@ public class ECKey implements EncryptableItem {
 
     @Override
     public EncryptionType getEncryptionType() {
-        return keyCrypter != null ? keyCrypter.getUnderstoodEncryptionType() : EncryptionType.UNENCRYPTED;
+        return new EncryptionType(EncryptionType.Deriver.SCRYPT, keyCrypter != null ? keyCrypter.getCrypterType() : EncryptionType.Crypter.NONE);
     }
 
     /**

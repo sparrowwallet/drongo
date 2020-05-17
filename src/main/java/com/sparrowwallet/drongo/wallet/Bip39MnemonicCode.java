@@ -1,6 +1,7 @@
 package com.sparrowwallet.drongo.wallet;
 
 import com.sparrowwallet.drongo.Utils;
+import com.sparrowwallet.drongo.crypto.Pbkdf2KeyDeriver;
 import com.sparrowwallet.drongo.protocol.Sha256Hash;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -108,7 +109,8 @@ public class Bip39MnemonicCode {
         String mnemonic = String.join(" ", words);
         String salt = "mnemonic" + Normalizer.normalize(passphrase, Normalizer.Form.NFKD);
 
-        return Utils.getPbkdf2HmacSha512Hash(mnemonic.getBytes(StandardCharsets.UTF_8), salt.getBytes(StandardCharsets.UTF_8), PBKDF2_ROUNDS);
+        Pbkdf2KeyDeriver keyDeriver = new Pbkdf2KeyDeriver(salt.getBytes(StandardCharsets.UTF_8), PBKDF2_ROUNDS);
+        return keyDeriver.deriveKey(mnemonic).getKeyBytes();
     }
 
     /**

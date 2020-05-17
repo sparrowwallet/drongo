@@ -23,16 +23,6 @@ public class AESKeyCrypter implements KeyCrypter {
 
     private static final SecureRandom secureRandom = new SecureRandom();
 
-    @Override
-    public EncryptionType getUnderstoodEncryptionType() {
-        return EncryptionType.ENCRYPTED_AES;
-    }
-
-    @Override
-    public Key deriveKey(CharSequence password) throws KeyCrypterException {
-        throw new UnsupportedOperationException("AESKeyCrypter does not define a key derivation function, but keys must be either 128, 192 or 256 bits long");
-    }
-
     /**
      * Decrypt bytes previously encrypted with this class.
      *
@@ -93,9 +83,14 @@ public class AESKeyCrypter implements KeyCrypter {
             final int length1 = cipher.processBytes(plainBytes, 0, plainBytes.length, encryptedBytes, 0);
             final int length2 = cipher.doFinal(encryptedBytes, length1);
 
-            return new EncryptedData(iv, Arrays.copyOf(encryptedBytes, length1 + length2), aesKey.getSalt());
+            return new EncryptedData(iv, Arrays.copyOf(encryptedBytes, length1 + length2), aesKey.getSalt(), aesKey.getDeriver(), getCrypterType());
         } catch (Exception e) {
             throw new KeyCrypterException("Could not encrypt bytes.", e);
         }
+    }
+
+    @Override
+    public EncryptionType.Crypter getCrypterType() {
+        return EncryptionType.Crypter.AES_CBC_PKCS7;
     }
 }

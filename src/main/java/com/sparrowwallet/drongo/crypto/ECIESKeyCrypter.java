@@ -1,6 +1,5 @@
 package com.sparrowwallet.drongo.crypto;
 
-import com.sparrowwallet.drongo.Utils;
 import org.bouncycastle.crypto.digests.SHA256Digest;
 import org.bouncycastle.crypto.digests.SHA512Digest;
 import org.bouncycastle.crypto.macs.HMac;
@@ -8,7 +7,6 @@ import org.bouncycastle.crypto.params.KeyParameter;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.Base64;
 
@@ -17,21 +15,6 @@ import java.util.Base64;
  */
 public class ECIESKeyCrypter implements AsymmetricKeyCrypter {
     private final KeyCrypter aesKeyCrypter = new AESKeyCrypter();
-
-    @Override
-    public EncryptionType getUnderstoodEncryptionType() {
-        return EncryptionType.ENCRYPTED_ECIES_AES;
-    }
-
-    @Override
-    public ECKey deriveECKey(CharSequence password) throws KeyCrypterException {
-        return deriveECKey(password.toString());
-    }
-
-    public static ECKey deriveECKey(String password) throws KeyCrypterException {
-        byte[] secret = Utils.getPbkdf2HmacSha512Hash(password.toString().getBytes(StandardCharsets.UTF_8), new byte[0], 1024);
-        return ECKey.fromPrivate(secret);
-    }
 
     @Override
     public byte[] decrypt(EncryptedData encryptedBytesToDecode, ECKey key) throws KeyCrypterException {
@@ -65,13 +48,13 @@ public class ECIESKeyCrypter implements AsymmetricKeyCrypter {
             throw new InvalidPasswordException();
         }
 
-        return aesKeyCrypter.decrypt(new EncryptedData(iv, ciphertext, null), new Key(key_e, null));
+        return aesKeyCrypter.decrypt(new EncryptedData(iv, ciphertext, null, null), new Key(key_e, null, null));
     }
 
     @Override
     public EncryptedData encrypt(byte[] plainBytes, byte[] initializationVector, ECKey key) throws KeyCrypterException {
         byte[] encryptedBytes = encryptEcies(key, plainBytes, initializationVector);
-        return new EncryptedData(initializationVector, encryptedBytes, null);
+        return new EncryptedData(initializationVector, encryptedBytes, null, null);
     }
 
     public byte[] encryptEcies(ECKey key, byte[] message, byte[] magic) {
@@ -83,7 +66,7 @@ public class ECIESKeyCrypter implements AsymmetricKeyCrypter {
         byte[] key_e = Arrays.copyOfRange(hash, 16, 32);
         byte[] key_m = Arrays.copyOfRange(hash, 32, 64);
 
-        byte[] ciphertext = aesKeyCrypter.encrypt(message, iv, new Key(key_e, null)).getEncryptedBytes();
+        byte[] ciphertext = aesKeyCrypter.encrypt(message, iv, new Key(key_e, null, null)).getEncryptedBytes();
         byte[] encrypted = concat(magic, ephemeral.getPubKey(), ciphertext);
         byte[] result = hmac256(key_m, encrypted);
         return Base64.getEncoder().encode(concat(encrypted, result));

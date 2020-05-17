@@ -245,20 +245,6 @@ public class Utils {
         return Ripemd160.getHash(sha256);
     }
 
-    /**
-     * Calculates RIPEMD160(SHA256(input)). This is used in Address calculations.
-     */
-    public static byte[] sha256sha256(byte[] input) {
-        byte[] sha256 = Sha256Hash.hash(input);
-        return Sha256Hash.hash(sha256);
-    }
-
-    public static byte[] decryptAesCbcPkcs7(byte[] initializationVector, byte[] encryptedBytes, byte[] keyBytes) {
-        KeyCrypter keyCrypter = new AESKeyCrypter();
-        EncryptedData data = new EncryptedData(initializationVector, encryptedBytes, null);
-        return keyCrypter.decrypt(data, new Key(keyBytes, null));
-    }
-
     /** Convert to a string path, starting with "M/" */
     public static String formatHDPath(List<ChildNumber> path) {
         StringJoiner joiner = new StringJoiner("/");
@@ -293,11 +279,5 @@ public class Utils {
         byte[] out = new byte[64];
         hmacSha512.doFinal(out, 0);
         return out;
-    }
-
-    public static byte[] getPbkdf2HmacSha512Hash(byte[] preimage, byte[] salt, int iterationCount) {
-        PKCS5S2ParametersGenerator gen = new PKCS5S2ParametersGenerator(new SHA512Digest());
-        gen.init(preimage, salt, iterationCount);
-        return ((KeyParameter) gen.generateDerivedParameters(512)).getKey();
     }
 }

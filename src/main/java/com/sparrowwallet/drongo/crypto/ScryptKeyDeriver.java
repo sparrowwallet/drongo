@@ -21,8 +21,8 @@ import java.util.Objects;
  * <p>2) Using the AES Key generated above, you then can encrypt and decrypt any bytes using
  * the AES symmetric cipher. Eight bytes of salt is used to prevent dictionary attacks.</p>
  */
-public class ScryptKeyCrypter extends AESKeyCrypter {
-    private static final Logger log = LoggerFactory.getLogger(ScryptKeyCrypter.class);
+public class ScryptKeyDeriver implements KeyDeriver {
+    private static final Logger log = LoggerFactory.getLogger(ScryptKeyDeriver.class);
 
     /**
      * Key length in bytes.
@@ -49,14 +49,14 @@ public class ScryptKeyCrypter extends AESKeyCrypter {
     /**
      * Encryption/Decryption using default parameters and a random salt.
      */
-    public ScryptKeyCrypter() {
+    public ScryptKeyDeriver() {
         this.scryptParameters = new ScryptParameters(randomSalt());
     }
 
     /**
      * Encryption/Decryption using default parameters and provided salt.
      */
-    public ScryptKeyCrypter(byte[] salt) {
+    public ScryptKeyDeriver(byte[] salt) {
         this.scryptParameters = new ScryptParameters(salt);
     }
 
@@ -67,7 +67,7 @@ public class ScryptKeyCrypter extends AESKeyCrypter {
      * @param iterations
      *            number of scrypt iterations
      */
-    public ScryptKeyCrypter(int iterations) {
+    public ScryptKeyDeriver(int iterations) {
         this.scryptParameters = new ScryptParameters(randomSalt(), iterations);
     }
 
@@ -77,11 +77,16 @@ public class ScryptKeyCrypter extends AESKeyCrypter {
      * @param scryptParameters ScryptParameters to use
      * @throws NullPointerException if the scryptParameters or any of its N, R or P is null.
      */
-    public ScryptKeyCrypter(ScryptParameters scryptParameters) {
+    public ScryptKeyDeriver(ScryptParameters scryptParameters) {
         this.scryptParameters = scryptParameters;
         if (scryptParameters.getSalt() == null || scryptParameters.getSalt() == null || scryptParameters.getSalt().length == 0) {
             log.warn("You are using a ScryptParameters with no salt. Your encryption may be vulnerable to a dictionary attack.");
         }
+    }
+
+    @Override
+    public EncryptionType.Deriver getDeriverType() {
+        return EncryptionType.Deriver.SCRYPT;
     }
 
     /**
@@ -94,7 +99,7 @@ public class ScryptKeyCrypter extends AESKeyCrypter {
      * @throws            KeyCrypterException
      */
     @Override
-    public Key deriveKey(CharSequence password) throws KeyCrypterException {
+    public Key deriveKey(String password) throws KeyCrypterException {
         byte[] passwordBytes = null;
         try {
             passwordBytes = convertToByteArray(password);
@@ -106,7 +111,7 @@ public class ScryptKeyCrypter extends AESKeyCrypter {
             }
 
             byte[] keyBytes = SCrypt.generate(passwordBytes, salt, (int) scryptParameters.getN(), scryptParameters.getR(), scryptParameters.getP(), KEY_LENGTH);
-            return new Key(keyBytes, scryptParameters.getSalt());
+            return new Key(keyBytes, scryptParameters.getSalt(), getDeriverType());
         } catch (Exception e) {
             throw new KeyCrypterException("Could not generate key from password and salt.", e);
         } finally {
@@ -136,15 +141,6 @@ public class ScryptKeyCrypter extends AESKeyCrypter {
         return scryptParameters;
     }
 
-    /**
-     * Return the EncryptionType enum value which denotes the type of encryption/ decryption that this KeyCrypter
-     * can understand.
-     */
-    @Override
-    public EncryptionType getUnderstoodEncryptionType() {
-        return EncryptionType.ENCRYPTED_SCRYPT_AES;
-    }
-
     @Override
     public String toString() {
         return "AES-" + KEY_LENGTH * 8 + "-CBC, Scrypt (" + scryptParametersString() + ")";
@@ -163,7 +159,7 @@ public class ScryptKeyCrypter extends AESKeyCrypter {
     public boolean equals(Object o) {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
-        return Objects.equals(scryptParameters, ((ScryptKeyCrypter)o).scryptParameters);
+        return Objects.equals(scryptParameters, ((ScryptKeyDeriver)o).scryptParameters);
     }
 
     public static class ScryptParameters {

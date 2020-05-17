@@ -1,6 +1,7 @@
 package com.sparrowwallet.drongo.wallet;
 
 import com.sparrowwallet.drongo.Utils;
+import com.sparrowwallet.drongo.crypto.Pbkdf2KeyDeriver;
 
 import java.nio.charset.StandardCharsets;
 import java.text.Normalizer;
@@ -33,7 +34,8 @@ public class ElectrumMnemonicCode {
         String mnemonic = Normalizer.normalize(mnemonicWords, Normalizer.Form.NFKD);
         String salt = "electrum" + Normalizer.normalize(passphrase, Normalizer.Form.NFKD);
 
-        return Utils.getPbkdf2HmacSha512Hash(mnemonic.getBytes(StandardCharsets.UTF_8), salt.getBytes(StandardCharsets.UTF_8), PBKDF2_ROUNDS);
+        Pbkdf2KeyDeriver keyDeriver = new Pbkdf2KeyDeriver(salt.getBytes(StandardCharsets.UTF_8), PBKDF2_ROUNDS);
+        return keyDeriver.deriveKey(mnemonic).getKeyBytes();
     }
 
     /**

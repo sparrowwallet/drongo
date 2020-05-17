@@ -158,7 +158,7 @@ public class DeterministicSeed implements EncryptableItem {
 
     @Override
     public EncryptionType getEncryptionType() {
-        return EncryptionType.ENCRYPTED_SCRYPT_AES;
+        return new EncryptionType(EncryptionType.Deriver.SCRYPT, EncryptionType.Crypter.AES_CBC_PKCS7);
     }
 
     @Override
@@ -174,27 +174,41 @@ public class DeterministicSeed implements EncryptableItem {
         return type;
     }
 
-    public DeterministicSeed encrypt(KeyCrypter keyCrypter, Key aesKey) {
+    public DeterministicSeed encrypt(String password) {
         if(encryptedMnemonicCode != null) {
             throw new IllegalArgumentException("Trying to encrypt twice");
         }
         if(mnemonicCode == null) {
             throw new IllegalArgumentException("Mnemonic missing so cannot encrypt");
         }
-        EncryptedData encryptedMnemonic = keyCrypter.encrypt(getMnemonicAsBytes(), null, aesKey);
-        return new DeterministicSeed(encryptedMnemonic, needsPassphrase, creationTimeSeconds, type);
+        KeyDeriver keyDeriver = getEncryptionType().getDeriver().getKeyDeriver();
+        Key key = keyDeriver.deriveKey(password);
+
+        KeyCrypter keyCrypter = getEncryptionType().getCrypter().getKeyCrypter();
+        EncryptedData encryptedMnemonic = keyCrypter.encrypt(getMnemonicAsBytes(), null, key);
+        DeterministicSeed seed = new DeterministicSeed(encryptedMnemonic, needsPassphrase, creationTimeSeconds, type);
+        seed.setPassphrase(passphrase);
+
+        return seed;
     }
 
     private byte[] getMnemonicAsBytes() {
         return getMnemonicString().getBytes(StandardCharsets.UTF_8);
     }
 
-    public DeterministicSeed decrypt(KeyCrypter crypter, Key aesKey) {
+    public DeterministicSeed decrypt(String password) {
         if(!isEncrypted()) {
             throw new IllegalStateException("Cannot decrypt unencrypted seed");
         }
-        List<String> mnemonic = decodeMnemonicCode(crypter.decrypt(encryptedMnemonicCode, aesKey));
-        return new DeterministicSeed(mnemonic, needsPassphrase, creationTimeSeconds, type);
+        KeyDeriver keyDeriver = getEncryptionType().getDeriver().getKeyDeriver(encryptedMnemonicCode.getKeySalt());
+        Key key = keyDeriver.deriveKey(password);
+
+        KeyCrypter keyCrypter = getEncryptionType().getCrypter().getKeyCrypter();
+        List<String> mnemonic = decodeMnemonicCode(keyCrypter.decrypt(encryptedMnemonicCode, key));
+        DeterministicSeed seed = new DeterministicSeed(mnemonic, needsPassphrase, creationTimeSeconds, type);
+        seed.setPassphrase(passphrase);
+
+        return seed;
     }
 
     @Override
