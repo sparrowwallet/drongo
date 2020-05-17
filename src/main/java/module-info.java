@@ -1,5 +1,6 @@
 open module com.sparrowwallet.drongo {
     requires org.bouncycastle.provider;
+    requires de.mkammerer.argon2;
     requires slf4j.api;
     exports com.sparrowwallet.drongo;
     exports com.sparrowwallet.drongo.psbt;
