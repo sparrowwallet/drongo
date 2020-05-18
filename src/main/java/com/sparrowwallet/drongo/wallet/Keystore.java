@@ -168,7 +168,7 @@ public class Keystore {
         DeterministicKey derivedKeyPublicOnly = derivedKey.dropPrivateBytes().dropParent();
         ExtendedKey xpub = new ExtendedKey(derivedKeyPublicOnly, derivedKey.getParentFingerprint(), derivation.get(derivation.size() - 1));
 
-        keystore.setLabel(masterFingerprint);
+        keystore.setLabel(seed.getType().name());
         keystore.setSource(KeystoreSource.SW_SEED);
         keystore.setWalletModel(WalletModel.SPARROW);
         keystore.setKeyDerivation(new KeyDerivation(masterFingerprint, KeyDerivation.writePath(derivation)));

@@ -93,4 +93,26 @@ public class Bip39MnemonicCodeTest {
 
         Assert.assertEquals("a652d123f421f56257391af26063e900619678b552dafd3850e699f6da0667269bbcaebb0509557481db29607caac0294b3cd337d740174cfa05f552fe9e0272", Utils.bytesToHex(seed));
     }
+
+    @Test
+    public void bip39TestVector1() throws MnemonicException {
+        String words = "letter advice cage absurd amount doctor acoustic avoid letter advice cage absurd amount doctor acoustic avoid letter always";
+        List<String> wordlist = Arrays.asList(words.split(" "));
+
+        Bip39MnemonicCode.INSTANCE.check(wordlist);
+        byte[] seed = Bip39MnemonicCode.toSeed(wordlist, "TREZOR");
+
+        Assert.assertEquals("107d7c02a5aa6f38c58083ff74f04c607c2d2c0ecc55501dadd72d025b751bc27fe913ffb796f841c49b1d33b610cf0e91d3aa239027f5e99fe4ce9e5088cd65", Utils.bytesToHex(seed));
+    }
+
+    @Test
+    public void bip39TestVector2() throws MnemonicException {
+        String words = "gravity machine north sort system female filter attitude volume fold club stay feature office ecology stable narrow fog";
+        List<String> wordlist = Arrays.asList(words.split(" "));
+
+        Bip39MnemonicCode.INSTANCE.check(wordlist);
+        byte[] seed = Bip39MnemonicCode.toSeed(wordlist, "TREZOR");
+
+        Assert.assertEquals("628c3827a8823298ee685db84f55caa34b5cc195a778e52d45f59bcf75aba68e4d7590e101dc414bc1bbd5737666fbbef35d1f1903953b66624f910feef245ac", Utils.bytesToHex(seed));
+    }
 }

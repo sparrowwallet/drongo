@@ -126,6 +126,30 @@ public class Wallet {
         return !keystores.stream().map(Keystore::getLabel).allMatch(new HashSet<>()::add);
     }
 
+    public int makeLabelsUnique(Keystore newKeystore) {
+        int max = 0;
+        for(Keystore keystore : getKeystores()) {
+            if(newKeystore != keystore && keystore.getLabel().startsWith(newKeystore.getLabel())) {
+                String remainder = keystore.getLabel().substring(newKeystore.getLabel().length());
+                if(remainder.length() == 0) {
+                    max = makeLabelsUnique(keystore);
+                } else {
+                    try {
+                        int count = Integer.parseInt(remainder.trim());
+                        max = Math.max(max, count);
+                    } catch (NumberFormatException e) {
+                        //ignore, no terminating number
+                    }
+                }
+            }
+        }
+
+        max++;
+        newKeystore.setLabel(newKeystore.getLabel() + " " + max);
+
+        return max;
+    }
+
     public Wallet copy() {
         Wallet copy = new Wallet(name);
         copy.setPolicyType(policyType);
