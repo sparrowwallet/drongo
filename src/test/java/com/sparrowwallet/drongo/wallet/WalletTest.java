@@ -1,5 +1,8 @@
 package com.sparrowwallet.drongo.wallet;
 
+import com.sparrowwallet.drongo.crypto.Argon2KeyDeriver;
+import com.sparrowwallet.drongo.crypto.Key;
+import com.sparrowwallet.drongo.crypto.KeyDeriver;
 import com.sparrowwallet.drongo.policy.Policy;
 import com.sparrowwallet.drongo.policy.PolicyType;
 import com.sparrowwallet.drongo.protocol.ScriptType;
@@ -17,7 +20,10 @@ public class WalletTest {
         wallet.getKeystores().add(keystore);
         wallet.setDefaultPolicy(Policy.getPolicy(PolicyType.SINGLE, ScriptType.P2PKH, wallet.getKeystores(), 1));
 
-        wallet.encrypt("pass");
+        KeyDeriver keyDeriver = new Argon2KeyDeriver();
+        Key key = keyDeriver.deriveKey("pass");
+        wallet.encrypt(key);
+
         wallet.decrypt("pass");
     }
 }

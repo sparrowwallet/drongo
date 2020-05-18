@@ -49,6 +49,10 @@ public class EncryptionType {
             public KeyDeriver getKeyDeriver() {
                 return new Argon2KeyDeriver();
             }
+
+            public KeyDeriver getKeyDeriver(byte[] salt) {
+                return new Argon2KeyDeriver(salt);
+            }
         };
 
         public abstract KeyDeriver getKeyDeriver();

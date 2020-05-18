@@ -158,7 +158,7 @@ public class DeterministicSeed implements EncryptableItem {
 
     @Override
     public EncryptionType getEncryptionType() {
-        return new EncryptionType(EncryptionType.Deriver.SCRYPT, EncryptionType.Crypter.AES_CBC_PKCS7);
+        return new EncryptionType(EncryptionType.Deriver.ARGON2, EncryptionType.Crypter.AES_CBC_PKCS7);
     }
 
     @Override
@@ -174,15 +174,13 @@ public class DeterministicSeed implements EncryptableItem {
         return type;
     }
 
-    public DeterministicSeed encrypt(String password) {
+    public DeterministicSeed encrypt(Key key) {
         if(encryptedMnemonicCode != null) {
             throw new IllegalArgumentException("Trying to encrypt twice");
         }
         if(mnemonicCode == null) {
             throw new IllegalArgumentException("Mnemonic missing so cannot encrypt");
         }
-        KeyDeriver keyDeriver = getEncryptionType().getDeriver().getKeyDeriver();
-        Key key = keyDeriver.deriveKey(password);
 
         KeyCrypter keyCrypter = getEncryptionType().getCrypter().getKeyCrypter();
         EncryptedData encryptedMnemonic = keyCrypter.encrypt(getMnemonicAsBytes(), null, key);
@@ -193,15 +191,29 @@ public class DeterministicSeed implements EncryptableItem {
     }
 
     private byte[] getMnemonicAsBytes() {
-        return getMnemonicString().getBytes(StandardCharsets.UTF_8);
+        String mnemonicString = getMnemonicString();
+        if(mnemonicString == null) {
+            return null;
+        }
+
+        return mnemonicString.getBytes(StandardCharsets.UTF_8);
     }
 
     public DeterministicSeed decrypt(String password) {
         if(!isEncrypted()) {
             throw new IllegalStateException("Cannot decrypt unencrypted seed");
         }
+
         KeyDeriver keyDeriver = getEncryptionType().getDeriver().getKeyDeriver(encryptedMnemonicCode.getKeySalt());
         Key key = keyDeriver.deriveKey(password);
+
+        return decrypt(key);
+    }
+
+    public DeterministicSeed decrypt(Key key) {
+        if(!isEncrypted()) {
+            throw new IllegalStateException("Cannot decrypt unencrypted seed");
+        }
 
         KeyCrypter keyCrypter = getEncryptionType().getCrypter().getKeyCrypter();
         List<String> mnemonic = decodeMnemonicCode(keyCrypter.decrypt(encryptedMnemonicCode, key));

@@ -1,8 +1,6 @@
 package com.sparrowwallet.drongo.crypto;
 
-import de.mkammerer.argon2.Argon2;
-import de.mkammerer.argon2.Argon2Factory;
-import de.mkammerer.argon2.Argon2Helper;
+import com.sparrowwallet.drongo.Utils;
 import org.junit.Assert;
 import org.junit.Test;
 
@@ -11,10 +9,23 @@ import java.security.SecureRandom;
 
 public class Argon2KeyDeriverTest {
     @Test
+    public void noPasswordTest() {
+        String password = "";
+
+        Argon2KeyDeriver.Argon2Parameters testParams = Argon2KeyDeriver.TEST_PARAMETERS;
+        byte[] salt = new byte[testParams.saltLength];
+        Argon2KeyDeriver keyDeriver = new Argon2KeyDeriver(salt);
+        Key key = keyDeriver.deriveKey(password);
+
+        String hex = Utils.bytesToHex(key.getKeyBytes());
+        Assert.assertEquals("6f6600a054c0271b96788906f62dfb1323c37b761715a0ae95ac524e4e1f2811", hex);
+    }
+
+    @Test
     public void testArgon2() {
         String password = "thisisapassword";
 
-        Argon2KeyDeriver keyDeriver = new Argon2KeyDeriver();
+        Argon2KeyDeriver keyDeriver = new Argon2KeyDeriver(Argon2KeyDeriver.TEST_PARAMETERS);
         Key key = keyDeriver.deriveKey(password);
 
         KeyCrypter keyCrypter = new AESKeyCrypter();
@@ -30,7 +41,7 @@ public class Argon2KeyDeriverTest {
 
         //Decrypt
 
-        Argon2KeyDeriver keyDeriver2 = new Argon2KeyDeriver(encrypted.getKeySalt());
+        Argon2KeyDeriver keyDeriver2 = new Argon2KeyDeriver(Argon2KeyDeriver.TEST_PARAMETERS, encrypted.getKeySalt());
         Key key2 = keyDeriver2.deriveKey(password);
 
         byte[] decrypted = keyCrypter.decrypt(encrypted, key2);

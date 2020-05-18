@@ -8,4 +8,6 @@ public interface AsymmetricKeyDeriver {
      * @throws KeyCrypterException
      */
     ECKey deriveECKey(String password) throws KeyCrypterException;
+
+    byte[] getSalt();
 }

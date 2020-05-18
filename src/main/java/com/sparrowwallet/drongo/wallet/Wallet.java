@@ -1,5 +1,6 @@
 package com.sparrowwallet.drongo.wallet;
 
+import com.sparrowwallet.drongo.crypto.Key;
 import com.sparrowwallet.drongo.policy.Policy;
 import com.sparrowwallet.drongo.policy.PolicyType;
 import com.sparrowwallet.drongo.protocol.ScriptType;
@@ -156,15 +157,21 @@ public class Wallet {
         return false;
     }
 
-    public void encrypt(String password) {
+    public void encrypt(Key key) {
         for(Keystore keystore : keystores) {
-            keystore.encrypt(password);
+            keystore.encrypt(key);
         }
     }
 
     public void decrypt(String password) {
         for(Keystore keystore : keystores) {
             keystore.decrypt(password);
+        }
+    }
+
+    public void decrypt(Key key) {
+        for(Keystore keystore : keystores) {
+            keystore.decrypt(key);
         }
     }
 }

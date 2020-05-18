@@ -185,15 +185,21 @@ public class Keystore {
         return seed != null && seed.isEncrypted();
     }
 
-    public void encrypt(String password) {
-        if(seed != null && !seed.isEncrypted()) {
-            seed = seed.encrypt(password);
+    public void encrypt(Key key) {
+        if(hasSeed() && !seed.isEncrypted()) {
+            seed = seed.encrypt(key);
         }
     }
 
     public void decrypt(String password) {
-        if(seed != null && seed.isEncrypted()) {
+        if(hasSeed() && seed.isEncrypted()) {
             seed = seed.decrypt(password);
+        }
+    }
+
+    public void decrypt(Key key) {
+        if(hasSeed() && seed.isEncrypted()) {
+            seed = seed.decrypt(key);
         }
     }
 }

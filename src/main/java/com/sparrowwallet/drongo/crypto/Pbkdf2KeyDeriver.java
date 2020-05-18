@@ -30,6 +30,11 @@ public class Pbkdf2KeyDeriver implements KeyDeriver, AsymmetricKeyDeriver {
     }
 
     @Override
+    public byte[] getSalt() {
+        return salt;
+    }
+
+    @Override
     public Key deriveKey(String password) throws KeyCrypterException {
         PKCS5S2ParametersGenerator gen = new PKCS5S2ParametersGenerator(new SHA512Digest());
         gen.init(password.getBytes(StandardCharsets.UTF_8), salt, iterationCount);
