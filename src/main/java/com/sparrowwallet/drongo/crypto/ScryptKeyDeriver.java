@@ -1,6 +1,6 @@
 package com.sparrowwallet.drongo.crypto;
 
-import com.sparrowwallet.drongo.Utils;
+import com.sparrowwallet.drongo.SecureString;
 import org.bouncycastle.crypto.generators.SCrypt;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -103,7 +103,7 @@ public class ScryptKeyDeriver implements KeyDeriver {
     public Key deriveKey(CharSequence password) throws KeyCrypterException {
         byte[] passwordBytes = null;
         try {
-            passwordBytes = Utils.toBytesUTF8(password);
+            passwordBytes = SecureString.toBytesUTF8(password);
             byte[] salt = new byte[0];
             if (scryptParameters.getSalt() != null) {
                 salt = scryptParameters.getSalt();

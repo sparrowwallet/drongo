@@ -1,5 +1,7 @@
 package com.sparrowwallet.drongo.crypto;
 
+import java.util.Arrays;
+
 public class Key {
     private final byte[] keyBytes;
     private final byte[] salt;
@@ -21,5 +23,10 @@ public class Key {
 
     public EncryptionType.Deriver getDeriver() {
         return deriver;
+    }
+
+    public void clear() {
+        Arrays.fill(keyBytes, (byte)0);
+        Arrays.fill(salt, (byte)0);
     }
 }

@@ -1,6 +1,6 @@
 package com.sparrowwallet.drongo.crypto;
 
-import com.sparrowwallet.drongo.Utils;
+import com.sparrowwallet.drongo.SecureString;
 import org.bouncycastle.crypto.digests.SHA512Digest;
 import org.bouncycastle.crypto.generators.PKCS5S2ParametersGenerator;
 import org.bouncycastle.crypto.params.KeyParameter;
@@ -36,7 +36,7 @@ public class Pbkdf2KeyDeriver implements KeyDeriver, AsymmetricKeyDeriver {
     @Override
     public Key deriveKey(CharSequence password) throws KeyCrypterException {
         PKCS5S2ParametersGenerator gen = new PKCS5S2ParametersGenerator(new SHA512Digest());
-        gen.init(Utils.toBytesUTF8(password), salt, iterationCount);
+        gen.init(SecureString.toBytesUTF8(password), salt, iterationCount);
         byte[] keyBytes = ((KeyParameter)gen.generateDerivedParameters(512)).getKey();
         return new Key(keyBytes, salt, getDeriverType());
     }

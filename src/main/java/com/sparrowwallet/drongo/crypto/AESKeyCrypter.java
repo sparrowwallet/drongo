@@ -49,7 +49,9 @@ public class AESKeyCrypter implements KeyCrypter {
             final int length1 = cipher.processBytes(cipherBytes, 0, cipherBytes.length, decryptedBytes, 0);
             final int length2 = cipher.doFinal(decryptedBytes, length1);
 
-            return Arrays.copyOf(decryptedBytes, length1 + length2);
+            byte[] decrypted = Arrays.copyOf(decryptedBytes, length1 + length2);
+            Arrays.fill(decryptedBytes, (byte)0);
+            return decrypted;
         } catch (InvalidCipherTextException e) {
             throw new KeyCrypterException.InvalidCipherText("Could not decrypt bytes", e);
         } catch (RuntimeException e) {

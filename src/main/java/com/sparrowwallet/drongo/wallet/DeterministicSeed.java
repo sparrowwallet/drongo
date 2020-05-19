@@ -1,9 +1,9 @@
 package com.sparrowwallet.drongo.wallet;
 
+import com.sparrowwallet.drongo.SecureString;
 import com.sparrowwallet.drongo.Utils;
 import com.sparrowwallet.drongo.crypto.*;
 
-import java.nio.charset.StandardCharsets;
 import java.security.SecureRandom;
 import java.util.*;
 
@@ -20,7 +20,7 @@ public class DeterministicSeed implements EncryptableItem {
     //Session only storage
     private transient String passphrase;
 
-    public DeterministicSeed(String mnemonicString, String passphrase, long creationTimeSeconds, Type type) {
+    public DeterministicSeed(CharSequence mnemonicString, String passphrase, long creationTimeSeconds, Type type) {
         this(decodeMnemonicCode(mnemonicString), passphrase, creationTimeSeconds, type);
     }
 
@@ -123,15 +123,6 @@ public class DeterministicSeed implements EncryptableItem {
         return encryptedMnemonicCode != null;
     }
 
-    @Override
-    public String toString() {
-        if(isEncrypted()) {
-            return encryptedMnemonicCode.toString();
-        }
-
-        return getMnemonicString();
-    }
-
     /** Returns the seed as hex or null if encrypted. */
     public String toHexString() throws MnemonicException {
         byte[] seed = getSeedBytes();
@@ -183,7 +174,10 @@ public class DeterministicSeed implements EncryptableItem {
         }
 
         KeyCrypter keyCrypter = getEncryptionType().getCrypter().getKeyCrypter();
-        EncryptedData encryptedMnemonic = keyCrypter.encrypt(getMnemonicAsBytes(), null, key);
+        byte[] mnemonicBytes = getMnemonicAsBytes();
+        EncryptedData encryptedMnemonic = keyCrypter.encrypt(mnemonicBytes, null, key);
+        Arrays.fill(mnemonicBytes != null ? mnemonicBytes : new byte[0], (byte)0);
+        
         DeterministicSeed seed = new DeterministicSeed(encryptedMnemonic, needsPassphrase, creationTimeSeconds, type);
         seed.setPassphrase(passphrase);
 
@@ -191,12 +185,15 @@ public class DeterministicSeed implements EncryptableItem {
     }
 
     private byte[] getMnemonicAsBytes() {
-        String mnemonicString = getMnemonicString();
+        SecureString mnemonicString = getMnemonicString();
         if(mnemonicString == null) {
             return null;
         }
 
-        return mnemonicString.getBytes(StandardCharsets.UTF_8);
+        byte[] mnemonicBytes = SecureString.toBytesUTF8(mnemonicString);
+        mnemonicString.clear();
+
+        return mnemonicBytes;
     }
 
     public DeterministicSeed decrypt(CharSequence password) {
@@ -206,8 +203,10 @@ public class DeterministicSeed implements EncryptableItem {
 
         KeyDeriver keyDeriver = getEncryptionType().getDeriver().getKeyDeriver(encryptedMnemonicCode.getKeySalt());
         Key key = keyDeriver.deriveKey(password);
+        DeterministicSeed seed = decrypt(key);
+        key.clear();
 
-        return decrypt(key);
+        return seed;
     }
 
     public DeterministicSeed decrypt(Key key) {
@@ -216,11 +215,23 @@ public class DeterministicSeed implements EncryptableItem {
         }
 
         KeyCrypter keyCrypter = getEncryptionType().getCrypter().getKeyCrypter();
-        List<String> mnemonic = decodeMnemonicCode(keyCrypter.decrypt(encryptedMnemonicCode, key));
+        byte[] decrypted = keyCrypter.decrypt(encryptedMnemonicCode, key);
+        List<String> mnemonic = decodeMnemonicCode(decrypted);
+        Arrays.fill(decrypted, (byte)0);
+
         DeterministicSeed seed = new DeterministicSeed(mnemonic, needsPassphrase, creationTimeSeconds, type);
         seed.setPassphrase(passphrase);
 
         return seed;
+    }
+
+    @Override
+    public String toString() {
+        return "DeterministicSeed{" +
+                "type=" + type +
+                ", encryptedMnemonicCode=" + encryptedMnemonicCode +
+                ", needsPassphrase=" + needsPassphrase +
+                '}';
     }
 
     @Override
@@ -250,6 +261,15 @@ public class DeterministicSeed implements EncryptableItem {
         }
     }
 
+    public void clear() {
+        if(mnemonicCode != null) {
+            mnemonicCode.clear();
+        }
+        if(passphrase != null) {
+            passphrase = "";
+        }
+    }
+
     byte[] getEntropyBytes() throws MnemonicException {
         return type.getEntropyBytes(mnemonicCode);
     }
@@ -260,25 +280,51 @@ public class DeterministicSeed implements EncryptableItem {
     }
 
     /** Get the mnemonic code as string, or null if unknown. */
-    public String getMnemonicString() {
-        StringJoiner joiner = new StringJoiner(" ");
+    public SecureString getMnemonicString() {
+        StringBuilder builder = new StringBuilder();
         if(mnemonicCode != null) {
             for(String word : mnemonicCode) {
-                joiner.add(word);
+                builder.append(word);
+                builder.append(' ');
             }
 
-            return joiner.toString();
+            if(builder.length() > 0) {
+                builder.setLength(builder.length() - 1);
+            }
+
+            return new SecureString(builder);
         }
 
         return null;
     }
 
     private static List<String> decodeMnemonicCode(byte[] mnemonicCode) {
-        return decodeMnemonicCode(new String(mnemonicCode, StandardCharsets.UTF_8));
+        SecureString secureString = SecureString.fromBytesUTF8(mnemonicCode);
+        List<String> words = decodeMnemonicCode(secureString);
+        secureString.clear();
+
+        return words;
     }
 
-    private static List<String> decodeMnemonicCode(String mnemonicCode) {
-        return Arrays.asList(mnemonicCode.split(" "));
+    private static List<String> decodeMnemonicCode(CharSequence mnemonicCode) {
+        List<String> words = new ArrayList<>();
+        StringBuilder word = new StringBuilder();
+        for(int i = 0; i < mnemonicCode.length(); i++) {
+            char c = mnemonicCode.charAt(i);
+            if(c != ' ') {
+                word.append(mnemonicCode.charAt(i));
+            }
+            if(c == ' ' || i == mnemonicCode.length() - 1) {
+                words.add(word.toString());
+
+                for(int j = 0; j < word.length(); j++) {
+                    word.setCharAt(j, ' ');
+                }
+                word = new StringBuilder();
+            }
+        }
+
+        return words;
     }
 
     public DeterministicSeed copy() {

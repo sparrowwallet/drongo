@@ -283,40 +283,4 @@ public class Utils {
         hmacSha512.doFinal(out, 0);
         return out;
     }
-
-    public static byte[] toBytesUTF8(CharSequence charSequence) {
-        CharBuffer charBuffer = CharBuffer.wrap(charSequence);
-        ByteBuffer byteBuffer = StandardCharsets.UTF_8.encode(charBuffer);
-        byte[] bytes = Arrays.copyOfRange(byteBuffer.array(), byteBuffer.position(), byteBuffer.limit());
-        Arrays.fill(byteBuffer.array(), (byte)0); // clear sensitive data
-        return bytes;
-    }
-
-    public static SecureString fromBytesUTF8(byte[] bytes) {
-        ByteBuffer byteBuffer = ByteBuffer.wrap(bytes);
-        CharBuffer charBuffer = StandardCharsets.UTF_8.decode(byteBuffer);
-        SecureString secureString = new SecureString(charBuffer);
-        Arrays.fill(charBuffer.array(), (char)0);
-        return secureString;
-    }
-
-    public static byte[] toBytesUTF16(CharSequence charSequence) {
-        byte[] byteArray = new byte[charSequence.length() << 1];
-        for(int i = 0; i < charSequence.length(); i++) {
-            int bytePosition = i << 1;
-            byteArray[bytePosition] = (byte) ((charSequence.charAt(i)&0xFF00)>>8);
-            byteArray[bytePosition + 1] = (byte) (charSequence.charAt(i)&0x00FF);
-        }
-        return byteArray;
-    }
-
-    public static boolean isValidUTF16(CharSequence charSequence) {
-        for (int i = 0; i < charSequence.length(); i++) {
-            if (Character.isLowSurrogate(charSequence.charAt(i)) && (i == 0 || !Character.isHighSurrogate(charSequence.charAt(i - 1)))
-                    || Character.isHighSurrogate(charSequence.charAt(i)) && (i == charSequence.length() -1 || !Character.isLowSurrogate(charSequence.charAt(i + 1)))) {
-                return false;
-            }
-        }
-        return true;
-    }
 }

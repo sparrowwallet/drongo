@@ -15,7 +15,7 @@ public class DeterministicSeedTest {
         DeterministicSeed encryptedSeed = seed.encrypt(keyDeriver.deriveKey("pass"));
 
         DeterministicSeed decryptedSeed = encryptedSeed.decrypt("pass");
-        Assert.assertEquals(words, decryptedSeed.getMnemonicString());
+        Assert.assertEquals(words, decryptedSeed.getMnemonicString().asString());
     }
 
     @Test
