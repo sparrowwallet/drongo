@@ -199,7 +199,7 @@ public class DeterministicSeed implements EncryptableItem {
         return mnemonicString.getBytes(StandardCharsets.UTF_8);
     }
 
-    public DeterministicSeed decrypt(String password) {
+    public DeterministicSeed decrypt(CharSequence password) {
         if(!isEncrypted()) {
             throw new IllegalStateException("Cannot decrypt unencrypted seed");
         }

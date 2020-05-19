@@ -1,5 +1,6 @@
 package com.sparrowwallet.drongo.crypto;
 
+import com.sparrowwallet.drongo.Utils;
 import org.bouncycastle.crypto.generators.SCrypt;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -99,10 +100,10 @@ public class ScryptKeyDeriver implements KeyDeriver {
      * @throws            KeyCrypterException
      */
     @Override
-    public Key deriveKey(String password) throws KeyCrypterException {
+    public Key deriveKey(CharSequence password) throws KeyCrypterException {
         byte[] passwordBytes = null;
         try {
-            passwordBytes = convertToByteArray(password);
+            passwordBytes = Utils.toBytesUTF8(password);
             byte[] salt = new byte[0];
             if (scryptParameters.getSalt() != null) {
                 salt = scryptParameters.getSalt();
@@ -120,21 +121,6 @@ public class ScryptKeyDeriver implements KeyDeriver {
                 java.util.Arrays.fill(passwordBytes, (byte) 0);
             }
         }
-    }
-
-    /**
-     * Convert a CharSequence (which are UTF16) into a byte array.
-     *
-     * Note: a String.getBytes() is not used to avoid creating a String of the password in the JVM.
-     */
-    private static byte[] convertToByteArray(CharSequence charSequence) {
-        byte[] byteArray = new byte[charSequence.length() << 1];
-        for(int i = 0; i < charSequence.length(); i++) {
-            int bytePosition = i << 1;
-            byteArray[bytePosition] = (byte) ((charSequence.charAt(i)&0xFF00)>>8);
-            byteArray[bytePosition + 1] = (byte) (charSequence.charAt(i)&0x00FF);
-        }
-        return byteArray;
     }
 
     public ScryptParameters getScryptParameters() {

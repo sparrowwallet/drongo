@@ -187,7 +187,7 @@ public class Wallet {
         }
     }
 
-    public void decrypt(String password) {
+    public void decrypt(CharSequence password) {
         for(Keystore keystore : keystores) {
             keystore.decrypt(password);
         }

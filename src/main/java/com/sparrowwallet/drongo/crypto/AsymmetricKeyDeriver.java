@@ -7,7 +7,7 @@ public interface AsymmetricKeyDeriver {
      * @return ECKey The ECKey to use for encrypting and decrypting
      * @throws KeyCrypterException
      */
-    ECKey deriveECKey(String password) throws KeyCrypterException;
+    ECKey deriveECKey(CharSequence password) throws KeyCrypterException;
 
     byte[] getSalt();
 }

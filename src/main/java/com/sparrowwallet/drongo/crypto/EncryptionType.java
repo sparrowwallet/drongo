@@ -1,5 +1,7 @@
 package com.sparrowwallet.drongo.crypto;
 
+import com.sparrowwallet.drongo.Utils;
+
 import java.nio.charset.StandardCharsets;
 import java.util.Objects;
 
@@ -9,8 +11,8 @@ public class EncryptionType {
             public KeyDeriver getKeyDeriver() {
                 return new KeyDeriver() {
                     @Override
-                    public Key deriveKey(String password) throws KeyCrypterException {
-                        return new Key(password.getBytes(StandardCharsets.UTF_8), null, NONE);
+                    public Key deriveKey(CharSequence password) throws KeyCrypterException {
+                        return new Key(Utils.toBytesUTF8(password), null, NONE);
                     }
 
                     @Override

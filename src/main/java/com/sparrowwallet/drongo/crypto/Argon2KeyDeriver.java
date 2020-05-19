@@ -1,9 +1,9 @@
 package com.sparrowwallet.drongo.crypto;
 
+import com.sparrowwallet.drongo.Utils;
 import de.mkammerer.argon2.Argon2Advanced;
 import de.mkammerer.argon2.Argon2Factory;
 
-import java.nio.charset.StandardCharsets;
 import java.security.SecureRandom;
 
 public class Argon2KeyDeriver implements KeyDeriver, AsymmetricKeyDeriver {
@@ -40,14 +40,14 @@ public class Argon2KeyDeriver implements KeyDeriver, AsymmetricKeyDeriver {
     }
 
     @Override
-    public Key deriveKey(String password) throws KeyCrypterException {
+    public Key deriveKey(CharSequence password) throws KeyCrypterException {
         Argon2Advanced argon2 = Argon2Factory.createAdvanced(Argon2Factory.Argon2Types.ARGON2id, argon2Parameters.saltLength, argon2Parameters.hashLength);
-        byte[] hash = argon2.rawHash(argon2Parameters.iterations, argon2Parameters.memory, argon2Parameters.parallelism, password.getBytes(StandardCharsets.UTF_8), salt);
+        byte[] hash = argon2.rawHash(argon2Parameters.iterations, argon2Parameters.memory, argon2Parameters.parallelism, Utils.toBytesUTF8(password), salt);
         return new Key(hash, salt, getDeriverType());
     }
 
     @Override
-    public ECKey deriveECKey(String password) throws KeyCrypterException {
+    public ECKey deriveECKey(CharSequence password) throws KeyCrypterException {
         Key key = deriveKey(password);
         return ECKey.fromPrivate(key.getKeyBytes());
     }

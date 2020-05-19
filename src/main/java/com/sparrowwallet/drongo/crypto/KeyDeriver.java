@@ -7,7 +7,7 @@ public interface KeyDeriver {
      * @return Key The Key which typically contains the AES key to use for encrypting and decrypting
      * @throws KeyCrypterException
      */
-    Key deriveKey(String password) throws KeyCrypterException;
+    Key deriveKey(CharSequence password) throws KeyCrypterException;
 
     EncryptionType.Deriver getDeriverType();
 }

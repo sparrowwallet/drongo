@@ -191,7 +191,7 @@ public class Keystore {
         }
     }
 
-    public void decrypt(String password) {
+    public void decrypt(CharSequence password) {
         if(hasSeed() && seed.isEncrypted()) {
             seed = seed.decrypt(password);
         }
