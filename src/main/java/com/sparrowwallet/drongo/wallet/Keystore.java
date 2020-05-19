@@ -202,4 +202,10 @@ public class Keystore {
             seed = seed.decrypt(key);
         }
     }
+
+    public void clearPrivate() {
+        if(hasSeed()) {
+            seed.clear();
+        }
+    }
 }

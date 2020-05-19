@@ -45,7 +45,7 @@ public class ECIESKeyCrypter implements AsymmetricKeyCrypter {
         byte[] hmacInput = Arrays.copyOfRange(decoded, 0, decoded.length - 32);
 
         if(!Arrays.equals(mac, hmac256(key_m, hmacInput))) {
-            throw new InvalidPasswordException();
+            throw new InvalidPasswordException("The password was invalid");
         }
 
         return aesKeyCrypter.decrypt(new EncryptedData(iv, ciphertext, null, null), new Key(key_e, null, null));

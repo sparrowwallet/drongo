@@ -27,6 +27,5 @@ public class Key {
 
     public void clear() {
         Arrays.fill(keyBytes, (byte)0);
-        Arrays.fill(salt, (byte)0);
     }
 }

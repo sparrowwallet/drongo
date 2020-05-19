@@ -198,4 +198,10 @@ public class Wallet {
             keystore.decrypt(key);
         }
     }
+
+    public void clearPrivate() {
+        for(Keystore keystore : keystores) {
+            keystore.clearPrivate();
+        }
+    }
 }

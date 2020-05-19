@@ -111,6 +111,7 @@ public class Utils {
         int srcPos = isFirstByteOnlyForSign ? 1 : 0;
         int destPos = numBytes - length;
         System.arraycopy(src, srcPos, dest, destPos, length);
+        Arrays.fill(src, (byte)0);
         return dest;
     }
 

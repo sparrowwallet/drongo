@@ -699,6 +699,12 @@ public class ECKey implements EncryptableItem {
         return Utils.bigIntegerToBytes(getPrivKey(), 32);
     }
 
+    public void clear() {
+        for(int i = 0; i < priv.bitLength(); i++) {
+            priv.clearBit(i);
+        }
+    }
+
     /**
      * Returns the creation time of this key or zero if the key was deserialized from a version that did not store
      * that data.
