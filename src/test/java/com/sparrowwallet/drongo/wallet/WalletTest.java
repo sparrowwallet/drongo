@@ -55,5 +55,15 @@ public class WalletTest {
         wallet.makeLabelsUnique(cckeystore);
         Assert.assertEquals("Coldcard 3", keystore3.getLabel());
         Assert.assertEquals("Coldcard 4", cckeystore.getLabel());
+
+        Keystore eekeystore = new Keystore("Electrum");
+        wallet.makeLabelsUnique(cckeystore);
+        Assert.assertEquals("Electrum", eekeystore.getLabel());
+        wallet.getKeystores().add(eekeystore);
+
+        Keystore eekeystore2 = new Keystore("Electrum");
+        wallet.makeLabelsUnique(eekeystore2);
+        Assert.assertEquals("Electrum 1", eekeystore.getLabel());
+        Assert.assertEquals("Electrum 2", eekeystore2.getLabel());
     }
 }

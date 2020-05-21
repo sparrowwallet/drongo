@@ -126,13 +126,18 @@ public class Wallet {
         return !keystores.stream().map(Keystore::getLabel).allMatch(new HashSet<>()::add);
     }
 
-    public int makeLabelsUnique(Keystore newKeystore) {
+    public void makeLabelsUnique(Keystore newKeystore) {
+        makeLabelsUnique(newKeystore, false);
+    }
+
+    private int makeLabelsUnique(Keystore newKeystore, boolean duplicateFound) {
         int max = 0;
         for(Keystore keystore : getKeystores()) {
             if(newKeystore != keystore && keystore.getLabel().startsWith(newKeystore.getLabel())) {
+                duplicateFound = true;
                 String remainder = keystore.getLabel().substring(newKeystore.getLabel().length());
                 if(remainder.length() == 0) {
-                    max = makeLabelsUnique(keystore);
+                    max = makeLabelsUnique(keystore, true);
                 } else {
                     try {
                         int count = Integer.parseInt(remainder.trim());
@@ -144,8 +149,10 @@ public class Wallet {
             }
         }
 
-        max++;
-        newKeystore.setLabel(newKeystore.getLabel() + " " + max);
+        if(duplicateFound) {
+            max++;
+            newKeystore.setLabel(newKeystore.getLabel() + " " + max);
+        }
 
         return max;
     }
@@ -164,6 +171,16 @@ public class Wallet {
     public boolean containsSeeds() {
         for(Keystore keystore : keystores) {
             if(keystore.hasSeed()) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    public boolean containsSource(KeystoreSource keystoreSource) {
+        for(Keystore keystore : keystores) {
+            if(keystoreSource.equals(keystore.getSource())) {
                 return true;
             }
         }

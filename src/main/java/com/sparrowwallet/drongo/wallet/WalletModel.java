@@ -30,6 +30,9 @@ public enum WalletModel {
         String[] words = line.split("_");
         StringBuilder builder = new StringBuilder();
         for(String word : words) {
+            if(word.equals("1")) {
+                word = "one";
+            }
             builder.append(Character.toUpperCase(word.charAt(0)));
             builder.append(word.substring(1));
             builder.append(" ");
