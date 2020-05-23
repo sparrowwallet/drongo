@@ -2,6 +2,7 @@ package com.sparrowwallet.drongo.wallet;
 
 import com.sparrowwallet.drongo.ExtendedKey;
 import com.sparrowwallet.drongo.KeyDerivation;
+import com.sparrowwallet.drongo.KeyPurpose;
 import com.sparrowwallet.drongo.Utils;
 import com.sparrowwallet.drongo.crypto.*;
 
@@ -103,22 +104,13 @@ public class Keystore {
         return new ExtendedKey(derivedKey, derivedKey.getParentFingerprint(), derivation.get(derivation.size() - 1));
     }
 
-    public DeterministicKey getReceivingKey(int keyIndex) {
-        List<ChildNumber> receivingDerivation = List.of(extendedPublicKey.getKeyChildNumber(), new ChildNumber(0), new ChildNumber(keyIndex));
+    public DeterministicKey getKey(KeyPurpose keyPurpose, int keyIndex) {
+        List<ChildNumber> receivingDerivation = List.of(extendedPublicKey.getKeyChildNumber(), new ChildNumber(keyPurpose.getPathIndex()), new ChildNumber(keyIndex));
         return extendedPublicKey.getKey(receivingDerivation);
     }
 
-    public KeyDerivation getReceivingDerivation(int keyIndex) {
-        return getKeyDerivation().extend(new ChildNumber(0)).extend(new ChildNumber(keyIndex));
-    }
-
-    public DeterministicKey getChangeKey(int keyIndex) {
-        List<ChildNumber> receivingDerivation = List.of(extendedPublicKey.getKeyChildNumber(), new ChildNumber(1), new ChildNumber(keyIndex));
-        return extendedPublicKey.getKey(receivingDerivation);
-    }
-
-    public KeyDerivation getChangeDerivation(int keyIndex) {
-        return getKeyDerivation().extend(new ChildNumber(1)).extend(new ChildNumber(keyIndex));
+    public KeyDerivation getDerivation(KeyPurpose keyPurpose, int keyIndex) {
+        return getKeyDerivation().extend(new ChildNumber(keyPurpose.getPathIndex())).extend(new ChildNumber(keyIndex));
     }
 
     public boolean isValid() {

@@ -1,5 +1,6 @@
 package com.sparrowwallet.drongo.wallet;
 
+import com.sparrowwallet.drongo.KeyPurpose;
 import com.sparrowwallet.drongo.address.Address;
 import com.sparrowwallet.drongo.crypto.DeterministicKey;
 import com.sparrowwallet.drongo.crypto.ECKey;
@@ -75,31 +76,31 @@ public class Wallet {
         this.keystores = keystores;
     }
 
-    public Address getReceivingAddress(int index) {
+    public Address getAddress(KeyPurpose keyPurpose, int index) {
         if(policyType == PolicyType.SINGLE) {
             Keystore keystore = getKeystores().get(0);
-            DeterministicKey key = keystore.getReceivingKey(index);
+            DeterministicKey key = keystore.getKey(keyPurpose, index);
             return scriptType.getAddress(key);
         } else if(policyType == PolicyType.MULTI) {
-            List<ECKey> pubKeys = getKeystores().stream().map(keystore -> keystore.getReceivingKey(index)).collect(Collectors.toList());
+            List<ECKey> pubKeys = getKeystores().stream().map(keystore -> keystore.getKey(keyPurpose, index)).collect(Collectors.toList());
             Script script = ScriptType.MULTISIG.getOutputScript(defaultPolicy.getNumSignaturesRequired(), pubKeys);
             return scriptType.getAddress(script);
         } else {
-            throw new UnsupportedOperationException("Cannot determine receiving addresses for custom policies");
+            throw new UnsupportedOperationException("Cannot determine addresses for custom policies");
         }
     }
 
-    public Address getChangeAddress(int index) {
+    public Script getOutputScript(KeyPurpose keyPurpose, int index) {
         if(policyType == PolicyType.SINGLE) {
             Keystore keystore = getKeystores().get(0);
-            DeterministicKey key = keystore.getChangeKey(index);
-            return scriptType.getAddress(key);
+            DeterministicKey key = keystore.getKey(keyPurpose, index);
+            return scriptType.getOutputScript(key);
         } else if(policyType == PolicyType.MULTI) {
-            List<ECKey> pubKeys = getKeystores().stream().map(keystore -> keystore.getChangeKey(index)).collect(Collectors.toList());
+            List<ECKey> pubKeys = getKeystores().stream().map(keystore -> keystore.getKey(keyPurpose, index)).collect(Collectors.toList());
             Script script = ScriptType.MULTISIG.getOutputScript(defaultPolicy.getNumSignaturesRequired(), pubKeys);
-            return scriptType.getAddress(script);
+            return scriptType.getOutputScript(script);
         } else {
-            throw new UnsupportedOperationException("Cannot determine change addresses for custom policies");
+            throw new UnsupportedOperationException("Cannot determine output script for custom policies");
         }
     }
 

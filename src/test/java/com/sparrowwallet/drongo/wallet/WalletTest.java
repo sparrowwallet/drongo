@@ -1,5 +1,6 @@
 package com.sparrowwallet.drongo.wallet;
 
+import com.sparrowwallet.drongo.KeyPurpose;
 import com.sparrowwallet.drongo.crypto.Argon2KeyDeriver;
 import com.sparrowwallet.drongo.crypto.Key;
 import com.sparrowwallet.drongo.crypto.KeyDeriver;
@@ -78,8 +79,8 @@ public class WalletTest {
         wallet.getKeystores().add(keystore);
         wallet.setDefaultPolicy(Policy.getPolicy(PolicyType.SINGLE, ScriptType.P2PKH, wallet.getKeystores(), 1));
 
-        Assert.assertEquals("12kTQjuWDp7Uu6PwY6CsS1KLTt3d1DBHZa", wallet.getReceivingAddress(0).toString());
-        Assert.assertEquals("1HbQwQCitHQxVtP39isXmUdHx7hQCZovrK", wallet.getReceivingAddress(1).toString());
+        Assert.assertEquals("12kTQjuWDp7Uu6PwY6CsS1KLTt3d1DBHZa", wallet.getAddress(KeyPurpose.RECEIVE, 0).toString());
+        Assert.assertEquals("1HbQwQCitHQxVtP39isXmUdHx7hQCZovrK", wallet.getAddress(KeyPurpose.RECEIVE, 1).toString());
     }
 
     @Test
@@ -93,8 +94,8 @@ public class WalletTest {
         wallet.getKeystores().add(keystore);
         wallet.setDefaultPolicy(Policy.getPolicy(PolicyType.SINGLE, ScriptType.P2SH_P2WPKH, wallet.getKeystores(), 1));
 
-        Assert.assertEquals("3NZLE4TntsjtcZ5MbrfxwtYo9meBVybVQj", wallet.getReceivingAddress(0).toString());
-        Assert.assertEquals("32YBBuRsp8XTeLx4T6BmD2L4nANGaNDkSg", wallet.getReceivingAddress(1).toString());
+        Assert.assertEquals("3NZLE4TntsjtcZ5MbrfxwtYo9meBVybVQj", wallet.getAddress(KeyPurpose.RECEIVE, 0).toString());
+        Assert.assertEquals("32YBBuRsp8XTeLx4T6BmD2L4nANGaNDkSg", wallet.getAddress(KeyPurpose.RECEIVE, 1).toString());
     }
 
     @Test
@@ -108,8 +109,8 @@ public class WalletTest {
         wallet.getKeystores().add(keystore);
         wallet.setDefaultPolicy(Policy.getPolicy(PolicyType.SINGLE, ScriptType.P2WPKH, wallet.getKeystores(), 1));
 
-        Assert.assertEquals("bc1quvxdut936uswuxwxrk6nvjmgwxh463r0fjwn55", wallet.getReceivingAddress(0).toString());
-        Assert.assertEquals("bc1q95j2862dz7mqpraw6qdjc70gumyu5z7adgq9x9", wallet.getReceivingAddress(1).toString());
+        Assert.assertEquals("bc1quvxdut936uswuxwxrk6nvjmgwxh463r0fjwn55", wallet.getAddress(KeyPurpose.RECEIVE, 0).toString());
+        Assert.assertEquals("bc1q95j2862dz7mqpraw6qdjc70gumyu5z7adgq9x9", wallet.getAddress(KeyPurpose.RECEIVE, 1).toString());
     }
 
     @Test
@@ -133,8 +134,8 @@ public class WalletTest {
         wallet.getKeystores().add(keystore2);
         wallet.setDefaultPolicy(Policy.getPolicy(PolicyType.MULTI, ScriptType.P2SH, wallet.getKeystores(), 2));
 
-        Assert.assertEquals("38kq6yz4VcYymTExQPY3gppbz38mtPLveK", wallet.getReceivingAddress(0).toString());
-        Assert.assertEquals("3EdKaNsnjBTBggWcSMRyVju6GbHWy68mAH", wallet.getChangeAddress(1).toString());
+        Assert.assertEquals("38kq6yz4VcYymTExQPY3gppbz38mtPLveK", wallet.getAddress(KeyPurpose.RECEIVE, 0).toString());
+        Assert.assertEquals("3EdKaNsnjBTBggWcSMRyVju6GbHWy68mAH", wallet.getAddress(KeyPurpose.CHANGE, 1).toString());
     }
 
     @Test
@@ -158,8 +159,8 @@ public class WalletTest {
         wallet.getKeystores().add(keystore2);
         wallet.setDefaultPolicy(Policy.getPolicy(PolicyType.MULTI, ScriptType.P2SH_P2WSH, wallet.getKeystores(), 2));
 
-        Assert.assertEquals("3Mw8xqAHh8g3eBvh7q1UEUmoexqdXDK9Tf", wallet.getReceivingAddress(0).toString());
-        Assert.assertEquals("35dFo1ivJ8jyHpyf42MWvnYf5LBU8Siren", wallet.getChangeAddress(1).toString());
+        Assert.assertEquals("3Mw8xqAHh8g3eBvh7q1UEUmoexqdXDK9Tf", wallet.getAddress(KeyPurpose.RECEIVE, 0).toString());
+        Assert.assertEquals("35dFo1ivJ8jyHpyf42MWvnYf5LBU8Siren", wallet.getAddress(KeyPurpose.CHANGE, 1).toString());
     }
 
     @Test
@@ -183,7 +184,7 @@ public class WalletTest {
         wallet.getKeystores().add(keystore2);
         wallet.setDefaultPolicy(Policy.getPolicy(PolicyType.MULTI, ScriptType.P2WSH, wallet.getKeystores(), 2));
 
-        Assert.assertEquals("bc1q20e4vm656h5lvmngz9ztz6hjzftvh39yzngqhuqzk8qzj7tqnzaqgclrwc", wallet.getReceivingAddress(0).toString());
-        Assert.assertEquals("bc1q2epdx7dplwaas2jucfrzmxm8350rqh68hs6vqreysku80ye44mfqla85f2", wallet.getChangeAddress(1).toString());
+        Assert.assertEquals("bc1q20e4vm656h5lvmngz9ztz6hjzftvh39yzngqhuqzk8qzj7tqnzaqgclrwc", wallet.getAddress(KeyPurpose.RECEIVE, 0).toString());
+        Assert.assertEquals("bc1q2epdx7dplwaas2jucfrzmxm8350rqh68hs6vqreysku80ye44mfqla85f2", wallet.getAddress(KeyPurpose.CHANGE, 1).toString());
     }
 }
