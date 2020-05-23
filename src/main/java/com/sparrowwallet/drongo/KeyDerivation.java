@@ -29,6 +29,12 @@ public class KeyDerivation {
         return Collections.unmodifiableList(derivation);
     }
 
+    public KeyDerivation extend(ChildNumber childNumber) {
+        List<ChildNumber> extendedDerivation = new ArrayList<>(derivation);
+        extendedDerivation.add(childNumber);
+        return new KeyDerivation(masterFingerprint, writePath(extendedDerivation));
+    }
+
     public static List<ChildNumber> parsePath(String path) {
         return parsePath(path, 0);
     }

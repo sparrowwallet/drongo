@@ -66,4 +66,124 @@ public class WalletTest {
         Assert.assertEquals("Electrum 1", eekeystore.getLabel());
         Assert.assertEquals("Electrum 2", eekeystore2.getLabel());
     }
+
+    @Test
+    public void p2pkhDerivationTest() throws MnemonicException {
+        String words = "absent essay fox snake vast pumpkin height crouch silent bulb excuse razor";
+        DeterministicSeed seed = new DeterministicSeed(words, "pp", 0, DeterministicSeed.Type.BIP39);
+        Wallet wallet = new Wallet();
+        wallet.setPolicyType(PolicyType.SINGLE);
+        wallet.setScriptType(ScriptType.P2PKH);
+        Keystore keystore = Keystore.fromSeed(seed, wallet.getScriptType().getDefaultDerivation());
+        wallet.getKeystores().add(keystore);
+        wallet.setDefaultPolicy(Policy.getPolicy(PolicyType.SINGLE, ScriptType.P2PKH, wallet.getKeystores(), 1));
+
+        Assert.assertEquals("12kTQjuWDp7Uu6PwY6CsS1KLTt3d1DBHZa", wallet.getReceivingAddress(0).toString());
+        Assert.assertEquals("1HbQwQCitHQxVtP39isXmUdHx7hQCZovrK", wallet.getReceivingAddress(1).toString());
+    }
+
+    @Test
+    public void p2shP2wpkhDerivationTest() throws MnemonicException {
+        String words = "absent essay fox snake vast pumpkin height crouch silent bulb excuse razor";
+        DeterministicSeed seed = new DeterministicSeed(words, "pp", 0, DeterministicSeed.Type.BIP39);
+        Wallet wallet = new Wallet();
+        wallet.setPolicyType(PolicyType.SINGLE);
+        wallet.setScriptType(ScriptType.P2SH_P2WPKH);
+        Keystore keystore = Keystore.fromSeed(seed, wallet.getScriptType().getDefaultDerivation());
+        wallet.getKeystores().add(keystore);
+        wallet.setDefaultPolicy(Policy.getPolicy(PolicyType.SINGLE, ScriptType.P2SH_P2WPKH, wallet.getKeystores(), 1));
+
+        Assert.assertEquals("3NZLE4TntsjtcZ5MbrfxwtYo9meBVybVQj", wallet.getReceivingAddress(0).toString());
+        Assert.assertEquals("32YBBuRsp8XTeLx4T6BmD2L4nANGaNDkSg", wallet.getReceivingAddress(1).toString());
+    }
+
+    @Test
+    public void p2wpkhDerivationTest() throws MnemonicException {
+        String words = "absent essay fox snake vast pumpkin height crouch silent bulb excuse razor";
+        DeterministicSeed seed = new DeterministicSeed(words, "pp", 0, DeterministicSeed.Type.BIP39);
+        Wallet wallet = new Wallet();
+        wallet.setPolicyType(PolicyType.SINGLE);
+        wallet.setScriptType(ScriptType.P2WPKH);
+        Keystore keystore = Keystore.fromSeed(seed, wallet.getScriptType().getDefaultDerivation());
+        wallet.getKeystores().add(keystore);
+        wallet.setDefaultPolicy(Policy.getPolicy(PolicyType.SINGLE, ScriptType.P2WPKH, wallet.getKeystores(), 1));
+
+        Assert.assertEquals("bc1quvxdut936uswuxwxrk6nvjmgwxh463r0fjwn55", wallet.getReceivingAddress(0).toString());
+        Assert.assertEquals("bc1q95j2862dz7mqpraw6qdjc70gumyu5z7adgq9x9", wallet.getReceivingAddress(1).toString());
+    }
+
+    @Test
+    public void p2shDerivationTest() throws MnemonicException {
+        String words = "absent essay fox snake vast pumpkin height crouch silent bulb excuse razor";
+        DeterministicSeed seed = new DeterministicSeed(words, "pp", 0, DeterministicSeed.Type.BIP39);
+
+        String words2 = "chef huge whisper year move obscure post pepper play minute foster lawn";
+        DeterministicSeed seed2 = new DeterministicSeed(words2, "", 0, DeterministicSeed.Type.BIP39);
+
+        Wallet wallet = new Wallet();
+        wallet.setPolicyType(PolicyType.MULTI);
+        wallet.setScriptType(ScriptType.P2SH);
+        Keystore keystore = Keystore.fromSeed(seed, ScriptType.P2PKH.getDefaultDerivation());
+        Assert.assertEquals("xprv9s21ZrQH143K4G3jeUxf7h93qLeinXNULjjaef1yZFXpoc5D16iHEFkgJ7ThkWzAEBwNNwyJFtrVhJVJRjCc9ew76JrgsVoXT4VYHJBbbSV", keystore.getExtendedMasterPrivateKey().toString());
+        Assert.assertEquals("xpub6DLZWwJhGmq2SwdAytDWhCUrM4MojYSLHhHMZ1sob9UGXnSvgczEL7zV1wtcy9qcH6yduKMp1bPWcSxxSmz6LEpw4xTABLL3XwX5KGzkNqZ", keystore.getExtendedPublicKey().toString());
+        wallet.getKeystores().add(keystore);
+        Keystore keystore2 = Keystore.fromSeed(seed2, ScriptType.P2PKH.getDefaultDerivation());
+        Assert.assertEquals("xprv9s21ZrQH143K4FNcBwXNXfzVNskpoRS7cf4jQTLrhbPkhhXp8hz4QRXT62HziiHziM3Pxyd2Qx3UQkoRpcDu2BauuJJRdyrduXBJGgjAgFx", keystore2.getExtendedMasterPrivateKey().toString());
+        Assert.assertEquals("xpub6ChqMsFBYpJiJYzcJgEvddHtbZr1mTaE1o4RbhFRBAYVxN8SScGb9kjwkXtM33JKejR16gBZhNbkV14AccetR5u2McnCgTCpDBfa8hee9v8", keystore2.getExtendedPublicKey().toString());
+        wallet.getKeystores().add(keystore2);
+        wallet.setDefaultPolicy(Policy.getPolicy(PolicyType.MULTI, ScriptType.P2SH, wallet.getKeystores(), 2));
+
+        Assert.assertEquals("38kq6yz4VcYymTExQPY3gppbz38mtPLveK", wallet.getReceivingAddress(0).toString());
+        Assert.assertEquals("3EdKaNsnjBTBggWcSMRyVju6GbHWy68mAH", wallet.getChangeAddress(1).toString());
+    }
+
+    @Test
+    public void p2shP2wshDerivationTest() throws MnemonicException {
+        String words = "absent essay fox snake vast pumpkin height crouch silent bulb excuse razor";
+        DeterministicSeed seed = new DeterministicSeed(words, "pp", 0, DeterministicSeed.Type.BIP39);
+
+        String words2 = "chef huge whisper year move obscure post pepper play minute foster lawn";
+        DeterministicSeed seed2 = new DeterministicSeed(words2, "", 0, DeterministicSeed.Type.BIP39);
+
+        Wallet wallet = new Wallet();
+        wallet.setPolicyType(PolicyType.MULTI);
+        wallet.setScriptType(ScriptType.P2SH_P2WSH);
+        Keystore keystore = Keystore.fromSeed(seed, ScriptType.P2PKH.getDefaultDerivation());
+        Assert.assertEquals("xprv9s21ZrQH143K4G3jeUxf7h93qLeinXNULjjaef1yZFXpoc5D16iHEFkgJ7ThkWzAEBwNNwyJFtrVhJVJRjCc9ew76JrgsVoXT4VYHJBbbSV", keystore.getExtendedMasterPrivateKey().toString());
+        Assert.assertEquals("xpub6DLZWwJhGmq2SwdAytDWhCUrM4MojYSLHhHMZ1sob9UGXnSvgczEL7zV1wtcy9qcH6yduKMp1bPWcSxxSmz6LEpw4xTABLL3XwX5KGzkNqZ", keystore.getExtendedPublicKey().toString());
+        wallet.getKeystores().add(keystore);
+        Keystore keystore2 = Keystore.fromSeed(seed2, ScriptType.P2PKH.getDefaultDerivation());
+        Assert.assertEquals("xprv9s21ZrQH143K4FNcBwXNXfzVNskpoRS7cf4jQTLrhbPkhhXp8hz4QRXT62HziiHziM3Pxyd2Qx3UQkoRpcDu2BauuJJRdyrduXBJGgjAgFx", keystore2.getExtendedMasterPrivateKey().toString());
+        Assert.assertEquals("xpub6ChqMsFBYpJiJYzcJgEvddHtbZr1mTaE1o4RbhFRBAYVxN8SScGb9kjwkXtM33JKejR16gBZhNbkV14AccetR5u2McnCgTCpDBfa8hee9v8", keystore2.getExtendedPublicKey().toString());
+        wallet.getKeystores().add(keystore2);
+        wallet.setDefaultPolicy(Policy.getPolicy(PolicyType.MULTI, ScriptType.P2SH_P2WSH, wallet.getKeystores(), 2));
+
+        Assert.assertEquals("3Mw8xqAHh8g3eBvh7q1UEUmoexqdXDK9Tf", wallet.getReceivingAddress(0).toString());
+        Assert.assertEquals("35dFo1ivJ8jyHpyf42MWvnYf5LBU8Siren", wallet.getChangeAddress(1).toString());
+    }
+
+    @Test
+    public void p2wshDerivationTest() throws MnemonicException {
+        String words = "absent essay fox snake vast pumpkin height crouch silent bulb excuse razor";
+        DeterministicSeed seed = new DeterministicSeed(words, "pp", 0, DeterministicSeed.Type.BIP39);
+
+        String words2 = "chef huge whisper year move obscure post pepper play minute foster lawn";
+        DeterministicSeed seed2 = new DeterministicSeed(words2, "", 0, DeterministicSeed.Type.BIP39);
+
+        Wallet wallet = new Wallet();
+        wallet.setPolicyType(PolicyType.MULTI);
+        wallet.setScriptType(ScriptType.P2WSH);
+        Keystore keystore = Keystore.fromSeed(seed, ScriptType.P2PKH.getDefaultDerivation());
+        Assert.assertEquals("xprv9s21ZrQH143K4G3jeUxf7h93qLeinXNULjjaef1yZFXpoc5D16iHEFkgJ7ThkWzAEBwNNwyJFtrVhJVJRjCc9ew76JrgsVoXT4VYHJBbbSV", keystore.getExtendedMasterPrivateKey().toString());
+        Assert.assertEquals("xpub6DLZWwJhGmq2SwdAytDWhCUrM4MojYSLHhHMZ1sob9UGXnSvgczEL7zV1wtcy9qcH6yduKMp1bPWcSxxSmz6LEpw4xTABLL3XwX5KGzkNqZ", keystore.getExtendedPublicKey().toString());
+        wallet.getKeystores().add(keystore);
+        Keystore keystore2 = Keystore.fromSeed(seed2, ScriptType.P2PKH.getDefaultDerivation());
+        Assert.assertEquals("xprv9s21ZrQH143K4FNcBwXNXfzVNskpoRS7cf4jQTLrhbPkhhXp8hz4QRXT62HziiHziM3Pxyd2Qx3UQkoRpcDu2BauuJJRdyrduXBJGgjAgFx", keystore2.getExtendedMasterPrivateKey().toString());
+        Assert.assertEquals("xpub6ChqMsFBYpJiJYzcJgEvddHtbZr1mTaE1o4RbhFRBAYVxN8SScGb9kjwkXtM33JKejR16gBZhNbkV14AccetR5u2McnCgTCpDBfa8hee9v8", keystore2.getExtendedPublicKey().toString());
+        wallet.getKeystores().add(keystore2);
+        wallet.setDefaultPolicy(Policy.getPolicy(PolicyType.MULTI, ScriptType.P2WSH, wallet.getKeystores(), 2));
+
+        Assert.assertEquals("bc1q20e4vm656h5lvmngz9ztz6hjzftvh39yzngqhuqzk8qzj7tqnzaqgclrwc", wallet.getReceivingAddress(0).toString());
+        Assert.assertEquals("bc1q2epdx7dplwaas2jucfrzmxm8350rqh68hs6vqreysku80ye44mfqla85f2", wallet.getChangeAddress(1).toString());
+    }
 }

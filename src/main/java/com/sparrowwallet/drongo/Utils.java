@@ -284,4 +284,23 @@ public class Utils {
         hmacSha512.doFinal(out, 0);
         return out;
     }
+
+    public static class LexicographicByteArrayComparator implements Comparator<byte[]> {
+        @Override
+        public int compare(byte[] left, byte[] right) {
+            int minLength = Math.min(left.length, right.length);
+            for (int i = 0; i < minLength; i++) {
+                int result = compare(left[i], right[i]);
+                if (result != 0) {
+                    return result;
+                }
+            }
+
+            return left.length - right.length;
+        }
+
+        public static int compare(byte a, byte b) {
+            return Byte.toUnsignedInt(a) - Byte.toUnsignedInt(b);
+        }
+    }
 }

@@ -1,11 +1,16 @@
 package com.sparrowwallet.drongo.wallet;
 
+import com.sparrowwallet.drongo.address.Address;
+import com.sparrowwallet.drongo.crypto.DeterministicKey;
+import com.sparrowwallet.drongo.crypto.ECKey;
 import com.sparrowwallet.drongo.crypto.Key;
 import com.sparrowwallet.drongo.policy.Policy;
 import com.sparrowwallet.drongo.policy.PolicyType;
+import com.sparrowwallet.drongo.protocol.Script;
 import com.sparrowwallet.drongo.protocol.ScriptType;
 
 import java.util.*;
+import java.util.stream.Collectors;
 
 public class Wallet {
 
@@ -68,6 +73,34 @@ public class Wallet {
 
     public void setKeystores(List<Keystore> keystores) {
         this.keystores = keystores;
+    }
+
+    public Address getReceivingAddress(int index) {
+        if(policyType == PolicyType.SINGLE) {
+            Keystore keystore = getKeystores().get(0);
+            DeterministicKey key = keystore.getReceivingKey(index);
+            return scriptType.getAddress(key);
+        } else if(policyType == PolicyType.MULTI) {
+            List<ECKey> pubKeys = getKeystores().stream().map(keystore -> keystore.getReceivingKey(index)).collect(Collectors.toList());
+            Script script = ScriptType.MULTISIG.getOutputScript(defaultPolicy.getNumSignaturesRequired(), pubKeys);
+            return scriptType.getAddress(script);
+        } else {
+            throw new UnsupportedOperationException("Cannot determine receiving addresses for custom policies");
+        }
+    }
+
+    public Address getChangeAddress(int index) {
+        if(policyType == PolicyType.SINGLE) {
+            Keystore keystore = getKeystores().get(0);
+            DeterministicKey key = keystore.getChangeKey(index);
+            return scriptType.getAddress(key);
+        } else if(policyType == PolicyType.MULTI) {
+            List<ECKey> pubKeys = getKeystores().stream().map(keystore -> keystore.getChangeKey(index)).collect(Collectors.toList());
+            Script script = ScriptType.MULTISIG.getOutputScript(defaultPolicy.getNumSignaturesRequired(), pubKeys);
+            return scriptType.getAddress(script);
+        } else {
+            throw new UnsupportedOperationException("Cannot determine change addresses for custom policies");
+        }
     }
 
     public boolean isValid() {

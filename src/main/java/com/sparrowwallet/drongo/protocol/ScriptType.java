@@ -1,6 +1,7 @@
 package com.sparrowwallet.drongo.protocol;
 
 import com.sparrowwallet.drongo.KeyDerivation;
+import com.sparrowwallet.drongo.Utils;
 import com.sparrowwallet.drongo.address.*;
 import com.sparrowwallet.drongo.crypto.ChildNumber;
 import com.sparrowwallet.drongo.crypto.ECKey;
@@ -24,6 +25,16 @@ public enum ScriptType {
         }
 
         @Override
+        public Address getAddress(ECKey key) {
+            return getAddress(key.getPubKey());
+        }
+
+        @Override
+        public Address getAddress(Script script) {
+            throw new ProtocolException("No script derived address for non pay to script type");
+        }
+
+        @Override
         public Address[] getAddresses(Script script) {
             return new Address[] { getAddress(getPublicKeyFromScript(script).getPubKey()) };
         }
@@ -35,6 +46,16 @@ public enum ScriptType {
             chunks.add(new ScriptChunk(ScriptOpCodes.OP_CHECKSIG, null));
 
             return new Script(chunks);
+        }
+
+        @Override
+        public Script getOutputScript(ECKey key) {
+            return getOutputScript(key.getPubKey());
+        }
+
+        @Override
+        public Script getOutputScript(Script script) {
+            throw new ProtocolException("No script derived output script for non pay to script type");
         }
 
         @Override
@@ -76,6 +97,16 @@ public enum ScriptType {
         }
 
         @Override
+        public Address getAddress(ECKey key) {
+            return getAddress(key.getPubKeyHash());
+        }
+
+        @Override
+        public Address getAddress(Script script) {
+            throw new ProtocolException("No script derived address for non pay to script type");
+        }
+
+        @Override
         public Script getOutputScript(byte[] pubKeyHash) {
             List<ScriptChunk> chunks = new ArrayList<>();
             chunks.add(new ScriptChunk(ScriptOpCodes.OP_DUP, null));
@@ -85,6 +116,16 @@ public enum ScriptType {
             chunks.add(new ScriptChunk(ScriptOpCodes.OP_CHECKSIG, null));
 
             return new Script(chunks);
+        }
+
+        @Override
+        public Script getOutputScript(ECKey key) {
+            return getOutputScript(key.getPubKeyHash());
+        }
+
+        @Override
+        public Script getOutputScript(Script script) {
+            throw new ProtocolException("No script derived output script for non pay to script type");
         }
 
         @Override
@@ -125,22 +166,53 @@ public enum ScriptType {
         }
 
         @Override
+        public Address getAddress(Script script) {
+            throw new ProtocolException("No single address for multisig script type");
+        }
+
+        @Override
+        public Address getAddress(ECKey key) {
+            throw new ProtocolException("No single key address for multisig script type");
+        }
+
+        @Override
         public Address[] getAddresses(Script script) {
             return Arrays.stream(getPublicKeysFromScript(script)).map(pubKey -> new P2PKAddress(pubKey.getPubKey())).toArray(Address[]::new);
         }
 
         @Override
         public Script getOutputScript(byte[] bytes) {
-            throw new ProtocolException("Output script for multisig script type must be constructed with method getOutputScript(int threshold, byte[] pubKey1, byte[] pubKey2, ...)");
+            throw new ProtocolException("Output script for multisig script type must be constructed with method getOutputScript(int threshold, List<ECKey> pubKeys)");
         }
 
-        public Script getOutputScript(int threshold, byte[] ...pubKeys) {
+        @Override
+        public Script getOutputScript(ECKey key) {
+            throw new ProtocolException("Output script for multisig script type must be constructed with method getOutputScript(int threshold, List<ECKey> pubKeys)");
+        }
+
+        @Override
+        public Script getOutputScript(Script script) {
+            if(isScriptType(script)) {
+                return script;
+            }
+
+            throw new ProtocolException("No script derived output script for non pay to script type");
+        }
+
+        @Override
+        public Script getOutputScript(int threshold, List<ECKey> pubKeys) {
+            List<byte[]> pubKeyBytes = new ArrayList<>();
+            for(ECKey key : pubKeys) {
+                pubKeyBytes.add(key.getPubKey());
+            }
+            pubKeyBytes.sort(new Utils.LexicographicByteArrayComparator());
+
             List<ScriptChunk> chunks = new ArrayList<>();
             chunks.add(new ScriptChunk(Script.encodeToOpN(threshold), null));
-            for(byte[] pubKey : pubKeys) {
+            for(byte[] pubKey : pubKeyBytes) {
                 chunks.add(new ScriptChunk(pubKey.length, pubKey));
             }
-            chunks.add(new ScriptChunk(Script.encodeToOpN(pubKeys.length), null));
+            chunks.add(new ScriptChunk(Script.encodeToOpN(pubKeys.size()), null));
             chunks.add(new ScriptChunk(ScriptOpCodes.OP_CHECKMULTISIG, null));
             return new Script(chunks);
         }
@@ -200,18 +272,38 @@ public enum ScriptType {
     },
     P2SH("P2SH", "m/45'/0'/0'") {
         @Override
-        public Address getAddress(byte[] bytes) {
-            return new P2SHAddress(bytes);
+        public Address getAddress(byte[] scriptHash) {
+            return new P2SHAddress(scriptHash);
         }
 
         @Override
-        public Script getOutputScript(byte[] bytes) {
+        public Address getAddress(ECKey key) {
+            throw new ProtocolException("No single key address for script hash type");
+        }
+
+        @Override
+        public Address getAddress(Script script) {
+            return getAddress(Utils.sha256hash160(script.getProgram()));
+        }
+
+        @Override
+        public Script getOutputScript(byte[] scriptHash) {
             List<ScriptChunk> chunks = new ArrayList<>();
             chunks.add(new ScriptChunk(ScriptOpCodes.OP_HASH160, null));
-            chunks.add(new ScriptChunk(bytes.length, bytes));
+            chunks.add(new ScriptChunk(scriptHash.length, scriptHash));
             chunks.add(new ScriptChunk(ScriptOpCodes.OP_EQUAL, null));
 
             return new Script(chunks);
+        }
+
+        @Override
+        public Script getOutputScript(ECKey key) {
+            throw new ProtocolException("No single key output script for script hash type");
+        }
+
+        @Override
+        public Script getOutputScript(Script script) {
+            return getOutputScript(Utils.sha256hash160(script.getProgram()));
         }
 
         @Override
@@ -251,13 +343,43 @@ public enum ScriptType {
     },
     P2SH_P2WPKH("P2SH-P2WPKH", "m/49'/0'/0'") {
         @Override
-        public Address getAddress(byte[] bytes) {
-            return P2SH.getAddress(bytes);
+        public Address getAddress(byte[] scriptHash) {
+            return P2SH.getAddress(scriptHash);
         }
 
         @Override
-        public Script getOutputScript(byte[] bytes) {
-            return P2SH.getOutputScript(bytes);
+        public Address getAddress(ECKey key) {
+            Script p2wpkhScript = P2WPKH.getOutputScript(key.getPubKeyHash());
+            return P2SH.getAddress(p2wpkhScript);
+        }
+
+        @Override
+        public Address getAddress(Script script) {
+            if(P2WPKH.isScriptType(script)) {
+                return P2SH.getAddress(script);
+            }
+
+            throw new ProtocolException("Provided script is not a P2WPKH script");
+        }
+
+        @Override
+        public Script getOutputScript(byte[] scriptHash) {
+            return P2SH.getOutputScript(scriptHash);
+        }
+
+        @Override
+        public Script getOutputScript(ECKey key) {
+            Script p2wpkhScript = P2WPKH.getOutputScript(key.getPubKeyHash());
+            return P2SH.getOutputScript(p2wpkhScript);
+        }
+
+        @Override
+        public Script getOutputScript(Script script) {
+            if(P2WPKH.isScriptType(script)) {
+                return P2SH.getOutputScript(script);
+            }
+
+            throw new ProtocolException("Provided script is not a P2WPKH script");
         }
 
         @Override
@@ -277,13 +399,35 @@ public enum ScriptType {
     },
     P2SH_P2WSH("P2SH-P2WSH", "m/48'/0'/0'/1'") {
         @Override
-        public Address getAddress(byte[] bytes) {
-            return P2SH.getAddress(bytes);
+        public Address getAddress(byte[] scriptHash) {
+            return P2SH.getAddress(scriptHash);
         }
 
         @Override
-        public Script getOutputScript(byte[] bytes) {
-            return P2SH.getOutputScript(bytes);
+        public Address getAddress(ECKey key) {
+            throw new ProtocolException("No single key address for wrapped witness script hash type");
+        }
+
+        @Override
+        public Address getAddress(Script script) {
+            Script p2wshScript = P2WSH.getOutputScript(script);
+            return P2SH.getAddress(p2wshScript);
+        }
+
+        @Override
+        public Script getOutputScript(byte[] scriptHash) {
+            return P2SH.getOutputScript(scriptHash);
+        }
+
+        @Override
+        public Script getOutputScript(ECKey key) {
+            throw new ProtocolException("No single key output script for wrapped witness script hash type");
+        }
+
+        @Override
+        public Script getOutputScript(Script script) {
+            Script p2wshScript = P2WSH.getOutputScript(script);
+            return P2SH.getOutputScript(p2wshScript);
         }
 
         @Override
@@ -303,17 +447,37 @@ public enum ScriptType {
     },
     P2WPKH("P2WPKH", "m/84'/0'/0'") {
         @Override
-        public Address getAddress(byte[] bytes) {
-            return new P2WPKHAddress(bytes);
+        public Address getAddress(byte[] pubKeyHash) {
+            return new P2WPKHAddress(pubKeyHash);
         }
 
         @Override
-        public Script getOutputScript(byte[] bytes) {
+        public Address getAddress(ECKey key) {
+            return getAddress(key.getPubKeyHash());
+        }
+
+        @Override
+        public Address getAddress(Script script) {
+            throw new ProtocolException("No script derived address for non pay to script type");
+        }
+
+        @Override
+        public Script getOutputScript(byte[] pubKeyHash) {
             List<ScriptChunk> chunks = new ArrayList<>();
             chunks.add(new ScriptChunk(OP_0, null));
-            chunks.add(new ScriptChunk(bytes.length, bytes));
+            chunks.add(new ScriptChunk(pubKeyHash.length, pubKeyHash));
 
             return new Script(chunks);
+        }
+
+        @Override
+        public Script getOutputScript(ECKey key) {
+            return getOutputScript(key.getPubKeyHash());
+        }
+
+        @Override
+        public Script getOutputScript(Script script) {
+            throw new ProtocolException("No script derived output script for non pay to script type");
         }
 
         @Override
@@ -343,17 +507,37 @@ public enum ScriptType {
     },
     P2WSH("P2WSH", "m/48'/0'/0'/2'") {
         @Override
-        public Address getAddress(byte[] bytes) {
-            return new P2WSHAddress(bytes);
+        public Address getAddress(byte[] scriptHash) {
+            return new P2WSHAddress(scriptHash);
         }
 
         @Override
-        public Script getOutputScript(byte[] bytes) {
+        public Address getAddress(ECKey key) {
+            throw new ProtocolException("No single key address for witness script hash type");
+        }
+
+        @Override
+        public Address getAddress(Script script) {
+            return getAddress(Sha256Hash.hash(script.getProgram()));
+        }
+
+        @Override
+        public Script getOutputScript(byte[] scriptHash) {
             List<ScriptChunk> chunks = new ArrayList<>();
             chunks.add(new ScriptChunk(OP_0, null));
-            chunks.add(new ScriptChunk(bytes.length, bytes));
+            chunks.add(new ScriptChunk(scriptHash.length, scriptHash));
 
             return new Script(chunks);
+        }
+
+        @Override
+        public Script getOutputScript(ECKey key) {
+            throw new ProtocolException("No single key output script for witness script hash type");
+        }
+
+        @Override
+        public Script getOutputScript(Script script) {
+            return getOutputScript(Sha256Hash.hash(script.getProgram()));
         }
 
         @Override
@@ -432,7 +616,19 @@ public enum ScriptType {
 
     public abstract Address getAddress(byte[] bytes);
 
+    public abstract Address getAddress(ECKey key);
+
+    public abstract Address getAddress(Script script);
+
     public abstract Script getOutputScript(byte[] bytes);
+
+    public abstract Script getOutputScript(ECKey key);
+
+    public abstract Script getOutputScript(Script script);
+
+    public Script getOutputScript(int threshold, List<ECKey> pubKeys) {
+        throw new UnsupportedOperationException("Only defined for MULTISIG script type");
+    }
 
     public abstract boolean isScriptType(Script script);
 
