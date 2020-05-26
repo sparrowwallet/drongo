@@ -1,15 +1,27 @@
 package com.sparrowwallet.drongo;
 
+import com.sparrowwallet.drongo.crypto.ChildNumber;
+
 public enum KeyPurpose {
-    RECEIVE(0), CHANGE(1);
+    RECEIVE(ChildNumber.ZERO), CHANGE(ChildNumber.ONE);
 
-    private final int pathIndex;
+    private final ChildNumber pathIndex;
 
-    KeyPurpose(int pathIndex) {
+    KeyPurpose(ChildNumber pathIndex) {
         this.pathIndex = pathIndex;
     }
 
-    public int getPathIndex() {
+    public ChildNumber getPathIndex() {
         return pathIndex;
+    }
+
+    public static KeyPurpose fromChildNumber(ChildNumber childNumber) {
+        for(KeyPurpose keyPurpose : values()) {
+            if(keyPurpose.getPathIndex().equals(childNumber)) {
+                return keyPurpose;
+            }
+        }
+
+        return null;
     }
 }

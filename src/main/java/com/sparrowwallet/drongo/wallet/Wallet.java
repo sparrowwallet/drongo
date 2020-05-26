@@ -1,7 +1,9 @@
 package com.sparrowwallet.drongo.wallet;
 
+import com.sparrowwallet.drongo.KeyDerivation;
 import com.sparrowwallet.drongo.KeyPurpose;
 import com.sparrowwallet.drongo.address.Address;
+import com.sparrowwallet.drongo.crypto.ChildNumber;
 import com.sparrowwallet.drongo.crypto.DeterministicKey;
 import com.sparrowwallet.drongo.crypto.ECKey;
 import com.sparrowwallet.drongo.crypto.Key;
@@ -14,12 +16,14 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 public class Wallet {
+    private static final int DEFAULT_LOOKAHEAD = 20;
 
     private String name;
     private PolicyType policyType;
     private ScriptType scriptType;
     private Policy defaultPolicy;
     private List<Keystore> keystores = new ArrayList<>();
+    private final List<Node> accountNodes = new ArrayList<>();
 
     public Wallet() {
     }
@@ -74,6 +78,25 @@ public class Wallet {
 
     public void setKeystores(List<Keystore> keystores) {
         this.keystores = keystores;
+    }
+
+    public Node getNodes(KeyPurpose keyPurpose) {
+        Node purposeNode;
+        Optional<Node> optionalPurposeNode = accountNodes.stream().filter(node -> node.getKeyPurpose().equals(keyPurpose)).findFirst();
+        if(optionalPurposeNode.isEmpty()) {
+            purposeNode = new Node(keyPurpose);
+            accountNodes.add(purposeNode);
+        } else {
+            purposeNode = optionalPurposeNode.get();
+        }
+
+        purposeNode.fillToLookAhead(getLookAhead());
+        return purposeNode;
+    }
+
+    public int getLookAhead() {
+        //TODO: Calculate using seen transactions
+        return DEFAULT_LOOKAHEAD;
     }
 
     public Address getAddress(KeyPurpose keyPurpose, int index) {
@@ -253,6 +276,96 @@ public class Wallet {
     public void clearPrivate() {
         for(Keystore keystore : keystores) {
             keystore.clearPrivate();
+        }
+    }
+
+    public class Node {
+        private final String derivationPath;
+        private String label;
+        private Long amount;
+        private final List<Node> children = new ArrayList<>();
+
+        private final transient KeyPurpose keyPurpose;
+        private final transient int index;
+        private final transient List<ChildNumber> derivation;
+
+        public Node(String derivationPath) {
+            this.derivationPath = derivationPath;
+            this.derivation = KeyDerivation.parsePath(derivationPath);
+            this.keyPurpose = KeyPurpose.fromChildNumber(derivation.get(0));
+            this.index = derivation.get(derivation.size() - 1).num();
+        }
+
+        public Node(KeyPurpose keyPurpose) {
+            this.derivation = List.of(keyPurpose.getPathIndex());
+            this.derivationPath = KeyDerivation.writePath(derivation);
+            this.keyPurpose = keyPurpose;
+            this.index = keyPurpose.getPathIndex().num();
+        }
+
+        public Node(KeyPurpose keyPurpose, int index) {
+            this.derivation = List.of(keyPurpose.getPathIndex(), new ChildNumber(index));
+            this.derivationPath = KeyDerivation.writePath(derivation);
+            this.keyPurpose = keyPurpose;
+            this.index = index;
+        }
+
+        public int getIndex() {
+            return index;
+        }
+
+        public KeyPurpose getKeyPurpose() {
+            return keyPurpose;
+        }
+
+        public String getLabel() {
+            return label;
+        }
+
+        public void setLabel(String label) {
+            this.label = label;
+        }
+
+        public Long getAmount() {
+            return amount;
+        }
+
+        public void setAmount(Long amount) {
+            this.amount = amount;
+        }
+
+        public List<Node> getChildren() {
+            return children;
+        }
+
+        public Address getAddress() {
+            return Wallet.this.getAddress(keyPurpose, index);
+        }
+
+        public Script getOutputScript() {
+            return Wallet.this.getOutputScript(keyPurpose, index);
+        }
+
+        public void fillToLookAhead(int lookAhead) {
+            for(int i = 0; i < lookAhead; i++) {
+                Node node = new Node(getKeyPurpose(), i);
+                if(!getChildren().contains(node)) {
+                    getChildren().add(node);
+                }
+            }
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) return true;
+            if (o == null || getClass() != o.getClass()) return false;
+            Node node = (Node) o;
+            return derivationPath.equals(node.derivationPath);
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hash(derivationPath);
         }
     }
 }

@@ -105,12 +105,12 @@ public class Keystore {
     }
 
     public DeterministicKey getKey(KeyPurpose keyPurpose, int keyIndex) {
-        List<ChildNumber> receivingDerivation = List.of(extendedPublicKey.getKeyChildNumber(), new ChildNumber(keyPurpose.getPathIndex()), new ChildNumber(keyIndex));
+        List<ChildNumber> receivingDerivation = List.of(extendedPublicKey.getKeyChildNumber(), keyPurpose.getPathIndex(), new ChildNumber(keyIndex));
         return extendedPublicKey.getKey(receivingDerivation);
     }
 
     public KeyDerivation getDerivation(KeyPurpose keyPurpose, int keyIndex) {
-        return getKeyDerivation().extend(new ChildNumber(keyPurpose.getPathIndex())).extend(new ChildNumber(keyIndex));
+        return getKeyDerivation().extend(keyPurpose.getPathIndex()).extend(new ChildNumber(keyIndex));
     }
 
     public boolean isValid() {
