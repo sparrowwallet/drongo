@@ -25,6 +25,8 @@ public class Wallet {
     private List<Keystore> keystores = new ArrayList<>();
     private final List<Node> accountNodes = new ArrayList<>();
 
+    private transient int lookAhead = DEFAULT_LOOKAHEAD;
+
     public Wallet() {
     }
 
@@ -80,7 +82,7 @@ public class Wallet {
         this.keystores = keystores;
     }
 
-    public Node getNodes(KeyPurpose keyPurpose) {
+    public Node getNode(KeyPurpose keyPurpose) {
         Node purposeNode;
         Optional<Node> optionalPurposeNode = accountNodes.stream().filter(node -> node.getKeyPurpose().equals(keyPurpose)).findFirst();
         if(optionalPurposeNode.isEmpty()) {
@@ -96,7 +98,28 @@ public class Wallet {
 
     public int getLookAhead() {
         //TODO: Calculate using seen transactions
-        return DEFAULT_LOOKAHEAD;
+        return lookAhead;
+    }
+
+    public Node getFreshNode(KeyPurpose keyPurpose) {
+        //TODO: Calculate using seen transactions
+        return getFreshNode(keyPurpose, null);
+    }
+
+    public Node getFreshNode(KeyPurpose keyPurpose, Node current) {
+        //TODO: Calculate using seen transactions
+        int index = 0;
+        if(current != null) {
+            index = current.getIndex() + 1;
+        }
+
+        Node node = getNode(keyPurpose);
+        if(index >= node.getChildren().size()) {
+            lookAhead = index;
+            node.fillToLookAhead(lookAhead);
+        }
+
+        return node.getChildren().get(index);
     }
 
     public Address getAddress(KeyPurpose keyPurpose, int index) {
@@ -308,6 +331,10 @@ public class Wallet {
             this.derivationPath = KeyDerivation.writePath(derivation);
             this.keyPurpose = keyPurpose;
             this.index = index;
+        }
+
+        public String getDerivationPath() {
+            return derivationPath;
         }
 
         public int getIndex() {
