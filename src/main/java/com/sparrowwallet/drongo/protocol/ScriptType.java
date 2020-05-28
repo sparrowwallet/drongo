@@ -7,10 +7,7 @@ import com.sparrowwallet.drongo.crypto.ChildNumber;
 import com.sparrowwallet.drongo.crypto.ECKey;
 import com.sparrowwallet.drongo.policy.PolicyType;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.List;
+import java.util.*;
 import java.util.stream.Collectors;
 
 import static com.sparrowwallet.drongo.policy.PolicyType.*;
@@ -56,6 +53,16 @@ public enum ScriptType {
         @Override
         public Script getOutputScript(Script script) {
             throw new ProtocolException("No script derived output script for non pay to script type");
+        }
+
+        @Override
+        public String getOutputDescriptor(ECKey key) {
+            return "pk(" + Utils.bytesToHex(key.getPubKey()) + ")";
+        }
+
+        @Override
+        public String getOutputDescriptor(Script script) {
+            throw new ProtocolException("No script derived output descriptor for non pay to script type");
         }
 
         @Override
@@ -126,6 +133,16 @@ public enum ScriptType {
         @Override
         public Script getOutputScript(Script script) {
             throw new ProtocolException("No script derived output script for non pay to script type");
+        }
+
+        @Override
+        public String getOutputDescriptor(ECKey key) {
+            return "pkh(" + Utils.bytesToHex(key.getPubKey()) + ")";
+        }
+
+        @Override
+        public String getOutputDescriptor(Script script) {
+            throw new ProtocolException("No script derived output descriptor for non pay to script type");
         }
 
         @Override
@@ -218,6 +235,34 @@ public enum ScriptType {
         }
 
         @Override
+        public String getOutputDescriptor(ECKey key) {
+            throw new ProtocolException("No single key output descriptor for multisig script type");
+        }
+
+        @Override
+        public String getOutputDescriptor(Script script) {
+            if(!isScriptType(script)) {
+                throw new IllegalArgumentException("Can only create output descriptor from multisig script");
+            }
+
+            int threshold = getThreshold(script);
+            ECKey[] pubKeys = getPublicKeysFromScript(script);
+
+            List<byte[]> pubKeyBytes = new ArrayList<>();
+            for(ECKey key : pubKeys) {
+                pubKeyBytes.add(key.getPubKey());
+            }
+            pubKeyBytes.sort(new Utils.LexicographicByteArrayComparator());
+
+            StringJoiner joiner = new StringJoiner(",");
+            for(byte[] pubKey : pubKeyBytes) {
+                joiner.add(Utils.bytesToHex(pubKey));
+            }
+
+            return "multi(" + threshold + "," + joiner.toString() + ")";
+        }
+
+        @Override
         public boolean isScriptType(Script script) {
             List<ScriptChunk> chunks = script.chunks;
             if (chunks.size() < 4) return false;
@@ -307,6 +352,20 @@ public enum ScriptType {
         }
 
         @Override
+        public String getOutputDescriptor(ECKey key) {
+            throw new ProtocolException("No single key output descriptor for script hash type");
+        }
+
+        @Override
+        public String getOutputDescriptor(Script script) {
+            if(!MULTISIG.isScriptType(script)) {
+                throw new IllegalArgumentException("Can only create output descriptor from multisig script");
+            }
+
+            return "sh(" + MULTISIG.getOutputDescriptor(script) + ")";
+        }
+
+        @Override
         public boolean isScriptType(Script script) {
             List<ScriptChunk> chunks = script.chunks;
             // We check for the effective serialized form because BIP16 defines a P2SH output using an exact byte
@@ -383,6 +442,16 @@ public enum ScriptType {
         }
 
         @Override
+        public String getOutputDescriptor(ECKey key) {
+            return "sh(wpkh(" + Utils.bytesToHex(key.getPubKey()) + "))";
+        }
+
+        @Override
+        public String getOutputDescriptor(Script script) {
+            throw new ProtocolException("No script derived output descriptor for non pay to script type");
+        }
+
+        @Override
         public boolean isScriptType(Script script) {
             return P2SH.isScriptType(script);
         }
@@ -428,6 +497,20 @@ public enum ScriptType {
         public Script getOutputScript(Script script) {
             Script p2wshScript = P2WSH.getOutputScript(script);
             return P2SH.getOutputScript(p2wshScript);
+        }
+
+        @Override
+        public String getOutputDescriptor(ECKey key) {
+            throw new ProtocolException("No single key output descriptor for script hash type");
+        }
+
+        @Override
+        public String getOutputDescriptor(Script script) {
+            if(!MULTISIG.isScriptType(script)) {
+                throw new IllegalArgumentException("Can only create output descriptor from multisig script");
+            }
+
+            return "sh(wsh(" + MULTISIG.getOutputDescriptor(script) + "))";
         }
 
         @Override
@@ -478,6 +561,16 @@ public enum ScriptType {
         @Override
         public Script getOutputScript(Script script) {
             throw new ProtocolException("No script derived output script for non pay to script type");
+        }
+
+        @Override
+        public String getOutputDescriptor(ECKey key) {
+            return "wpkh(" + Utils.bytesToHex(key.getPubKey()) + ")";
+        }
+
+        @Override
+        public String getOutputDescriptor(Script script) {
+            throw new ProtocolException("No script derived output descriptor for non pay to script type");
         }
 
         @Override
@@ -538,6 +631,20 @@ public enum ScriptType {
         @Override
         public Script getOutputScript(Script script) {
             return getOutputScript(Sha256Hash.hash(script.getProgram()));
+        }
+
+        @Override
+        public String getOutputDescriptor(ECKey key) {
+            throw new ProtocolException("No single key output descriptor for script hash type");
+        }
+
+        @Override
+        public String getOutputDescriptor(Script script) {
+            if(!MULTISIG.isScriptType(script)) {
+                throw new IllegalArgumentException("Can only create output descriptor from multisig script");
+            }
+
+            return "wsh(" + MULTISIG.getOutputDescriptor(script) + ")";
         }
 
         @Override
@@ -629,6 +736,10 @@ public enum ScriptType {
     public Script getOutputScript(int threshold, List<ECKey> pubKeys) {
         throw new UnsupportedOperationException("Only defined for MULTISIG script type");
     }
+
+    public abstract String getOutputDescriptor(ECKey key);
+
+    public abstract String getOutputDescriptor(Script script);
 
     public abstract boolean isScriptType(Script script);
 

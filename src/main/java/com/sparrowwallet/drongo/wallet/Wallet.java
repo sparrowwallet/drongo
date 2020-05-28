@@ -23,9 +23,7 @@ public class Wallet {
     private ScriptType scriptType;
     private Policy defaultPolicy;
     private List<Keystore> keystores = new ArrayList<>();
-    private final List<Node> accountNodes = new ArrayList<>();
-
-    private transient int lookAhead = DEFAULT_LOOKAHEAD;
+    private final Set<Node> accountNodes = new TreeSet<>();
 
     public Wallet() {
     }
@@ -82,6 +80,10 @@ public class Wallet {
         this.keystores = keystores;
     }
 
+    private Set<Node> getAccountNodes() {
+        return accountNodes;
+    }
+
     public Node getNode(KeyPurpose keyPurpose) {
         Node purposeNode;
         Optional<Node> optionalPurposeNode = accountNodes.stream().filter(node -> node.getKeyPurpose().equals(keyPurpose)).findFirst();
@@ -92,12 +94,18 @@ public class Wallet {
             purposeNode = optionalPurposeNode.get();
         }
 
-        purposeNode.fillToLookAhead(getLookAhead());
+        purposeNode.fillToIndex(getLookAhead(purposeNode) - 1);
         return purposeNode;
     }
 
-    public int getLookAhead() {
+    public int getLookAhead(Node node) {
         //TODO: Calculate using seen transactions
+        int lookAhead = DEFAULT_LOOKAHEAD;
+        Integer maxIndex = node.getHighestIndex();
+        if(maxIndex != null) {
+            lookAhead = Math.max(maxIndex + lookAhead/2, lookAhead);
+        }
+
         return lookAhead;
     }
 
@@ -115,11 +123,16 @@ public class Wallet {
 
         Node node = getNode(keyPurpose);
         if(index >= node.getChildren().size()) {
-            lookAhead = index;
-            node.fillToLookAhead(lookAhead);
+            node.fillToIndex(index);
         }
 
-        return node.getChildren().get(index);
+        for(Node childNode : node.getChildren()) {
+            if(childNode.getIndex() == index) {
+                return childNode;
+            }
+        }
+
+        throw new IllegalStateException("Could not fill nodes to index " + index);
     }
 
     public Address getAddress(KeyPurpose keyPurpose, int index) {
@@ -147,6 +160,20 @@ public class Wallet {
             return scriptType.getOutputScript(script);
         } else {
             throw new UnsupportedOperationException("Cannot determine output script for custom policies");
+        }
+    }
+
+    public String getOutputDescriptor(KeyPurpose keyPurpose, int index) {
+        if(policyType == PolicyType.SINGLE) {
+            Keystore keystore = getKeystores().get(0);
+            DeterministicKey key = keystore.getKey(keyPurpose, index);
+            return scriptType.getOutputDescriptor(key);
+        } else if(policyType == PolicyType.MULTI) {
+            List<ECKey> pubKeys = getKeystores().stream().map(keystore -> keystore.getKey(keyPurpose, index)).collect(Collectors.toList());
+            Script script = ScriptType.MULTISIG.getOutputScript(defaultPolicy.getNumSignaturesRequired(), pubKeys);
+            return scriptType.getOutputDescriptor(script);
+        } else {
+            throw new UnsupportedOperationException("Cannot determine output descriptor for custom policies");
         }
     }
 
@@ -245,6 +272,21 @@ public class Wallet {
         for(Keystore keystore : keystores) {
             copy.getKeystores().add(keystore.copy());
         }
+        for(Wallet.Node node : accountNodes) {
+            Node nodeCopy = copy.copyNode(node);
+            copy.getAccountNodes().add(nodeCopy);
+        }
+        return copy;
+    }
+
+    private Node copyNode(Node node) {
+        Node copy = new Node(node.derivationPath);
+        copy.setLabel(node.label);
+        copy.setAmount(node.amount);
+        for(Node child : node.getChildren()) {
+            copy.getChildren().add(copyNode(child));
+        }
+
         return copy;
     }
 
@@ -302,21 +344,19 @@ public class Wallet {
         }
     }
 
-    public class Node {
+    public class Node implements Comparable<Node> {
         private final String derivationPath;
         private String label;
         private Long amount;
-        private final List<Node> children = new ArrayList<>();
+        private Set<Node> children = new TreeSet<>();
 
-        private final transient KeyPurpose keyPurpose;
-        private final transient int index;
-        private final transient List<ChildNumber> derivation;
+        private transient KeyPurpose keyPurpose;
+        private transient int index = -1;
+        private transient List<ChildNumber> derivation;
 
         public Node(String derivationPath) {
             this.derivationPath = derivationPath;
-            this.derivation = KeyDerivation.parsePath(derivationPath);
-            this.keyPurpose = KeyPurpose.fromChildNumber(derivation.get(0));
-            this.index = derivation.get(derivation.size() - 1).num();
+            parseDerivation();
         }
 
         public Node(KeyPurpose keyPurpose) {
@@ -337,12 +377,34 @@ public class Wallet {
             return derivationPath;
         }
 
+        private void parseDerivation() {
+            this.derivation = KeyDerivation.parsePath(derivationPath);
+            this.keyPurpose = KeyPurpose.fromChildNumber(derivation.get(0));
+            this.index = derivation.get(derivation.size() - 1).num();
+        }
+
         public int getIndex() {
+            if(index < 0) {
+                parseDerivation();
+            }
+
             return index;
         }
 
         public KeyPurpose getKeyPurpose() {
+            if(keyPurpose == null) {
+                parseDerivation();
+            }
+
             return keyPurpose;
+        }
+
+        public List<ChildNumber> getDerivation() {
+            if(derivation == null) {
+                parseDerivation();
+            }
+
+            return derivation;
         }
 
         public String getLabel() {
@@ -361,8 +423,12 @@ public class Wallet {
             this.amount = amount;
         }
 
-        public List<Node> getChildren() {
+        public Set<Node> getChildren() {
             return children;
+        }
+
+        public void setChildren(Set<Node> children) {
+            this.children = children;
         }
 
         public Address getAddress() {
@@ -373,13 +439,24 @@ public class Wallet {
             return Wallet.this.getOutputScript(keyPurpose, index);
         }
 
-        public void fillToLookAhead(int lookAhead) {
-            for(int i = 0; i < lookAhead; i++) {
+        public String getOutputDescriptor() {
+            return Wallet.this.getOutputDescriptor(keyPurpose, index);
+        }
+
+        public void fillToIndex(int index) {
+            for(int i = 0; i <= index; i++) {
                 Node node = new Node(getKeyPurpose(), i);
-                if(!getChildren().contains(node)) {
-                    getChildren().add(node);
-                }
+                getChildren().add(node);
             }
+        }
+
+        public Integer getHighestIndex() {
+            Node highestNode = null;
+            for(Node childNode : getChildren()) {
+                highestNode = childNode;
+            }
+
+            return highestNode == null ? null : highestNode.index;
         }
 
         @Override
@@ -393,6 +470,11 @@ public class Wallet {
         @Override
         public int hashCode() {
             return Objects.hash(derivationPath);
+        }
+
+        @Override
+        public int compareTo(Node node) {
+            return getIndex() - node.getIndex();
         }
     }
 }
