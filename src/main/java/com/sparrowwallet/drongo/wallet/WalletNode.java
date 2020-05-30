@@ -112,10 +112,12 @@ public class WalletNode implements Comparable<WalletNode> {
         }
     }
 
-    public Integer getHighestIndex() {
+    public Integer getHighestUsedIndex() {
         WalletNode highestNode = null;
         for(WalletNode childNode : getChildren()) {
-            highestNode = childNode;
+            if(!childNode.getHistory().isEmpty()) {
+                highestNode = childNode;
+            }
         }
 
         return highestNode == null ? null : highestNode.index;

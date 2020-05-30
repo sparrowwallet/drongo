@@ -105,7 +105,7 @@ public class Wallet {
     public int getLookAhead(WalletNode node) {
         //TODO: Calculate using seen transactions
         int lookAhead = DEFAULT_LOOKAHEAD;
-        Integer maxIndex = node.getHighestIndex();
+        Integer maxIndex = node.getHighestUsedIndex();
         if(maxIndex != null) {
             lookAhead = Math.max(maxIndex + lookAhead/2, lookAhead);
         }
@@ -191,6 +191,17 @@ public class Wallet {
         } else {
             throw new UnsupportedOperationException("Cannot determine output descriptor for custom policies");
         }
+    }
+
+    public void clearHistory() {
+        for(WalletNode purposeNode : purposeNodes) {
+            purposeNode.getHistory().clear();
+            for(WalletNode addressNode : purposeNode.getChildren()) {
+                addressNode.getHistory().clear();
+            }
+        }
+
+        transactions.clear();
     }
 
     public boolean isValid() {
