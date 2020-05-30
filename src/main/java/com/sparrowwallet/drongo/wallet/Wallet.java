@@ -11,6 +11,7 @@ import com.sparrowwallet.drongo.policy.Policy;
 import com.sparrowwallet.drongo.policy.PolicyType;
 import com.sparrowwallet.drongo.protocol.Script;
 import com.sparrowwallet.drongo.protocol.ScriptType;
+import com.sparrowwallet.drongo.protocol.Transaction;
 
 import java.util.*;
 import java.util.stream.Collectors;
@@ -23,7 +24,8 @@ public class Wallet {
     private ScriptType scriptType;
     private Policy defaultPolicy;
     private List<Keystore> keystores = new ArrayList<>();
-    private final Set<Node> accountNodes = new TreeSet<>();
+    private final Set<Node> purposeNodes = new TreeSet<>();
+    private final Map<String, Transaction> transactions = new HashMap<>();
 
     public Wallet() {
     }
@@ -80,16 +82,20 @@ public class Wallet {
         this.keystores = keystores;
     }
 
-    private Set<Node> getAccountNodes() {
-        return accountNodes;
+    private Set<Node> getPurposeNodes() {
+        return purposeNodes;
+    }
+
+    public Map<String, Transaction> getTransactions() {
+        return transactions;
     }
 
     public Node getNode(KeyPurpose keyPurpose) {
         Node purposeNode;
-        Optional<Node> optionalPurposeNode = accountNodes.stream().filter(node -> node.getKeyPurpose().equals(keyPurpose)).findFirst();
+        Optional<Node> optionalPurposeNode = purposeNodes.stream().filter(node -> node.getKeyPurpose().equals(keyPurpose)).findFirst();
         if(optionalPurposeNode.isEmpty()) {
             purposeNode = new Node(keyPurpose);
-            accountNodes.add(purposeNode);
+            purposeNodes.add(purposeNode);
         } else {
             purposeNode = optionalPurposeNode.get();
         }
@@ -272,9 +278,9 @@ public class Wallet {
         for(Keystore keystore : keystores) {
             copy.getKeystores().add(keystore.copy());
         }
-        for(Wallet.Node node : accountNodes) {
+        for(Wallet.Node node : purposeNodes) {
             Node nodeCopy = copy.copyNode(node);
-            copy.getAccountNodes().add(nodeCopy);
+            copy.getPurposeNodes().add(nodeCopy);
         }
         return copy;
     }
@@ -285,6 +291,9 @@ public class Wallet {
         copy.setAmount(node.amount);
         for(Node child : node.getChildren()) {
             copy.getChildren().add(copyNode(child));
+        }
+        for(TransactionReference reference : node.getHistory()) {
+            copy.getHistory().add(reference.copy());
         }
 
         return copy;
@@ -349,6 +358,7 @@ public class Wallet {
         private String label;
         private Long amount;
         private Set<Node> children = new TreeSet<>();
+        private Set<TransactionReference> history = new TreeSet<>();
 
         private transient KeyPurpose keyPurpose;
         private transient int index = -1;
@@ -429,6 +439,14 @@ public class Wallet {
 
         public void setChildren(Set<Node> children) {
             this.children = children;
+        }
+
+        public Set<TransactionReference> getHistory() {
+            return history;
+        }
+
+        public void setHistory(Set<TransactionReference> history) {
+            this.history = history;
         }
 
         public Address getAddress() {

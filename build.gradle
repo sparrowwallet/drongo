@@ -68,6 +68,8 @@ jar {
         attributes "Main-Class": "com.sparrowwallet.drongo.Main"
     }
 
+    exclude('logback.xml')
+
     archiveBaseName = 'drongo'
     archiveVersion = '0.1'
 }
