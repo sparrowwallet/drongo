@@ -1,9 +1,7 @@
 package com.sparrowwallet.drongo.wallet;
 
-import com.sparrowwallet.drongo.KeyDerivation;
 import com.sparrowwallet.drongo.KeyPurpose;
 import com.sparrowwallet.drongo.address.Address;
-import com.sparrowwallet.drongo.crypto.ChildNumber;
 import com.sparrowwallet.drongo.crypto.DeterministicKey;
 import com.sparrowwallet.drongo.crypto.ECKey;
 import com.sparrowwallet.drongo.crypto.Key;
@@ -24,7 +22,7 @@ public class Wallet {
     private ScriptType scriptType;
     private Policy defaultPolicy;
     private List<Keystore> keystores = new ArrayList<>();
-    private final Set<Node> purposeNodes = new TreeSet<>();
+    private final Set<WalletNode> purposeNodes = new TreeSet<>();
     private final Map<String, Transaction> transactions = new HashMap<>();
 
     public Wallet() {
@@ -82,7 +80,7 @@ public class Wallet {
         this.keystores = keystores;
     }
 
-    private Set<Node> getPurposeNodes() {
+    private Set<WalletNode> getPurposeNodes() {
         return purposeNodes;
     }
 
@@ -90,11 +88,11 @@ public class Wallet {
         return transactions;
     }
 
-    public Node getNode(KeyPurpose keyPurpose) {
-        Node purposeNode;
-        Optional<Node> optionalPurposeNode = purposeNodes.stream().filter(node -> node.getKeyPurpose().equals(keyPurpose)).findFirst();
+    public WalletNode getNode(KeyPurpose keyPurpose) {
+        WalletNode purposeNode;
+        Optional<WalletNode> optionalPurposeNode = purposeNodes.stream().filter(node -> node.getKeyPurpose().equals(keyPurpose)).findFirst();
         if(optionalPurposeNode.isEmpty()) {
-            purposeNode = new Node(keyPurpose);
+            purposeNode = new WalletNode(keyPurpose);
             purposeNodes.add(purposeNode);
         } else {
             purposeNode = optionalPurposeNode.get();
@@ -104,7 +102,7 @@ public class Wallet {
         return purposeNode;
     }
 
-    public int getLookAhead(Node node) {
+    public int getLookAhead(WalletNode node) {
         //TODO: Calculate using seen transactions
         int lookAhead = DEFAULT_LOOKAHEAD;
         Integer maxIndex = node.getHighestIndex();
@@ -115,24 +113,24 @@ public class Wallet {
         return lookAhead;
     }
 
-    public Node getFreshNode(KeyPurpose keyPurpose) {
+    public WalletNode getFreshNode(KeyPurpose keyPurpose) {
         //TODO: Calculate using seen transactions
         return getFreshNode(keyPurpose, null);
     }
 
-    public Node getFreshNode(KeyPurpose keyPurpose, Node current) {
+    public WalletNode getFreshNode(KeyPurpose keyPurpose, WalletNode current) {
         //TODO: Calculate using seen transactions
         int index = 0;
         if(current != null) {
             index = current.getIndex() + 1;
         }
 
-        Node node = getNode(keyPurpose);
+        WalletNode node = getNode(keyPurpose);
         if(index >= node.getChildren().size()) {
             node.fillToIndex(index);
         }
 
-        for(Node childNode : node.getChildren()) {
+        for(WalletNode childNode : node.getChildren()) {
             if(childNode.getIndex() == index) {
                 return childNode;
             }
@@ -141,7 +139,7 @@ public class Wallet {
         throw new IllegalStateException("Could not fill nodes to index " + index);
     }
 
-    public Address getAddress(Node node) {
+    public Address getAddress(WalletNode node) {
         return getAddress(node.getKeyPurpose(), node.getIndex());
     }
 
@@ -159,7 +157,7 @@ public class Wallet {
         }
     }
 
-    public Script getOutputScript(Node node) {
+    public Script getOutputScript(WalletNode node) {
         return getOutputScript(node.getKeyPurpose(), node.getIndex());
     }
 
@@ -177,7 +175,7 @@ public class Wallet {
         }
     }
 
-    public String getOutputDescriptor(Node node) {
+    public String getOutputDescriptor(WalletNode node) {
         return getOutputDescriptor(node.getKeyPurpose(), node.getIndex());
     }
 
@@ -290,22 +288,11 @@ public class Wallet {
         for(Keystore keystore : keystores) {
             copy.getKeystores().add(keystore.copy());
         }
-        for(Wallet.Node node : purposeNodes) {
-            Node nodeCopy = copy.copyNode(node);
-            copy.getPurposeNodes().add(nodeCopy);
+        for(WalletNode node : purposeNodes) {
+            copy.getPurposeNodes().add(node.copy());
         }
-        return copy;
-    }
-
-    private Node copyNode(Node node) {
-        Node copy = new Node(node.derivationPath);
-        copy.setLabel(node.label);
-        copy.setAmount(node.amount);
-        for(Node child : node.getChildren()) {
-            copy.getChildren().add(copyNode(child));
-        }
-        for(TransactionReference reference : node.getHistory()) {
-            copy.getHistory().add(reference.copy());
+        for(String transactionId : transactions.keySet()) {
+            copy.getTransactions().put(transactionId, transactions.get(transactionId));
         }
 
         return copy;
@@ -365,134 +352,4 @@ public class Wallet {
         }
     }
 
-    public static class Node implements Comparable<Node> {
-        private final String derivationPath;
-        private String label;
-        private Long amount;
-        private Set<Node> children = new TreeSet<>();
-        private Set<TransactionReference> history = new TreeSet<>();
-
-        private transient KeyPurpose keyPurpose;
-        private transient int index = -1;
-        private transient List<ChildNumber> derivation;
-
-        public Node(String derivationPath) {
-            this.derivationPath = derivationPath;
-            parseDerivation();
-        }
-
-        public Node(KeyPurpose keyPurpose) {
-            this.derivation = List.of(keyPurpose.getPathIndex());
-            this.derivationPath = KeyDerivation.writePath(derivation);
-            this.keyPurpose = keyPurpose;
-            this.index = keyPurpose.getPathIndex().num();
-        }
-
-        public Node(KeyPurpose keyPurpose, int index) {
-            this.derivation = List.of(keyPurpose.getPathIndex(), new ChildNumber(index));
-            this.derivationPath = KeyDerivation.writePath(derivation);
-            this.keyPurpose = keyPurpose;
-            this.index = index;
-        }
-
-        public String getDerivationPath() {
-            return derivationPath;
-        }
-
-        private void parseDerivation() {
-            this.derivation = KeyDerivation.parsePath(derivationPath);
-            this.keyPurpose = KeyPurpose.fromChildNumber(derivation.get(0));
-            this.index = derivation.get(derivation.size() - 1).num();
-        }
-
-        public int getIndex() {
-            if(index < 0) {
-                parseDerivation();
-            }
-
-            return index;
-        }
-
-        public KeyPurpose getKeyPurpose() {
-            if(keyPurpose == null) {
-                parseDerivation();
-            }
-
-            return keyPurpose;
-        }
-
-        public List<ChildNumber> getDerivation() {
-            if(derivation == null) {
-                parseDerivation();
-            }
-
-            return derivation;
-        }
-
-        public String getLabel() {
-            return label;
-        }
-
-        public void setLabel(String label) {
-            this.label = label;
-        }
-
-        public Long getAmount() {
-            return amount;
-        }
-
-        public void setAmount(Long amount) {
-            this.amount = amount;
-        }
-
-        public Set<Node> getChildren() {
-            return children;
-        }
-
-        public void setChildren(Set<Node> children) {
-            this.children = children;
-        }
-
-        public Set<TransactionReference> getHistory() {
-            return history;
-        }
-
-        public void setHistory(Set<TransactionReference> history) {
-            this.history = history;
-        }
-
-        public void fillToIndex(int index) {
-            for(int i = 0; i <= index; i++) {
-                Node node = new Node(getKeyPurpose(), i);
-                getChildren().add(node);
-            }
-        }
-
-        public Integer getHighestIndex() {
-            Node highestNode = null;
-            for(Node childNode : getChildren()) {
-                highestNode = childNode;
-            }
-
-            return highestNode == null ? null : highestNode.index;
-        }
-
-        @Override
-        public boolean equals(Object o) {
-            if (this == o) return true;
-            if (o == null || getClass() != o.getClass()) return false;
-            Node node = (Node) o;
-            return derivationPath.equals(node.derivationPath);
-        }
-
-        @Override
-        public int hashCode() {
-            return Objects.hash(derivationPath);
-        }
-
-        @Override
-        public int compareTo(Node node) {
-            return getIndex() - node.getIndex();
-        }
-    }
 }
