@@ -141,6 +141,10 @@ public class Wallet {
         throw new IllegalStateException("Could not fill nodes to index " + index);
     }
 
+    public Address getAddress(Node node) {
+        return getAddress(node.getKeyPurpose(), node.getIndex());
+    }
+
     public Address getAddress(KeyPurpose keyPurpose, int index) {
         if(policyType == PolicyType.SINGLE) {
             Keystore keystore = getKeystores().get(0);
@@ -155,6 +159,10 @@ public class Wallet {
         }
     }
 
+    public Script getOutputScript(Node node) {
+        return getOutputScript(node.getKeyPurpose(), node.getIndex());
+    }
+
     public Script getOutputScript(KeyPurpose keyPurpose, int index) {
         if(policyType == PolicyType.SINGLE) {
             Keystore keystore = getKeystores().get(0);
@@ -167,6 +175,10 @@ public class Wallet {
         } else {
             throw new UnsupportedOperationException("Cannot determine output script for custom policies");
         }
+    }
+
+    public String getOutputDescriptor(Node node) {
+        return getOutputDescriptor(node.getKeyPurpose(), node.getIndex());
     }
 
     public String getOutputDescriptor(KeyPurpose keyPurpose, int index) {
@@ -353,7 +365,7 @@ public class Wallet {
         }
     }
 
-    public class Node implements Comparable<Node> {
+    public static class Node implements Comparable<Node> {
         private final String derivationPath;
         private String label;
         private Long amount;
@@ -447,18 +459,6 @@ public class Wallet {
 
         public void setHistory(Set<TransactionReference> history) {
             this.history = history;
-        }
-
-        public Address getAddress() {
-            return Wallet.this.getAddress(keyPurpose, index);
-        }
-
-        public Script getOutputScript() {
-            return Wallet.this.getOutputScript(keyPurpose, index);
-        }
-
-        public String getOutputDescriptor() {
-            return Wallet.this.getOutputDescriptor(keyPurpose, index);
         }
 
         public void fillToIndex(int index) {
