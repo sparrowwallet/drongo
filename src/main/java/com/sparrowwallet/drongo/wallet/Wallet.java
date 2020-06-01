@@ -7,9 +7,7 @@ import com.sparrowwallet.drongo.crypto.ECKey;
 import com.sparrowwallet.drongo.crypto.Key;
 import com.sparrowwallet.drongo.policy.Policy;
 import com.sparrowwallet.drongo.policy.PolicyType;
-import com.sparrowwallet.drongo.protocol.Script;
-import com.sparrowwallet.drongo.protocol.ScriptType;
-import com.sparrowwallet.drongo.protocol.Transaction;
+import com.sparrowwallet.drongo.protocol.*;
 
 import java.util.*;
 import java.util.stream.Collectors;
@@ -23,7 +21,7 @@ public class Wallet {
     private Policy defaultPolicy;
     private List<Keystore> keystores = new ArrayList<>();
     private final Set<WalletNode> purposeNodes = new TreeSet<>();
-    private final Map<String, Transaction> transactions = new HashMap<>();
+    private final Map<Sha256Hash, Transaction> transactions = new HashMap<>();
 
     public Wallet() {
     }
@@ -84,7 +82,7 @@ public class Wallet {
         return purposeNodes;
     }
 
-    public Map<String, Transaction> getTransactions() {
+    public Map<Sha256Hash, Transaction> getTransactions() {
         return transactions;
     }
 
@@ -204,6 +202,57 @@ public class Wallet {
         transactions.clear();
     }
 
+    public WalletNodeHistory getNodeHistory(WalletNode node) {
+        Set<BlockchainTransactionHashIndex> receivedTXOs = new TreeSet<>();
+        Set<BlockchainTransactionHashIndex> spentTXOs = new TreeSet<>();
+        Set<BlockchainTransactionHashIndex> spendingTXIs = new TreeSet<>();
+
+        Script nodeScript = getOutputScript(node);
+        for(BlockchainTransactionHash reference : node.getHistory()) {
+            Transaction transaction = transactions.get(reference.getHash());
+            if(transaction == null) {
+                throw new IllegalStateException("Could not retrieve transaction for hash " + reference.getHashAsString());
+            }
+
+            for(int inputIndex = 0; inputIndex < transaction.getInputs().size(); inputIndex++) {
+                TransactionInput input = transaction.getInputs().get(inputIndex);
+                Sha256Hash previousHash = input.getOutpoint().getHash();
+                Transaction previousTransaction = transactions.get(previousHash);
+                if(previousTransaction == null) {
+                    //No referenced transaction found, cannot check if spends from wallet
+                    //This is fine so long as all referenced transactions have been returned, in which case this refers to a transaction that does not affect this wallet
+                    continue;
+                }
+
+                Optional<BlockchainTransactionHash> optionalTxHash = node.getHistory().stream().filter(txHash -> txHash.getHash().equals(previousHash)).findFirst();
+                if(optionalTxHash.isEmpty()) {
+                    //No previous transaction history found, cannot check if spends from wallet
+                    //This is fine so long as all referenced transactions have been returned, in which case this refers to a transaction that does not affect this wallet node
+                    continue;
+                }
+
+                BlockchainTransactionHash spentTxHash = optionalTxHash.get();
+                TransactionOutput spentOutput = previousTransaction.getOutputs().get((int)input.getOutpoint().getIndex());
+                if(spentOutput.getScript().equals(nodeScript)) {
+                    BlockchainTransactionHashIndex spendingTXI = new BlockchainTransactionHashIndex(reference.getHash(), reference.getHeight(), reference.getFee(), inputIndex);
+                    spendingTXIs.add(spendingTXI);
+                    BlockchainTransactionHashIndex spentTXO = new BlockchainTransactionHashIndex(spentTxHash.getHash(), spentTxHash.getHeight(), spentTxHash.getFee(), input.getOutpoint().getIndex(), spendingTXI);
+                    spentTXOs.add(spentTXO);
+                }
+            }
+
+            for(int outputIndex = 0; outputIndex < transaction.getOutputs().size(); outputIndex++) {
+                TransactionOutput output = transaction.getOutputs().get(outputIndex);
+                if(output.getScript().equals(nodeScript)) {
+                    BlockchainTransactionHashIndex receivingTXO = new BlockchainTransactionHashIndex(reference.getHash(), reference.getHeight(), reference.getFee(), outputIndex);
+                    receivedTXOs.add(receivingTXO);
+                }
+            }
+        }
+
+        return new WalletNodeHistory(receivedTXOs, spentTXOs, spendingTXIs);
+    }
+
     public boolean isValid() {
         if(policyType == null || scriptType == null || defaultPolicy == null || keystores.isEmpty()) {
             return false;
@@ -302,8 +351,8 @@ public class Wallet {
         for(WalletNode node : purposeNodes) {
             copy.getPurposeNodes().add(node.copy());
         }
-        for(String transactionId : transactions.keySet()) {
-            copy.getTransactions().put(transactionId, transactions.get(transactionId));
+        for(Sha256Hash hash : transactions.keySet()) {
+            copy.getTransactions().put(hash, transactions.get(hash));
         }
 
         return copy;

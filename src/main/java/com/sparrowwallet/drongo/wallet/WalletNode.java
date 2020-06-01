@@ -14,7 +14,7 @@ public class WalletNode implements Comparable<WalletNode> {
     private String label;
     private Long amount;
     private Set<WalletNode> children = new TreeSet<>();
-    private Set<TransactionReference> history = new TreeSet<>();
+    private Set<BlockchainTransactionHash> history = new TreeSet<>();
 
     private transient KeyPurpose keyPurpose;
     private transient int index = -1;
@@ -97,11 +97,11 @@ public class WalletNode implements Comparable<WalletNode> {
         this.children = children;
     }
 
-    public Set<TransactionReference> getHistory() {
+    public Set<BlockchainTransactionHash> getHistory() {
         return history;
     }
 
-    public void setHistory(Set<TransactionReference> history) {
+    public void setHistory(Set<BlockchainTransactionHash> history) {
         this.history = history;
     }
 
@@ -148,7 +148,7 @@ public class WalletNode implements Comparable<WalletNode> {
         for(WalletNode child : getChildren()) {
             copy.getChildren().add(child.copy());
         }
-        for(TransactionReference reference : getHistory()) {
+        for(BlockchainTransactionHash reference : getHistory()) {
             copy.getHistory().add(reference.copy());
         }
 
