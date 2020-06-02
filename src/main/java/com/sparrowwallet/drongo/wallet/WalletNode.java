@@ -4,17 +4,14 @@ import com.sparrowwallet.drongo.KeyDerivation;
 import com.sparrowwallet.drongo.KeyPurpose;
 import com.sparrowwallet.drongo.crypto.ChildNumber;
 
-import java.util.List;
-import java.util.Objects;
-import java.util.Set;
-import java.util.TreeSet;
+import java.util.*;
+import java.util.stream.Collectors;
 
 public class WalletNode implements Comparable<WalletNode> {
     private final String derivationPath;
     private String label;
-    private Long amount;
     private Set<WalletNode> children = new TreeSet<>();
-    private Set<BlockchainTransactionHash> history = new TreeSet<>();
+    private Set<BlockchainTransactionHashIndex> transactionOutputs = new TreeSet<>();
 
     private transient KeyPurpose keyPurpose;
     private transient int index = -1;
@@ -81,12 +78,12 @@ public class WalletNode implements Comparable<WalletNode> {
         this.label = label;
     }
 
-    public Long getAmount() {
-        return amount;
-    }
+    public Long getValue() {
+        if(transactionOutputs == null) {
+            return null;
+        }
 
-    public void setAmount(Long amount) {
-        this.amount = amount;
+        return getUnspentTransactionOutputs().stream().mapToLong(BlockchainTransactionHashIndex::getValue).sum();
     }
 
     public Set<WalletNode> getChildren() {
@@ -97,12 +94,17 @@ public class WalletNode implements Comparable<WalletNode> {
         this.children = children;
     }
 
-    public Set<BlockchainTransactionHash> getHistory() {
-        return history;
+    public Set<BlockchainTransactionHashIndex> getTransactionOutputs() {
+        return transactionOutputs;
     }
 
-    public void setHistory(Set<BlockchainTransactionHash> history) {
-        this.history = history;
+    public void setTransactionOutputs(Set<BlockchainTransactionHashIndex> transactionOutputs) {
+        this.transactionOutputs = transactionOutputs;
+    }
+
+    public Set<BlockchainTransactionHashIndex> getUnspentTransactionOutputs() {
+        Set<BlockchainTransactionHashIndex> unspentTXOs = new TreeSet<>(transactionOutputs);
+        return unspentTXOs.stream().filter(txo -> !txo.isSpent()).collect(Collectors.toCollection(HashSet::new));
     }
 
     public void fillToIndex(int index) {
@@ -115,12 +117,17 @@ public class WalletNode implements Comparable<WalletNode> {
     public Integer getHighestUsedIndex() {
         WalletNode highestNode = null;
         for(WalletNode childNode : getChildren()) {
-            if(!childNode.getHistory().isEmpty()) {
+            if(!childNode.getTransactionOutputs().isEmpty()) {
                 highestNode = childNode;
             }
         }
 
         return highestNode == null ? null : highestNode.index;
+    }
+
+    @Override
+    public String toString() {
+        return derivationPath;
     }
 
     @Override
@@ -141,15 +148,23 @@ public class WalletNode implements Comparable<WalletNode> {
         return getIndex() - node.getIndex();
     }
 
+    public void clearHistory() {
+        transactionOutputs.clear();
+        for(WalletNode childNode : getChildren()) {
+            childNode.clearHistory();
+        }
+    }
+
     public WalletNode copy() {
         WalletNode copy = new WalletNode(derivationPath);
         copy.setLabel(label);
-        copy.setAmount(amount);
+
         for(WalletNode child : getChildren()) {
             copy.getChildren().add(child.copy());
         }
-        for(BlockchainTransactionHash reference : getHistory()) {
-            copy.getHistory().add(reference.copy());
+
+        for(BlockchainTransactionHashIndex txo : getTransactionOutputs()) {
+            copy.getTransactionOutputs().add(txo.copy());
         }
 
         return copy;
