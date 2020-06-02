@@ -2,7 +2,6 @@ package com.sparrowwallet.drongo.protocol;
 
 import com.sparrowwallet.drongo.Utils;
 import com.sparrowwallet.drongo.address.Address;
-import com.sparrowwallet.drongo.address.P2PKHAddress;
 import com.sparrowwallet.drongo.crypto.ECKey;
 
 import java.io.ByteArrayOutputStream;
@@ -17,7 +16,7 @@ import java.util.List;
 import static com.sparrowwallet.drongo.Utils.uint32ToByteStreamLE;
 import static com.sparrowwallet.drongo.Utils.uint64ToByteStreamLE;
 
-public class Transaction extends TransactionPart {
+public class Transaction extends ChildMessage {
     public static final int MAX_BLOCK_SIZE = 1000 * 1000;
     public static final long MAX_BITCOIN = 21 * 1000 * 1000L;
     public static final long SATOSHIS_PER_BITCOIN = 100 * 1000 * 1000L;

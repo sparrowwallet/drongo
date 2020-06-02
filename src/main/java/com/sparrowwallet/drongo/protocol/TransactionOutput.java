@@ -7,7 +7,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 
-public class TransactionOutput extends TransactionPart {
+public class TransactionOutput extends ChildMessage {
     // The output's value is kept as a native type in order to save class instances.
     private long value;
 

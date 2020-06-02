@@ -7,7 +7,7 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.util.Objects;
 
-public class TransactionOutPoint extends TransactionPart {
+public class TransactionOutPoint extends ChildMessage {
 
     static final int MESSAGE_LENGTH = 36;
 
@@ -18,7 +18,7 @@ public class TransactionOutPoint extends TransactionPart {
 
     private Address[] addresses = new Address[0];
 
-    public TransactionOutPoint(byte[] rawtx, int offset, TransactionPart parent) {
+    public TransactionOutPoint(byte[] rawtx, int offset, Message parent) {
         super(rawtx, offset);
         setParent(parent);
     }

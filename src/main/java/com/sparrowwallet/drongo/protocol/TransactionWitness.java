@@ -10,7 +10,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 
-public class TransactionWitness extends TransactionPart {
+public class TransactionWitness extends ChildMessage {
     private List<byte[]> pushes;
 
     public TransactionWitness(Transaction parent, byte[] rawtx, int offset) {

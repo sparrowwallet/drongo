@@ -7,8 +7,8 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.io.OutputStream;
 
-public abstract class TransactionPart {
-    private static final Logger log = LoggerFactory.getLogger(TransactionPart.class);
+public abstract class Message {
+    private static final Logger log = LoggerFactory.getLogger(Message.class);
 
     public static final int MAX_SIZE = 0x02000000; // 32MB
     public static final int UNKNOWN_LENGTH = Integer.MIN_VALUE;
@@ -21,11 +21,9 @@ public abstract class TransactionPart {
     // Note that it's relative to the start of the array NOT the start of the message payload.
     protected int cursor;
 
-    protected TransactionPart parent;
-
     protected int length = UNKNOWN_LENGTH;
 
-    public TransactionPart(byte[] rawtx, int offset) {
+    public Message(byte[] rawtx, int offset) {
         this.rawtx = rawtx;
         this.cursor = this.offset = offset;
 
@@ -33,14 +31,6 @@ public abstract class TransactionPart {
     }
 
     protected abstract void parse() throws ProtocolException;
-
-    public TransactionPart getParent() {
-        return parent;
-    }
-
-    public final void setParent(TransactionPart parent) {
-        this.parent = parent;
-    }
 
     public int getOffset() {
         return offset;
@@ -137,9 +127,5 @@ public abstract class TransactionPart {
             length++;  // The assumption here is we never call adjustLength with the same arraySize as before.
         else if (newArraySize != 0)
             length += VarInt.sizeOf(newArraySize) - VarInt.sizeOf(newArraySize - 1);
-
-        if (parent != null) {
-            parent.adjustLength(newArraySize, adjustment);
-        }
     }
 }
