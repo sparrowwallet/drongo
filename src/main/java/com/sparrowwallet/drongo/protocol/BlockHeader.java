@@ -47,7 +47,7 @@ public class BlockHeader extends Message {
     }
 
     public Date getTimeAsDate() {
-        return new Date(time);
+        return new Date(time * 1000);
     }
 
     public long getDifficultyTarget() {

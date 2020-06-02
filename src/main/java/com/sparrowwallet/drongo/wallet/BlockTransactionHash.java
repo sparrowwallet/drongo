@@ -2,26 +2,21 @@ package com.sparrowwallet.drongo.wallet;
 
 import com.sparrowwallet.drongo.protocol.Sha256Hash;
 
+import java.util.Date;
 import java.util.Objects;
 
 public abstract class BlockTransactionHash {
     private final Sha256Hash hash;
     private final int height;
+    private final Date date;
     private final Long fee;
 
     private String label;
 
-    public BlockTransactionHash(Sha256Hash hash) {
-        this(hash, 0, 0L);
-    }
-
-    public BlockTransactionHash(Sha256Hash hash, int height) {
-        this(hash, height, 0L);
-    }
-
-    public BlockTransactionHash(Sha256Hash hash, int height, Long fee) {
+    public BlockTransactionHash(Sha256Hash hash, int height, Date date, Long fee) {
         this.hash = hash;
         this.height = height;
+        this.date = date;
         this.fee = fee;
     }
 
@@ -35,6 +30,10 @@ public abstract class BlockTransactionHash {
 
     public int getHeight() {
         return height;
+    }
+
+    public Date getDate() {
+        return date;
     }
 
     public Long getFee() {

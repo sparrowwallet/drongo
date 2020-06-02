@@ -2,6 +2,7 @@ package com.sparrowwallet.drongo.wallet;
 
 import com.sparrowwallet.drongo.protocol.Sha256Hash;
 
+import java.util.Date;
 import java.util.Objects;
 
 public class BlockTransactionHashIndex extends BlockTransactionHash implements Comparable<BlockTransactionHashIndex> {
@@ -9,12 +10,12 @@ public class BlockTransactionHashIndex extends BlockTransactionHash implements C
     private final long value;
     private BlockTransactionHashIndex spentBy;
 
-    public BlockTransactionHashIndex(Sha256Hash hash, int height, Long fee, long index, long value) {
-        this(hash, height, fee, index, value, null);
+    public BlockTransactionHashIndex(Sha256Hash hash, int height, Date date, Long fee, long index, long value) {
+        this(hash, height, date, fee, index, value, null);
     }
 
-    public BlockTransactionHashIndex(Sha256Hash hash, int height, Long fee, long index, long value, BlockTransactionHashIndex spentBy) {
-        super(hash, height, fee);
+    public BlockTransactionHashIndex(Sha256Hash hash, int height, Date date, Long fee, long index, long value, BlockTransactionHashIndex spentBy) {
+        super(hash, height, date, fee);
         this.index = index;
         this.value = value;
         this.spentBy = spentBy;
@@ -51,12 +52,14 @@ public class BlockTransactionHashIndex extends BlockTransactionHash implements C
         if (o == null || getClass() != o.getClass()) return false;
         if (!super.equals(o)) return false;
         BlockTransactionHashIndex that = (BlockTransactionHashIndex) o;
-        return index == that.index;
+        return index == that.index &&
+                value == that.value &&
+                Objects.equals(spentBy, that.spentBy);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(super.hashCode(), index);
+        return Objects.hash(super.hashCode(), index, value, spentBy);
     }
 
     @Override
@@ -66,10 +69,20 @@ public class BlockTransactionHashIndex extends BlockTransactionHash implements C
             return diff;
         }
 
-        return (int)(index - reference.index);
+        diff = (int)(index - reference.index);
+        if(diff != 0) {
+            return diff;
+        }
+
+        diff = (int)(value - reference.value);
+        if(diff != 0) {
+            return diff;
+        }
+
+        return spentBy == null ? (reference.spentBy == null ? 0 : Integer.MIN_VALUE) : (reference.spentBy == null ? Integer.MAX_VALUE : spentBy.compareTo(reference.spentBy));
     }
 
     public BlockTransactionHashIndex copy() {
-        return new BlockTransactionHashIndex(super.getHash(), super.getHeight(), super.getFee(), index, value, spentBy.copy());
+        return new BlockTransactionHashIndex(super.getHash(), super.getHeight(), super.getDate(), super.getFee(), index, value, spentBy == null ? null : spentBy.copy());
     }
 }
