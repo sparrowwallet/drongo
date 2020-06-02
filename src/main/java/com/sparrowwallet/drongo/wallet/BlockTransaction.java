@@ -3,10 +3,10 @@ package com.sparrowwallet.drongo.wallet;
 import com.sparrowwallet.drongo.protocol.Sha256Hash;
 import com.sparrowwallet.drongo.protocol.Transaction;
 
-public class BlockchainTransaction extends BlockchainTransactionHash implements Comparable<BlockchainTransaction> {
+public class BlockTransaction extends BlockTransactionHash implements Comparable<BlockTransaction> {
     private final Transaction transaction;
 
-    public BlockchainTransaction(Sha256Hash hash, int height, Long fee, Transaction transaction) {
+    public BlockTransaction(Sha256Hash hash, int height, Long fee, Transaction transaction) {
         super(hash, height, fee);
         this.transaction = transaction;
     }
@@ -16,7 +16,7 @@ public class BlockchainTransaction extends BlockchainTransactionHash implements 
     }
 
     @Override
-    public int compareTo(BlockchainTransaction blockchainTransaction) {
+    public int compareTo(BlockTransaction blockchainTransaction) {
         return super.compareTo(blockchainTransaction);
     }
 }

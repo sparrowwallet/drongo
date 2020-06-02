@@ -11,7 +11,7 @@ public class WalletNode implements Comparable<WalletNode> {
     private final String derivationPath;
     private String label;
     private Set<WalletNode> children = new TreeSet<>();
-    private Set<BlockchainTransactionHashIndex> transactionOutputs = new TreeSet<>();
+    private Set<BlockTransactionHashIndex> transactionOutputs = new TreeSet<>();
 
     private transient KeyPurpose keyPurpose;
     private transient int index = -1;
@@ -83,7 +83,7 @@ public class WalletNode implements Comparable<WalletNode> {
             return null;
         }
 
-        return getUnspentTransactionOutputs().stream().mapToLong(BlockchainTransactionHashIndex::getValue).sum();
+        return getUnspentTransactionOutputs().stream().mapToLong(BlockTransactionHashIndex::getValue).sum();
     }
 
     public Set<WalletNode> getChildren() {
@@ -94,16 +94,16 @@ public class WalletNode implements Comparable<WalletNode> {
         this.children = children;
     }
 
-    public Set<BlockchainTransactionHashIndex> getTransactionOutputs() {
+    public Set<BlockTransactionHashIndex> getTransactionOutputs() {
         return transactionOutputs;
     }
 
-    public void setTransactionOutputs(Set<BlockchainTransactionHashIndex> transactionOutputs) {
+    public void setTransactionOutputs(Set<BlockTransactionHashIndex> transactionOutputs) {
         this.transactionOutputs = transactionOutputs;
     }
 
-    public Set<BlockchainTransactionHashIndex> getUnspentTransactionOutputs() {
-        Set<BlockchainTransactionHashIndex> unspentTXOs = new TreeSet<>(transactionOutputs);
+    public Set<BlockTransactionHashIndex> getUnspentTransactionOutputs() {
+        Set<BlockTransactionHashIndex> unspentTXOs = new TreeSet<>(transactionOutputs);
         return unspentTXOs.stream().filter(txo -> !txo.isSpent()).collect(Collectors.toCollection(HashSet::new));
     }
 
@@ -163,7 +163,7 @@ public class WalletNode implements Comparable<WalletNode> {
             copy.getChildren().add(child.copy());
         }
 
-        for(BlockchainTransactionHashIndex txo : getTransactionOutputs()) {
+        for(BlockTransactionHashIndex txo : getTransactionOutputs()) {
             copy.getTransactionOutputs().add(txo.copy());
         }
 

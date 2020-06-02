@@ -4,16 +4,16 @@ import com.sparrowwallet.drongo.protocol.Sha256Hash;
 
 import java.util.Objects;
 
-public class BlockchainTransactionHashIndex extends BlockchainTransactionHash implements Comparable<BlockchainTransactionHashIndex> {
+public class BlockTransactionHashIndex extends BlockTransactionHash implements Comparable<BlockTransactionHashIndex> {
     private final long index;
     private final long value;
-    private BlockchainTransactionHashIndex spentBy;
+    private BlockTransactionHashIndex spentBy;
 
-    public BlockchainTransactionHashIndex(Sha256Hash hash, int height, Long fee, long index, long value) {
+    public BlockTransactionHashIndex(Sha256Hash hash, int height, Long fee, long index, long value) {
         this(hash, height, fee, index, value, null);
     }
 
-    public BlockchainTransactionHashIndex(Sha256Hash hash, int height, Long fee, long index, long value, BlockchainTransactionHashIndex spentBy) {
+    public BlockTransactionHashIndex(Sha256Hash hash, int height, Long fee, long index, long value, BlockTransactionHashIndex spentBy) {
         super(hash, height, fee);
         this.index = index;
         this.value = value;
@@ -32,11 +32,11 @@ public class BlockchainTransactionHashIndex extends BlockchainTransactionHash im
         return spentBy != null;
     }
 
-    public BlockchainTransactionHashIndex getSpentBy() {
+    public BlockTransactionHashIndex getSpentBy() {
         return spentBy;
     }
 
-    public void setSpentBy(BlockchainTransactionHashIndex spentBy) {
+    public void setSpentBy(BlockTransactionHashIndex spentBy) {
         this.spentBy = spentBy;
     }
 
@@ -50,7 +50,7 @@ public class BlockchainTransactionHashIndex extends BlockchainTransactionHash im
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
         if (!super.equals(o)) return false;
-        BlockchainTransactionHashIndex that = (BlockchainTransactionHashIndex) o;
+        BlockTransactionHashIndex that = (BlockTransactionHashIndex) o;
         return index == that.index;
     }
 
@@ -60,7 +60,7 @@ public class BlockchainTransactionHashIndex extends BlockchainTransactionHash im
     }
 
     @Override
-    public int compareTo(BlockchainTransactionHashIndex reference) {
+    public int compareTo(BlockTransactionHashIndex reference) {
         int diff = super.compareTo(reference);
         if(diff != 0) {
             return diff;
@@ -69,7 +69,7 @@ public class BlockchainTransactionHashIndex extends BlockchainTransactionHash im
         return (int)(index - reference.index);
     }
 
-    public BlockchainTransactionHashIndex copy() {
-        return new BlockchainTransactionHashIndex(super.getHash(), super.getHeight(), super.getFee(), index, value, spentBy.copy());
+    public BlockTransactionHashIndex copy() {
+        return new BlockTransactionHashIndex(super.getHash(), super.getHeight(), super.getFee(), index, value, spentBy.copy());
     }
 }

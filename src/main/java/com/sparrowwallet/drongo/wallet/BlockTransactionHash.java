@@ -4,22 +4,22 @@ import com.sparrowwallet.drongo.protocol.Sha256Hash;
 
 import java.util.Objects;
 
-public abstract class BlockchainTransactionHash {
+public abstract class BlockTransactionHash {
     private final Sha256Hash hash;
     private final int height;
     private final Long fee;
 
     private String label;
 
-    public BlockchainTransactionHash(Sha256Hash hash) {
+    public BlockTransactionHash(Sha256Hash hash) {
         this(hash, 0, 0L);
     }
 
-    public BlockchainTransactionHash(Sha256Hash hash, int height) {
+    public BlockTransactionHash(Sha256Hash hash, int height) {
         this(hash, height, 0L);
     }
 
-    public BlockchainTransactionHash(Sha256Hash hash, int height, Long fee) {
+    public BlockTransactionHash(Sha256Hash hash, int height, Long fee) {
         this.hash = hash;
         this.height = height;
         this.fee = fee;
@@ -58,7 +58,7 @@ public abstract class BlockchainTransactionHash {
     public boolean equals(Object o) {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
-        BlockchainTransactionHash that = (BlockchainTransactionHash) o;
+        BlockTransactionHash that = (BlockTransactionHash) o;
         return hash.equals(that.hash) && height == that.height;
     }
 
@@ -67,7 +67,7 @@ public abstract class BlockchainTransactionHash {
         return Objects.hash(hash, height);
     }
 
-    public int compareTo(BlockchainTransactionHash reference) {
+    public int compareTo(BlockTransactionHash reference) {
         int heightDiff = height - reference.height;
         if(heightDiff != 0) {
             return heightDiff;

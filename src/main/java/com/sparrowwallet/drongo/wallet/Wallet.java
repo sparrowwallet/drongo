@@ -21,7 +21,7 @@ public class Wallet {
     private Policy defaultPolicy;
     private List<Keystore> keystores = new ArrayList<>();
     private final Set<WalletNode> purposeNodes = new TreeSet<>();
-    private final Map<Sha256Hash, BlockchainTransaction> transactions = new HashMap<>();
+    private final Map<Sha256Hash, BlockTransaction> transactions = new HashMap<>();
 
     public Wallet() {
     }
@@ -82,7 +82,7 @@ public class Wallet {
         return purposeNodes;
     }
 
-    public Map<Sha256Hash, BlockchainTransaction> getTransactions() {
+    public Map<Sha256Hash, BlockTransaction> getTransactions() {
         return transactions;
     }
 
