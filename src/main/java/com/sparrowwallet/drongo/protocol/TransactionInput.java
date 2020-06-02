@@ -31,7 +31,7 @@ public class TransactionInput extends ChildMessage {
     }
 
     protected void parse() throws ProtocolException {
-        outpoint = new TransactionOutPoint(rawtx, cursor, this);
+        outpoint = new TransactionOutPoint(payload, cursor, this);
         cursor += outpoint.getMessageSize();
         int scriptLen = (int) readVarInt();
         length = cursor - offset + scriptLen + 4;
@@ -62,7 +62,7 @@ public class TransactionInput extends ChildMessage {
     }
 
     void setScriptBytes(byte[] scriptBytes) {
-        super.rawtx = null;
+        super.payload = null;
         this.scriptSig = null;
         int oldLength = length;
         this.scriptBytes = scriptBytes;

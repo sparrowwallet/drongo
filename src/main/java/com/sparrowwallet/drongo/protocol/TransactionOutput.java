@@ -34,7 +34,7 @@ public class TransactionOutput extends ChildMessage {
         try {
             ByteArrayOutputStream baos = new ByteArrayOutputStream();
             bitcoinSerializeToStream(baos);
-            rawtx = baos.toByteArray();
+            payload = baos.toByteArray();
         } catch(IOException e) {
             //ignore
         }

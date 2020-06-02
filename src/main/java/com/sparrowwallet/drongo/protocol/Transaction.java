@@ -182,7 +182,7 @@ public class Transaction extends ChildMessage {
         // version
         version = readUint32();
         // peek at marker
-        byte marker = rawtx[cursor];
+        byte marker = payload[cursor];
         segwit = (marker == 0);
         // marker, flag
         if (segwit) {
@@ -206,7 +206,7 @@ public class Transaction extends ChildMessage {
         long numInputs = readVarInt();
         inputs = new ArrayList<>(Math.min((int) numInputs, Utils.MAX_INITIAL_ARRAY_LENGTH));
         for (long i = 0; i < numInputs; i++) {
-            TransactionInput input = new TransactionInput(this, rawtx, cursor);
+            TransactionInput input = new TransactionInput(this, payload, cursor);
             inputs.add(input);
             long scriptLen = readVarInt(TransactionOutPoint.MESSAGE_LENGTH);
             cursor += scriptLen + 4;
@@ -217,7 +217,7 @@ public class Transaction extends ChildMessage {
         long numOutputs = readVarInt();
         outputs = new ArrayList<>(Math.min((int) numOutputs, Utils.MAX_INITIAL_ARRAY_LENGTH));
         for (long i = 0; i < numOutputs; i++) {
-            TransactionOutput output = new TransactionOutput(this, rawtx, cursor);
+            TransactionOutput output = new TransactionOutput(this, payload, cursor);
             outputs.add(output);
             long scriptLen = readVarInt(8);
             cursor += scriptLen;
@@ -227,7 +227,7 @@ public class Transaction extends ChildMessage {
     private void parseWitnesses() {
         int numWitnesses = inputs.size();
         for (int i = 0; i < numWitnesses; i++) {
-            TransactionWitness witness = new TransactionWitness(this, rawtx, cursor);
+            TransactionWitness witness = new TransactionWitness(this, payload, cursor);
             inputs.get(i).setWitness(witness);
             cursor += witness.getLength();
         }

@@ -13,7 +13,7 @@ public abstract class Message {
     public static final int MAX_SIZE = 0x02000000; // 32MB
     public static final int UNKNOWN_LENGTH = Integer.MIN_VALUE;
 
-    protected byte[] rawtx;
+    protected byte[] payload;
 
     // The offset is how many bytes into the provided byte array this message payload starts at.
     protected int offset;
@@ -23,8 +23,8 @@ public abstract class Message {
 
     protected int length = UNKNOWN_LENGTH;
 
-    public Message(byte[] rawtx, int offset) {
-        this.rawtx = rawtx;
+    public Message(byte[] payload, int offset) {
+        this.payload = payload;
         this.cursor = this.offset = offset;
 
         parse();
@@ -53,7 +53,7 @@ public abstract class Message {
 
     protected long readUint32() throws ProtocolException {
         try {
-            long u = Utils.readUint32(rawtx, cursor);
+            long u = Utils.readUint32(payload, cursor);
             cursor += 4;
             return u;
         } catch (ArrayIndexOutOfBoundsException e) {
@@ -63,7 +63,7 @@ public abstract class Message {
 
     protected long readInt64() throws ProtocolException {
         try {
-            long u = Utils.readInt64(rawtx, cursor);
+            long u = Utils.readInt64(payload, cursor);
             cursor += 8;
             return u;
         } catch (ArrayIndexOutOfBoundsException e) {
@@ -72,12 +72,12 @@ public abstract class Message {
     }
 
     protected byte[] readBytes(int length) throws ProtocolException {
-        if ((length > MAX_SIZE) || (cursor + length > rawtx.length)) {
+        if ((length > MAX_SIZE) || (cursor + length > payload.length)) {
             throw new ProtocolException("Claimed value length too large: " + length);
         }
         try {
             byte[] b = new byte[length];
-            System.arraycopy(rawtx, cursor, b, 0, length);
+            System.arraycopy(payload, cursor, b, 0, length);
             cursor += length;
             return b;
         } catch (IndexOutOfBoundsException e) {
@@ -91,7 +91,7 @@ public abstract class Message {
 
     protected long readVarInt(int offset) throws ProtocolException {
         try {
-            VarInt varint = new VarInt(rawtx, cursor + offset);
+            VarInt varint = new VarInt(payload, cursor + offset);
             cursor += offset + varint.getOriginalSizeInBytes();
             return varint.value;
         } catch (ArrayIndexOutOfBoundsException e) {
