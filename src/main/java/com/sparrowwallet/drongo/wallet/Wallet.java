@@ -22,6 +22,7 @@ public class Wallet {
     private List<Keystore> keystores = new ArrayList<>();
     private final Set<WalletNode> purposeNodes = new TreeSet<>();
     private final Map<Sha256Hash, BlockTransaction> transactions = new HashMap<>();
+    private Integer storedBlockHeight;
 
     public Wallet() {
     }
@@ -84,6 +85,14 @@ public class Wallet {
 
     public Map<Sha256Hash, BlockTransaction> getTransactions() {
         return transactions;
+    }
+
+    public Integer getStoredBlockHeight() {
+        return storedBlockHeight;
+    }
+
+    public void setStoredBlockHeight(Integer storedBlockHeight) {
+        this.storedBlockHeight = storedBlockHeight;
     }
 
     public WalletNode getNode(KeyPurpose keyPurpose) {
