@@ -101,29 +101,32 @@ public class Wallet {
     }
 
     public int getLookAhead(WalletNode node) {
-        //TODO: Calculate using seen transactions
         int lookAhead = DEFAULT_LOOKAHEAD;
-        Integer maxIndex = node.getHighestUsedIndex();
-        if(maxIndex != null) {
-            lookAhead = Math.max(maxIndex + lookAhead/2, lookAhead);
+        Integer highestUsed = node.getHighestUsedIndex();
+        if(highestUsed != null) {
+            lookAhead = Math.max(highestUsed + lookAhead/2, lookAhead);
         }
 
         return lookAhead;
     }
 
     public WalletNode getFreshNode(KeyPurpose keyPurpose) {
-        //TODO: Calculate using seen transactions
         return getFreshNode(keyPurpose, null);
     }
 
     public WalletNode getFreshNode(KeyPurpose keyPurpose, WalletNode current) {
-        //TODO: Calculate using seen transactions
         int index = 0;
-        if(current != null) {
+
+        WalletNode node = getNode(keyPurpose);
+        Integer highestUsed = node.getHighestUsedIndex();
+        if(highestUsed != null) {
+            index = highestUsed + 1;
+        }
+
+        if(current != null && current.getIndex() >= index) {
             index = current.getIndex() + 1;
         }
 
-        WalletNode node = getNode(keyPurpose);
         if(index >= node.getChildren().size()) {
             node.fillToIndex(index);
         }

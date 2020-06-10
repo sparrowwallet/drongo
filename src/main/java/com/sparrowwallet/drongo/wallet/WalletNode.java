@@ -107,6 +107,15 @@ public class WalletNode implements Comparable<WalletNode> {
         return unspentTXOs.stream().filter(txo -> !txo.isSpent()).collect(Collectors.toCollection(HashSet::new));
     }
 
+    public long getUnspentValue() {
+        long value = 0L;
+        for(BlockTransactionHashIndex utxo : getUnspentTransactionOutputs()) {
+            value += utxo.getValue();
+        }
+
+        return value;
+    }
+
     public void fillToIndex(int index) {
         for(int i = 0; i <= index; i++) {
             WalletNode node = new WalletNode(getKeyPurpose(), i);
@@ -114,6 +123,9 @@ public class WalletNode implements Comparable<WalletNode> {
         }
     }
 
+    /**
+     * @return The highest used index, or null if no addresses are used
+     */
     public Integer getHighestUsedIndex() {
         WalletNode highestNode = null;
         for(WalletNode childNode : getChildren()) {
