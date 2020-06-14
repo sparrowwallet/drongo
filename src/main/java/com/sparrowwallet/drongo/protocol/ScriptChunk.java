@@ -109,6 +109,10 @@ public class ScriptChunk {
             return false;
         }
 
+        if(isSignature() || isPubKey()) {
+            return false;
+        }
+
         try {
             Script script = new Script(data);
             //Flaky: Test if contains a non-zero opcode, otherwise not a script
