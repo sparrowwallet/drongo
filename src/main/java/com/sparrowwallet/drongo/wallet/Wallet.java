@@ -13,7 +13,7 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 public class Wallet {
-    private static final int DEFAULT_LOOKAHEAD = 20;
+    public static final int DEFAULT_LOOKAHEAD = 20;
 
     private String name;
     private PolicyType policyType;
@@ -75,10 +75,6 @@ public class Wallet {
         return keystores;
     }
 
-    public void setKeystores(List<Keystore> keystores) {
-        this.keystores = keystores;
-    }
-
     private Set<WalletNode> getPurposeNodes() {
         return purposeNodes;
     }
@@ -113,7 +109,7 @@ public class Wallet {
         int lookAhead = DEFAULT_LOOKAHEAD;
         Integer highestUsed = node.getHighestUsedIndex();
         if(highestUsed != null) {
-            lookAhead = Math.max(highestUsed + lookAhead/2, lookAhead);
+            lookAhead = highestUsed + lookAhead;
         }
 
         return lookAhead;

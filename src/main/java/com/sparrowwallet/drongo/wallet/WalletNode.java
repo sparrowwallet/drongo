@@ -157,7 +157,19 @@ public class WalletNode implements Comparable<WalletNode> {
 
     @Override
     public int compareTo(WalletNode node) {
-        return getIndex() - node.getIndex();
+        if(getDerivation().size() != node.getDerivation().size()) {
+            return getDerivation().size() - node.getDerivation().size();
+        }
+
+        for(int i = 0; i < getDerivation().size(); i++) {
+            ChildNumber thisChild = getDerivation().get(i);
+            ChildNumber nodeChild = node.getDerivation().get(i);
+            if(thisChild.num() != nodeChild.num()) {
+                return thisChild.num() - nodeChild.num();
+            }
+        }
+
+        return 0;
     }
 
     public void clearHistory() {
