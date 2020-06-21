@@ -199,12 +199,19 @@ public class Wallet {
         }
     }
 
+    public void clearNodes() {
+        purposeNodes.clear();
+        transactions.clear();
+        storedBlockHeight = 0;
+    }
+
     public void clearHistory() {
         for(WalletNode purposeNode : purposeNodes) {
             purposeNode.clearHistory();
         }
 
         transactions.clear();
+        storedBlockHeight = 0;
     }
 
     public boolean isValid() {
