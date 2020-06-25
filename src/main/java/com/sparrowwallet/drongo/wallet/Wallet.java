@@ -101,7 +101,7 @@ public class Wallet {
             purposeNode = optionalPurposeNode.get();
         }
 
-        purposeNode.fillToIndex(getLookAhead(purposeNode) - 1);
+        purposeNode.fillToIndex(getLookAhead(purposeNode));
         return purposeNode;
     }
 
