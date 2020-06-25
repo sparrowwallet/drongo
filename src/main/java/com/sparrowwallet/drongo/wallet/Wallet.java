@@ -101,18 +101,18 @@ public class Wallet {
             purposeNode = optionalPurposeNode.get();
         }
 
-        purposeNode.fillToIndex(getLookAhead(purposeNode));
+        purposeNode.fillToIndex(getLookAheadIndex(purposeNode));
         return purposeNode;
     }
 
-    public int getLookAhead(WalletNode node) {
-        int lookAhead = DEFAULT_LOOKAHEAD;
+    public int getLookAheadIndex(WalletNode node) {
+        int lookAheadIndex = DEFAULT_LOOKAHEAD - 1;
         Integer highestUsed = node.getHighestUsedIndex();
         if(highestUsed != null) {
-            lookAhead = highestUsed + lookAhead;
+            lookAheadIndex = highestUsed + DEFAULT_LOOKAHEAD;
         }
 
-        return lookAhead;
+        return lookAheadIndex;
     }
 
     public WalletNode getFreshNode(KeyPurpose keyPurpose) {
