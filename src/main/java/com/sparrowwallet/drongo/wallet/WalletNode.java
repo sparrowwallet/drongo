@@ -87,7 +87,7 @@ public class WalletNode implements Comparable<WalletNode> {
     }
 
     public Set<WalletNode> getChildren() {
-        return children;
+        return children == null ? null : Collections.unmodifiableSet(children);
     }
 
     public void setChildren(Set<WalletNode> children) {
@@ -95,11 +95,21 @@ public class WalletNode implements Comparable<WalletNode> {
     }
 
     public Set<BlockTransactionHashIndex> getTransactionOutputs() {
-        return transactionOutputs;
+        return transactionOutputs == null ? null : Collections.unmodifiableSet(transactionOutputs);
     }
 
     public void setTransactionOutputs(Set<BlockTransactionHashIndex> transactionOutputs) {
         this.transactionOutputs = transactionOutputs;
+    }
+
+    public synchronized void updateTransactionOutputs(Set<BlockTransactionHashIndex> updatedOutputs) {
+        for(BlockTransactionHashIndex txo : updatedOutputs) {
+            Optional<String> optionalLabel = transactionOutputs.stream().filter(oldTxo -> oldTxo.getHash().equals(txo.getHash()) && oldTxo.getIndex() == txo.getIndex()).map(BlockTransactionHash::getLabel).filter(Objects::nonNull).findFirst();
+            optionalLabel.ifPresent(txo::setLabel);
+        }
+
+        transactionOutputs.clear();
+        transactionOutputs.addAll(updatedOutputs);
     }
 
     public Set<BlockTransactionHashIndex> getUnspentTransactionOutputs() {
@@ -116,10 +126,10 @@ public class WalletNode implements Comparable<WalletNode> {
         return value;
     }
 
-    public void fillToIndex(int index) {
+    public synchronized void fillToIndex(int index) {
         for(int i = 0; i <= index; i++) {
             WalletNode node = new WalletNode(getKeyPurpose(), i);
-            getChildren().add(node);
+            children.add(node);
         }
     }
 
@@ -172,7 +182,7 @@ public class WalletNode implements Comparable<WalletNode> {
         return 0;
     }
 
-    public void clearHistory() {
+    public synchronized void clearHistory() {
         transactionOutputs.clear();
         for(WalletNode childNode : getChildren()) {
             childNode.clearHistory();
@@ -184,11 +194,11 @@ public class WalletNode implements Comparable<WalletNode> {
         copy.setLabel(label);
 
         for(WalletNode child : getChildren()) {
-            copy.getChildren().add(child.copy());
+            copy.children.add(child.copy());
         }
 
         for(BlockTransactionHashIndex txo : getTransactionOutputs()) {
-            copy.getTransactionOutputs().add(txo.copy());
+            copy.transactionOutputs.add(txo.copy());
         }
 
         return copy;

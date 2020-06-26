@@ -75,12 +75,18 @@ public class Wallet {
         return keystores;
     }
 
-    private Set<WalletNode> getPurposeNodes() {
-        return purposeNodes;
+    public Map<Sha256Hash, BlockTransaction> getTransactions() {
+        return Collections.unmodifiableMap(transactions);
     }
 
-    public Map<Sha256Hash, BlockTransaction> getTransactions() {
-        return transactions;
+    public synchronized void updateTransactions(Map<Sha256Hash, BlockTransaction> updatedTransactions) {
+        for(BlockTransaction blockTx : updatedTransactions.values()) {
+            Optional<String> optionalLabel = transactions.values().stream().filter(oldBlTx -> oldBlTx.getHash().equals(blockTx.getHash())).map(BlockTransaction::getLabel).filter(Objects::nonNull).findFirst();
+            optionalLabel.ifPresent(blockTx::setLabel);
+        }
+
+        transactions.clear();
+        transactions.putAll(updatedTransactions);
     }
 
     public Integer getStoredBlockHeight() {
@@ -91,7 +97,7 @@ public class Wallet {
         this.storedBlockHeight = storedBlockHeight;
     }
 
-    public WalletNode getNode(KeyPurpose keyPurpose) {
+    public synchronized WalletNode getNode(KeyPurpose keyPurpose) {
         WalletNode purposeNode;
         Optional<WalletNode> optionalPurposeNode = purposeNodes.stream().filter(node -> node.getKeyPurpose().equals(keyPurpose)).findFirst();
         if(optionalPurposeNode.isEmpty()) {
@@ -310,10 +316,10 @@ public class Wallet {
             copy.getKeystores().add(keystore.copy());
         }
         for(WalletNode node : purposeNodes) {
-            copy.getPurposeNodes().add(node.copy());
+            copy.purposeNodes.add(node.copy());
         }
         for(Sha256Hash hash : transactions.keySet()) {
-            copy.getTransactions().put(hash, transactions.get(hash));
+            copy.transactions.put(hash, transactions.get(hash));
         }
 
         return copy;
