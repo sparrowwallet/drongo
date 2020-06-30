@@ -178,7 +178,7 @@ public class Bech32 {
     /**
      * Helper for re-arranging bits into groups.
      */
-    private static byte[] convertBits(final byte[] in, final int inStart, final int inLen, final int fromBits,
+    public static byte[] convertBits(final byte[] in, final int inStart, final int inLen, final int fromBits,
                                       final int toBits, final boolean pad) {
         int acc = 0;
         int bits = 0;
