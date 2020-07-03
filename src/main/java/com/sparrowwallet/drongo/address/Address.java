@@ -2,6 +2,7 @@ package com.sparrowwallet.drongo.address;
 
 import com.sparrowwallet.drongo.protocol.Base58;
 import com.sparrowwallet.drongo.protocol.Bech32;
+import com.sparrowwallet.drongo.protocol.Script;
 import com.sparrowwallet.drongo.protocol.ScriptType;
 
 import java.util.Arrays;
@@ -30,6 +31,8 @@ public abstract class Address {
     public abstract int getVersion();
 
     public abstract ScriptType getScriptType();
+
+    public abstract Script getOutputScript();
 
     public abstract byte[] getOutputScriptData();
 

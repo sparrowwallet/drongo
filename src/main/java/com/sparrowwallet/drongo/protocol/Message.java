@@ -23,7 +23,11 @@ public abstract class Message {
 
     protected int length = UNKNOWN_LENGTH;
 
-    public Message(byte[] payload, int offset) {
+    protected Message() {
+
+    }
+
+    protected Message(byte[] payload, int offset) {
         this.payload = payload;
         this.cursor = this.offset = offset;
 

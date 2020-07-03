@@ -33,6 +33,13 @@ public class Transaction extends ChildMessage {
     private ArrayList<TransactionInput> inputs;
     private ArrayList<TransactionOutput> outputs;
 
+    public Transaction() {
+        version = 1;
+        inputs = new ArrayList<>();
+        outputs = new ArrayList<>();
+        length = 8;
+    }
+
     public Transaction(byte[] rawtx) {
         super(rawtx, 0);
     }
@@ -125,6 +132,11 @@ public class Transaction extends ChildMessage {
     }
 
     public void setSegwitVersion(int segwitVersion) {
+        if(!segwit) {
+            adjustLength(2);
+            this.segwit = true;
+        }
+
         this.segwitVersion = segwitVersion;
     }
 
@@ -272,8 +284,42 @@ public class Transaction extends ChildMessage {
         return Collections.unmodifiableList(inputs);
     }
 
+    public TransactionInput addInput(Sha256Hash spendTxHash, long outputIndex, Script script) {
+        return addInput(new TransactionInput(this, new TransactionOutPoint(spendTxHash, outputIndex), script.getProgram()));
+    }
+
+    public TransactionInput addInput(Sha256Hash spendTxHash, long outputIndex, Script script, TransactionWitness witness) {
+        return addInput(new TransactionInput(this, new TransactionOutPoint(spendTxHash, outputIndex), script.getProgram(), witness));
+    }
+
+    public TransactionInput addInput(TransactionInput input) {
+        input.setParent(this);
+        inputs.add(input);
+        adjustLength(inputs.size(), input.length);
+        return input;
+    }
+
     public List<TransactionOutput> getOutputs() {
         return Collections.unmodifiableList(outputs);
+    }
+
+    public TransactionOutput addOutput(long value, Script script) {
+        return addOutput(new TransactionOutput(this, value, script));
+    }
+
+    public TransactionOutput addOutput(long value, Address address) {
+        return addOutput(new TransactionOutput(this, value, address.getOutputScript()));
+    }
+
+    public TransactionOutput addOutput(long value, ECKey pubkey) {
+        return addOutput(new TransactionOutput(this, value, ScriptType.P2PK.getOutputScript(pubkey)));
+    }
+
+    public TransactionOutput addOutput(TransactionOutput output) {
+        output.setParent(this);
+        outputs.add(output);
+        adjustLength(outputs.size(), output.length);
+        return output;
     }
 
     public void verify() throws VerificationException {

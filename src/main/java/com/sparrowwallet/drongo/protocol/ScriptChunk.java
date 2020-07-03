@@ -22,16 +22,38 @@ public class ScriptChunk {
      */
     public final byte[] data;
 
-    private int startLocationInProgram;
-
     public ScriptChunk(int opcode, byte[] data) {
-        this(opcode, data, -1);
-    }
-
-    public ScriptChunk(int opcode, byte[] data, int startLocationInProgram) {
         this.opcode = opcode;
         this.data = data;
-        this.startLocationInProgram = startLocationInProgram;
+    }
+
+    public static ScriptChunk fromOpcode(int opcode) {
+        return new ScriptChunk(opcode, null);
+    }
+
+    public static ScriptChunk fromData(byte[] data) {
+        byte[] copy = Arrays.copyOf(data, data.length);
+        int opcode;
+        if (data.length == 0) {
+            opcode = OP_0;
+        } else if (data.length == 1) {
+            byte b = data[0];
+            if (b >= 1 && b <= 16) {
+                opcode = Script.encodeToOpN(b);
+            } else {
+                opcode = 1;
+            }
+        } else if (data.length < OP_PUSHDATA1) {
+            opcode = data.length;
+        } else if (data.length < 256) {
+            opcode = OP_PUSHDATA1;
+        } else if (data.length < 65536) {
+            opcode = OP_PUSHDATA2;
+        } else {
+            opcode = OP_PUSHDATA4;
+        }
+
+        return new ScriptChunk(opcode, copy);
     }
 
     public boolean equalsOpCode(int opcode) {

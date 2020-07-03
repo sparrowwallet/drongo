@@ -1,6 +1,7 @@
 package com.sparrowwallet.drongo.address;
 
 import com.sparrowwallet.drongo.protocol.Bech32;
+import com.sparrowwallet.drongo.protocol.Script;
 import com.sparrowwallet.drongo.protocol.ScriptType;
 
 public class P2WPKHAddress extends Address {
@@ -20,6 +21,11 @@ public class P2WPKHAddress extends Address {
 
     public ScriptType getScriptType() {
         return ScriptType.P2WPKH;
+    }
+
+    @Override
+    public Script getOutputScript() {
+        return getScriptType().getOutputScript(hash);
     }
 
     @Override

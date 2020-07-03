@@ -41,10 +41,10 @@ public class Script {
     }
 
     private static final ScriptChunk[] STANDARD_TRANSACTION_SCRIPT_CHUNKS = {
-            new ScriptChunk(ScriptOpCodes.OP_DUP, null, 0),
-            new ScriptChunk(ScriptOpCodes.OP_HASH160, null, 1),
-            new ScriptChunk(ScriptOpCodes.OP_EQUALVERIFY, null, 23),
-            new ScriptChunk(ScriptOpCodes.OP_CHECKSIG, null, 24),
+            new ScriptChunk(ScriptOpCodes.OP_DUP, null),
+            new ScriptChunk(ScriptOpCodes.OP_HASH160, null),
+            new ScriptChunk(ScriptOpCodes.OP_EQUALVERIFY, null),
+            new ScriptChunk(ScriptOpCodes.OP_CHECKSIG, null),
     };
 
     void parse() {
@@ -52,7 +52,6 @@ public class Script {
         ByteArrayInputStream bis = new ByteArrayInputStream(program);
         int initialSize = bis.available();
         while (bis.available() > 0) {
-            int startLocationInProgram = initialSize - bis.available();
             int opcode = bis.read();
 
             long dataToRead = -1;
@@ -75,7 +74,7 @@ public class Script {
 
             ScriptChunk chunk;
             if (dataToRead == -1) {
-                chunk = new ScriptChunk(opcode, null, startLocationInProgram);
+                chunk = new ScriptChunk(opcode, null);
             } else {
                 if (dataToRead > bis.available())
                     throw new ProtocolException("Push of data element that is larger than remaining data");
@@ -84,7 +83,7 @@ public class Script {
                     throw new ProtocolException();
                 }
 
-                chunk = new ScriptChunk(opcode, data, startLocationInProgram);
+                chunk = new ScriptChunk(opcode, data);
             }
             // Save some memory by eliminating redundant copies of the same chunk objects.
             for (ScriptChunk c : STANDARD_TRANSACTION_SCRIPT_CHUNKS) {

@@ -3,7 +3,6 @@ package com.sparrowwallet.drongo.protocol;
 import com.sparrowwallet.drongo.Utils;
 import com.sparrowwallet.drongo.address.Address;
 
-import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 
@@ -19,25 +18,20 @@ public class TransactionOutput extends ChildMessage {
 
     private Address[] addresses = new Address[0];
 
+    public TransactionOutput(Transaction transaction, long value, Script script) {
+        this(transaction, value, script.getProgram());
+    }
+
+    public TransactionOutput(Transaction transaction, long value, byte[] scriptBytes) {
+        this.value = value;
+        this.scriptBytes = scriptBytes;
+        setParent(transaction);
+        length = 8 + VarInt.sizeOf(scriptBytes.length) + scriptBytes.length;
+    }
+
     public TransactionOutput(Transaction parent, byte[] rawtx, int offset) {
         super(rawtx, offset);
         setParent(parent);
-    }
-
-    public TransactionOutput(Transaction parent, long value, byte[] scriptBytes) {
-        super(new byte[0], 0);
-        this.value = value;
-        this.scriptBytes = scriptBytes;
-        setParent(parent);
-        length = 8 + VarInt.sizeOf(scriptBytes.length) + scriptBytes.length;
-
-        try {
-            ByteArrayOutputStream baos = new ByteArrayOutputStream();
-            bitcoinSerializeToStream(baos);
-            payload = baos.toByteArray();
-        } catch(IOException e) {
-            //ignore
-        }
     }
 
     protected void parse() throws ProtocolException {
@@ -76,6 +70,11 @@ public class TransactionOutput extends ChildMessage {
 
     public void setAddresses(Address[] addresses) {
         this.addresses = addresses;
+    }
+
+    public Sha256Hash getHash() {
+        Transaction transaction = (Transaction)parent;
+        return transaction.getTxId();
     }
 
     public int getIndex() {

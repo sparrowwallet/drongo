@@ -18,6 +18,12 @@ public class TransactionOutPoint extends ChildMessage {
 
     private Address[] addresses = new Address[0];
 
+    public TransactionOutPoint(Sha256Hash hash, long index) {
+        this.hash = hash;
+        this.index = index;
+        length = MESSAGE_LENGTH;
+    }
+
     public TransactionOutPoint(byte[] rawtx, int offset, Message parent) {
         super(rawtx, offset);
         setParent(parent);

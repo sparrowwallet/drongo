@@ -1,5 +1,6 @@
 package com.sparrowwallet.drongo.protocol;
 
+import com.sparrowwallet.drongo.crypto.ECKey;
 import org.bouncycastle.util.encoders.Hex;
 
 import java.io.ByteArrayOutputStream;
@@ -12,6 +13,30 @@ import java.util.List;
 
 public class TransactionWitness extends ChildMessage {
     private List<byte[]> pushes;
+
+    public TransactionWitness(Transaction transaction, ECKey pubKey, TransactionSignature signature) {
+        setParent(transaction);
+        this.pushes = new ArrayList<>();
+        pushes.add(signature.encodeToBitcoin());
+        pushes.add(pubKey.getPubKey());
+    }
+
+    public TransactionWitness(Transaction transaction, List<TransactionSignature> signatures, Script witnessScript) {
+        setParent(transaction);
+        this.pushes = new ArrayList<>();
+        if(ScriptType.MULTISIG.isScriptType(witnessScript)) {
+            pushes.add(new byte[] { ScriptOpCodes.OP_0 });
+        }
+        for(TransactionSignature signature : signatures) {
+            pushes.add(signature.encodeToBitcoin());
+        }
+        pushes.add(witnessScript.getProgram());
+    }
+
+    public TransactionWitness(Transaction transaction, List<byte[]> witnesses) {
+        setParent(transaction);
+        this.pushes = witnesses;
+    }
 
     public TransactionWitness(Transaction parent, byte[] rawtx, int offset) {
         super(rawtx, offset);
@@ -53,8 +78,12 @@ public class TransactionWitness extends ChildMessage {
         int length = new VarInt(pushes.size()).getSizeInBytes();
         for (int i = 0; i < pushes.size(); i++) {
             byte[] push = pushes.get(i);
-            length += new VarInt(push.length).getSizeInBytes();
-            length += push.length;
+            if(push.length == 1 && push[0] == 0) {
+                length++;
+            } else {
+                length += new VarInt(push.length).getSizeInBytes();
+                length += push.length;
+            }
         }
 
         return length;
@@ -64,8 +93,12 @@ public class TransactionWitness extends ChildMessage {
         stream.write(new VarInt(pushes.size()).encode());
         for (int i = 0; i < pushes.size(); i++) {
             byte[] push = pushes.get(i);
-            stream.write(new VarInt(push.length).encode());
-            stream.write(push);
+            if(push.length == 1 && push[0] == 0) {
+                stream.write(push);
+            } else {
+                stream.write(new VarInt(push.length).encode());
+                stream.write(push);
+            }
         }
     }
 

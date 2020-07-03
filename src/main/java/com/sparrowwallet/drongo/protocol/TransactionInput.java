@@ -25,6 +25,23 @@ public class TransactionInput extends ChildMessage {
 
     private TransactionWitness witness;
 
+    public TransactionInput(Transaction transaction, TransactionOutPoint outpoint, byte[] scriptBytes) {
+        this(transaction, outpoint, scriptBytes, null);
+    }
+
+    public TransactionInput(Transaction transaction, TransactionOutPoint outpoint, byte[] scriptBytes, TransactionWitness witness) {
+        setParent(transaction);
+        this.sequence = SEQUENCE_LOCKTIME_DISABLED;
+        this.outpoint = outpoint;
+        this.outpoint.setParent(this);
+        this.scriptBytes = scriptBytes;
+        this.witness = witness;
+        length = 40 + (scriptBytes == null ? 1 : VarInt.sizeOf(scriptBytes.length) + scriptBytes.length);
+        if(witness != null) {
+            transaction.adjustLength(witness.getLength());
+        }
+    }
+
     public TransactionInput(Transaction transaction, byte[] rawtx, int offset) {
         super(rawtx, offset);
         setParent(transaction);

@@ -4,7 +4,11 @@ public abstract class ChildMessage extends Message {
 
     protected Message parent;
 
-    public ChildMessage(byte[] rawtx, int offset) {
+    protected ChildMessage() {
+        super();
+    }
+
+    protected ChildMessage(byte[] rawtx, int offset) {
         super(rawtx, offset);
     }
 

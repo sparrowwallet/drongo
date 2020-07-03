@@ -205,6 +205,23 @@ public class Wallet {
         }
     }
 
+    public Map<BlockTransactionHashIndex, WalletNode> getWalletUtxos() {
+        Map<BlockTransactionHashIndex, WalletNode> walletUtxos = new TreeMap<>();
+
+        getWalletUtxos(walletUtxos, getNode(KeyPurpose.RECEIVE));
+        getWalletUtxos(walletUtxos, getNode(KeyPurpose.CHANGE));
+
+        return walletUtxos;
+    }
+
+    private void getWalletUtxos(Map<BlockTransactionHashIndex, WalletNode> walletUtxos, WalletNode purposeNode) {
+        for(WalletNode addressNode : purposeNode.getChildren()) {
+            for(BlockTransactionHashIndex utxo : addressNode.getUnspentTransactionOutputs()) {
+                walletUtxos.put(utxo, addressNode);
+            }
+        }
+    }
+
     public void clearNodes() {
         purposeNodes.clear();
         transactions.clear();

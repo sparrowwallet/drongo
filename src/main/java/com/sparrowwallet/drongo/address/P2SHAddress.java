@@ -1,6 +1,7 @@
 package com.sparrowwallet.drongo.address;
 
 import com.sparrowwallet.drongo.Utils;
+import com.sparrowwallet.drongo.protocol.Script;
 import com.sparrowwallet.drongo.protocol.ScriptType;
 
 public class P2SHAddress extends Address {
@@ -12,8 +13,14 @@ public class P2SHAddress extends Address {
         return 5;
     }
 
+    @Override
     public ScriptType getScriptType() {
         return ScriptType.P2SH;
+    }
+
+    @Override
+    public Script getOutputScript() {
+        return getScriptType().getOutputScript(hash);
     }
 
     @Override
