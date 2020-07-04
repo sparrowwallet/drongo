@@ -151,17 +151,45 @@ public class Wallet {
         throw new IllegalStateException("Could not fill nodes to index " + index);
     }
 
+    public ECKey getPubKey(WalletNode node) {
+        return getPubKey(node.getKeyPurpose(), node.getIndex());
+    }
+
+    public ECKey getPubKey(KeyPurpose keyPurpose, int index) {
+        if(policyType == PolicyType.MULTI) {
+            throw new IllegalStateException("Attempting to retrieve a single key for a multisig policy wallet");
+        } else if(policyType == PolicyType.CUSTOM) {
+            throw new UnsupportedOperationException("Cannot determine a public key for a custom policy");
+        }
+
+        Keystore keystore = getKeystores().get(0);
+        return keystore.getKey(keyPurpose, index);
+    }
+
+    public List<ECKey> getPubKeys(WalletNode node) {
+        return getPubKeys(node.getKeyPurpose(), node.getIndex());
+    }
+
+    public List<ECKey> getPubKeys(KeyPurpose keyPurpose, int index) {
+        if(policyType == PolicyType.SINGLE) {
+            throw new IllegalStateException("Attempting to retrieve multiple keys for a singlesig policy wallet");
+        } else if(policyType == PolicyType.CUSTOM) {
+            throw new UnsupportedOperationException("Cannot determine public keys for a custom policy");
+        }
+
+        return getKeystores().stream().map(keystore -> keystore.getKey(keyPurpose, index)).collect(Collectors.toList());
+    }
+
     public Address getAddress(WalletNode node) {
         return getAddress(node.getKeyPurpose(), node.getIndex());
     }
 
     public Address getAddress(KeyPurpose keyPurpose, int index) {
         if(policyType == PolicyType.SINGLE) {
-            Keystore keystore = getKeystores().get(0);
-            DeterministicKey key = keystore.getKey(keyPurpose, index);
-            return scriptType.getAddress(key);
+            ECKey pubKey = getPubKey(keyPurpose, index);
+            return scriptType.getAddress(pubKey);
         } else if(policyType == PolicyType.MULTI) {
-            List<ECKey> pubKeys = getKeystores().stream().map(keystore -> keystore.getKey(keyPurpose, index)).collect(Collectors.toList());
+            List<ECKey> pubKeys = getPubKeys(keyPurpose, index);
             Script script = ScriptType.MULTISIG.getOutputScript(defaultPolicy.getNumSignaturesRequired(), pubKeys);
             return scriptType.getAddress(script);
         } else {
@@ -175,11 +203,10 @@ public class Wallet {
 
     public Script getOutputScript(KeyPurpose keyPurpose, int index) {
         if(policyType == PolicyType.SINGLE) {
-            Keystore keystore = getKeystores().get(0);
-            DeterministicKey key = keystore.getKey(keyPurpose, index);
-            return scriptType.getOutputScript(key);
+            ECKey pubKey = getPubKey(keyPurpose, index);
+            return scriptType.getOutputScript(pubKey);
         } else if(policyType == PolicyType.MULTI) {
-            List<ECKey> pubKeys = getKeystores().stream().map(keystore -> keystore.getKey(keyPurpose, index)).collect(Collectors.toList());
+            List<ECKey> pubKeys = getPubKeys(keyPurpose, index);
             Script script = ScriptType.MULTISIG.getOutputScript(defaultPolicy.getNumSignaturesRequired(), pubKeys);
             return scriptType.getOutputScript(script);
         } else {
@@ -193,11 +220,10 @@ public class Wallet {
 
     public String getOutputDescriptor(KeyPurpose keyPurpose, int index) {
         if(policyType == PolicyType.SINGLE) {
-            Keystore keystore = getKeystores().get(0);
-            DeterministicKey key = keystore.getKey(keyPurpose, index);
-            return scriptType.getOutputDescriptor(key);
+            ECKey pubKey = getPubKey(keyPurpose, index);
+            return scriptType.getOutputDescriptor(pubKey);
         } else if(policyType == PolicyType.MULTI) {
-            List<ECKey> pubKeys = getKeystores().stream().map(keystore -> keystore.getKey(keyPurpose, index)).collect(Collectors.toList());
+            List<ECKey> pubKeys = getPubKeys(keyPurpose, index);
             Script script = ScriptType.MULTISIG.getOutputScript(defaultPolicy.getNumSignaturesRequired(), pubKeys);
             return scriptType.getOutputDescriptor(script);
         } else {
@@ -220,6 +246,91 @@ public class Wallet {
                 walletUtxos.put(utxo, addressNode);
             }
         }
+    }
+
+    public WalletTransaction createWalletTransaction(List<UtxoSelector> utxoSelectors, Address recipientAddress, long recipientAmount, double feeRate) throws InsufficientFundsException {
+        long valueRequiredAmt = recipientAmount;
+
+        while(true) {
+            Map<BlockTransactionHashIndex, WalletNode> selectedUtxos = selectInputs(utxoSelectors, valueRequiredAmt);
+            long totalSelectedAmt = selectedUtxos.keySet().stream().mapToLong(BlockTransactionHashIndex::getValue).sum();
+
+            //Add inputs
+            Transaction transaction = new Transaction();
+            for(Map.Entry<BlockTransactionHashIndex, WalletNode> selectedUtxo : selectedUtxos.entrySet()) {
+                Transaction prevTx = getTransactions().get(selectedUtxo.getKey().getHash()).getTransaction();
+                TransactionOutput prevTxOut = prevTx.getOutputs().get((int)selectedUtxo.getKey().getIndex());
+
+                if(getPolicyType().equals(PolicyType.SINGLE)) {
+                    ECKey pubKey = getPubKey(selectedUtxo.getValue());
+                    TransactionSignature signature = TransactionSignature.dummy();
+                    getScriptType().addSpendingInput(transaction, prevTxOut, pubKey, signature);
+                } else if(getPolicyType().equals(PolicyType.MULTI)) {
+                    List<ECKey> pubKeys = getPubKeys(selectedUtxo.getValue());
+                    int threshold = getDefaultPolicy().getNumSignaturesRequired();
+                    List<TransactionSignature> signatures = new ArrayList<>(threshold);
+                    for(int i = 0; i < threshold; i++) {
+                        signatures.add(TransactionSignature.dummy());
+                    }
+                    getScriptType().addMultisigSpendingInput(transaction, prevTxOut, threshold, pubKeys, signatures);
+                }
+            }
+
+            //Add recipient output
+            transaction.addOutput(recipientAmount, recipientAddress);
+            int noChangeVSize = transaction.getVirtualSize();
+            long noChangeFeeRequiredAmt = (long)(feeRate * noChangeVSize);
+
+            //Calculate what is left over from selected utxos after paying recipient
+            long differenceAmt = totalSelectedAmt - recipientAmount;
+
+            //If insufficient fee, increase value required from inputs to include the fee and try again
+            if(differenceAmt < noChangeFeeRequiredAmt) {
+                valueRequiredAmt = totalSelectedAmt + 1;
+                continue;
+            }
+
+            //Determine if a change output is required by checking if its value is greater than its dust threshold
+            long changeAmt = differenceAmt - noChangeFeeRequiredAmt;
+            WalletNode changeNode = getFreshNode(KeyPurpose.CHANGE);
+            TransactionOutput changeOutput = new TransactionOutput(transaction, changeAmt, getOutputScript(changeNode));
+            long dustThreshold = getScriptType().getDustThreshold(changeOutput, Transaction.DEFAULT_DISCARD_FEE_RATE);
+            if(changeAmt > dustThreshold) {
+                //Change output is required, determine new fee once change output has been added
+                int changeVSize = noChangeVSize + changeOutput.getLength();
+                long changeFeeRequiredAmt = (long)(feeRate * changeVSize);
+
+                //Recalculate the change amount with the new fee
+                changeAmt = differenceAmt - changeFeeRequiredAmt;
+                if(changeAmt < dustThreshold) {
+                    //The new fee has meant that the change output is now dust. We pay too high a fee without change, but change is dust when added. Increase value required from inputs and try again
+                    valueRequiredAmt = totalSelectedAmt + 1;
+                    continue;
+                }
+
+                //Add change output
+                transaction.addOutput(changeAmt, getOutputScript(changeNode));
+
+                return new WalletTransaction(this, transaction, selectedUtxos, recipientAddress, recipientAmount, changeNode, changeAmt, changeFeeRequiredAmt);
+            }
+
+            return new WalletTransaction(this, transaction, selectedUtxos, recipientAddress, recipientAmount, differenceAmt);
+        }
+    }
+
+    private Map<BlockTransactionHashIndex, WalletNode> selectInputs(List<UtxoSelector> utxoSelectors, Long targetValue) throws InsufficientFundsException {
+        Map<BlockTransactionHashIndex, WalletNode> utxos = getWalletUtxos();
+
+        for(UtxoSelector utxoSelector : utxoSelectors) {
+            Collection<BlockTransactionHashIndex> selectedInputs = utxoSelector.select(targetValue, utxos.keySet());
+            long total = selectedInputs.stream().mapToLong(BlockTransactionHashIndex::getValue).sum();
+            if(total > targetValue) {
+                utxos.keySet().retainAll(selectedInputs);
+                return utxos;
+            }
+        }
+
+        throw new InsufficientFundsException("Not enough combined value in UTXOs for output value " + targetValue);
     }
 
     public void clearNodes() {

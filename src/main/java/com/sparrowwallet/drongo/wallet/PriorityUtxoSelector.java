@@ -18,6 +18,9 @@ public class PriorityUtxoSelector implements UtxoSelector {
         List<BlockTransactionHashIndex> sorted = candidates.stream().filter(ref -> ref.getHeight() != 0).collect(Collectors.toList());
         sort(sorted);
 
+        //Testing only: remove
+        Collections.reverse(sorted);
+
         long total = 0;
         for(BlockTransactionHashIndex reference : sorted) {
             if(total > targetValue) {

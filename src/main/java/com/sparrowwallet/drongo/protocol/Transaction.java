@@ -21,6 +21,8 @@ public class Transaction extends ChildMessage {
     public static final long MAX_BITCOIN = 21 * 1000 * 1000L;
     public static final long SATOSHIS_PER_BITCOIN = 100 * 1000 * 1000L;
     public static final long MAX_BLOCK_LOCKTIME = 500000000L;
+    public static final int WITNESS_SCALE_FACTOR = 4;
+    public static final double DEFAULT_DISCARD_FEE_RATE = 10000d / 1000;
 
     private long version;
     private long locktime;
@@ -147,6 +149,18 @@ public class Transaction extends ChildMessage {
         return false;
     }
 
+    public byte[] bitcoinSerialize() {
+        try {
+            ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+            bitcoinSerializeToStream(outputStream);
+            return outputStream.toByteArray();
+        } catch (IOException e) {
+            //can't happen
+        }
+
+        return null;
+    }
+
     public void bitcoinSerializeToStream(OutputStream stream) throws IOException {
         boolean useSegwit = isSegwit();
         bitcoinSerializeToStream(stream, useSegwit);
@@ -253,19 +267,19 @@ public class Transaction extends ChildMessage {
         int wu = 0;
 
         // version
-        wu += 4*4;
+        wu += 4 * WITNESS_SCALE_FACTOR;
         // marker, flag
         if(isSegwit()) {
             wu += 2;
         }
         // txin_count, txins
-        wu += new VarInt(inputs.size()).getSizeInBytes() * 4;
+        wu += new VarInt(inputs.size()).getSizeInBytes() * WITNESS_SCALE_FACTOR;
         for (TransactionInput in : inputs)
-            wu += in.length * 4;
+            wu += in.length * WITNESS_SCALE_FACTOR;
         // txout_count, txouts
-        wu += new VarInt(outputs.size()).getSizeInBytes() * 4;
+        wu += new VarInt(outputs.size()).getSizeInBytes() * WITNESS_SCALE_FACTOR;
         for (TransactionOutput out : outputs)
-            wu += out.length * 4;
+            wu += out.length * WITNESS_SCALE_FACTOR;
         // script_witnesses
         if(isSegwit()) {
             for (TransactionInput in : inputs) {
@@ -275,9 +289,9 @@ public class Transaction extends ChildMessage {
             }
         }
         // lock_time
-        wu += 4*4;
+        wu += 4 * WITNESS_SCALE_FACTOR;
 
-        return (int)Math.ceil((double)wu / 4.0);
+        return (int)Math.ceil((double)wu / (double)WITNESS_SCALE_FACTOR);
     }
 
     public List<TransactionInput> getInputs() {

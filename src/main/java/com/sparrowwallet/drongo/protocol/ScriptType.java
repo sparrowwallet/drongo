@@ -13,6 +13,7 @@ import java.util.stream.Collectors;
 import static com.sparrowwallet.drongo.policy.PolicyType.*;
 import static com.sparrowwallet.drongo.protocol.Script.decodeFromOpN;
 import static com.sparrowwallet.drongo.protocol.ScriptOpCodes.*;
+import static com.sparrowwallet.drongo.protocol.Transaction.WITNESS_SCALE_FACTOR;
 
 public enum ScriptType {
     P2PK("P2PK", "m/44'/0'/0'") {
@@ -1030,6 +1031,10 @@ public enum ScriptType {
 
     public static final ScriptType[] SINGLE_HASH_TYPES = {P2PKH, P2SH, P2SH_P2WPKH, P2SH_P2WSH, P2WPKH, P2WSH};
 
+    public static final ScriptType[] NON_WITNESS_TYPES = {P2PK, P2PKH, P2SH};
+
+    public static final ScriptType[] WITNESS_TYPES = {P2SH_P2WPKH, P2SH_P2WSH, P2WPKH, P2WSH};
+
     public static List<ScriptType> getScriptTypesForPolicyType(PolicyType policyType) {
         return Arrays.stream(values()).filter(scriptType -> scriptType.isAllowed(policyType)).collect(Collectors.toList());
     }
@@ -1042,6 +1047,30 @@ public enum ScriptType {
         }
 
         return null;
+    }
+
+    /**
+     * Determines the dust threshold for this script type.
+     *
+     * @param output The output under consideration
+     * @param feeRate The fee rate at which the fee required will be calculated
+     * @return the minimum viable value than the provided output must have in order to not be dust
+     */
+    public long getDustThreshold(TransactionOutput output, Double feeRate) {
+        //Start with length of output
+        int totalLength = output.getLength();
+        if(Arrays.asList(WITNESS_TYPES).contains(this)) {
+            //Add length of spending input with 75% discount to script size
+            totalLength += (32 + 4 + 1 + (107 / WITNESS_SCALE_FACTOR) + 4);
+        } else if(Arrays.asList(NON_WITNESS_TYPES).contains(this)) {
+            //Add length of spending input with no discount
+            totalLength += (32 + 4 + 1 + 107 + 4);
+        } else {
+            throw new UnsupportedOperationException("Cannot determine dust threshold for script type " + this.getName());
+        }
+
+        //Return fee rate in sats/vbyte multiplied by the calculated total byte length
+        return (long)(feeRate * totalLength);
     }
 
     @Override
