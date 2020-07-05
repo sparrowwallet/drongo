@@ -64,11 +64,23 @@ public class WalletTransaction {
         return changeNode;
     }
 
+    public Address getChangeAddress() {
+        return getWallet().getAddress(getChangeNode());
+    }
+
     public long getChangeAmount() {
         return changeAmount;
     }
 
     public long getFee() {
         return fee;
+    }
+
+    public long getTotal() {
+        return selectedUtxos.keySet().stream().mapToLong(BlockTransactionHashIndex::getValue).sum();
+    }
+
+    public double getFeePercentage() {
+        return (double)getFee() / getTotal();
     }
 }
