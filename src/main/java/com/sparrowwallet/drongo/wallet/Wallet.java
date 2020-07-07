@@ -248,7 +248,7 @@ public class Wallet {
         }
     }
 
-    public WalletTransaction createWalletTransaction(List<UtxoSelector> utxoSelectors, Address recipientAddress, long recipientAmount, double feeRate, Long fee) throws InsufficientFundsException {
+    public WalletTransaction createWalletTransaction(List<UtxoSelector> utxoSelectors, Address recipientAddress, long recipientAmount, double feeRate, Long fee, boolean sendAll) throws InsufficientFundsException {
         long valueRequiredAmt = recipientAmount;
 
         while(true) {
@@ -280,6 +280,13 @@ public class Wallet {
             transaction.addOutput(recipientAmount, recipientAddress);
             int noChangeVSize = transaction.getVirtualSize();
             long noChangeFeeRequiredAmt = (fee == null ? (long)(feeRate * noChangeVSize) : fee);
+
+            //If sending all selected utxos, set the recipient amount to equal to total of those utxos less the no change fee
+            long maxSendAmt = totalSelectedAmt - noChangeFeeRequiredAmt;
+            if(sendAll && recipientAmount != maxSendAmt) {
+                recipientAmount = maxSendAmt;
+                continue;
+            }
 
             //Calculate what is left over from selected utxos after paying recipient
             long differenceAmt = totalSelectedAmt - recipientAmount;
