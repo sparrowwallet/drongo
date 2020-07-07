@@ -4,6 +4,7 @@ import com.sparrowwallet.drongo.address.Address;
 import com.sparrowwallet.drongo.protocol.Transaction;
 import com.sparrowwallet.drongo.psbt.PSBT;
 
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -13,6 +14,7 @@ import java.util.Map;
 public class WalletTransaction {
     private final Wallet wallet;
     private final Transaction transaction;
+    private final List<UtxoSelector> utxoSelectors;
     private final Map<BlockTransactionHashIndex, WalletNode> selectedUtxos;
     private final Address recipientAddress;
     private final long recipientAmount;
@@ -20,13 +22,14 @@ public class WalletTransaction {
     private final long changeAmount;
     private final long fee;
 
-    public WalletTransaction(Wallet wallet, Transaction transaction, Map<BlockTransactionHashIndex, WalletNode> selectedUtxos, Address recipientAddress, long recipientAmount, long fee) {
-        this(wallet, transaction, selectedUtxos, recipientAddress, recipientAmount, null, 0L, fee);
+    public WalletTransaction(Wallet wallet, Transaction transaction, List<UtxoSelector> utxoSelectors, Map<BlockTransactionHashIndex, WalletNode> selectedUtxos, Address recipientAddress, long recipientAmount, long fee) {
+        this(wallet, transaction, utxoSelectors, selectedUtxos, recipientAddress, recipientAmount, null, 0L, fee);
     }
 
-    public WalletTransaction(Wallet wallet, Transaction transaction, Map<BlockTransactionHashIndex, WalletNode> selectedUtxos, Address recipientAddress, long recipientAmount, WalletNode changeNode, long changeAmount, long fee) {
+    public WalletTransaction(Wallet wallet, Transaction transaction, List<UtxoSelector> utxoSelectors, Map<BlockTransactionHashIndex, WalletNode> selectedUtxos, Address recipientAddress, long recipientAmount, WalletNode changeNode, long changeAmount, long fee) {
         this.wallet = wallet;
         this.transaction = transaction;
+        this.utxoSelectors = utxoSelectors;
         this.selectedUtxos = selectedUtxos;
         this.recipientAddress = recipientAddress;
         this.recipientAmount = recipientAmount;
@@ -46,6 +49,10 @@ public class WalletTransaction {
 
     public Transaction getTransaction() {
         return transaction;
+    }
+
+    public List<UtxoSelector> getUtxoSelectors() {
+        return utxoSelectors;
     }
 
     public Map<BlockTransactionHashIndex, WalletNode> getSelectedUtxos() {
@@ -82,5 +89,9 @@ public class WalletTransaction {
 
     public double getFeePercentage() {
         return (double)getFee() / getTotal();
+    }
+
+    public boolean isCoinControlUsed() {
+        return !utxoSelectors.isEmpty() && utxoSelectors.get(0) instanceof PresetUtxoSelector;
     }
 }

@@ -318,10 +318,10 @@ public class Wallet {
                 //Add change output
                 transaction.addOutput(changeAmt, getOutputScript(changeNode));
 
-                return new WalletTransaction(this, transaction, selectedUtxos, recipientAddress, recipientAmount, changeNode, changeAmt, changeFeeRequiredAmt);
+                return new WalletTransaction(this, transaction, utxoSelectors, selectedUtxos, recipientAddress, recipientAmount, changeNode, changeAmt, changeFeeRequiredAmt);
             }
 
-            return new WalletTransaction(this, transaction, selectedUtxos, recipientAddress, recipientAmount, differenceAmt);
+            return new WalletTransaction(this, transaction, utxoSelectors, selectedUtxos, recipientAddress, recipientAmount, differenceAmt);
         }
     }
 
