@@ -1039,6 +1039,10 @@ public enum ScriptType {
         return Arrays.stream(values()).filter(scriptType -> scriptType.isAllowed(policyType)).collect(Collectors.toList());
     }
 
+    public static List<ScriptType> getAddressableScriptTypes(PolicyType policyType) {
+        return Arrays.stream(values()).filter(scriptType -> scriptType.isAllowed(policyType) && Arrays.asList(SINGLE_HASH_TYPES).contains(scriptType)).collect(Collectors.toList());
+    }
+
     public static ScriptType getType(Script script) {
         for(ScriptType type : values()) {
             if(type.isScriptType(script)) {
