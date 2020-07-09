@@ -1,8 +1,8 @@
 package com.sparrowwallet.drongo.wallet;
 
+import com.sparrowwallet.drongo.BitcoinUnit;
 import com.sparrowwallet.drongo.KeyPurpose;
 import com.sparrowwallet.drongo.address.Address;
-import com.sparrowwallet.drongo.crypto.DeterministicKey;
 import com.sparrowwallet.drongo.crypto.ECKey;
 import com.sparrowwallet.drongo.crypto.Key;
 import com.sparrowwallet.drongo.policy.Policy;
@@ -338,6 +338,20 @@ public class Wallet {
         }
 
         throw new InsufficientFundsException("Not enough combined value in UTXOs for output value " + targetValue);
+    }
+
+    public BitcoinUnit getAutoUnit() {
+        for(KeyPurpose keyPurpose : KeyPurpose.values()) {
+            for(WalletNode addressNode : getNode(keyPurpose).getChildren()) {
+                for(BlockTransactionHashIndex output : addressNode.getTransactionOutputs()) {
+                    if(output.getValue() >= BitcoinUnit.getAutoThreshold()) {
+                        return BitcoinUnit.BTC;
+                    }
+                }
+            }
+        }
+
+        return BitcoinUnit.SATOSHIS;
     }
 
     public void clearNodes() {
