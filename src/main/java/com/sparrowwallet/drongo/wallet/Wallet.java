@@ -301,7 +301,7 @@ public class Wallet {
             long changeAmt = differenceAmt - noChangeFeeRequiredAmt;
             WalletNode changeNode = getFreshNode(KeyPurpose.CHANGE);
             TransactionOutput changeOutput = new TransactionOutput(transaction, changeAmt, getOutputScript(changeNode));
-            long dustThreshold = getScriptType().getDustThreshold(changeOutput, Transaction.DEFAULT_DISCARD_FEE_RATE);
+            long dustThreshold = getScriptType().getDustThreshold(changeOutput, Transaction.DUST_RELAY_TX_FEE);
             if(changeAmt > dustThreshold) {
                 //Change output is required, determine new fee once change output has been added
                 int changeVSize = noChangeVSize + changeOutput.getLength();

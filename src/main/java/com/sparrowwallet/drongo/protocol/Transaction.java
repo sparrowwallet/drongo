@@ -22,7 +22,10 @@ public class Transaction extends ChildMessage {
     public static final long SATOSHIS_PER_BITCOIN = 100 * 1000 * 1000L;
     public static final long MAX_BLOCK_LOCKTIME = 500000000L;
     public static final int WITNESS_SCALE_FACTOR = 4;
-    public static final double DEFAULT_DISCARD_FEE_RATE = 10000d / 1000;
+
+    //Min feerate for defining dust, defined in sats/vByte
+    //From: https://github.com/bitcoin/bitcoin/blob/0.19/src/policy/policy.h#L50
+    public static final double DUST_RELAY_TX_FEE = 3d;
 
     private long version;
     private long locktime;
