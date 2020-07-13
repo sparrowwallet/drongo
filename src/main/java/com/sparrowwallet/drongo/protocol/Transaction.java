@@ -267,6 +267,10 @@ public class Transaction extends ChildMessage {
     }
 
     public int getVirtualSize() {
+        return (int)Math.ceil((double)getWeightUnits() / (double)WITNESS_SCALE_FACTOR);
+    }
+
+    public int getWeightUnits() {
         int wu = 0;
 
         // version
@@ -294,7 +298,7 @@ public class Transaction extends ChildMessage {
         // lock_time
         wu += 4 * WITNESS_SCALE_FACTOR;
 
-        return (int)Math.ceil((double)wu / (double)WITNESS_SCALE_FACTOR);
+        return wu;
     }
 
     public List<TransactionInput> getInputs() {
@@ -306,6 +310,10 @@ public class Transaction extends ChildMessage {
     }
 
     public TransactionInput addInput(Sha256Hash spendTxHash, long outputIndex, Script script, TransactionWitness witness) {
+        if(!isSegwit()) {
+            setSegwitVersion(0);
+        }
+
         return addInput(new TransactionInput(this, new TransactionOutPoint(spendTxHash, outputIndex), script.getProgram(), witness));
     }
 

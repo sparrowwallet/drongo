@@ -12,6 +12,8 @@ import com.sparrowwallet.drongo.protocol.*;
 import java.util.*;
 import java.util.stream.Collectors;
 
+import static com.sparrowwallet.drongo.protocol.Transaction.WITNESS_SCALE_FACTOR;
+
 public class Wallet {
     public static final int DEFAULT_LOOKAHEAD = 20;
 
@@ -248,7 +250,83 @@ public class Wallet {
         }
     }
 
-    public WalletTransaction createWalletTransaction(List<UtxoSelector> utxoSelectors, Address recipientAddress, long recipientAmount, double feeRate, Long fee, boolean sendAll) throws InsufficientFundsException {
+    /**
+     * Determines the dust threshold for creating a new change output in this wallet.
+     *
+     * @param output The output under consideration
+     * @param feeRate The fee rate for the transaction creating the change UTXO
+     * @return the minimum viable value than the provided change output must have in order to not be dust
+     */
+    public long getDustThreshold(TransactionOutput output, Double feeRate) {
+        return getFee(output, feeRate, Transaction.DUST_RELAY_TX_FEE);
+    }
+
+    /**
+     * Determines the minimum incremental fee necessary to pay for added the provided output to a transaction
+     * This is done by calculating the sum of multiplying the size of the output at the current fee rate,
+     * and the size of the input needed to spend it in future at the long term fee rate
+     *
+     * @param output The output to be added
+     * @param feeRate The transaction's fee rate
+     * @param longTermFeeRate The long term minimum fee rate
+     * @return The fee that adding this output would add
+     */
+    public long getFee(TransactionOutput output, Double feeRate, Double longTermFeeRate) {
+        //Start with length of output
+        int outputVbytes = output.getLength();
+        //Add length of spending input (with or without discount depending on script type)
+        int inputVbytes = getInputVbytes();
+
+        //Return fee rate in sats/vbyte multiplied by the calculated output and input vByte lengths
+        return (long)(feeRate * outputVbytes + longTermFeeRate * inputVbytes);
+    }
+
+    /**
+     * Return the number of vBytes required for an input created by this wallet.
+     *
+     * @return the number of vBytes
+     */
+    public int getInputVbytes() {
+        return (int)Math.ceil((double)getInputWeightUnits() / (double)WITNESS_SCALE_FACTOR);
+    }
+
+    /**
+     * Return the number of vBytes required for an input created by this wallet.
+     *
+     * @return the number of vBytes
+     */
+    public int getInputWeightUnits() {
+        //Estimate assuming an input spending from a fresh receive node - it does not matter this node has no real utxos
+        WalletNode receiveNode = getFreshNode(KeyPurpose.RECEIVE);
+
+        Transaction transaction = new Transaction();
+        TransactionOutput prevTxOut = transaction.addOutput(1L, getAddress(receiveNode));
+
+        TransactionInput txInput = null;
+        if(getPolicyType().equals(PolicyType.SINGLE)) {
+            ECKey pubKey = getPubKey(receiveNode);
+            TransactionSignature signature = TransactionSignature.dummy();
+            txInput = getScriptType().addSpendingInput(transaction, prevTxOut, pubKey, signature);
+        } else if(getPolicyType().equals(PolicyType.MULTI)) {
+            List<ECKey> pubKeys = getPubKeys(receiveNode);
+            int threshold = getDefaultPolicy().getNumSignaturesRequired();
+            List<TransactionSignature> signatures = new ArrayList<>(threshold);
+            for(int i = 0; i < threshold; i++) {
+                signatures.add(TransactionSignature.dummy());
+            }
+            txInput = getScriptType().addMultisigSpendingInput(transaction, prevTxOut, threshold, pubKeys, signatures);
+        }
+
+        assert txInput != null;
+        int wu = txInput.getLength() * WITNESS_SCALE_FACTOR;
+        if(txInput.hasWitness()) {
+            wu += txInput.getWitness().getLength();
+        }
+
+        return wu;
+    }
+
+    public WalletTransaction createWalletTransaction(List<UtxoSelector> utxoSelectors, Address recipientAddress, long recipientAmount, double feeRate, double longTermFeeRate, Long fee, boolean sendAll) throws InsufficientFundsException {
         long valueRequiredAmt = recipientAmount;
 
         while(true) {
@@ -301,15 +379,15 @@ public class Wallet {
             long changeAmt = differenceAmt - noChangeFeeRequiredAmt;
             WalletNode changeNode = getFreshNode(KeyPurpose.CHANGE);
             TransactionOutput changeOutput = new TransactionOutput(transaction, changeAmt, getOutputScript(changeNode));
-            long dustThreshold = getScriptType().getDustThreshold(changeOutput, Transaction.DUST_RELAY_TX_FEE);
-            if(changeAmt > dustThreshold) {
+            long costOfChangeAmt = getFee(changeOutput, feeRate, longTermFeeRate);
+            if(changeAmt > costOfChangeAmt) {
                 //Change output is required, determine new fee once change output has been added
                 int changeVSize = noChangeVSize + changeOutput.getLength();
                 long changeFeeRequiredAmt = (fee == null ? (long)(feeRate * changeVSize) : fee);
 
                 //Recalculate the change amount with the new fee
                 changeAmt = differenceAmt - changeFeeRequiredAmt;
-                if(changeAmt < dustThreshold) {
+                if(changeAmt < costOfChangeAmt) {
                     //The new fee has meant that the change output is now dust. We pay too high a fee without change, but change is dust when added. Increase value required from inputs and try again
                     valueRequiredAmt = totalSelectedAmt + 1;
                     continue;

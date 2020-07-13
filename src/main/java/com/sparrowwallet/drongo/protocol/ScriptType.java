@@ -1054,27 +1054,56 @@ public enum ScriptType {
     }
 
     /**
-     * Determines the dust threshold for this script type.
+     * Determines the dust threshold for the given output for this script type.
      *
      * @param output The output under consideration
-     * @param feeRate The fee rate at which the fee required will be calculated
      * @return the minimum viable value than the provided output must have in order to not be dust
      */
     public long getDustThreshold(TransactionOutput output, Double feeRate) {
+        return getFee(output, feeRate, Transaction.DUST_RELAY_TX_FEE);
+    }
+
+    /**
+     * Determines the minimum incremental fee necessary to pay for added the provided output to a transaction
+     * This is done by calculating the sum of multiplying the size of the output at the current fee rate,
+     * and the size of the input needed to spend it in future at the long term fee rate
+     *
+     * @param output The output to be added
+     * @param feeRate The transaction's fee rate
+     * @param longTermFeeRate The long term minimum fee rate
+     * @return The fee that adding this output would add
+     */
+    public long getFee(TransactionOutput output, Double feeRate, Double longTermFeeRate) {
         //Start with length of output
-        int totalLength = output.getLength();
-        if(Arrays.asList(WITNESS_TYPES).contains(this)) {
-            //Add length of spending input with 75% discount to script size
-            totalLength += (32 + 4 + 1 + (107 / WITNESS_SCALE_FACTOR) + 4);
+        int outputVbytes = output.getLength();
+        //Add length of spending input (with or without discount depending on script type)
+        int inputVbytes = getInputVbytes();
+
+        //Return fee rate in sats/vByte multiplied by the calculated output and input vByte lengths
+        return (long)(feeRate * outputVbytes + longTermFeeRate * inputVbytes);
+    }
+
+    /**
+     * Return a coarse estimation of the minimum number of vBytes required to spend an input of this script type.
+     * Because we don't know the nature of the scriptSig/witnessScript required, pay to script inputs will likely be underestimated.
+     * Use Wallet.getInputVbytes() for an accurate value to spend a wallet UTXO.
+     *
+     * @return The number of vBytes required for an input of this script type
+     */
+    public int getInputVbytes() {
+        if(P2SH_P2WPKH.equals(this)) {
+            return (32 + 4 + 1 + 13 + (107 / WITNESS_SCALE_FACTOR) + 4);
+        } else if(P2SH_P2WSH.equals(this)) {
+            return (32 + 4 + 1 + 35 + (107 / WITNESS_SCALE_FACTOR) + 4);
+        } else if(Arrays.asList(WITNESS_TYPES).contains(this)) {
+            //Return length of spending input with 75% discount to script size
+            return (32 + 4 + 1 + (107 / WITNESS_SCALE_FACTOR) + 4);
         } else if(Arrays.asList(NON_WITNESS_TYPES).contains(this)) {
-            //Add length of spending input with no discount
-            totalLength += (32 + 4 + 1 + 107 + 4);
+            //Return length of spending input with no discount
+            return (32 + 4 + 1 + 107 + 4);
         } else {
             throw new UnsupportedOperationException("Cannot determine dust threshold for script type " + this.getName());
         }
-
-        //Return fee rate in sats/vbyte multiplied by the calculated total byte length
-        return (long)(feeRate * totalLength);
     }
 
     @Override
