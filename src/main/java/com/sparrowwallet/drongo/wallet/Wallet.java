@@ -282,6 +282,21 @@ public class Wallet {
     }
 
     /**
+     * Determines the weight units for a transaction from this wallet that has one output and no inputs
+     *
+     * @param recipientAddress The address to create the output to send to
+     * @return The determined weight units
+     */
+    public int getNoInputsWeightUnits(Address recipientAddress) {
+        Transaction transaction = new Transaction();
+        if(Arrays.asList(ScriptType.WITNESS_TYPES).contains(getScriptType())) {
+            transaction.setSegwitVersion(0);
+        }
+        transaction.addOutput(1L, recipientAddress);
+        return transaction.getWeightUnits();
+    }
+
+    /**
      * Return the number of vBytes required for an input created by this wallet.
      *
      * @return the number of vBytes
@@ -326,11 +341,17 @@ public class Wallet {
         return wu;
     }
 
+    public long getCostOfChange(double feeRate, double longTermFeeRate) {
+        WalletNode changeNode = getFreshNode(KeyPurpose.CHANGE);
+        TransactionOutput changeOutput = new TransactionOutput(new Transaction(), 1L, getOutputScript(changeNode));
+        return getFee(changeOutput, feeRate, longTermFeeRate);
+    }
+
     public WalletTransaction createWalletTransaction(List<UtxoSelector> utxoSelectors, Address recipientAddress, long recipientAmount, double feeRate, double longTermFeeRate, Long fee, boolean sendAll) throws InsufficientFundsException {
         long valueRequiredAmt = recipientAmount;
 
         while(true) {
-            Map<BlockTransactionHashIndex, WalletNode> selectedUtxos = selectInputs(utxoSelectors, valueRequiredAmt);
+            Map<BlockTransactionHashIndex, WalletNode> selectedUtxos = selectInputs(utxoSelectors, valueRequiredAmt, feeRate, longTermFeeRate);
             long totalSelectedAmt = selectedUtxos.keySet().stream().mapToLong(BlockTransactionHashIndex::getValue).sum();
 
             //Add inputs
@@ -377,11 +398,11 @@ public class Wallet {
 
             //Determine if a change output is required by checking if its value is greater than its dust threshold
             long changeAmt = differenceAmt - noChangeFeeRequiredAmt;
-            WalletNode changeNode = getFreshNode(KeyPurpose.CHANGE);
-            TransactionOutput changeOutput = new TransactionOutput(transaction, changeAmt, getOutputScript(changeNode));
-            long costOfChangeAmt = getFee(changeOutput, feeRate, longTermFeeRate);
+            long costOfChangeAmt = getCostOfChange(feeRate, longTermFeeRate);
             if(changeAmt > costOfChangeAmt) {
                 //Change output is required, determine new fee once change output has been added
+                WalletNode changeNode = getFreshNode(KeyPurpose.CHANGE);
+                TransactionOutput changeOutput = new TransactionOutput(transaction, changeAmt, getOutputScript(changeNode));
                 int changeVSize = noChangeVSize + changeOutput.getLength();
                 long changeFeeRequiredAmt = (fee == null ? (long)(feeRate * changeVSize) : fee);
 
@@ -403,11 +424,12 @@ public class Wallet {
         }
     }
 
-    private Map<BlockTransactionHashIndex, WalletNode> selectInputs(List<UtxoSelector> utxoSelectors, Long targetValue) throws InsufficientFundsException {
+    private Map<BlockTransactionHashIndex, WalletNode> selectInputs(List<UtxoSelector> utxoSelectors, Long targetValue, double feeRate, double longTermFeeRate) throws InsufficientFundsException {
         Map<BlockTransactionHashIndex, WalletNode> utxos = getWalletUtxos();
 
         for(UtxoSelector utxoSelector : utxoSelectors) {
-            Collection<BlockTransactionHashIndex> selectedInputs = utxoSelector.select(targetValue, utxos.keySet());
+            List<OutputGroup> utxoPool = utxos.keySet().stream().map(utxo -> new OutputGroup(getInputWeightUnits(), feeRate, longTermFeeRate, utxo)).collect(Collectors.toList());
+            Collection<BlockTransactionHashIndex> selectedInputs = utxoSelector.select(targetValue, utxoPool);
             long total = selectedInputs.stream().mapToLong(BlockTransactionHashIndex::getValue).sum();
             if(total > targetValue) {
                 utxos.keySet().retainAll(selectedInputs);

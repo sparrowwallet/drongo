@@ -1,44 +1,33 @@
 package com.sparrowwallet.drongo.wallet;
 
-import com.sparrowwallet.drongo.KeyPurpose;
 import com.sparrowwallet.drongo.protocol.Transaction;
-import com.sparrowwallet.drongo.protocol.TransactionOutput;
 
 import java.util.*;
-import java.util.stream.Collectors;
 
 import static com.sparrowwallet.drongo.protocol.Transaction.WITNESS_SCALE_FACTOR;
 
 public class BnBUtxoSelector implements UtxoSelector {
     private static final int TOTAL_TRIES = 100000;
 
-    private final Wallet wallet;
     private final int noInputsWeightUnits;
     private final Double feeRate;
-    private final Double longTermFeeRate;
-    private final int inputWeightUnits;
     private final long costOfChangeValue;
 
     public BnBUtxoSelector(Wallet wallet, int noInputsWeightUnits, Double feeRate, Double longTermFeeRate) {
-        this.wallet = wallet;
         this.noInputsWeightUnits = noInputsWeightUnits;
         this.feeRate = feeRate;
-        this.longTermFeeRate = longTermFeeRate;
-        this.inputWeightUnits = wallet.getInputWeightUnits();
-        this.costOfChangeValue = getCostOfChange();
+        this.costOfChangeValue = wallet.getCostOfChange(feeRate, longTermFeeRate);
     }
 
     @Override
-    public Collection<BlockTransactionHashIndex> select(long targetValue, Collection<BlockTransactionHashIndex> candidates) {
-        List<OutputGroup> utxoPool = candidates.stream().map(OutputGroup::new).collect(Collectors.toList());
+    public Collection<BlockTransactionHashIndex> select(long targetValue, Collection<OutputGroup> candidates) {
+        List<OutputGroup> utxoPool = new ArrayList<>(candidates);
 
         long currentValue = 0;
 
         ArrayDeque<Boolean> currentSelection = new ArrayDeque<>(utxoPool.size());
         long actualTargetValue = targetValue + (long)(noInputsWeightUnits * feeRate / WITNESS_SCALE_FACTOR);
-        System.out.println("Actual target: " + actualTargetValue);
-        System.out.println("Cost of change: " + costOfChangeValue);
-        System.out.println("Selected must be less than: " + (actualTargetValue + costOfChangeValue));
+        System.out.println("Selected must be: " + actualTargetValue + " < x < " + (actualTargetValue + costOfChangeValue));
 
         long currentAvailableValue = utxoPool.stream().mapToLong(OutputGroup::getEffectiveValue).sum();
         if(currentAvailableValue < targetValue) {
@@ -74,7 +63,6 @@ public class BnBUtxoSelector implements UtxoSelector {
             }
 
             if(backtrack) {
-                System.out.println("Backtracking");
                 // Walk backwards to find the last included UTXO that still needs to have its omission branch traversed
                 while(!currentSelection.isEmpty() && !currentSelection.getLast()) {
                     currentSelection.removeLast();
@@ -132,12 +120,6 @@ public class BnBUtxoSelector implements UtxoSelector {
         return outList;
     }
 
-    private long getCostOfChange() {
-        WalletNode changeNode = wallet.getFreshNode(KeyPurpose.CHANGE);
-        TransactionOutput changeOutput = new TransactionOutput(new Transaction(), 1L, wallet.getOutputScript(changeNode));
-        return wallet.getFee(changeOutput, feeRate, longTermFeeRate);
-    }
-
     private ArrayDeque<Boolean> resize(ArrayDeque<Boolean> deque, int size) {
         Boolean[] arr = new Boolean[size];
         Arrays.fill(arr, Boolean.FALSE);
@@ -161,47 +143,5 @@ public class BnBUtxoSelector implements UtxoSelector {
         }
         long noChangeFeeRequiredAmt = noInputsFee + inputsFee;
         System.out.println(joiner.toString() + " = " + currentValue + " (plus fee of " + noChangeFeeRequiredAmt + ")");
-    }
-
-    private class OutputGroup {
-        private final List<BlockTransactionHashIndex> utxos = new ArrayList<>();
-        private long effectiveValue = 0;
-        private long fee = 0;
-        private long longTermFee = 0;
-
-        public OutputGroup(BlockTransactionHashIndex utxo) {
-            add(utxo);
-        }
-
-        public void add(BlockTransactionHashIndex utxo) {
-            utxos.add(utxo);
-            effectiveValue += utxo.getValue() - (long)(inputWeightUnits * feeRate / WITNESS_SCALE_FACTOR);
-            fee += (long)(inputWeightUnits * feeRate / WITNESS_SCALE_FACTOR);
-            longTermFee += (long)(inputWeightUnits * longTermFeeRate / WITNESS_SCALE_FACTOR);
-        }
-
-        public void remove(BlockTransactionHashIndex utxo) {
-            if(utxos.remove(utxo)) {
-                effectiveValue -= (utxo.getValue() - (long)(inputWeightUnits * feeRate / WITNESS_SCALE_FACTOR));
-                fee -= (long)(inputWeightUnits * feeRate / WITNESS_SCALE_FACTOR);
-                longTermFee -= (long)(inputWeightUnits * longTermFeeRate / WITNESS_SCALE_FACTOR);
-            }
-        }
-
-        public List<BlockTransactionHashIndex> getUtxos() {
-            return utxos;
-        }
-
-        public long getEffectiveValue() {
-            return effectiveValue;
-        }
-
-        public long getFee() {
-            return fee;
-        }
-
-        public long getLongTermFee() {
-            return longTermFee;
-        }
     }
 }

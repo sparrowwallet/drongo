@@ -12,10 +12,10 @@ public class PriorityUtxoSelector implements UtxoSelector {
     }
 
     @Override
-    public Collection<BlockTransactionHashIndex> select(long targetValue, Collection<BlockTransactionHashIndex> candidates) {
+    public Collection<BlockTransactionHashIndex> select(long targetValue, Collection<OutputGroup> candidates) {
         List<BlockTransactionHashIndex> selected = new ArrayList<>();
 
-        List<BlockTransactionHashIndex> sorted = candidates.stream().filter(ref -> ref.getHeight() != 0).collect(Collectors.toList());
+        List<BlockTransactionHashIndex> sorted = candidates.stream().flatMap(outputGroup -> outputGroup.getUtxos().stream()).filter(ref -> ref.getHeight() != 0).collect(Collectors.toList());
         sort(sorted);
 
         //Testing only: remove
