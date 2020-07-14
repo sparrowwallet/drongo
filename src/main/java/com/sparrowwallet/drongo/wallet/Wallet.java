@@ -282,6 +282,16 @@ public class Wallet {
     }
 
     /**
+     * Determines the fee for a transaction from this wallet that has one output and no inputs
+     *
+     * @param recipientAddress The address to create the output to send to
+     * @return The determined fee
+     */
+    public long getNoInputsFee(Address recipientAddress, Double feeRate) {
+        return (long)Math.ceil((double)getNoInputsWeightUnits(recipientAddress) * feeRate / (double)WITNESS_SCALE_FACTOR);
+    }
+
+    /**
      * Determines the weight units for a transaction from this wallet that has one output and no inputs
      *
      * @param recipientAddress The address to create the output to send to

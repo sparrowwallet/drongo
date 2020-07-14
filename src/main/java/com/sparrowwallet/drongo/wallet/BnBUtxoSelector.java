@@ -4,19 +4,15 @@ import com.sparrowwallet.drongo.protocol.Transaction;
 
 import java.util.*;
 
-import static com.sparrowwallet.drongo.protocol.Transaction.WITNESS_SCALE_FACTOR;
-
 public class BnBUtxoSelector implements UtxoSelector {
     private static final int TOTAL_TRIES = 100000;
 
-    private final int noInputsWeightUnits;
-    private final Double feeRate;
+    private final long noInputsFee;
     private final long costOfChangeValue;
 
-    public BnBUtxoSelector(Wallet wallet, int noInputsWeightUnits, Double feeRate, Double longTermFeeRate) {
-        this.noInputsWeightUnits = noInputsWeightUnits;
-        this.feeRate = feeRate;
-        this.costOfChangeValue = wallet.getCostOfChange(feeRate, longTermFeeRate);
+    public BnBUtxoSelector(long noInputsFee, long costOfChangeValue) {
+        this.noInputsFee = noInputsFee;
+        this.costOfChangeValue = costOfChangeValue;
     }
 
     @Override
@@ -26,7 +22,7 @@ public class BnBUtxoSelector implements UtxoSelector {
         long currentValue = 0;
 
         ArrayDeque<Boolean> currentSelection = new ArrayDeque<>(utxoPool.size());
-        long actualTargetValue = targetValue + (long)(noInputsWeightUnits * feeRate / WITNESS_SCALE_FACTOR);
+        long actualTargetValue = targetValue + noInputsFee;
         System.out.println("Selected must be: " + actualTargetValue + " < x < " + (actualTargetValue + costOfChangeValue));
 
         long currentAvailableValue = utxoPool.stream().mapToLong(OutputGroup::getEffectiveValue).sum();
@@ -131,7 +127,6 @@ public class BnBUtxoSelector implements UtxoSelector {
     }
 
     private void printCurrentUtxoSet(List<OutputGroup> utxoPool, ArrayDeque<Boolean> currentSelection, long currentValue) {
-        long noInputsFee = (long)(noInputsWeightUnits * feeRate / WITNESS_SCALE_FACTOR);
         long inputsFee = 0;
         StringJoiner joiner = new StringJoiner(" + ");
         int i = 0;
