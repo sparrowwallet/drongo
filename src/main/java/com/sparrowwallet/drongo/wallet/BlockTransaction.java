@@ -32,20 +32,20 @@ public class BlockTransaction extends BlockTransactionHash implements Comparable
     }
 
     @Override
-    public int compareTo(BlockTransaction blockchainTransaction) {
-        if(getHeight() != blockchainTransaction.getHeight()) {
-            return getHeight() - blockchainTransaction.getHeight();
+    public int compareTo(BlockTransaction blkTx) {
+        if(getHeight() != blkTx.getHeight()) {
+            return (getHeight() > 0 ? getHeight() : Integer.MAX_VALUE) - (blkTx.getHeight() > 0 ? blkTx.getHeight() : Integer.MAX_VALUE);
         }
 
-        if(getReferencedOutpoints(this).removeAll(getOutputs(blockchainTransaction))) {
+        if(getReferencedOutpoints(this).removeAll(getOutputs(blkTx))) {
             return 1;
         }
 
-        if(getReferencedOutpoints(blockchainTransaction).removeAll(getOutputs(this))) {
+        if(getReferencedOutpoints(blkTx).removeAll(getOutputs(this))) {
             return -1;
         }
 
-        return super.compareTo(blockchainTransaction);
+        return super.compareTo(blkTx);
     }
 
     private static List<HashIndex> getReferencedOutpoints(BlockTransaction blockchainTransaction) {

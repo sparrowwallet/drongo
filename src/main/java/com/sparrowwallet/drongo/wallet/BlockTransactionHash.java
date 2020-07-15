@@ -67,9 +67,8 @@ public abstract class BlockTransactionHash {
     }
 
     public int compareTo(BlockTransactionHash reference) {
-        int heightDiff = height - reference.height;
-        if(heightDiff != 0) {
-            return heightDiff;
+        if(height != reference.height) {
+            return (height > 0 ? height : Integer.MAX_VALUE) - (reference.height > 0 ? reference.height : Integer.MAX_VALUE);
         }
 
         return hash.compareTo(reference.hash);

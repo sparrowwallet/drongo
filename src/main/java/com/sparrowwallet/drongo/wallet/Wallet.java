@@ -233,12 +233,29 @@ public class Wallet {
         }
     }
 
+    public boolean isWalletTxo(BlockTransactionHashIndex txo) {
+        return getWalletTxos().containsKey(txo);
+    }
+
+    public Map<BlockTransactionHashIndex, WalletNode> getWalletTxos() {
+        Map<BlockTransactionHashIndex, WalletNode> walletTxos = new TreeMap<>();
+        getWalletTxos(walletTxos, getNode(KeyPurpose.RECEIVE));
+        getWalletTxos(walletTxos, getNode(KeyPurpose.CHANGE));
+        return walletTxos;
+    }
+
+    private void getWalletTxos(Map<BlockTransactionHashIndex, WalletNode> walletTxos, WalletNode purposeNode) {
+        for(WalletNode addressNode : purposeNode.getChildren()) {
+            for(BlockTransactionHashIndex txo : addressNode.getTransactionOutputs()) {
+                walletTxos.put(txo, addressNode);
+            }
+        }
+    }
+
     public Map<BlockTransactionHashIndex, WalletNode> getWalletUtxos() {
         Map<BlockTransactionHashIndex, WalletNode> walletUtxos = new TreeMap<>();
-
         getWalletUtxos(walletUtxos, getNode(KeyPurpose.RECEIVE));
         getWalletUtxos(walletUtxos, getNode(KeyPurpose.CHANGE));
-
         return walletUtxos;
     }
 
@@ -357,11 +374,11 @@ public class Wallet {
         return getFee(changeOutput, feeRate, longTermFeeRate);
     }
 
-    public WalletTransaction createWalletTransaction(List<UtxoSelector> utxoSelectors, Address recipientAddress, long recipientAmount, double feeRate, double longTermFeeRate, Long fee, boolean sendAll) throws InsufficientFundsException {
+    public WalletTransaction createWalletTransaction(List<UtxoSelector> utxoSelectors, Address recipientAddress, long recipientAmount, double feeRate, double longTermFeeRate, Long fee, boolean sendAll, boolean groupByAddress, boolean includeMempoolChange) throws InsufficientFundsException {
         long valueRequiredAmt = recipientAmount;
 
         while(true) {
-            Map<BlockTransactionHashIndex, WalletNode> selectedUtxos = selectInputs(utxoSelectors, valueRequiredAmt, feeRate, longTermFeeRate);
+            Map<BlockTransactionHashIndex, WalletNode> selectedUtxos = selectInputs(utxoSelectors, valueRequiredAmt, feeRate, longTermFeeRate, groupByAddress, includeMempoolChange);
             long totalSelectedAmt = selectedUtxos.keySet().stream().mapToLong(BlockTransactionHashIndex::getValue).sum();
 
             //Add inputs
@@ -434,20 +451,83 @@ public class Wallet {
         }
     }
 
-    private Map<BlockTransactionHashIndex, WalletNode> selectInputs(List<UtxoSelector> utxoSelectors, Long targetValue, double feeRate, double longTermFeeRate) throws InsufficientFundsException {
-        Map<BlockTransactionHashIndex, WalletNode> utxos = getWalletUtxos();
+    private Map<BlockTransactionHashIndex, WalletNode> selectInputs(List<UtxoSelector> utxoSelectors, Long targetValue, double feeRate, double longTermFeeRate, boolean groupByAddress, boolean includeMempoolChange) throws InsufficientFundsException {
+        List<OutputGroup> utxoPool = getGroupedUtxos(feeRate, longTermFeeRate, groupByAddress);
 
-        for(UtxoSelector utxoSelector : utxoSelectors) {
-            List<OutputGroup> utxoPool = utxos.keySet().stream().map(utxo -> new OutputGroup(getInputWeightUnits(), feeRate, longTermFeeRate, utxo)).collect(Collectors.toList());
-            Collection<BlockTransactionHashIndex> selectedInputs = utxoSelector.select(targetValue, utxoPool);
-            long total = selectedInputs.stream().mapToLong(BlockTransactionHashIndex::getValue).sum();
-            if(total > targetValue) {
-                utxos.keySet().retainAll(selectedInputs);
-                return utxos;
+        List<OutputGroup.Filter> filters = new ArrayList<>();
+        filters.add(new OutputGroup.Filter(1, 6));
+        filters.add(new OutputGroup.Filter(1, 1));
+        if(includeMempoolChange) {
+            filters.add(new OutputGroup.Filter(0, 1));
+        }
+
+        for(OutputGroup.Filter filter : filters) {
+            List<OutputGroup> filteredPool = utxoPool.stream().filter(filter::isEligible).collect(Collectors.toList());
+
+            for(UtxoSelector utxoSelector : utxoSelectors) {
+                Collection<BlockTransactionHashIndex> selectedInputs = utxoSelector.select(targetValue, filteredPool);
+                long total = selectedInputs.stream().mapToLong(BlockTransactionHashIndex::getValue).sum();
+                if(total > targetValue) {
+                    Map<BlockTransactionHashIndex, WalletNode> utxos = getWalletUtxos();
+                    utxos.keySet().retainAll(selectedInputs);
+                    return utxos;
+                }
             }
         }
 
         throw new InsufficientFundsException("Not enough combined value in UTXOs for output value " + targetValue);
+    }
+
+    private List<OutputGroup> getGroupedUtxos(double feeRate, double longTermFeeRate, boolean groupByAddress) {
+        List<OutputGroup> outputGroups = new ArrayList<>();
+        getGroupedUtxos(outputGroups, getNode(KeyPurpose.RECEIVE), feeRate, longTermFeeRate, groupByAddress);
+        getGroupedUtxos(outputGroups, getNode(KeyPurpose.CHANGE), feeRate, longTermFeeRate, groupByAddress);
+        return outputGroups;
+    }
+
+    private void getGroupedUtxos(List<OutputGroup> outputGroups, WalletNode purposeNode, double feeRate, double longTermFeeRate, boolean groupByAddress) {
+        for(WalletNode addressNode : purposeNode.getChildren()) {
+            OutputGroup outputGroup = null;
+            for(BlockTransactionHashIndex utxo : addressNode.getUnspentTransactionOutputs()) {
+                if(outputGroup == null || !groupByAddress) {
+                    outputGroup = new OutputGroup(getStoredBlockHeight(), getInputWeightUnits(), feeRate, longTermFeeRate);
+                    outputGroups.add(outputGroup);
+                }
+
+                outputGroup.add(utxo, allInputsFromWallet(utxo.getHash()));
+            }
+        }
+    }
+
+    /**
+     * Determines if the provided wallet transaction was created from a purely internal transaction
+     *
+     * @param txId The txid
+     * @return Whether the transaction was created entirely from inputs that reference outputs that belong to this wallet
+     */
+    private boolean allInputsFromWallet(Sha256Hash txId) {
+        BlockTransaction utxoBlkTx = getTransactions().get(txId);
+        if(utxoBlkTx == null) {
+            throw new IllegalArgumentException("Provided txId was not a wallet transaction");
+        }
+
+        for(int i = 0; i < utxoBlkTx.getTransaction().getInputs().size(); i++) {
+            TransactionInput utxoTxInput = utxoBlkTx.getTransaction().getInputs().get(i);
+            BlockTransaction prevBlkTx = getTransactions().get(utxoTxInput.getOutpoint().getHash());
+            if(prevBlkTx == null) {
+                return false;
+            }
+
+            int index = (int)utxoTxInput.getOutpoint().getIndex();
+            TransactionOutput prevTxOut = prevBlkTx.getTransaction().getOutputs().get(index);
+            BlockTransactionHashIndex spendingTXI = new BlockTransactionHashIndex(utxoBlkTx.getHash(), utxoBlkTx.getHeight(), utxoBlkTx.getDate(), utxoBlkTx.getFee(), i, prevTxOut.getValue());
+            BlockTransactionHashIndex spentTXO = new BlockTransactionHashIndex(prevBlkTx.getHash(), prevBlkTx.getHeight(), prevBlkTx.getDate(), prevBlkTx.getFee(), index, prevTxOut.getValue(), spendingTXI);
+            if(!isWalletTxo(spentTXO)) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     public BitcoinUnit getAutoUnit() {
