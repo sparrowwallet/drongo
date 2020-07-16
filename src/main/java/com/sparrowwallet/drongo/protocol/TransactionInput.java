@@ -96,8 +96,18 @@ public class TransactionInput extends ChildMessage {
         return witness;
     }
 
-    public void setWitness(TransactionWitness witness) {
+    void setWitness(TransactionWitness witness) {
         this.witness = witness;
+    }
+
+    public void clearWitness() {
+        TransactionWitness witness = getWitness();
+        if(witness != null) {
+            if(getParent() != null) {
+                getParent().adjustLength(-witness.getLength());
+            }
+            setWitness(null);
+        }
     }
 
     public boolean hasWitness() {

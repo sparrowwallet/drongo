@@ -11,6 +11,7 @@ import com.sparrowwallet.drongo.protocol.*;
 
 import java.util.*;
 import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
 import static com.sparrowwallet.drongo.protocol.Transaction.WITNESS_SCALE_FACTOR;
 
@@ -233,6 +234,23 @@ public class Wallet {
         }
     }
 
+    public boolean isWalletAddress(Address address) {
+        return getWalletAddresses().containsKey(address);
+    }
+
+    public Map<Address, WalletNode> getWalletAddresses() {
+        Map<Address, WalletNode> walletAddresses = new LinkedHashMap<>();
+        getWalletAddresses(walletAddresses, getNode(KeyPurpose.RECEIVE));
+        getWalletAddresses(walletAddresses, getNode(KeyPurpose.CHANGE));
+        return walletAddresses;
+    }
+
+    private void getWalletAddresses(Map<Address, WalletNode> walletAddresses, WalletNode purposeNode) {
+        for(WalletNode addressNode : purposeNode.getChildren()) {
+            walletAddresses.put(getAddress(addressNode), addressNode);
+        }
+    }
+
     public boolean isWalletTxo(BlockTransactionHashIndex txo) {
         return getWalletTxos().containsKey(txo);
     }
@@ -386,20 +404,7 @@ public class Wallet {
             for(Map.Entry<BlockTransactionHashIndex, WalletNode> selectedUtxo : selectedUtxos.entrySet()) {
                 Transaction prevTx = getTransactions().get(selectedUtxo.getKey().getHash()).getTransaction();
                 TransactionOutput prevTxOut = prevTx.getOutputs().get((int)selectedUtxo.getKey().getIndex());
-
-                if(getPolicyType().equals(PolicyType.SINGLE)) {
-                    ECKey pubKey = getPubKey(selectedUtxo.getValue());
-                    TransactionSignature signature = TransactionSignature.dummy();
-                    getScriptType().addSpendingInput(transaction, prevTxOut, pubKey, signature);
-                } else if(getPolicyType().equals(PolicyType.MULTI)) {
-                    List<ECKey> pubKeys = getPubKeys(selectedUtxo.getValue());
-                    int threshold = getDefaultPolicy().getNumSignaturesRequired();
-                    List<TransactionSignature> signatures = new ArrayList<>(threshold);
-                    for(int i = 0; i < threshold; i++) {
-                        signatures.add(TransactionSignature.dummy());
-                    }
-                    getScriptType().addMultisigSpendingInput(transaction, prevTxOut, threshold, pubKeys, signatures);
-                }
+                addDummySpendingInput(transaction, selectedUtxo.getValue(), prevTxOut);
             }
 
             //Add recipient output
@@ -448,6 +453,20 @@ public class Wallet {
             }
 
             return new WalletTransaction(this, transaction, utxoSelectors, selectedUtxos, recipientAddress, recipientAmount, differenceAmt);
+        }
+    }
+
+    public TransactionInput addDummySpendingInput(Transaction transaction, WalletNode walletNode, TransactionOutput prevTxOut) {
+        if(getPolicyType().equals(PolicyType.SINGLE)) {
+            ECKey pubKey = getPubKey(walletNode);
+            return getScriptType().addSpendingInput(transaction, prevTxOut, pubKey, TransactionSignature.dummy());
+        } else if(getPolicyType().equals(PolicyType.MULTI)) {
+            List<ECKey> pubKeys = getPubKeys(walletNode);
+            int threshold = getDefaultPolicy().getNumSignaturesRequired();
+            List<TransactionSignature> signatures = IntStream.range(0, threshold).mapToObj(i -> TransactionSignature.dummy()).collect(Collectors.toList());
+            return getScriptType().addMultisigSpendingInput(transaction, prevTxOut, threshold, pubKeys, signatures);
+        } else {
+            throw new UnsupportedOperationException("Cannot create transaction for policy type " + getPolicyType());
         }
     }
 

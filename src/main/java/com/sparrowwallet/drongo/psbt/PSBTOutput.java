@@ -2,7 +2,6 @@ package com.sparrowwallet.drongo.psbt;
 
 import com.sparrowwallet.drongo.KeyDerivation;
 import com.sparrowwallet.drongo.crypto.ECKey;
-import com.sparrowwallet.drongo.crypto.LazyECPoint;
 import com.sparrowwallet.drongo.protocol.Script;
 import org.bouncycastle.util.encoders.Hex;
 import org.slf4j.Logger;
@@ -12,6 +11,8 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
+import static com.sparrowwallet.drongo.psbt.PSBTEntry.parseKeyDerivation;
+
 public class PSBTOutput {
     public static final byte PSBT_OUT_REDEEM_SCRIPT = 0x00;
     public static final byte PSBT_OUT_WITNESS_SCRIPT = 0x01;
@@ -20,10 +21,17 @@ public class PSBTOutput {
 
     private Script redeemScript;
     private Script witnessScript;
-    private Map<LazyECPoint, KeyDerivation> derivedPublicKeys = new LinkedHashMap<>();
-    private Map<String, String> proprietary = new LinkedHashMap<>();
+    private final Map<ECKey, KeyDerivation> derivedPublicKeys = new LinkedHashMap<>();
+    private final Map<String, String> proprietary = new LinkedHashMap<>();
 
     private static final Logger log = LoggerFactory.getLogger(PSBTOutput.class);
+
+    PSBTOutput(Script redeemScript, Script witnessScript, Map<ECKey, KeyDerivation> derivedPublicKeys, Map<String, String> proprietary) {
+        this.redeemScript = redeemScript;
+        this.witnessScript = witnessScript;
+        this.derivedPublicKeys.putAll(derivedPublicKeys);
+        this.proprietary.putAll(proprietary);
+    }
 
     PSBTOutput(List<PSBTEntry> outputEntries) throws PSBTParseException {
         for(PSBTEntry entry : outputEntries) {
@@ -42,10 +50,10 @@ public class PSBTOutput {
                     break;
                 case PSBT_OUT_BIP32_DERIVATION:
                     entry.checkOneBytePlusPubKey();
-                    LazyECPoint publicKey = new LazyECPoint(ECKey.CURVE.getCurve(), entry.getKeyData());
-                    KeyDerivation keyDerivation = PSBTEntry.parseKeyDerivation(entry.getData());
-                    this.derivedPublicKeys.put(publicKey, keyDerivation);
-                    log.debug("Found output bip32_derivation with master fingerprint " + keyDerivation.getMasterFingerprint() + " at path " + keyDerivation.getDerivationPath() + " public key " + publicKey);
+                    ECKey derivedPublicKey = ECKey.fromPublicOnly(entry.getKeyData());
+                    KeyDerivation keyDerivation = parseKeyDerivation(entry.getData());
+                    this.derivedPublicKeys.put(derivedPublicKey, keyDerivation);
+                    log.debug("Found output bip32_derivation with master fingerprint " + keyDerivation.getMasterFingerprint() + " at path " + keyDerivation.getDerivationPath() + " public key " + derivedPublicKey);
                     break;
                 case PSBT_OUT_PROPRIETARY:
                     proprietary.put(Hex.toHexString(entry.getKeyData()), Hex.toHexString(entry.getData()));
@@ -65,11 +73,11 @@ public class PSBTOutput {
         return witnessScript;
     }
 
-    public KeyDerivation getKeyDerivation(LazyECPoint publicKey) {
+    public KeyDerivation getKeyDerivation(ECKey publicKey) {
         return derivedPublicKeys.get(publicKey);
     }
 
-    public Map<LazyECPoint, KeyDerivation> getDerivedPublicKeys() {
+    public Map<ECKey, KeyDerivation> getDerivedPublicKeys() {
         return derivedPublicKeys;
     }
 

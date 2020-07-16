@@ -39,8 +39,7 @@ public class WalletTransaction {
     }
 
     public PSBT createPSBT() {
-        //TODO: Create PSBT
-        return null;
+        return new PSBT(this);
     }
 
     public Wallet getWallet() {

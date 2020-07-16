@@ -3,7 +3,9 @@ package com.sparrowwallet.drongo.psbt;
 import com.sparrowwallet.drongo.ExtendedKey;
 import com.sparrowwallet.drongo.KeyDerivation;
 import com.sparrowwallet.drongo.Utils;
+import com.sparrowwallet.drongo.crypto.ECKey;
 import com.sparrowwallet.drongo.protocol.*;
+import com.sparrowwallet.drongo.wallet.*;
 import org.bouncycastle.util.encoders.Base64;
 import org.bouncycastle.util.encoders.Hex;
 import org.slf4j.Logger;
@@ -39,13 +41,92 @@ public class PSBT {
 
     private Transaction transaction = null;
     private Integer version = null;
-    private Map<ExtendedKey, KeyDerivation> extendedPublicKeys = new LinkedHashMap<>();
-    private Map<String, String> globalProprietary = new LinkedHashMap<>();
+    private final Map<ExtendedKey, KeyDerivation> extendedPublicKeys = new LinkedHashMap<>();
+    private final Map<String, String> globalProprietary = new LinkedHashMap<>();
 
-    private List<PSBTInput> psbtInputs = new ArrayList<>();
-    private List<PSBTOutput> psbtOutputs = new ArrayList<>();
+    private final List<PSBTInput> psbtInputs = new ArrayList<>();
+    private final List<PSBTOutput> psbtOutputs = new ArrayList<>();
 
     private static final Logger log = LoggerFactory.getLogger(PSBT.class);
+
+    public PSBT(WalletTransaction walletTransaction) {
+        Wallet wallet = walletTransaction.getWallet();
+
+        transaction = new Transaction(walletTransaction.getTransaction().bitcoinSerialize());
+        for(TransactionInput input : transaction.getInputs()) {
+            input.clearScriptBytes();
+            input.clearWitness();
+        }
+        for(Keystore keystore : walletTransaction.getWallet().getKeystores()) {
+            extendedPublicKeys.put(keystore.getExtendedPublicKey(), keystore.getKeyDerivation());
+        }
+        version = 0;
+
+        int inputIndex = 0;
+        for(Iterator<Map.Entry<BlockTransactionHashIndex, WalletNode>> iter = walletTransaction.getSelectedUtxos().entrySet().iterator(); iter.hasNext(); inputIndex++) {
+            Map.Entry<BlockTransactionHashIndex, WalletNode> utxoEntry = iter.next();
+            Transaction utxo = wallet.getTransactions().get(utxoEntry.getKey().getHash()).getTransaction();
+            int utxoIndex = (int)utxoEntry.getKey().getIndex();
+            TransactionOutput utxoOutput = utxo.getOutputs().get(utxoIndex);
+
+            TransactionInput txInput = walletTransaction.getTransaction().getInputs().get(inputIndex);
+
+            Script redeemScript = null;
+            if(ScriptType.P2SH.isScriptType(utxoOutput.getScript())) {
+                redeemScript = txInput.getScriptSig().getFirstNestedScript();
+            }
+
+            Script witnessScript = null;
+            if(txInput.getWitness() != null) {
+                witnessScript = txInput.getWitness().getWitnessScript();
+            }
+
+            Map<ECKey, KeyDerivation> derivedPublicKeys = new LinkedHashMap<>();
+            for(Keystore keystore : wallet.getKeystores()) {
+                WalletNode walletNode = utxoEntry.getValue();
+                derivedPublicKeys.put(keystore.getKey(walletNode.getKeyPurpose(), walletNode.getIndex()), keystore.getKeyDerivation());
+            }
+
+            PSBTInput psbtInput = new PSBTInput(wallet.getScriptType(), transaction, inputIndex, utxo, utxoIndex, redeemScript, witnessScript, derivedPublicKeys, Collections.emptyMap());
+            psbtInputs.add(psbtInput);
+        }
+
+        List<WalletNode> outputNodes = new ArrayList<>();
+        outputNodes.add(wallet.getWalletAddresses().getOrDefault(walletTransaction.getRecipientAddress(), null));
+        outputNodes.add(walletTransaction.getChangeNode());
+
+        for(int outputIndex = 0; outputIndex < outputNodes.size(); outputIndex++) {
+            WalletNode outputNode = outputNodes.get(outputIndex);
+            if(outputNode == null) {
+                PSBTOutput externalRecipientOutput = new PSBTOutput(null, null, Collections.emptyMap(), Collections.emptyMap());
+                psbtOutputs.add(externalRecipientOutput);
+            } else {
+                TransactionOutput txOutput = walletTransaction.getTransaction().getOutputs().get(outputIndex);
+
+                //Construct dummy transaction to spend the UTXO created by this wallet's txOutput
+                Transaction transaction = new Transaction();
+                TransactionInput spendingInput = wallet.addDummySpendingInput(transaction, outputNode, txOutput);
+
+                Script redeemScript = null;
+                if(ScriptType.P2SH.isScriptType(txOutput.getScript())) {
+                    redeemScript = spendingInput.getScriptSig().getFirstNestedScript();
+                }
+
+                Script witnessScript = null;
+                if(spendingInput.getWitness() != null) {
+                    witnessScript = spendingInput.getWitness().getWitnessScript();
+                }
+
+                Map<ECKey, KeyDerivation> derivedPublicKeys = new LinkedHashMap<>();
+                for(Keystore keystore : wallet.getKeystores()) {
+                    derivedPublicKeys.put(keystore.getKey(outputNode.getKeyPurpose(), outputNode.getIndex()), keystore.getKeyDerivation());
+                }
+
+                PSBTOutput walletOutput = new PSBTOutput(redeemScript, witnessScript, derivedPublicKeys, Collections.emptyMap());
+                psbtOutputs.add(walletOutput);
+            }
+        }
+    }
 
     public PSBT(byte[] psbt) throws PSBTParseException {
         this.psbtBytes = psbt;
@@ -388,6 +469,10 @@ public class PSBT {
 
     public List<ExtendedKey> getExtendedPublicKeys() {
         return new ArrayList<ExtendedKey>(extendedPublicKeys.keySet());
+    }
+
+    public Map<String, String> getGlobalProprietary() {
+        return globalProprietary;
     }
 
     public String toString() {

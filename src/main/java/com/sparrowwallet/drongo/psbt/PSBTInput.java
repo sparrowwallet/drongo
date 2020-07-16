@@ -29,20 +29,38 @@ public class PSBTInput {
 
     private Transaction nonWitnessUtxo;
     private TransactionOutput witnessUtxo;
-    private Map<ECKey, TransactionSignature> partialSignatures = new LinkedHashMap<>();
+    private final Map<ECKey, TransactionSignature> partialSignatures = new LinkedHashMap<>();
     private Transaction.SigHash sigHash;
     private Script redeemScript;
     private Script witnessScript;
-    private Map<ECKey, KeyDerivation> derivedPublicKeys = new LinkedHashMap<>();
+    private final Map<ECKey, KeyDerivation> derivedPublicKeys = new LinkedHashMap<>();
     private Script finalScriptSig;
     private TransactionWitness finalScriptWitness;
     private String porCommitment;
-    private Map<String, String> proprietary = new LinkedHashMap<>();
+    private final Map<String, String> proprietary = new LinkedHashMap<>();
 
-    private Transaction transaction;
-    private int index;
+    private final Transaction transaction;
+    private final int index;
 
     private static final Logger log = LoggerFactory.getLogger(PSBTInput.class);
+
+    PSBTInput(ScriptType scriptType, Transaction transaction, int index, Transaction utxo, int utxoIndex, Script redeemScript, Script witnessScript, Map<ECKey, KeyDerivation> derivedPublicKeys, Map<String, String> proprietary) {
+        this.transaction = transaction;
+        this.index = index;
+        sigHash = Transaction.SigHash.ALL;
+
+        if(Arrays.asList(ScriptType.WITNESS_TYPES).contains(scriptType)) {
+            this.witnessUtxo = utxo.getOutputs().get(utxoIndex);
+        } else {
+            this.nonWitnessUtxo = utxo;
+        }
+
+        this.redeemScript = redeemScript;
+        this.witnessScript = witnessScript;
+
+        this.derivedPublicKeys.putAll(derivedPublicKeys);
+        this.proprietary.putAll(proprietary);
+    }
 
     PSBTInput(List<PSBTEntry> inputEntries, Transaction transaction, int index) throws PSBTParseException {
         for(PSBTEntry entry : inputEntries) {
@@ -226,11 +244,9 @@ public class PSBTInput {
     }
 
     public ECKey getKeyForSignature(TransactionSignature signature) {
-        if(partialSignatures != null) {
-            for(Map.Entry<ECKey, TransactionSignature> entry : partialSignatures.entrySet()) {
-                if(entry.getValue().equals(signature)) {
-                    return entry.getKey();
-                }
+        for(Map.Entry<ECKey, TransactionSignature> entry : partialSignatures.entrySet()) {
+            if(entry.getValue().equals(signature)) {
+                return entry.getKey();
             }
         }
 

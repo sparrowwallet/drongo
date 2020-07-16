@@ -413,7 +413,7 @@ public class Transaction extends ChildMessage {
             for (int i = 0; i < tx.inputs.size(); i++) {
                 TransactionInput input = tx.inputs.get(i);
                 input.clearScriptBytes();
-                input.setWitness(null);
+                input.clearWitness();
             }
 
             // This step has no purpose beyond being synchronized with Bitcoin Core's bugs. OP_CODESEPARATOR
