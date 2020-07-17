@@ -8,6 +8,8 @@ import com.sparrowwallet.drongo.crypto.Key;
 import com.sparrowwallet.drongo.policy.Policy;
 import com.sparrowwallet.drongo.policy.PolicyType;
 import com.sparrowwallet.drongo.protocol.*;
+import com.sparrowwallet.drongo.psbt.PSBT;
+import com.sparrowwallet.drongo.psbt.PSBTInput;
 
 import java.util.*;
 import java.util.stream.Collectors;
@@ -248,6 +250,23 @@ public class Wallet {
     private void getWalletAddresses(Map<Address, WalletNode> walletAddresses, WalletNode purposeNode) {
         for(WalletNode addressNode : purposeNode.getChildren()) {
             walletAddresses.put(getAddress(addressNode), addressNode);
+        }
+    }
+
+    public boolean isWalletOutputScript(Script outputScript) {
+        return getWalletOutputScripts().containsKey(outputScript);
+    }
+
+    public Map<Script, WalletNode> getWalletOutputScripts() {
+        Map<Script, WalletNode> walletOutputScripts = new LinkedHashMap<>();
+        getWalletOutputScripts(walletOutputScripts, getNode(KeyPurpose.RECEIVE));
+        getWalletOutputScripts(walletOutputScripts, getNode(KeyPurpose.CHANGE));
+        return walletOutputScripts;
+    }
+
+    private void getWalletOutputScripts(Map<Script, WalletNode> walletOutputScripts, WalletNode purposeNode) {
+        for(WalletNode addressNode : purposeNode.getChildren()) {
+            walletOutputScripts.put(getOutputScript(addressNode), addressNode);
         }
     }
 
@@ -549,6 +568,27 @@ public class Wallet {
         return true;
     }
 
+    public boolean canSign(PSBT psbt) {
+        for(int inputIndex = 0; inputIndex < psbt.getTransaction().getInputs().size(); inputIndex++) {
+            TransactionInput txInput = psbt.getTransaction().getInputs().get(inputIndex);
+            PSBTInput psbtInput = psbt.getPsbtInputs().get(inputIndex);
+
+            TransactionOutput utxo = psbtInput.getWitnessUtxo();
+            if(utxo == null) {
+                utxo = psbtInput.getNonWitnessUtxo().getOutputs().get((int)txInput.getOutpoint().getIndex());
+            }
+
+            if(utxo != null) {
+                Script scriptPubKey = utxo.getScript();
+                if(isWalletOutputScript(scriptPubKey)) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
     public BitcoinUnit getAutoUnit() {
         for(KeyPurpose keyPurpose : KeyPurpose.values()) {
             for(WalletNode addressNode : getNode(keyPurpose).getChildren()) {
@@ -737,4 +777,8 @@ public class Wallet {
         }
     }
 
+    @Override
+    public String toString() {
+        return getName();
+    }
 }

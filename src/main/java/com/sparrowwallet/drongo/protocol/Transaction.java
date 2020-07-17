@@ -561,54 +561,6 @@ public class Transaction extends ChildMessage {
         return Sha256Hash.twiceOf(bos.toByteArray());
     }
 
-    /**
-     * These constants are a part of a scriptSig signature on the inputs. They define the details of how a
-     * transaction can be redeemed, specifically, they control how the hash of the transaction is calculated.
-     */
-    public enum SigHash {
-        ALL(1),
-        NONE(2),
-        SINGLE(3),
-        ANYONECANPAY(0x80), // Caution: Using this type in isolation is non-standard. Treated similar to ANYONECANPAY_ALL.
-        ANYONECANPAY_ALL(0x81),
-        ANYONECANPAY_NONE(0x82),
-        ANYONECANPAY_SINGLE(0x83),
-        UNSET(0); // Caution: Using this type in isolation is non-standard. Treated similar to ALL.
-
-        public final int value;
-
-        /**
-         * @param value
-         */
-        private SigHash(final int value) {
-            this.value = value;
-        }
-
-        /**
-         * @return the value as a int
-         */
-        public int intValue() {
-            return this.value;
-        }
-
-        /**
-         * @return the value as a byte
-         */
-        public byte byteValue() {
-            return (byte) this.value;
-        }
-
-        public static SigHash fromInt(int sigHashInt) {
-            for(SigHash value : SigHash.values()) {
-                if(sigHashInt == value.intValue()) {
-                    return value;
-                }
-            }
-
-            throw new IllegalArgumentException("No defined sighash value for int " + sigHashInt);
-        }
-    }
-
     public static final void main(String[] args) throws NonStandardScriptException {
         String hex = "0100000002fe3dc9208094f3ffd12645477b3dc56f60ec4fa8e6f5d67c565d1c6b9216b36e0000000000ffffffff0815cf020f013ed6cf91d29f4202e8a58726b1ac6c79da47c23d1bee0a6925f80000000000ffffffff0100f2052a010000001976a914a30741f8145e5acadf23f751864167f32e0963f788ac00000000";
         byte[] transactionBytes = Utils.hexToBytes(hex);

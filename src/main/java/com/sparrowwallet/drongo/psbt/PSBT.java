@@ -388,6 +388,26 @@ public class PSBT {
         return fee;
     }
 
+    public boolean hasSignatures() {
+        for(PSBTInput psbtInput : getPsbtInputs()) {
+            if(!psbtInput.getPartialSignatures().isEmpty() || psbtInput.getFinalScriptSig() != null || psbtInput.getFinalScriptWitness() != null) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    public boolean isSigned() {
+        for(PSBTInput psbtInput : getPsbtInputs()) {
+            if(!psbtInput.isSigned()) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
     public byte[] serialize() throws IOException {
         ByteArrayOutputStream transactionbaos = new ByteArrayOutputStream();
         transaction.bitcoinSerializeToStream(transactionbaos);

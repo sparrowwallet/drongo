@@ -30,7 +30,7 @@ public class PSBTInput {
     private Transaction nonWitnessUtxo;
     private TransactionOutput witnessUtxo;
     private final Map<ECKey, TransactionSignature> partialSignatures = new LinkedHashMap<>();
-    private Transaction.SigHash sigHash;
+    private SigHash sigHash;
     private Script redeemScript;
     private Script witnessScript;
     private final Map<ECKey, KeyDerivation> derivedPublicKeys = new LinkedHashMap<>();
@@ -47,7 +47,7 @@ public class PSBTInput {
     PSBTInput(ScriptType scriptType, Transaction transaction, int index, Transaction utxo, int utxoIndex, Script redeemScript, Script witnessScript, Map<ECKey, KeyDerivation> derivedPublicKeys, Map<String, String> proprietary) {
         this.transaction = transaction;
         this.index = index;
-        sigHash = Transaction.SigHash.ALL;
+        sigHash = SigHash.ALL;
 
         if(Arrays.asList(ScriptType.WITNESS_TYPES).contains(scriptType)) {
             this.witnessUtxo = utxo.getOutputs().get(utxoIndex);
@@ -118,7 +118,7 @@ public class PSBTInput {
                 case PSBT_IN_SIGHASH_TYPE:
                     entry.checkOneByteKey();
                     long sighashType = Utils.readUint32(entry.getData(), 0);
-                    Transaction.SigHash sigHash = Transaction.SigHash.fromInt((int)sighashType);
+                    SigHash sigHash = SigHash.fromInt((int)sighashType);
                     this.sigHash = sigHash;
                     log.debug("Found input sighash_type " + sigHash.toString());
                     break;
@@ -211,8 +211,12 @@ public class PSBTInput {
         return partialSignatures.get(publicKey);
     }
 
-    public Transaction.SigHash getSigHash() {
+    public SigHash getSigHash() {
         return sigHash;
+    }
+
+    public void setSigHash(SigHash sigHash) {
+        this.sigHash = sigHash;
     }
 
     public Script getRedeemScript() {
@@ -261,18 +265,26 @@ public class PSBTInput {
         return proprietary;
     }
 
-    public boolean isSigned() throws NonStandardScriptException {
-        //All partial sigs are already verified
-        int reqSigs = getSigningScript().getNumRequiredSignatures();
-        int sigs = getPartialSignatures().size();
-        return sigs == reqSigs;
+    public boolean isSigned() {
+        if(!getPartialSignatures().isEmpty()) {
+            try {
+                //All partial sigs are already verified
+                int reqSigs = getSigningScript().getNumRequiredSignatures();
+                int sigs = getPartialSignatures().size();
+                return sigs == reqSigs;
+            } catch(NonStandardScriptException e) {
+                return false;
+            }
+        } else {
+            return getFinalScriptSig() != null;
+        }
     }
 
     boolean verifySignatures() throws PSBTParseException {
-        Transaction.SigHash localSigHash = getSigHash();
+        SigHash localSigHash = getSigHash();
         if(localSigHash == null) {
             //Assume SigHash.ALL
-            localSigHash = Transaction.SigHash.ALL;
+            localSigHash = SigHash.ALL;
         }
 
         if(getNonWitnessUtxo() != null || getWitnessUtxo() != null) {
@@ -325,7 +337,7 @@ public class PSBTInput {
         return signingScript;
     }
 
-    private Sha256Hash getHashForSignature(Script connectedScript, Transaction.SigHash localSigHash) {
+    private Sha256Hash getHashForSignature(Script connectedScript, SigHash localSigHash) {
         Sha256Hash hash;
         if (getNonWitnessUtxo() != null) {
             hash = transaction.hashForSignature(index, connectedScript, localSigHash, false);
