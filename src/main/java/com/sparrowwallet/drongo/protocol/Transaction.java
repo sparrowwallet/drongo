@@ -22,6 +22,7 @@ public class Transaction extends ChildMessage {
     public static final long SATOSHIS_PER_BITCOIN = 100 * 1000 * 1000L;
     public static final long MAX_BLOCK_LOCKTIME = 500000000L;
     public static final int WITNESS_SCALE_FACTOR = 4;
+    public static final int DEFAULT_SEGWIT_VERSION = 1;
 
     //Min feerate for defining dust, defined in sats/vByte
     //From: https://github.com/bitcoin/bitcoin/blob/0.19/src/policy/policy.h#L50
@@ -311,7 +312,7 @@ public class Transaction extends ChildMessage {
 
     public TransactionInput addInput(Sha256Hash spendTxHash, long outputIndex, Script script, TransactionWitness witness) {
         if(!isSegwit()) {
-            setSegwitVersion(0);
+            setSegwitVersion(DEFAULT_SEGWIT_VERSION);
         }
 
         return addInput(new TransactionInput(this, new TransactionOutPoint(spendTxHash, outputIndex), script.getProgram(), witness));
