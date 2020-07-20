@@ -12,6 +12,7 @@ import com.sparrowwallet.drongo.psbt.PSBT;
 import com.sparrowwallet.drongo.psbt.PSBTInput;
 
 import java.util.*;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
@@ -569,6 +570,19 @@ public class Wallet {
     }
 
     public boolean canSign(PSBT psbt) {
+        return !getSigningNodes(psbt).isEmpty();
+    }
+
+    /**
+     * Determines which nodes in this wallet can sign which inputs in the provided PSBT
+     *
+     * @param psbt The PSBT to be signed
+     * @return A map if the PSBT inputs and the nodes that can sign them
+     */
+    public Map<PSBTInput, WalletNode> getSigningNodes(PSBT psbt) {
+        Map<PSBTInput, WalletNode> signingNodes = new LinkedHashMap<>();
+        Map<Script, WalletNode> walletOutputScripts = getWalletOutputScripts();
+
         for(int inputIndex = 0; inputIndex < psbt.getTransaction().getInputs().size(); inputIndex++) {
             TransactionInput txInput = psbt.getTransaction().getInputs().get(inputIndex);
             PSBTInput psbtInput = psbt.getPsbtInputs().get(inputIndex);
@@ -580,13 +594,38 @@ public class Wallet {
 
             if(utxo != null) {
                 Script scriptPubKey = utxo.getScript();
-                if(isWalletOutputScript(scriptPubKey)) {
-                    return true;
+                WalletNode signingNode = walletOutputScripts.get(scriptPubKey);
+                if(signingNode != null) {
+                    signingNodes.put(psbtInput, signingNode);
                 }
             }
         }
 
-        return false;
+        return signingNodes;
+    }
+
+    /**
+     * Determines which keystores have signed a partially signed (unfinalized) PSBT
+     *
+     * @param psbt The partially signed PSBT
+     */
+    public Map<PSBTInput, List<Keystore>> getSignedKeystores(PSBT psbt) {
+        Map<PSBTInput, WalletNode> signingNodes = getSigningNodes(psbt);
+        Map<PSBTInput, List<Keystore>> signedKeystores = new LinkedHashMap<>();
+
+        for(PSBTInput psbtInput : signingNodes.keySet()) {
+            WalletNode walletNode = signingNodes.get(psbtInput);
+            Map<ECKey, Keystore> keystoreKeysForNode = getKeystores().stream().collect(Collectors.toMap(keystore -> keystore.getKey(walletNode), Function.identity(),
+                    (u, v) -> { throw new IllegalStateException("Duplicate keys from different keystores for node " + walletNode.getDerivationPath()); },
+                    LinkedHashMap::new));
+
+            keystoreKeysForNode.keySet().retainAll(psbtInput.getPartialSignatures().keySet());
+
+            List<Keystore> inputSignedKeystores = new ArrayList<>(keystoreKeysForNode.values());
+            signedKeystores.put(psbtInput, inputSignedKeystores);
+        }
+
+        return signedKeystores;
     }
 
     public BitcoinUnit getAutoUnit() {

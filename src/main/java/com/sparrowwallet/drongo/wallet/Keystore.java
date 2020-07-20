@@ -104,9 +104,13 @@ public class Keystore {
         return new ExtendedKey(derivedKey, derivedKey.getParentFingerprint(), derivation.get(derivation.size() - 1));
     }
 
+    public DeterministicKey getKey(WalletNode walletNode) {
+        return getKey(walletNode.getKeyPurpose(), walletNode.getIndex());
+    }
+
     public DeterministicKey getKey(KeyPurpose keyPurpose, int keyIndex) {
-        List<ChildNumber> receivingDerivation = List.of(extendedPublicKey.getKeyChildNumber(), keyPurpose.getPathIndex(), new ChildNumber(keyIndex));
-        return extendedPublicKey.getKey(receivingDerivation);
+        List<ChildNumber> derivation = List.of(extendedPublicKey.getKeyChildNumber(), keyPurpose.getPathIndex(), new ChildNumber(keyIndex));
+        return extendedPublicKey.getKey(derivation);
     }
 
     public KeyDerivation getDerivation(KeyPurpose keyPurpose, int keyIndex) {
