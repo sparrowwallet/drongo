@@ -73,11 +73,12 @@ public class ExtendedKey {
         return buffer.array();
     }
 
-    public static ExtendedKey fromDescriptor(String extPubKey) {
-        byte[] serializedKey = Base58.decodeChecked(extPubKey);
+    public static ExtendedKey fromDescriptor(String descriptor) {
+        byte[] serializedKey = Base58.decodeChecked(descriptor);
         ByteBuffer buffer = ByteBuffer.wrap(serializedKey);
-        int header = buffer.getInt();
-        if(!Header.isValidHeader(header)) {
+        int headerInt = buffer.getInt();
+        Header header = Header.getHeader(headerInt);
+        if(header == null) {
             throw new IllegalArgumentException("Unknown header bytes: " + DeterministicKey.toBase58(serializedKey).substring(0, 4));
         }
 
@@ -106,8 +107,13 @@ public class ExtendedKey {
             throw new IllegalArgumentException("Found unexpected data in key");
         }
 
-        DeterministicKey pubKey = new DeterministicKey(path, chainCode, new LazyECPoint(ECKey.CURVE.getCurve(), data), depth, parentFingerprint);
-        return new ExtendedKey(pubKey, parentFingerprint, childNumber);
+        if(header.isPrivate()) {
+            DeterministicKey prvKey = HDKeyDerivation.createMasterPrivKeyFromBytes(Arrays.copyOfRange(data, 1, 33), chainCode, path);
+            return new ExtendedKey(prvKey, parentFingerprint, childNumber);
+        } else {
+            DeterministicKey pubKey = new DeterministicKey(path, chainCode, new LazyECPoint(ECKey.CURVE.getCurve(), data), depth, parentFingerprint);
+            return new ExtendedKey(pubKey, parentFingerprint, childNumber);
+        }
     }
 
     public static boolean isValid(String extPubKey) {
@@ -206,14 +212,14 @@ public class ExtendedKey {
             return name.endsWith("prv");
         }
 
-        public static boolean isValidHeader(int header) {
+        public static Header getHeader(int header) {
             for(Header extendedKeyHeader : Header.values()) {
                 if(header == extendedKeyHeader.header) {
-                    return true;
+                    return extendedKeyHeader;
                 }
             }
 
-            return false;
+            return null;
         }
     }
 }

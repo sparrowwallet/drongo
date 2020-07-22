@@ -169,7 +169,7 @@ public class Wallet {
         }
 
         Keystore keystore = getKeystores().get(0);
-        return keystore.getKey(keyPurpose, index);
+        return keystore.getPubKey(keyPurpose, index);
     }
 
     public List<ECKey> getPubKeys(WalletNode node) {
@@ -183,7 +183,7 @@ public class Wallet {
             throw new UnsupportedOperationException("Cannot determine public keys for a custom policy");
         }
 
-        return getKeystores().stream().map(keystore -> keystore.getKey(keyPurpose, index)).collect(Collectors.toList());
+        return getKeystores().stream().map(keystore -> keystore.getPubKey(keyPurpose, index)).collect(Collectors.toList());
     }
 
     public Address getAddress(WalletNode node) {
@@ -615,7 +615,7 @@ public class Wallet {
 
         for(PSBTInput psbtInput : signingNodes.keySet()) {
             WalletNode walletNode = signingNodes.get(psbtInput);
-            Map<ECKey, Keystore> keystoreKeysForNode = getKeystores().stream().collect(Collectors.toMap(keystore -> keystore.getKey(walletNode), Function.identity(),
+            Map<ECKey, Keystore> keystoreKeysForNode = getKeystores().stream().collect(Collectors.toMap(keystore -> keystore.getPubKey(walletNode), Function.identity(),
                     (u, v) -> { throw new IllegalStateException("Duplicate keys from different keystores for node " + walletNode.getDerivationPath()); },
                     LinkedHashMap::new));
 
@@ -626,6 +626,19 @@ public class Wallet {
         }
 
         return signedKeystores;
+    }
+
+    public void sign(PSBT psbt) throws MnemonicException {
+        Map<PSBTInput, WalletNode> signingNodes = getSigningNodes(psbt);
+        for(Keystore keystore : getKeystores()) {
+            if(keystore.hasSeed()) {
+                for(Map.Entry<PSBTInput, WalletNode> signingEntry : signingNodes.entrySet()) {
+                    ECKey privKey = keystore.getKey(signingEntry.getValue());
+                    PSBTInput psbtInput = signingEntry.getKey();
+                    psbtInput.sign(privKey);
+                }
+            }
+        }
     }
 
     public BitcoinUnit getAutoUnit() {

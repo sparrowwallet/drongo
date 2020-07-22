@@ -84,7 +84,7 @@ public class PSBT {
             Map<ECKey, KeyDerivation> derivedPublicKeys = new LinkedHashMap<>();
             for(Keystore keystore : wallet.getKeystores()) {
                 WalletNode walletNode = utxoEntry.getValue();
-                derivedPublicKeys.put(keystore.getKey(walletNode.getKeyPurpose(), walletNode.getIndex()), keystore.getKeyDerivation());
+                derivedPublicKeys.put(keystore.getPubKey(walletNode), keystore.getKeyDerivation());
             }
 
             PSBTInput psbtInput = new PSBTInput(wallet.getScriptType(), transaction, inputIndex, utxo, utxoIndex, redeemScript, witnessScript, derivedPublicKeys, Collections.emptyMap());
@@ -119,7 +119,7 @@ public class PSBT {
 
                 Map<ECKey, KeyDerivation> derivedPublicKeys = new LinkedHashMap<>();
                 for(Keystore keystore : wallet.getKeystores()) {
-                    derivedPublicKeys.put(keystore.getKey(outputNode.getKeyPurpose(), outputNode.getIndex()), keystore.getKeyDerivation());
+                    derivedPublicKeys.put(keystore.getPubKey(outputNode), keystore.getKeyDerivation());
                 }
 
                 PSBTOutput walletOutput = new PSBTOutput(redeemScript, witnessScript, derivedPublicKeys, Collections.emptyMap());

@@ -280,7 +280,7 @@ public class PSBTInput {
         }
     }
 
-    boolean sign(ECKey privKey) {
+    public boolean sign(ECKey privKey) {
         SigHash localSigHash = getSigHash();
         if(localSigHash == null) {
             //Assume SigHash.ALL

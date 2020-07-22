@@ -101,14 +101,26 @@ public class Keystore {
     public ExtendedKey getExtendedPrivateKey() throws MnemonicException {
         List<ChildNumber> derivation = getKeyDerivation().getDerivation();
         DeterministicKey derivedKey = getExtendedMasterPrivateKey().getKey(derivation);
-        return new ExtendedKey(derivedKey, derivedKey.getParentFingerprint(), derivation.get(derivation.size() - 1));
+        ExtendedKey xprv = new ExtendedKey(derivedKey, derivedKey.getParentFingerprint(), derivation.get(derivation.size() - 1));
+        //Recreate from xprv string to reset path to single ChildNumber at the derived depth
+        return ExtendedKey.fromDescriptor(xprv.toString());
     }
 
-    public DeterministicKey getKey(WalletNode walletNode) {
+    public DeterministicKey getKey(WalletNode walletNode) throws MnemonicException {
         return getKey(walletNode.getKeyPurpose(), walletNode.getIndex());
     }
 
-    public DeterministicKey getKey(KeyPurpose keyPurpose, int keyIndex) {
+    public DeterministicKey getKey(KeyPurpose keyPurpose, int keyIndex) throws MnemonicException {
+        ExtendedKey extendedPrivateKey = getExtendedPrivateKey();
+        List<ChildNumber> derivation = List.of(extendedPrivateKey.getKeyChildNumber(), keyPurpose.getPathIndex(), new ChildNumber(keyIndex));
+        return extendedPrivateKey.getKey(derivation);
+    }
+
+    public DeterministicKey getPubKey(WalletNode walletNode) {
+        return getPubKey(walletNode.getKeyPurpose(), walletNode.getIndex());
+    }
+
+    public DeterministicKey getPubKey(KeyPurpose keyPurpose, int keyIndex) {
         List<ChildNumber> derivation = List.of(extendedPublicKey.getKeyChildNumber(), keyPurpose.getPathIndex(), new ChildNumber(keyIndex));
         return extendedPublicKey.getKey(derivation);
     }
