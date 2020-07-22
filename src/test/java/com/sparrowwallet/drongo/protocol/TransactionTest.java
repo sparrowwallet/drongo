@@ -18,7 +18,7 @@ public class TransactionTest {
         Transaction transaction = new Transaction(Utils.hexToBytes(hex));
 
         ECKey pubKey = ECKey.fromPublicOnly(Utils.hexToBytes("025476c2e83188368da1ff3e292e7acafcdb3566bb0ad253f62fc70f07aeee6357"));
-        Sha256Hash hash = transaction.hashForWitnessSignature(1, ScriptType.P2PKH.getOutputScript(pubKey.getPubKeyHash()),600000000L, SigHash.ALL, false);
+        Sha256Hash hash = transaction.hashForWitnessSignature(1, ScriptType.P2PKH.getOutputScript(pubKey.getPubKeyHash()),600000000L, SigHash.ALL);
         TransactionSignature signature = TransactionSignature.decodeFromBitcoin(Utils.hexToBytes("304402203609e17b84f6a7d30c80bfa610b5b4542f32a8a0d5447a12fb1366d7f01cc44a0220573a954c4518331561406f90300e8f3358f51928d43c212a8caed02de67eebee"), false, true);
         Assert.assertTrue(pubKey.verify(hash, signature));
     }
@@ -29,7 +29,7 @@ public class TransactionTest {
         Transaction transaction = new Transaction(Utils.hexToBytes(hex));
 
         ECKey pubKey = ECKey.fromPublicOnly(Utils.hexToBytes("03ad1d8e89212f0b92c74d23bb710c00662ad1470198ac48c43f7d6f93a2a26873"));
-        Sha256Hash hash = transaction.hashForWitnessSignature(0, ScriptType.P2PKH.getOutputScript(pubKey.getPubKeyHash()),1000000000L, SigHash.ALL, false);
+        Sha256Hash hash = transaction.hashForWitnessSignature(0, ScriptType.P2PKH.getOutputScript(pubKey.getPubKeyHash()),1000000000L, SigHash.ALL);
         TransactionSignature signature = TransactionSignature.decodeFromBitcoin(Utils.hexToBytes("3044022047ac8e878352d3ebbde1c94ce3a10d057c24175747116f8288e5d794d12d482f0220217f36a485cae903c713331d877c1f64677e3622ad4010726870540656fe9dcb01"), true, true);
         Assert.assertTrue(pubKey.verify(hash, signature));
     }
@@ -41,7 +41,7 @@ public class TransactionTest {
 
         ECKey pubKey = ECKey.fromPublicOnly(Utils.hexToBytes("026dccc749adc2a9d0d89497ac511f760f45c47dc5ed9cf352a58ac706453880ae"));
         Script script = new Script(Utils.hexToBytes("21026dccc749adc2a9d0d89497ac511f760f45c47dc5ed9cf352a58ac706453880aeadab210255a9626aebf5e29c0e6538428ba0d1dcf6ca98ffdf086aa8ced5e0d0215ea465ac"));
-        Sha256Hash hash = transaction.hashForWitnessSignature(1, script,4900000000L, SigHash.SINGLE, false);
+        Sha256Hash hash = transaction.hashForWitnessSignature(1, script,4900000000L, SigHash.SINGLE);
         TransactionSignature signature = TransactionSignature.decodeFromBitcoin(Utils.hexToBytes("3044022027dc95ad6b740fe5129e7e62a75dd00f291a2aeb1200b84b09d9e3789406b6c002201a9ecd315dd6a0e632ab20bbb98948bc0c6fb204f2c286963bb48517a7058e2703"), true, true);
         Assert.assertTrue(pubKey.verify(hash, signature));
     }
@@ -53,7 +53,7 @@ public class TransactionTest {
 
         ECKey pubKey = ECKey.fromPublicOnly(Utils.hexToBytes("0392972e2eb617b2388771abe27235fd5ac44af8e61693261550447a4c3e39da98"));
         Script script = new Script(Utils.hexToBytes("68210392972e2eb617b2388771abe27235fd5ac44af8e61693261550447a4c3e39da98ac"));
-        Sha256Hash hash = transaction.hashForWitnessSignature(1, script,16777215L, SigHash.SINGLE, true);
+        Sha256Hash hash = transaction.hashForWitnessSignature(1, script,16777215L, SigHash.ANYONECANPAY_SINGLE);
         TransactionSignature signature = TransactionSignature.decodeFromBitcoin(Utils.hexToBytes("30440220032521802a76ad7bf74d0e2c218b72cf0cbc867066e2e53db905ba37f130397e02207709e2188ed7f08f4c952d9d13986da504502b8c3be59617e043552f506c46ff83"), true, true);
         Assert.assertTrue(pubKey.verify(hash, signature));
     }
@@ -65,7 +65,7 @@ public class TransactionTest {
 
         ECKey pubKey = ECKey.fromPublicOnly(Utils.hexToBytes("0307b8ae49ac90a048e9b53357a2354b3334e9c8bee813ecb98e99a7e07e8c3ba3"));
         Script script = new Script(Utils.hexToBytes("56210307b8ae49ac90a048e9b53357a2354b3334e9c8bee813ecb98e99a7e07e8c3ba32103b28f0c28bfab54554ae8c658ac5c3e0ce6e79ad336331f78c428dd43eea8449b21034b8113d703413d57761b8b9781957b8c0ac1dfe69f492580ca4195f50376ba4a21033400f6afecb833092a9a21cfdf1ed1376e58c5d1f47de74683123987e967a8f42103a6d48b1131e94ba04d9737d61acdaa1322008af9602b3b14862c07a1789aac162102d8b661b0b3302ee2f162b09e07a55ad5dfbe673a9f01d9f0c19617681024306b56ae"));
-        Sha256Hash hash = transaction.hashForWitnessSignature(0, script,987654321L, SigHash.ALL, false);
+        Sha256Hash hash = transaction.hashForWitnessSignature(0, script,987654321L, SigHash.ALL);
         TransactionSignature signature = TransactionSignature.decodeFromBitcoin(Utils.hexToBytes("304402206ac44d672dac41f9b00e28f4df20c52eeb087207e8d758d76d92c6fab3b73e2b0220367750dbbe19290069cba53d096f44530e4f98acaa594810388cf7409a1870ce01"), true, true);
         Assert.assertTrue(pubKey.verify(hash, signature));
     }
@@ -77,7 +77,7 @@ public class TransactionTest {
 
         ECKey pubKey = ECKey.fromPublicOnly(Utils.hexToBytes("03b28f0c28bfab54554ae8c658ac5c3e0ce6e79ad336331f78c428dd43eea8449b"));
         Script script = new Script(Utils.hexToBytes("56210307b8ae49ac90a048e9b53357a2354b3334e9c8bee813ecb98e99a7e07e8c3ba32103b28f0c28bfab54554ae8c658ac5c3e0ce6e79ad336331f78c428dd43eea8449b21034b8113d703413d57761b8b9781957b8c0ac1dfe69f492580ca4195f50376ba4a21033400f6afecb833092a9a21cfdf1ed1376e58c5d1f47de74683123987e967a8f42103a6d48b1131e94ba04d9737d61acdaa1322008af9602b3b14862c07a1789aac162102d8b661b0b3302ee2f162b09e07a55ad5dfbe673a9f01d9f0c19617681024306b56ae"));
-        Sha256Hash hash = transaction.hashForWitnessSignature(0, script,987654321L, SigHash.NONE, false);
+        Sha256Hash hash = transaction.hashForWitnessSignature(0, script,987654321L, SigHash.NONE);
         TransactionSignature signature = TransactionSignature.decodeFromBitcoin(Utils.hexToBytes("3044022068c7946a43232757cbdf9176f009a928e1cd9a1a8c212f15c1e11ac9f2925d9002205b75f937ff2f9f3c1246e547e54f62e027f64eefa2695578cc6432cdabce271502"), true, true);
         Assert.assertTrue(pubKey.verify(hash, signature));
     }
@@ -89,7 +89,7 @@ public class TransactionTest {
 
         ECKey pubKey = ECKey.fromPublicOnly(Utils.hexToBytes("034b8113d703413d57761b8b9781957b8c0ac1dfe69f492580ca4195f50376ba4a"));
         Script script = new Script(Utils.hexToBytes("56210307b8ae49ac90a048e9b53357a2354b3334e9c8bee813ecb98e99a7e07e8c3ba32103b28f0c28bfab54554ae8c658ac5c3e0ce6e79ad336331f78c428dd43eea8449b21034b8113d703413d57761b8b9781957b8c0ac1dfe69f492580ca4195f50376ba4a21033400f6afecb833092a9a21cfdf1ed1376e58c5d1f47de74683123987e967a8f42103a6d48b1131e94ba04d9737d61acdaa1322008af9602b3b14862c07a1789aac162102d8b661b0b3302ee2f162b09e07a55ad5dfbe673a9f01d9f0c19617681024306b56ae"));
-        Sha256Hash hash = transaction.hashForWitnessSignature(0, script,987654321L, SigHash.SINGLE, false);
+        Sha256Hash hash = transaction.hashForWitnessSignature(0, script,987654321L, SigHash.SINGLE);
         TransactionSignature signature = TransactionSignature.decodeFromBitcoin(Utils.hexToBytes("3044022059ebf56d98010a932cf8ecfec54c48e6139ed6adb0728c09cbe1e4fa0915302e022007cd986c8fa870ff5d2b3a89139c9fe7e499259875357e20fcbb15571c76795403"), true, true);
         Assert.assertTrue(pubKey.verify(hash, signature));
     }
@@ -101,7 +101,7 @@ public class TransactionTest {
 
         ECKey pubKey = ECKey.fromPublicOnly(Utils.hexToBytes("033400f6afecb833092a9a21cfdf1ed1376e58c5d1f47de74683123987e967a8f4"));
         Script script = new Script(Utils.hexToBytes("56210307b8ae49ac90a048e9b53357a2354b3334e9c8bee813ecb98e99a7e07e8c3ba32103b28f0c28bfab54554ae8c658ac5c3e0ce6e79ad336331f78c428dd43eea8449b21034b8113d703413d57761b8b9781957b8c0ac1dfe69f492580ca4195f50376ba4a21033400f6afecb833092a9a21cfdf1ed1376e58c5d1f47de74683123987e967a8f42103a6d48b1131e94ba04d9737d61acdaa1322008af9602b3b14862c07a1789aac162102d8b661b0b3302ee2f162b09e07a55ad5dfbe673a9f01d9f0c19617681024306b56ae"));
-        Sha256Hash hash = transaction.hashForWitnessSignature(0, script,987654321L, SigHash.ALL, true);
+        Sha256Hash hash = transaction.hashForWitnessSignature(0, script,987654321L, SigHash.ANYONECANPAY_ALL);
         TransactionSignature signature = TransactionSignature.decodeFromBitcoin(Utils.hexToBytes("3045022100fbefd94bd0a488d50b79102b5dad4ab6ced30c4069f1eaa69a4b5a763414067e02203156c6a5c9cf88f91265f5a942e96213afae16d83321c8b31bb342142a14d16381"), true, true);
         Assert.assertTrue(pubKey.verify(hash, signature));
     }
@@ -113,7 +113,7 @@ public class TransactionTest {
 
         ECKey pubKey = ECKey.fromPublicOnly(Utils.hexToBytes("03a6d48b1131e94ba04d9737d61acdaa1322008af9602b3b14862c07a1789aac16"));
         Script script = new Script(Utils.hexToBytes("56210307b8ae49ac90a048e9b53357a2354b3334e9c8bee813ecb98e99a7e07e8c3ba32103b28f0c28bfab54554ae8c658ac5c3e0ce6e79ad336331f78c428dd43eea8449b21034b8113d703413d57761b8b9781957b8c0ac1dfe69f492580ca4195f50376ba4a21033400f6afecb833092a9a21cfdf1ed1376e58c5d1f47de74683123987e967a8f42103a6d48b1131e94ba04d9737d61acdaa1322008af9602b3b14862c07a1789aac162102d8b661b0b3302ee2f162b09e07a55ad5dfbe673a9f01d9f0c19617681024306b56ae"));
-        Sha256Hash hash = transaction.hashForWitnessSignature(0, script,987654321L, SigHash.NONE, true);
+        Sha256Hash hash = transaction.hashForWitnessSignature(0, script,987654321L, SigHash.ANYONECANPAY_NONE);
         TransactionSignature signature = TransactionSignature.decodeFromBitcoin(Utils.hexToBytes("3045022100a5263ea0553ba89221984bd7f0b13613db16e7a70c549a86de0cc0444141a407022005c360ef0ae5a5d4f9f2f87a56c1546cc8268cab08c73501d6b3be2e1e1a8a0882"), true, true);
         Assert.assertTrue(pubKey.verify(hash, signature));
     }
@@ -125,7 +125,7 @@ public class TransactionTest {
 
         ECKey pubKey = ECKey.fromPublicOnly(Utils.hexToBytes("02d8b661b0b3302ee2f162b09e07a55ad5dfbe673a9f01d9f0c19617681024306b"));
         Script script = new Script(Utils.hexToBytes("56210307b8ae49ac90a048e9b53357a2354b3334e9c8bee813ecb98e99a7e07e8c3ba32103b28f0c28bfab54554ae8c658ac5c3e0ce6e79ad336331f78c428dd43eea8449b21034b8113d703413d57761b8b9781957b8c0ac1dfe69f492580ca4195f50376ba4a21033400f6afecb833092a9a21cfdf1ed1376e58c5d1f47de74683123987e967a8f42103a6d48b1131e94ba04d9737d61acdaa1322008af9602b3b14862c07a1789aac162102d8b661b0b3302ee2f162b09e07a55ad5dfbe673a9f01d9f0c19617681024306b56ae"));
-        Sha256Hash hash = transaction.hashForWitnessSignature(0, script,987654321L, SigHash.SINGLE, true);
+        Sha256Hash hash = transaction.hashForWitnessSignature(0, script,987654321L, SigHash.ANYONECANPAY_SINGLE);
         TransactionSignature signature = TransactionSignature.decodeFromBitcoin(Utils.hexToBytes("30440220525406a1482936d5a21888260dc165497a90a15669636d8edca6b9fe490d309c022032af0c646a34a44d1f4576bf6a4a74b67940f8faa84c7df9abe12a01a11e2b4783"), true, true);
         Assert.assertTrue(pubKey.verify(hash, signature));
     }

@@ -13,7 +13,7 @@ public class TransactionSignature extends ECKey.ECDSASignature {
      * Because Bitcoin Core works via bit testing, we must not lose the exact value when round-tripping
      * otherwise we'll fail to verify signature hashes.
      */
-    public final int sighashFlags;
+    public final byte sighashFlags;
 
     /** Constructs a signature with the given components and SIGHASH_ALL. */
     public TransactionSignature(BigInteger r, BigInteger s) {
@@ -21,15 +21,15 @@ public class TransactionSignature extends ECKey.ECDSASignature {
     }
 
     /** Constructs a signature with the given components and raw sighash flag bytes (needed for rule compatibility). */
-    public TransactionSignature(BigInteger r, BigInteger s, int sighashFlags) {
+    public TransactionSignature(BigInteger r, BigInteger s, byte sighashFlags) {
         super(r, s);
         this.sighashFlags = sighashFlags;
     }
 
     /** Constructs a transaction signature based on the ECDSA signature. */
-    public TransactionSignature(ECKey.ECDSASignature signature, SigHash mode, boolean anyoneCanPay) {
+    public TransactionSignature(ECKey.ECDSASignature signature, SigHash sigHash) {
         super(signature.r, signature.s);
-        sighashFlags = calcSigHashValue(mode, anyoneCanPay);
+        sighashFlags = sigHash.value;
     }
 
     /**
@@ -41,17 +41,6 @@ public class TransactionSignature extends ECKey.ECDSASignature {
     public static TransactionSignature dummy() {
         BigInteger val = ECKey.HALF_CURVE_ORDER;
         return new TransactionSignature(val, val);
-    }
-
-    /** Calculates the byte used in the protocol to represent the combination of mode and anyoneCanPay. */
-    public static int calcSigHashValue(SigHash mode, boolean anyoneCanPay) {
-        if(SigHash.ALL != mode && SigHash.NONE != mode && SigHash.SINGLE != mode) { // enforce compatibility since this code was made before the SigHash enum was updated
-            throw new IllegalArgumentException("Sighash mode must be one of ALL, NONE or SINGLE");
-        }
-        int sighashFlags = mode.value;
-        if (anyoneCanPay)
-            sighashFlags |= SigHash.ANYONECANPAY.value;
-        return sighashFlags;
     }
 
     /**
@@ -110,14 +99,16 @@ public class TransactionSignature extends ECKey.ECDSASignature {
         return (sighashFlags & SigHash.ANYONECANPAY.value) != 0;
     }
 
-    public SigHash sigHashMode() {
+    public SigHash getSigHash() {
+        boolean anyoneCanPay = anyoneCanPay();
         final int mode = sighashFlags & 0x1f;
-        if (mode == SigHash.NONE.value)
-            return SigHash.NONE;
-        else if (mode == SigHash.SINGLE.value)
-            return SigHash.SINGLE;
-        else
-            return SigHash.ALL;
+        if (mode == SigHash.NONE.value) {
+            return anyoneCanPay ? SigHash.ANYONECANPAY_NONE : SigHash.NONE;
+        } else if (mode == SigHash.SINGLE.value) {
+            return anyoneCanPay ? SigHash.ANYONECANPAY_SINGLE : SigHash.SINGLE;
+        } else {
+            return anyoneCanPay ? SigHash.ANYONECANPAY_ALL : SigHash.ALL;
+        }
     }
 
     /**
@@ -137,7 +128,7 @@ public class TransactionSignature extends ECKey.ECDSASignature {
 
     @Override
     public ECKey.ECDSASignature toCanonicalised() {
-        return new TransactionSignature(super.toCanonicalised(), sigHashMode(), anyoneCanPay());
+        return new TransactionSignature(super.toCanonicalised(), getSigHash());
     }
 
     /**

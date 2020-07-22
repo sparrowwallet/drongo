@@ -397,9 +397,8 @@ public class Transaction extends ChildMessage {
         return version > 0 && version < 5;
     }
 
-    public Sha256Hash hashForSignature(int inputIndex, Script redeemScript, SigHash type, boolean anyoneCanPay) {
-        int sigHash = TransactionSignature.calcSigHashValue(type, anyoneCanPay);
-        return hashForSignature(inputIndex, redeemScript.getProgram(), (byte) sigHash);
+    public Sha256Hash hashForSignature(int inputIndex, Script redeemScript, SigHash sigHash) {
+        return hashForSignature(inputIndex, redeemScript.getProgram(), sigHash.value);
     }
 
     public Sha256Hash hashForSignature(int inputIndex, byte[] connectedScript, byte sigHashType) {
@@ -491,12 +490,10 @@ public class Transaction extends ChildMessage {
      * @param inputIndex   input the signature is being calculated for. Tx signatures are always relative to an input.
      * @param scriptCode   the script that should be in the given input during signing.
      * @param prevValue    the value of the coin being spent
-     * @param type         Should be SigHash.ALL
-     * @param anyoneCanPay should be false.
+     * @param sigHash      Should usually be SigHash.ALL
      */
-    public synchronized Sha256Hash hashForWitnessSignature(int inputIndex, Script scriptCode, long prevValue, SigHash type, boolean anyoneCanPay) {
-        int sigHash = TransactionSignature.calcSigHashValue(type, anyoneCanPay);
-        return hashForWitnessSignature(inputIndex, scriptCode.getProgram(), prevValue, (byte)sigHash);
+    public synchronized Sha256Hash hashForWitnessSignature(int inputIndex, Script scriptCode, long prevValue, SigHash sigHash) {
+        return hashForWitnessSignature(inputIndex, scriptCode.getProgram(), prevValue, sigHash.value);
     }
 
     public synchronized Sha256Hash hashForWitnessSignature(int inputIndex, byte[] scriptCode, long prevValue, byte sigHashType) {
@@ -569,7 +566,7 @@ public class Transaction extends ChildMessage {
         ECKey pubKey = ECKey.fromPublicOnly(Utils.hexToBytes("026dccc749adc2a9d0d89497ac511f760f45c47dc5ed9cf352a58ac706453880ae"));
         System.out.println(ScriptType.P2PKH.getOutputScript(pubKey.getPubKeyHash()).getProgram().length);
         Script script = new Script(Utils.hexToBytes("21026dccc749adc2a9d0d89497ac511f760f45c47dc5ed9cf352a58ac706453880aeadab210255a9626aebf5e29c0e6538428ba0d1dcf6ca98ffdf086aa8ced5e0d0215ea465ac"));
-        Sha256Hash hash = transaction.hashForWitnessSignature(1, script,4900000000L, SigHash.SINGLE, false);
+        Sha256Hash hash = transaction.hashForWitnessSignature(1, script,4900000000L, SigHash.SINGLE);
         System.out.println("Sighash: " + hash.toString());
         TransactionSignature signature = TransactionSignature.decodeFromBitcoin(Utils.hexToBytes("3044022027dc95ad6b740fe5129e7e62a75dd00f291a2aeb1200b84b09d9e3789406b6c002201a9ecd315dd6a0e632ab20bbb98948bc0c6fb204f2c286963bb48517a7058e2703"), true, true);
         if(pubKey.verify(hash, signature)) {

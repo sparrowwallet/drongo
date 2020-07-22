@@ -118,7 +118,7 @@ public class PSBTInput {
                 case PSBT_IN_SIGHASH_TYPE:
                     entry.checkOneByteKey();
                     long sighashType = Utils.readUint32(entry.getData(), 0);
-                    SigHash sigHash = SigHash.fromInt((int)sighashType);
+                    SigHash sigHash = SigHash.fromByte((byte)sighashType);
                     this.sigHash = sigHash;
                     log.debug("Found input sighash_type " + sigHash.toString());
                     break;
@@ -280,6 +280,30 @@ public class PSBTInput {
         }
     }
 
+    boolean sign(ECKey privKey) {
+        SigHash localSigHash = getSigHash();
+        if(localSigHash == null) {
+            //Assume SigHash.ALL
+            localSigHash = SigHash.ALL;
+        }
+
+        if(getNonWitnessUtxo() != null || getWitnessUtxo() != null) {
+            Script signingScript = getSigningScript();
+            if(signingScript != null) {
+                Sha256Hash hash = getHashForSignature(signingScript, localSigHash);
+                ECKey.ECDSASignature ecdsaSignature = privKey.sign(hash);
+                TransactionSignature transactionSignature = new TransactionSignature(ecdsaSignature, localSigHash);
+
+                ECKey pubKey = ECKey.fromPublicOnly(privKey);
+                getPartialSignatures().put(pubKey, transactionSignature);
+
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     boolean verifySignatures() throws PSBTParseException {
         SigHash localSigHash = getSigHash();
         if(localSigHash == null) {
@@ -340,10 +364,10 @@ public class PSBTInput {
     private Sha256Hash getHashForSignature(Script connectedScript, SigHash localSigHash) {
         Sha256Hash hash;
         if (getNonWitnessUtxo() != null) {
-            hash = transaction.hashForSignature(index, connectedScript, localSigHash, false);
+            hash = transaction.hashForSignature(index, connectedScript, localSigHash);
         } else {
             long prevValue = getWitnessUtxo().getValue();
-            hash = transaction.hashForWitnessSignature(index, connectedScript, prevValue, localSigHash, false);
+            hash = transaction.hashForWitnessSignature(index, connectedScript, prevValue, localSigHash);
         }
 
         return hash;
