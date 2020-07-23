@@ -101,9 +101,10 @@ public class TransactionInput extends ChildMessage {
     }
 
     public void setWitness(TransactionWitness witness) {
+        int newLength = witness != null ? witness.getLength() : 0;
         int existingLength = getWitness() != null ? getWitness().getLength() : 0;
         if(getParent() != null) {
-            getParent().adjustLength(witness.getLength() - existingLength);
+            getParent().adjustLength(newLength - existingLength);
         }
 
         this.witness = witness;
