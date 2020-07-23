@@ -88,6 +88,19 @@ public class PSBTOutput {
         return entries;
     }
 
+    void combine(PSBTOutput psbtOutput) {
+        if(psbtOutput.redeemScript != null) {
+            redeemScript = psbtOutput.redeemScript;
+        }
+
+        if(psbtOutput.witnessScript != null) {
+            witnessScript = psbtOutput.witnessScript;
+        }
+
+        derivedPublicKeys.putAll(psbtOutput.derivedPublicKeys);
+        proprietary.putAll(psbtOutput.proprietary);
+    }
+
     public Script getRedeemScript() {
         return redeemScript;
     }

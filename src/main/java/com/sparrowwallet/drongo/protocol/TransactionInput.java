@@ -78,7 +78,7 @@ public class TransactionInput extends ChildMessage {
         return scriptSig;
     }
 
-    void setScriptBytes(byte[] scriptBytes) {
+    public void setScriptBytes(byte[] scriptBytes) {
         super.payload = null;
         this.scriptSig = null;
         int oldLength = length;
@@ -96,18 +96,21 @@ public class TransactionInput extends ChildMessage {
         return witness;
     }
 
-    void setWitness(TransactionWitness witness) {
+    void witness(TransactionWitness witness) {
+        this.witness = witness;
+    }
+
+    public void setWitness(TransactionWitness witness) {
+        int existingLength = getWitness() != null ? getWitness().getLength() : 0;
+        if(getParent() != null) {
+            getParent().adjustLength(witness.getLength() - existingLength);
+        }
+
         this.witness = witness;
     }
 
     public void clearWitness() {
-        TransactionWitness witness = getWitness();
-        if(witness != null) {
-            if(getParent() != null) {
-                getParent().adjustLength(-witness.getLength());
-            }
-            setWitness(null);
-        }
+        setWitness(null);
     }
 
     public boolean hasWitness() {

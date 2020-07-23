@@ -583,14 +583,8 @@ public class Wallet {
         Map<PSBTInput, WalletNode> signingNodes = new LinkedHashMap<>();
         Map<Script, WalletNode> walletOutputScripts = getWalletOutputScripts();
 
-        for(int inputIndex = 0; inputIndex < psbt.getTransaction().getInputs().size(); inputIndex++) {
-            TransactionInput txInput = psbt.getTransaction().getInputs().get(inputIndex);
-            PSBTInput psbtInput = psbt.getPsbtInputs().get(inputIndex);
-
-            TransactionOutput utxo = psbtInput.getWitnessUtxo();
-            if(utxo == null) {
-                utxo = psbtInput.getNonWitnessUtxo().getOutputs().get((int)txInput.getOutpoint().getIndex());
-            }
+        for(PSBTInput psbtInput : psbt.getPsbtInputs()) {
+            TransactionOutput utxo = psbtInput.getUtxo();
 
             if(utxo != null) {
                 Script scriptPubKey = utxo.getScript();
@@ -637,6 +631,45 @@ public class Wallet {
                     PSBTInput psbtInput = signingEntry.getKey();
                     psbtInput.sign(privKey);
                 }
+            }
+        }
+    }
+
+    public void finalise(PSBT psbt) {
+        int threshold = getDefaultPolicy().getNumSignaturesRequired();
+        Map<PSBTInput, WalletNode> signingNodes = getSigningNodes(psbt);
+
+        for(PSBTInput psbtInput : psbt.getPsbtInputs()) {
+            WalletNode signingNode = signingNodes.get(psbtInput);
+            TransactionOutput utxo = psbtInput.getUtxo();
+
+            if(psbtInput.getPartialSignatures().size() >= threshold && signingNode != null && utxo != null) {
+                Transaction transaction = new Transaction();
+
+                TransactionInput txInput;
+                if(getPolicyType().equals(PolicyType.SINGLE)) {
+                    ECKey pubKey = getPubKey(signingNode);
+                    TransactionSignature transactionSignature = psbtInput.getPartialSignature(pubKey);
+                    if(transactionSignature == null) {
+                        throw new IllegalArgumentException("Pubkey of partial signature does not match wallet pubkey");
+                    }
+
+                    txInput = getScriptType().addSpendingInput(transaction, utxo, pubKey, transactionSignature);
+                } else if(getPolicyType().equals(PolicyType.MULTI)) {
+                    List<ECKey> pubKeys = getPubKeys(signingNode);
+                    List<TransactionSignature> signatures = pubKeys.stream().map(psbtInput::getPartialSignature).collect(Collectors.toList());
+                    if(pubKeys.size() != signatures.size()) {
+                        throw new IllegalArgumentException("Pubkeys of partial signatures do not match wallet pubkeys");
+                    }
+
+                    txInput = getScriptType().addMultisigSpendingInput(transaction, utxo, threshold, pubKeys, signatures);
+                } else {
+                    throw new UnsupportedOperationException("Cannot finalise PSBT for policy type " + getPolicyType());
+                }
+
+                psbtInput.setFinalScriptSig(txInput.getScriptSig());
+                psbtInput.setFinalScriptWitness(txInput.getWitness());
+                psbtInput.clearFinalised();
             }
         }
     }

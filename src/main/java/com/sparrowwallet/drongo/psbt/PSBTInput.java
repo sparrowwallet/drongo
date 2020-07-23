@@ -250,6 +250,38 @@ public class PSBTInput {
         return entries;
     }
 
+    void combine(PSBTInput psbtInput) {
+        if(psbtInput.nonWitnessUtxo != null) {
+            nonWitnessUtxo = psbtInput.nonWitnessUtxo;
+        }
+
+        if(psbtInput.witnessUtxo != null) {
+            witnessUtxo = psbtInput.witnessUtxo;
+        }
+
+        partialSignatures.putAll(psbtInput.partialSignatures);
+
+        if(psbtInput.sigHash != null) {
+            sigHash = psbtInput.sigHash;
+        }
+
+        if(psbtInput.redeemScript != null) {
+            redeemScript = psbtInput.redeemScript;
+        }
+
+        if(psbtInput.witnessScript != null) {
+            witnessScript = psbtInput.witnessScript;
+        }
+
+        derivedPublicKeys.putAll(psbtInput.derivedPublicKeys);
+
+        if(psbtInput.porCommitment != null) {
+            porCommitment = psbtInput.porCommitment;
+        }
+
+        proprietary.putAll(psbtInput.proprietary);
+    }
+
     public Transaction getNonWitnessUtxo() {
         return nonWitnessUtxo;
     }
@@ -286,8 +318,16 @@ public class PSBTInput {
         return finalScriptSig;
     }
 
+    public void setFinalScriptSig(Script finalScriptSig) {
+        this.finalScriptSig = finalScriptSig;
+    }
+
     public TransactionWitness getFinalScriptWitness() {
         return finalScriptWitness;
+    }
+
+    public void setFinalScriptWitness(TransactionWitness finalScriptWitness) {
+        this.finalScriptWitness = finalScriptWitness;
     }
 
     public String getPorCommitment() {
@@ -384,8 +424,7 @@ public class PSBTInput {
     }
 
     public Script getSigningScript() {
-        int vout = (int)transaction.getInputs().get(index).getOutpoint().getIndex();
-        Script signingScript = getWitnessUtxo() != null ? getWitnessUtxo().getScript() : getNonWitnessUtxo().getOutputs().get(vout).getScript();
+        Script signingScript = getUtxo().getScript();
 
         if(P2SH.isScriptType(signingScript)) {
             if(getRedeemScript() != null) {
@@ -410,6 +449,21 @@ public class PSBTInput {
         }
 
         return signingScript;
+    }
+
+    public TransactionOutput getUtxo() {
+        int vout = (int)transaction.getInputs().get(index).getOutpoint().getIndex();
+        return getWitnessUtxo() != null ? getWitnessUtxo() : (getNonWitnessUtxo() != null ?  getNonWitnessUtxo().getOutputs().get(vout) : null);
+    }
+
+    public void clearFinalised() {
+        partialSignatures.clear();
+        sigHash = null;
+        redeemScript = null;
+        witnessScript = null;
+        derivedPublicKeys.clear();
+        porCommitment = null;
+        proprietary.clear();
     }
 
     private Sha256Hash getHashForSignature(Script connectedScript, SigHash localSigHash) {

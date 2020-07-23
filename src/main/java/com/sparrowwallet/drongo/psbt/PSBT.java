@@ -314,13 +314,11 @@ public class PSBT {
     public Long getFee() {
         long fee = 0L;
 
-        for (int i = 0; i < psbtInputs.size(); i++) {
-            PSBTInput input = psbtInputs.get(i);
-            if(input.getNonWitnessUtxo() != null) {
-                int index = (int)transaction.getInputs().get(i).getOutpoint().getIndex();
-                fee += input.getNonWitnessUtxo().getOutputs().get(index).getValue();
-            } else if(input.getWitnessUtxo() != null) {
-                fee += input.getWitnessUtxo().getValue();
+        for(PSBTInput input : psbtInputs) {
+            TransactionOutput utxo = input.getUtxo();
+
+            if(utxo != null) {
+                fee += utxo.getValue();
             } else {
                 log.error("Cannot determine fee - not enough information provided on inputs");
                 return null;
@@ -408,6 +406,63 @@ public class PSBT {
         }
 
         return baos.toByteArray();
+    }
+
+    public void combine(PSBT... psbts) {
+        for(PSBT psbt : psbts) {
+            combine(psbt);
+        }
+    }
+
+    public void combine(PSBT psbt) {
+        byte[] txBytes = transaction.bitcoinSerialize();
+        byte[] psbtTxBytes = psbt.getTransaction().bitcoinSerialize();
+
+        if(!Arrays.equals(txBytes, psbtTxBytes)) {
+            throw new IllegalArgumentException("Provided PSBT does contain a matching global transaction");
+        }
+
+        for(PSBTInput psbtInput : psbt.getPsbtInputs()) {
+            if(psbtInput.getFinalScriptSig() != null || psbtInput.getFinalScriptWitness() != null) {
+                throw new IllegalArgumentException("Cannot combine an already finalised PSBT");
+            }
+        }
+
+        if(psbt.getVersion() != null) {
+            version = psbt.getVersion();
+        }
+
+        extendedPublicKeys.putAll(psbt.extendedPublicKeys);
+        globalProprietary.putAll(psbt.globalProprietary);
+
+        for(int i = 0; i < getPsbtInputs().size(); i++) {
+            PSBTInput thisInput = getPsbtInputs().get(i);
+            PSBTInput otherInput = psbt.getPsbtInputs().get(i);
+            thisInput.combine(otherInput);
+        }
+
+        for(int i = 0; i < getPsbtOutputs().size(); i++) {
+            PSBTOutput thisOutput = getPsbtOutputs().get(i);
+            PSBTOutput otherOutput = psbt.getPsbtOutputs().get(i);
+            thisOutput.combine(otherOutput);
+        }
+    }
+
+    public Transaction extractTransaction() {
+        for(PSBTInput psbtInput : getPsbtInputs()) {
+            if(psbtInput.getFinalScriptSig() == null) {
+                return null;
+            }
+        }
+
+        for(int i = 0; i < transaction.getInputs().size(); i++) {
+            TransactionInput txInput = transaction.getInputs().get(i);
+            PSBTInput psbtInput = getPsbtInputs().get(i);
+            txInput.setScriptBytes(psbtInput.getFinalScriptSig().getProgram());
+            txInput.setWitness(psbtInput.getFinalScriptWitness());
+        }
+
+        return transaction;
     }
 
     public List<PSBTInput> getPsbtInputs() {

@@ -258,7 +258,7 @@ public class Transaction extends ChildMessage {
         int numWitnesses = inputs.size();
         for (int i = 0; i < numWitnesses; i++) {
             TransactionWitness witness = new TransactionWitness(this, payload, cursor);
-            inputs.get(i).setWitness(witness);
+            inputs.get(i).witness(witness);
             cursor += witness.getLength();
         }
     }
