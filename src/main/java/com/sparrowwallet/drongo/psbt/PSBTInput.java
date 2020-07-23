@@ -334,7 +334,7 @@ public class PSBTInput {
 
     public Script getSigningScript() {
         int vout = (int)transaction.getInputs().get(index).getOutpoint().getIndex();
-        Script signingScript = getNonWitnessUtxo() != null ? getNonWitnessUtxo().getOutputs().get(vout).getScript() : getWitnessUtxo().getScript();
+        Script signingScript = getWitnessUtxo() != null ? getWitnessUtxo().getScript() : getNonWitnessUtxo().getOutputs().get(vout).getScript();
 
         if(P2SH.isScriptType(signingScript)) {
             if(getRedeemScript() != null) {
@@ -363,11 +363,11 @@ public class PSBTInput {
 
     private Sha256Hash getHashForSignature(Script connectedScript, SigHash localSigHash) {
         Sha256Hash hash;
-        if (getNonWitnessUtxo() != null) {
-            hash = transaction.hashForSignature(index, connectedScript, localSigHash);
-        } else {
+        if(getWitnessUtxo() != null) {
             long prevValue = getWitnessUtxo().getValue();
             hash = transaction.hashForWitnessSignature(index, connectedScript, prevValue, localSigHash);
+        } else {
+            hash = transaction.hashForSignature(index, connectedScript, localSigHash);
         }
 
         return hash;

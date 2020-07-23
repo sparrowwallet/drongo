@@ -461,6 +461,10 @@ public class ECKey implements EncryptableItem {
             return bos;
         }
 
+        protected boolean hasLowR() {
+            return r.toByteArray().length <= 32;
+        }
+
         @Override
         public boolean equals(Object o) {
             if (this == o) return true;
@@ -517,11 +521,18 @@ public class ECKey implements EncryptableItem {
             throw new IllegalArgumentException("Private key cannot be null");
         }
 
-        ECDSASigner signer = new ECDSASigner(new HMacDSAKCalculator(new SHA256Digest()));
-        ECPrivateKeyParameters privKey = new ECPrivateKeyParameters(privateKeyForSigning, CURVE);
-        signer.init(true, privKey);
-        BigInteger[] components = signer.generateSignature(input.getBytes());
-        return new ECDSASignature(components[0], components[1]).toCanonicalised();
+        ECDSASignature signature;
+        int counter = 0;
+        do {
+            ECDSASigner signer = new ECDSASigner(new HMacDSANonceKCalculator(new SHA256Digest(), counter));
+            ECPrivateKeyParameters privKey = new ECPrivateKeyParameters(privateKeyForSigning, CURVE);
+            signer.init(true, privKey);
+            BigInteger[] components = signer.generateSignature(input.getBytes());
+            signature = new ECDSASignature(components[0], components[1]).toCanonicalised();
+            counter++;
+        } while(!signature.hasLowR());
+
+        return signature;
     }
 
     /**
