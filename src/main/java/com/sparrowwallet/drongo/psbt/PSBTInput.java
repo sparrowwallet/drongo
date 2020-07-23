@@ -4,7 +4,6 @@ import com.sparrowwallet.drongo.KeyDerivation;
 import com.sparrowwallet.drongo.Utils;
 import com.sparrowwallet.drongo.crypto.ECKey;
 import com.sparrowwallet.drongo.protocol.*;
-import org.bouncycastle.util.encoders.Hex;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -12,7 +11,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.*;
 
 import static com.sparrowwallet.drongo.protocol.ScriptType.*;
-import static com.sparrowwallet.drongo.psbt.PSBTEntry.parseKeyDerivation;
+import static com.sparrowwallet.drongo.psbt.PSBTEntry.*;
 
 public class PSBTInput {
     public static final byte PSBT_IN_NON_WITNESS_UTXO = 0x00;
@@ -85,7 +84,7 @@ public class PSBTInput {
                     }
                     for(TransactionOutput output: nonWitnessTx.getOutputs()) {
                         try {
-                            log.debug(" Transaction output value: " + output.getValue() + " to addresses " + Arrays.asList(output.getScript().getToAddresses()) + " with script hex " + Hex.toHexString(output.getScript().getProgram()) + " to script " + output.getScript());
+                            log.debug(" Transaction output value: " + output.getValue() + " to addresses " + Arrays.asList(output.getScript().getToAddresses()) + " with script hex " + Utils.bytesToHex(output.getScript().getProgram()) + " to script " + output.getScript());
                         } catch(NonStandardScriptException e) {
                             log.error("Unknown script type", e);
                         }
@@ -102,7 +101,7 @@ public class PSBTInput {
                     }
                     this.witnessUtxo = witnessTxOutput;
                     try {
-                        log.debug("Found input witness utxo amount " + witnessTxOutput.getValue() + " script hex " + Hex.toHexString(witnessTxOutput.getScript().getProgram()) + " script " + witnessTxOutput.getScript() + " addresses " + Arrays.asList(witnessTxOutput.getScript().getToAddresses()));
+                        log.debug("Found input witness utxo amount " + witnessTxOutput.getValue() + " script hex " + Utils.bytesToHex(witnessTxOutput.getScript().getProgram()) + " script " + witnessTxOutput.getScript() + " addresses " + Arrays.asList(witnessTxOutput.getScript().getToAddresses()));
                     } catch(NonStandardScriptException e) {
                         log.error("Unknown script type", e);
                     }
@@ -113,7 +112,7 @@ public class PSBTInput {
                     //TODO: Verify signature
                     TransactionSignature signature = TransactionSignature.decodeFromBitcoin(entry.getData(), true, false);
                     this.partialSignatures.put(sigPublicKey, signature);
-                    log.debug("Found input partial signature with public key " + sigPublicKey + " signature " + Hex.toHexString(entry.getData()));
+                    log.debug("Found input partial signature with public key " + sigPublicKey + " signature " + Utils.bytesToHex(entry.getData()));
                     break;
                 case PSBT_IN_SIGHASH_TYPE:
                     entry.checkOneByteKey();
@@ -138,11 +137,11 @@ public class PSBTInput {
                         throw new PSBTParseException("PSBT provided a redeem script for a transaction output that does not need one");
                     }
                     if(!Arrays.equals(Utils.sha256hash160(redeemScript.getProgram()), scriptPubKey.getPubKeyHash())) {
-                        throw new PSBTParseException("Redeem script hash does not match transaction output script pubkey hash " + Hex.toHexString(scriptPubKey.getPubKeyHash()));
+                        throw new PSBTParseException("Redeem script hash does not match transaction output script pubkey hash " + Utils.bytesToHex(scriptPubKey.getPubKeyHash()));
                     }
 
                     this.redeemScript = redeemScript;
-                    log.debug("Found input redeem script hex " + Hex.toHexString(redeemScript.getProgram()) + " script " + redeemScript);
+                    log.debug("Found input redeem script hex " + Utils.bytesToHex(redeemScript.getProgram()) + " script " + redeemScript);
                     break;
                 case PSBT_IN_WITNESS_SCRIPT:
                     entry.checkOneByteKey();
@@ -156,10 +155,10 @@ public class PSBTInput {
                     if(pubKeyHash == null) {
                         throw new PSBTParseException("Witness script provided without P2WSH witness utxo or P2SH redeem script");
                     } else if(!Arrays.equals(Sha256Hash.hash(witnessScript.getProgram()), pubKeyHash)) {
-                        throw new PSBTParseException("Witness script hash does not match provided pay to script hash " + Hex.toHexString(pubKeyHash));
+                        throw new PSBTParseException("Witness script hash does not match provided pay to script hash " + Utils.bytesToHex(pubKeyHash));
                     }
                     this.witnessScript = witnessScript;
-                    log.debug("Found input witness script hex " + Hex.toHexString(witnessScript.getProgram()) + " script " + witnessScript);
+                    log.debug("Found input witness script hex " + Utils.bytesToHex(witnessScript.getProgram()) + " script " + witnessScript);
                     break;
                 case PSBT_IN_BIP32_DERIVATION:
                     entry.checkOneBytePlusPubKey();
@@ -172,7 +171,7 @@ public class PSBTInput {
                     entry.checkOneByteKey();
                     Script finalScriptSig = new Script(entry.getData());
                     this.finalScriptSig = finalScriptSig;
-                    log.debug("Found input final scriptSig script hex " + Hex.toHexString(finalScriptSig.getProgram()) + " script " + finalScriptSig.toString());
+                    log.debug("Found input final scriptSig script hex " + Utils.bytesToHex(finalScriptSig.getProgram()) + " script " + finalScriptSig.toString());
                     break;
                 case PSBT_IN_FINAL_SCRIPTWITNESS:
                     entry.checkOneByteKey();
@@ -187,8 +186,8 @@ public class PSBTInput {
                     log.debug("Found input POR commitment message " + porMessage);
                     break;
                 case PSBT_IN_PROPRIETARY:
-                    this.proprietary.put(Hex.toHexString(entry.getKeyData()), Hex.toHexString(entry.getData()));
-                    log.debug("Found proprietary input " + Hex.toHexString(entry.getKeyData()) + ": " + Hex.toHexString(entry.getData()));
+                    this.proprietary.put(Utils.bytesToHex(entry.getKeyData()), Utils.bytesToHex(entry.getData()));
+                    log.debug("Found proprietary input " + Utils.bytesToHex(entry.getKeyData()) + ": " + Utils.bytesToHex(entry.getData()));
                     break;
                 default:
                     log.warn("PSBT input not recognized key type: " + entry.getKeyType());
@@ -197,6 +196,58 @@ public class PSBTInput {
 
         this.transaction = transaction;
         this.index = index;
+    }
+
+    public List<PSBTEntry> getInputEntries() {
+        List<PSBTEntry> entries = new ArrayList<>();
+
+        if(nonWitnessUtxo != null) {
+            entries.add(populateEntry(PSBT_IN_NON_WITNESS_UTXO, null, nonWitnessUtxo.bitcoinSerialize()));
+        }
+
+        if(witnessUtxo != null) {
+            entries.add(populateEntry(PSBT_IN_WITNESS_UTXO, null, witnessUtxo.bitcoinSerialize()));
+        }
+
+        for(Map.Entry<ECKey, TransactionSignature> entry : partialSignatures.entrySet()) {
+            entries.add(populateEntry(PSBT_IN_PARTIAL_SIG, entry.getKey().getPubKey(), entry.getValue().encodeToBitcoin()));
+        }
+
+        if(sigHash != null) {
+            byte[] sigHashBytes = new byte[4];
+            Utils.uint32ToByteArrayLE(sigHash.intValue(), sigHashBytes, 0);
+            entries.add(populateEntry(PSBT_IN_SIGHASH_TYPE, null, sigHashBytes));
+        }
+
+        if(redeemScript != null) {
+            entries.add(populateEntry(PSBT_IN_REDEEM_SCRIPT, null, redeemScript.getProgram()));
+        }
+
+        if(witnessScript != null) {
+            entries.add(populateEntry(PSBT_IN_WITNESS_SCRIPT, null, witnessScript.getProgram()));
+        }
+
+        for(Map.Entry<ECKey, KeyDerivation> entry : derivedPublicKeys.entrySet()) {
+            entries.add(populateEntry(PSBT_IN_BIP32_DERIVATION, entry.getKey().getPubKey(), serializeKeyDerivation(entry.getValue())));
+        }
+
+        if(finalScriptSig != null) {
+            entries.add(populateEntry(PSBT_IN_FINAL_SCRIPTSIG, null, finalScriptSig.getProgram()));
+        }
+
+        if(finalScriptWitness != null) {
+            entries.add(populateEntry(PSBT_IN_FINAL_SCRIPTWITNESS, null, finalScriptWitness.toByteArray()));
+        }
+
+        if(porCommitment != null) {
+            entries.add(populateEntry(PSBT_IN_POR_COMMITMENT, null, porCommitment.getBytes(StandardCharsets.UTF_8)));
+        }
+
+        for(Map.Entry<String, String> entry : proprietary.entrySet()) {
+            entries.add(populateEntry(PSBT_IN_PROPRIETARY, Utils.hexToBytes(entry.getKey()), Utils.hexToBytes(entry.getValue())));
+        }
+
+        return entries;
     }
 
     public Transaction getNonWitnessUtxo() {

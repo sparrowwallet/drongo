@@ -1,50 +1,58 @@
 package com.sparrowwallet.drongo.psbt;
 
 import com.sparrowwallet.drongo.KeyDerivation;
+import com.sparrowwallet.drongo.Utils;
 import com.sparrowwallet.drongo.crypto.ChildNumber;
-import org.bouncycastle.util.encoders.Hex;
 
+import java.io.ByteArrayOutputStream;
 import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
 public class PSBTEntry {
-    private byte[] key = null;
-    private byte keyType;
-    private byte[] keyData = null;
-    private byte[] data = null;
+    private final byte[] key;
+    private final byte keyType;
+    private final byte[] keyData;
+    private final byte[] data;
 
-    public byte[] getKey() {
-        return key;
-    }
-
-    public void setKey(byte[] key) {
+    public PSBTEntry(byte[] key, byte keyType, byte[] keyData, byte[] data) {
         this.key = key;
-    }
-
-    public byte getKeyType() {
-        return keyType;
-    }
-
-    public void setKeyType(byte keyType) {
         this.keyType = keyType;
-    }
-
-    public byte[] getKeyData() {
-        return keyData;
-    }
-
-    public void setKeyData(byte[] keyData) {
         this.keyData = keyData;
-    }
-
-    public byte[] getData() {
-        return data;
-    }
-
-    public void setData(byte[] data) {
         this.data = data;
+    }
+
+    PSBTEntry(ByteBuffer psbtByteBuffer) throws PSBTParseException {
+        int keyLen = readCompactInt(psbtByteBuffer);
+
+        if (keyLen == 0x00) {
+            key = null;
+            keyType = 0x00;
+            keyData = null;
+            data = null;
+        } else {
+            byte[] key = new byte[keyLen];
+            psbtByteBuffer.get(key);
+
+            byte keyType = key[0];
+
+            byte[] keyData = null;
+            if (key.length > 1) {
+                keyData = new byte[key.length - 1];
+                System.arraycopy(key, 1, keyData, 0, keyData.length);
+            }
+
+            int dataLen = readCompactInt(psbtByteBuffer);
+            byte[] data = new byte[dataLen];
+            psbtByteBuffer.get(data);
+
+            this.key = key;
+            this.keyType = keyType;
+            this.keyData = keyData;
+            this.data = data;
+        }
     }
 
     public static KeyDerivation parseKeyDerivation(byte[] data) throws PSBTParseException {
@@ -64,7 +72,7 @@ public class PSBTEntry {
     }
 
     public static String getMasterFingerprint(byte[] data) {
-        return Hex.toHexString(data);
+        return Utils.bytesToHex(data);
     }
 
     public static List<ChildNumber> readBIP32Derivation(byte[] data) {
@@ -81,6 +89,117 @@ public class PSBTEntry {
         } while(bb.hasRemaining());
 
         return path;
+    }
+
+    public static byte[] serializeKeyDerivation(KeyDerivation keyDerivation) {
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        byte[] fingerprintBytes = Utils.hexToBytes(keyDerivation.getMasterFingerprint());
+        if(fingerprintBytes.length != 4) {
+            throw new IllegalArgumentException("Invalid number of fingerprint bytes: " + fingerprintBytes.length);
+        }
+        baos.writeBytes(fingerprintBytes);
+
+        for(ChildNumber childNumber : keyDerivation.getDerivation()) {
+            byte[] indexBytes = new byte[4];
+            Utils.uint32ToByteArrayLE(childNumber.i(), indexBytes, 0);
+            baos.writeBytes(indexBytes);
+        }
+
+        return baos.toByteArray();
+    }
+
+    static PSBTEntry populateEntry(byte type, byte[] keydata, byte[] data) {
+        return new PSBTEntry(new byte[] {type}, type, keydata, data);
+    }
+
+    void serializeToStream(ByteArrayOutputStream baos) {
+        int keyLen = 1;
+        if(keyData != null) {
+            keyLen += keyData.length;
+        }
+
+        baos.writeBytes(writeCompactInt(keyLen));
+        baos.writeBytes(key);
+        if(keyData != null) {
+            baos.writeBytes(keyData);
+        }
+
+        baos.writeBytes(writeCompactInt(data.length));
+        baos.writeBytes(data);
+    }
+
+    public byte[] getKey() {
+        return key;
+    }
+
+    public byte getKeyType() {
+        return keyType;
+    }
+
+    public byte[] getKeyData() {
+        return keyData;
+    }
+
+    public byte[] getData() {
+        return data;
+    }
+
+    public static int readCompactInt(ByteBuffer psbtByteBuffer) throws PSBTParseException {
+        byte b = psbtByteBuffer.get();
+
+        switch (b) {
+            case (byte) 0xfd: {
+                byte[] buf = new byte[2];
+                psbtByteBuffer.get(buf);
+                ByteBuffer byteBuffer = ByteBuffer.wrap(buf);
+                byteBuffer.order(ByteOrder.LITTLE_ENDIAN);
+                return byteBuffer.getShort();
+            }
+            case (byte) 0xfe: {
+                byte[] buf = new byte[4];
+                psbtByteBuffer.get(buf);
+                ByteBuffer byteBuffer = ByteBuffer.wrap(buf);
+                byteBuffer.order(ByteOrder.LITTLE_ENDIAN);
+                return byteBuffer.getInt();
+            }
+            case (byte) 0xff: {
+                byte[] buf = new byte[8];
+                psbtByteBuffer.get(buf);
+                ByteBuffer byteBuffer = ByteBuffer.wrap(buf);
+                byteBuffer.order(ByteOrder.LITTLE_ENDIAN);
+                throw new PSBTParseException("Data too long:" + byteBuffer.getLong());
+            }
+            default:
+                return (int) (b & 0xff);
+        }
+    }
+
+    public static byte[] writeCompactInt(long val) {
+        ByteBuffer bb = null;
+
+        if (val < 0xfdL) {
+            bb = ByteBuffer.allocate(1);
+            bb.order(ByteOrder.LITTLE_ENDIAN);
+            bb.put((byte) val);
+        } else if (val < 0xffffL) {
+            bb = ByteBuffer.allocate(3);
+            bb.order(ByteOrder.LITTLE_ENDIAN);
+            bb.put((byte) 0xfd);
+            bb.put((byte) (val & 0xff));
+            bb.put((byte) ((val >> 8) & 0xff));
+        } else if (val < 0xffffffffL) {
+            bb = ByteBuffer.allocate(5);
+            bb.order(ByteOrder.LITTLE_ENDIAN);
+            bb.put((byte) 0xfe);
+            bb.putInt((int) val);
+        } else {
+            bb = ByteBuffer.allocate(9);
+            bb.order(ByteOrder.LITTLE_ENDIAN);
+            bb.put((byte) 0xff);
+            bb.putLong(val);
+        }
+
+        return bb.array();
     }
 
     private static void reverse(byte[] array) {

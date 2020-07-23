@@ -33,6 +33,10 @@ public enum SigHash {
         return this.value;
     }
 
+    public int intValue() {
+        return Byte.toUnsignedInt(value);
+    }
+
     public boolean anyoneCanPay() {
         return (value & SigHash.ANYONECANPAY.value) != 0;
     }

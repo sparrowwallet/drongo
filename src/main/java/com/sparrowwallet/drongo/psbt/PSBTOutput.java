@@ -1,17 +1,18 @@
 package com.sparrowwallet.drongo.psbt;
 
 import com.sparrowwallet.drongo.KeyDerivation;
+import com.sparrowwallet.drongo.Utils;
 import com.sparrowwallet.drongo.crypto.ECKey;
 import com.sparrowwallet.drongo.protocol.Script;
-import org.bouncycastle.util.encoders.Hex;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-import static com.sparrowwallet.drongo.psbt.PSBTEntry.parseKeyDerivation;
+import static com.sparrowwallet.drongo.psbt.PSBTEntry.*;
 
 public class PSBTOutput {
     public static final byte PSBT_OUT_REDEEM_SCRIPT = 0x00;
@@ -40,13 +41,13 @@ public class PSBTOutput {
                     entry.checkOneByteKey();
                     Script redeemScript = new Script(entry.getData());
                     this.redeemScript = redeemScript;
-                    log.debug("Found output redeem script hex " + Hex.toHexString(redeemScript.getProgram()) + " script " + redeemScript);
+                    log.debug("Found output redeem script hex " + Utils.bytesToHex(redeemScript.getProgram()) + " script " + redeemScript);
                     break;
                 case PSBT_OUT_WITNESS_SCRIPT:
                     entry.checkOneByteKey();
                     Script witnessScript = new Script(entry.getData());
                     this.witnessScript = witnessScript;
-                    log.debug("Found output witness script hex " + Hex.toHexString(witnessScript.getProgram()) + " script " + witnessScript);
+                    log.debug("Found output witness script hex " + Utils.bytesToHex(witnessScript.getProgram()) + " script " + witnessScript);
                     break;
                 case PSBT_OUT_BIP32_DERIVATION:
                     entry.checkOneBytePlusPubKey();
@@ -56,13 +57,35 @@ public class PSBTOutput {
                     log.debug("Found output bip32_derivation with master fingerprint " + keyDerivation.getMasterFingerprint() + " at path " + keyDerivation.getDerivationPath() + " public key " + derivedPublicKey);
                     break;
                 case PSBT_OUT_PROPRIETARY:
-                    proprietary.put(Hex.toHexString(entry.getKeyData()), Hex.toHexString(entry.getData()));
-                    log.debug("Found proprietary output " + Hex.toHexString(entry.getKeyData()) + ": " + Hex.toHexString(entry.getData()));
+                    proprietary.put(Utils.bytesToHex(entry.getKeyData()), Utils.bytesToHex(entry.getData()));
+                    log.debug("Found proprietary output " + Utils.bytesToHex(entry.getKeyData()) + ": " + Utils.bytesToHex(entry.getData()));
                     break;
                 default:
                     log.warn("PSBT output not recognized key type: " + entry.getKeyType());
             }
         }
+    }
+
+    public List<PSBTEntry> getOutputEntries() {
+        List<PSBTEntry> entries = new ArrayList<>();
+
+        if(redeemScript != null) {
+            entries.add(populateEntry(PSBT_OUT_REDEEM_SCRIPT, null, redeemScript.getProgram()));
+        }
+
+        if(witnessScript != null) {
+            entries.add(populateEntry(PSBT_OUT_WITNESS_SCRIPT, null, witnessScript.getProgram()));
+        }
+
+        for(Map.Entry<ECKey, KeyDerivation> entry : derivedPublicKeys.entrySet()) {
+            entries.add(populateEntry(PSBT_OUT_BIP32_DERIVATION, entry.getKey().getPubKey(), serializeKeyDerivation(entry.getValue())));
+        }
+
+        for(Map.Entry<String, String> entry : proprietary.entrySet()) {
+            entries.add(populateEntry(PSBT_OUT_PROPRIETARY, Utils.hexToBytes(entry.getKey()), Utils.hexToBytes(entry.getValue())));
+        }
+
+        return entries;
     }
 
     public Script getRedeemScript() {
