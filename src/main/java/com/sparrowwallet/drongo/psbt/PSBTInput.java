@@ -43,9 +43,13 @@ public class PSBTInput {
 
     private static final Logger log = LoggerFactory.getLogger(PSBTInput.class);
 
-    PSBTInput(ScriptType scriptType, Transaction transaction, int index, Transaction utxo, int utxoIndex, Script redeemScript, Script witnessScript, Map<ECKey, KeyDerivation> derivedPublicKeys, Map<String, String> proprietary) {
+    PSBTInput(Transaction transaction, int index) {
         this.transaction = transaction;
         this.index = index;
+    }
+
+    PSBTInput(ScriptType scriptType, Transaction transaction, int index, Transaction utxo, int utxoIndex, Script redeemScript, Script witnessScript, Map<ECKey, KeyDerivation> derivedPublicKeys, Map<String, String> proprietary) {
+        this(transaction, index);
         sigHash = SigHash.ALL;
 
         if(Arrays.asList(ScriptType.WITNESS_TYPES).contains(scriptType)) {
@@ -286,8 +290,16 @@ public class PSBTInput {
         return nonWitnessUtxo;
     }
 
+    public void setNonWitnessUtxo(Transaction nonWitnessUtxo) {
+        this.nonWitnessUtxo = nonWitnessUtxo;
+    }
+
     public TransactionOutput getWitnessUtxo() {
         return witnessUtxo;
+    }
+
+    public void setWitnessUtxo(TransactionOutput witnessUtxo) {
+        this.witnessUtxo = witnessUtxo;
     }
 
     public TransactionSignature getPartialSignature(ECKey publicKey) {
@@ -306,8 +318,16 @@ public class PSBTInput {
         return redeemScript;
     }
 
+    public void setRedeemScript(Script redeemScript) {
+        this.redeemScript = redeemScript;
+    }
+
     public Script getWitnessScript() {
         return witnessScript;
+    }
+
+    public void setWitnessScript(Script witnessScript) {
+        this.witnessScript = witnessScript;
     }
 
     public KeyDerivation getKeyDerivation(ECKey publicKey) {
@@ -332,6 +352,10 @@ public class PSBTInput {
 
     public String getPorCommitment() {
         return porCommitment;
+    }
+
+    public void setPorCommitment(String porCommitment) {
+        this.porCommitment = porCommitment;
     }
 
     public Map<ECKey, TransactionSignature> getPartialSignatures() {

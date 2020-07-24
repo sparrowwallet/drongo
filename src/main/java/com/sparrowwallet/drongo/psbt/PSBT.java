@@ -45,6 +45,18 @@ public class PSBT {
 
     private static final Logger log = LoggerFactory.getLogger(PSBT.class);
 
+    public PSBT(Transaction transaction) {
+        this.transaction = transaction;
+
+        for(int i = 0; i < transaction.getInputs().size(); i++) {
+            psbtInputs.add(new PSBTInput(transaction, i));
+        }
+
+        for(int i = 0; i < transaction.getOutputs().size(); i++) {
+            psbtOutputs.add(new PSBTOutput());
+        }
+    }
+
     public PSBT(WalletTransaction walletTransaction) {
         Wallet wallet = walletTransaction.getWallet();
 
@@ -449,17 +461,32 @@ public class PSBT {
     }
 
     public Transaction extractTransaction() {
+        boolean hasWitness = false;
         for(PSBTInput psbtInput : getPsbtInputs()) {
             if(psbtInput.getFinalScriptSig() == null) {
                 return null;
             }
+            if(psbtInput.getFinalScriptWitness() != null) {
+                hasWitness = true;
+            }
+        }
+
+        if(hasWitness && !transaction.isSegwit()) {
+            transaction.setSegwitVersion(1);
         }
 
         for(int i = 0; i < transaction.getInputs().size(); i++) {
             TransactionInput txInput = transaction.getInputs().get(i);
             PSBTInput psbtInput = getPsbtInputs().get(i);
             txInput.setScriptBytes(psbtInput.getFinalScriptSig().getProgram());
-            txInput.setWitness(psbtInput.getFinalScriptWitness());
+
+            if(hasWitness) {
+                if(psbtInput.getFinalScriptWitness() != null) {
+                    txInput.setWitness(psbtInput.getFinalScriptWitness());
+                } else {
+                    txInput.setWitness(new TransactionWitness(transaction, Collections.emptyList()));
+                }
+            }
         }
 
         return transaction;

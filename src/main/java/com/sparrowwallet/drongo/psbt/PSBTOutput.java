@@ -27,6 +27,10 @@ public class PSBTOutput {
 
     private static final Logger log = LoggerFactory.getLogger(PSBTOutput.class);
 
+    PSBTOutput() {
+        //empty constructor
+    }
+
     PSBTOutput(Script redeemScript, Script witnessScript, Map<ECKey, KeyDerivation> derivedPublicKeys, Map<String, String> proprietary) {
         this.redeemScript = redeemScript;
         this.witnessScript = witnessScript;
@@ -105,8 +109,16 @@ public class PSBTOutput {
         return redeemScript;
     }
 
+    public void setRedeemScript(Script redeemScript) {
+        this.redeemScript = redeemScript;
+    }
+
     public Script getWitnessScript() {
         return witnessScript;
+    }
+
+    public void setWitnessScript(Script witnessScript) {
+        this.witnessScript = witnessScript;
     }
 
     public KeyDerivation getKeyDerivation(ECKey publicKey) {

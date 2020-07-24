@@ -115,7 +115,7 @@ public class TransactionInput extends ChildMessage {
     }
 
     public boolean hasWitness() {
-        return witness != null && witness.getPushCount() != 0;
+        return witness != null;
     }
 
     public TransactionOutPoint getOutpoint() {

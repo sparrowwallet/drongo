@@ -151,7 +151,7 @@ public class TransactionWitness extends ChildMessage {
 
     public Script getWitnessScript() {
         List<ScriptChunk> scriptChunks = this.asScriptChunks();
-        if(scriptChunks.get(scriptChunks.size() - 1).isScript()) {
+        if(!scriptChunks.isEmpty() && scriptChunks.get(scriptChunks.size() - 1).isScript()) {
             return scriptChunks.get(scriptChunks.size() - 1).getScript();
         }
 
