@@ -307,7 +307,11 @@ public class Transaction extends ChildMessage {
     }
 
     public TransactionInput addInput(Sha256Hash spendTxHash, long outputIndex, Script script) {
-        return addInput(new TransactionInput(this, new TransactionOutPoint(spendTxHash, outputIndex), script.getProgram()));
+        if(isSegwit()) {
+            return addInput(spendTxHash, outputIndex, script, new TransactionWitness(this));
+        } else {
+            return addInput(new TransactionInput(this, new TransactionOutPoint(spendTxHash, outputIndex), script.getProgram()));
+        }
     }
 
     public TransactionInput addInput(Sha256Hash spendTxHash, long outputIndex, Script script, TransactionWitness witness) {

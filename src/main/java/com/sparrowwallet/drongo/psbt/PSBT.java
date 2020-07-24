@@ -484,7 +484,7 @@ public class PSBT {
                 if(psbtInput.getFinalScriptWitness() != null) {
                     txInput.setWitness(psbtInput.getFinalScriptWitness());
                 } else {
-                    txInput.setWitness(new TransactionWitness(transaction, Collections.emptyList()));
+                    txInput.setWitness(new TransactionWitness(transaction));
                 }
             }
         }

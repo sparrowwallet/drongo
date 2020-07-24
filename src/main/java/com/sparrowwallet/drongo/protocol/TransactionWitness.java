@@ -33,6 +33,10 @@ public class TransactionWitness extends ChildMessage {
         pushes.add(witnessScript.getProgram());
     }
 
+    public TransactionWitness(Transaction transaction) {
+        this(transaction, new ArrayList<>());
+    }
+
     public TransactionWitness(Transaction transaction, List<byte[]> witnesses) {
         setParent(transaction);
         this.pushes = witnesses;
