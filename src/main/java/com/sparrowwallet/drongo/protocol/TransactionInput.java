@@ -110,10 +110,6 @@ public class TransactionInput extends ChildMessage {
         this.witness = witness;
     }
 
-    public void clearWitness() {
-        setWitness(null);
-    }
-
     public boolean hasWitness() {
         return witness != null;
     }

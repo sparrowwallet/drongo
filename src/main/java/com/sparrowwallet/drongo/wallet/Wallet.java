@@ -412,19 +412,27 @@ public class Wallet {
         return getFee(changeOutput, feeRate, longTermFeeRate);
     }
 
-    public WalletTransaction createWalletTransaction(List<UtxoSelector> utxoSelectors, Address recipientAddress, long recipientAmount, double feeRate, double longTermFeeRate, Long fee, boolean sendAll, boolean groupByAddress, boolean includeMempoolChange) throws InsufficientFundsException {
+    public WalletTransaction createWalletTransaction(List<UtxoSelector> utxoSelectors, Address recipientAddress, long recipientAmount, double feeRate, double longTermFeeRate, Long fee, Integer currentBlockHeight, boolean sendAll, boolean groupByAddress, boolean includeMempoolChange) throws InsufficientFundsException {
         long valueRequiredAmt = recipientAmount;
 
         while(true) {
             Map<BlockTransactionHashIndex, WalletNode> selectedUtxos = selectInputs(utxoSelectors, valueRequiredAmt, feeRate, longTermFeeRate, groupByAddress, includeMempoolChange);
             long totalSelectedAmt = selectedUtxos.keySet().stream().mapToLong(BlockTransactionHashIndex::getValue).sum();
 
-            //Add inputs
             Transaction transaction = new Transaction();
+            transaction.setVersion(2);
+            if(currentBlockHeight != null) {
+                transaction.setLocktime(currentBlockHeight.longValue());
+            }
+
+            //Add inputs
             for(Map.Entry<BlockTransactionHashIndex, WalletNode> selectedUtxo : selectedUtxos.entrySet()) {
                 Transaction prevTx = getTransactions().get(selectedUtxo.getKey().getHash()).getTransaction();
                 TransactionOutput prevTxOut = prevTx.getOutputs().get((int)selectedUtxo.getKey().getIndex());
-                addDummySpendingInput(transaction, selectedUtxo.getValue(), prevTxOut);
+                TransactionInput txInput = addDummySpendingInput(transaction, selectedUtxo.getValue(), prevTxOut);
+
+                //Enable opt-in RBF by default, matching Bitcoin Core and Electrum
+                txInput.setSequenceNumber(TransactionInput.SEQUENCE_RBF_ENABLED);
             }
 
             //Add recipient output

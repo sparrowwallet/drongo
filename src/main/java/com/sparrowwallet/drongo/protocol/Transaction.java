@@ -146,17 +146,32 @@ public class Transaction extends ChildMessage {
         this.segwitVersion = segwitVersion;
     }
 
+    public void clearSegwit() {
+        if(segwit) {
+            adjustLength(-2);
+            segwit = false;
+        }
+    }
+
     public boolean hasWitnesses() {
-        for (TransactionInput in : inputs)
-            if (in.hasWitness())
+        for(TransactionInput in : inputs) {
+            if(in.hasWitness()) {
                 return true;
+            }
+        }
+
         return false;
     }
 
     public byte[] bitcoinSerialize() {
+        boolean useWitnessFormat = isSegwit();
+        return bitcoinSerialize(useWitnessFormat);
+    }
+
+    public byte[] bitcoinSerialize(boolean useWitnessFormat) {
         try {
             ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
-            bitcoinSerializeToStream(outputStream);
+            bitcoinSerializeToStream(outputStream, useWitnessFormat);
             return outputStream.toByteArray();
         } catch (IOException e) {
             //can't happen
@@ -166,8 +181,8 @@ public class Transaction extends ChildMessage {
     }
 
     public void bitcoinSerializeToStream(OutputStream stream) throws IOException {
-        boolean useSegwit = isSegwit();
-        bitcoinSerializeToStream(stream, useSegwit);
+        boolean useWitnessFormat = isSegwit();
+        bitcoinSerializeToStream(stream, useWitnessFormat);
     }
 
     /**
@@ -175,30 +190,40 @@ public class Transaction extends ChildMessage {
      * <a href="https://en.bitcoin.it/wiki/Protocol_documentation#tx">classic format</a>, depending on if segwit is
      * desired.
      */
-    protected void bitcoinSerializeToStream(OutputStream stream, boolean useSegwit) throws IOException {
+    protected void bitcoinSerializeToStream(OutputStream stream, boolean useWitnessFormat) throws IOException {
         // version
         uint32ToByteStreamLE(version, stream);
+
         // marker, flag
-        if (useSegwit) {
+        if(useWitnessFormat) {
             stream.write(0);
             stream.write(segwitVersion);
         }
+
         // txin_count, txins
         stream.write(new VarInt(inputs.size()).encode());
-        for (TransactionInput in : inputs)
+        for(TransactionInput in : inputs) {
             in.bitcoinSerializeToStream(stream);
+        }
+
         // txout_count, txouts
         stream.write(new VarInt(outputs.size()).encode());
-        for (TransactionOutput out : outputs)
+        for(TransactionOutput out : outputs) {
             out.bitcoinSerializeToStream(stream);
+        }
+
         // script_witnesses
-        if (useSegwit) {
-            for (TransactionInput in : inputs) {
-                if (in.hasWitness()) {
-                    in.getWitness().bitcoinSerializeToStream(stream);
+        if(useWitnessFormat) {
+            for(TransactionInput in : inputs) {
+                //Per BIP141 all txins must have a witness
+                if(!in.hasWitness()) {
+                    in.setWitness(new TransactionWitness(this));
                 }
+
+                in.getWitness().bitcoinSerializeToStream(stream);
             }
         }
+
         // lock_time
         uint32ToByteStreamLE(locktime, stream);
     }
@@ -333,6 +358,10 @@ public class Transaction extends ChildMessage {
         return Collections.unmodifiableList(outputs);
     }
 
+    public void shuffleOutputs() {
+        Collections.shuffle(outputs);
+    }
+
     public TransactionOutput addOutput(long value, Script script) {
         return addOutput(new TransactionOutput(this, value, script));
     }
@@ -401,11 +430,11 @@ public class Transaction extends ChildMessage {
         return version > 0 && version < 5;
     }
 
-    public Sha256Hash hashForSignature(int inputIndex, Script redeemScript, SigHash sigHash) {
-        return hashForSignature(inputIndex, redeemScript.getProgram(), sigHash.value);
+    public Sha256Hash hashForLegacySignature(int inputIndex, Script redeemScript, SigHash sigHash) {
+        return hashForLegacySignature(inputIndex, redeemScript.getProgram(), sigHash.value);
     }
 
-    public Sha256Hash hashForSignature(int inputIndex, byte[] connectedScript, byte sigHashType) {
+    public Sha256Hash hashForLegacySignature(int inputIndex, byte[] connectedScript, byte sigHashType) {
         try {
             ByteArrayOutputStream baos = new ByteArrayOutputStream();
             this.bitcoinSerializeToStream(baos);
@@ -417,7 +446,6 @@ public class Transaction extends ChildMessage {
             for (int i = 0; i < tx.inputs.size(); i++) {
                 TransactionInput input = tx.inputs.get(i);
                 input.clearScriptBytes();
-                input.clearWitness();
             }
 
             // This step has no purpose beyond being synchronized with Bitcoin Core's bugs. OP_CODESEPARATOR
@@ -432,16 +460,18 @@ public class Transaction extends ChildMessage {
             TransactionInput input = tx.inputs.get(inputIndex);
             input.setScriptBytes(connectedScript);
 
-            if ((sigHashType & 0x1f) == SigHash.NONE.value) {
+            if((sigHashType & 0x1f) == SigHash.NONE.value) {
                 // SIGHASH_NONE means no outputs are signed at all - the signature is effectively for a "blank cheque".
                 tx.outputs = new ArrayList<>(0);
                 // The signature isn't broken by new versions of the transaction issued by other parties.
-                for (int i = 0; i < tx.inputs.size(); i++)
-                    if (i != inputIndex)
+                for(int i = 0; i < tx.inputs.size(); i++) {
+                    if(i != inputIndex) {
                         tx.inputs.get(i).setSequenceNumber(0);
-            } else if ((sigHashType & 0x1f) == SigHash.SINGLE.value) {
+                    }
+                }
+            } else if((sigHashType & 0x1f) == SigHash.SINGLE.value) {
                 // SIGHASH_SINGLE means only sign the output at the same index as the input (ie, my output).
-                if (inputIndex >= tx.outputs.size()) {
+                if(inputIndex >= tx.outputs.size()) {
                     // The input index is beyond the number of outputs, it's a buggy signature made by a broken
                     // Bitcoin implementation. Bitcoin Core also contains a bug in handling this case:
                     // any transaction output that is signed in this case will result in both the signed output
@@ -455,15 +485,18 @@ public class Transaction extends ChildMessage {
                 // In SIGHASH_SINGLE the outputs after the matching input index are deleted, and the outputs before
                 // that position are "nulled out". Unintuitively, the value in a "null" transaction is set to -1.
                 tx.outputs = new ArrayList<>(tx.outputs.subList(0, inputIndex + 1));
-                for (int i = 0; i < inputIndex; i++)
-                    tx.outputs.set(i, new TransactionOutput(tx, -1L, new byte[] {}));
+                for(int i = 0; i < inputIndex; i++) {
+                    tx.outputs.set(i, new TransactionOutput(tx, -1L, new byte[]{}));
+                }
                 // The signature isn't broken by new versions of the transaction issued by other parties.
-                for (int i = 0; i < tx.inputs.size(); i++)
-                    if (i != inputIndex)
+                for(int i = 0; i < tx.inputs.size(); i++) {
+                    if(i != inputIndex) {
                         tx.inputs.get(i).setSequenceNumber(0);
+                    }
+                }
             }
 
-            if ((sigHashType & SigHash.ANYONECANPAY.value) == SigHash.ANYONECANPAY.value) {
+            if((sigHashType & SigHash.ANYONECANPAY.value) == SigHash.ANYONECANPAY.value) {
                 // SIGHASH_ANYONECANPAY means the signature in the input is not broken by changes/additions/removals
                 // of other inputs. For example, this is useful for building assurance contracts.
                 tx.inputs = new ArrayList<>();
@@ -510,38 +543,39 @@ public class Transaction extends ChildMessage {
             boolean anyoneCanPay = (sigHashType & SigHash.ANYONECANPAY.value) == SigHash.ANYONECANPAY.value;
             boolean signAll = (basicSigHashType != SigHash.SINGLE.value) && (basicSigHashType != SigHash.NONE.value);
 
-            if (!anyoneCanPay) {
+            if(!anyoneCanPay) {
                 ByteArrayOutputStream bosHashPrevouts = new UnsafeByteArrayOutputStream(256);
-                for (int i = 0; i < this.inputs.size(); ++i) {
+                for(int i = 0; i < this.inputs.size(); ++i) {
                     bosHashPrevouts.write(this.inputs.get(i).getOutpoint().getHash().getReversedBytes());
                     uint32ToByteStreamLE(this.inputs.get(i).getOutpoint().getIndex(), bosHashPrevouts);
                 }
                 hashPrevouts = Sha256Hash.hashTwice(bosHashPrevouts.toByteArray());
             }
 
-            if (!anyoneCanPay && signAll) {
+            if(!anyoneCanPay && signAll) {
                 ByteArrayOutputStream bosSequence = new UnsafeByteArrayOutputStream(256);
-                for (int i = 0; i < this.inputs.size(); ++i) {
+                for(int i = 0; i < this.inputs.size(); ++i) {
                     uint32ToByteStreamLE(this.inputs.get(i).getSequenceNumber(), bosSequence);
                 }
                 hashSequence = Sha256Hash.hashTwice(bosSequence.toByteArray());
             }
 
-            if (signAll) {
+            if(signAll) {
                 ByteArrayOutputStream bosHashOutputs = new UnsafeByteArrayOutputStream(256);
-                for (int i = 0; i < this.outputs.size(); ++i) {
+                for(int i = 0; i < this.outputs.size(); ++i) {
                     uint64ToByteStreamLE(BigInteger.valueOf(this.outputs.get(i).getValue()), bosHashOutputs);
                     bosHashOutputs.write(new VarInt(this.outputs.get(i).getScriptBytes().length).encode());
                     bosHashOutputs.write(this.outputs.get(i).getScriptBytes());
                 }
                 hashOutputs = Sha256Hash.hashTwice(bosHashOutputs.toByteArray());
-            } else if (basicSigHashType == SigHash.SINGLE.value && inputIndex < outputs.size()) {
+            } else if(basicSigHashType == SigHash.SINGLE.value && inputIndex < outputs.size()) {
                 ByteArrayOutputStream bosHashOutputs = new UnsafeByteArrayOutputStream(256);
                 uint64ToByteStreamLE(BigInteger.valueOf(this.outputs.get(inputIndex).getValue()), bosHashOutputs);
                 bosHashOutputs.write(new VarInt(this.outputs.get(inputIndex).getScriptBytes().length).encode());
                 bosHashOutputs.write(this.outputs.get(inputIndex).getScriptBytes());
                 hashOutputs = Sha256Hash.hashTwice(bosHashOutputs.toByteArray());
             }
+
             uint32ToByteStreamLE(version, bos);
             bos.write(hashPrevouts);
             bos.write(hashSequence);

@@ -8,13 +8,8 @@ import java.io.IOException;
 import java.io.OutputStream;
 
 public class TransactionOutput extends ChildMessage {
-    // The output's value is kept as a native type in order to save class instances.
     private long value;
-
-    // A transaction output has a script used for authenticating that the redeemer is allowed to spend
-    // this output.
     private byte[] scriptBytes;
-
     private Script script;
 
     private Address[] addresses = new Address[0];

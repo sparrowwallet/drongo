@@ -9,7 +9,7 @@ import java.util.List;
 public class KeyDerivation {
     private final String masterFingerprint;
     private final String derivationPath;
-    private final transient List<ChildNumber> derivation;
+    private transient List<ChildNumber> derivation;
 
     public KeyDerivation(String masterFingerprint, String derivationPath) {
         this.masterFingerprint = masterFingerprint == null ? null : masterFingerprint.toLowerCase();
@@ -26,12 +26,20 @@ public class KeyDerivation {
     }
 
     public List<ChildNumber> getDerivation() {
+        if(derivation == null) {
+            derivation = parsePath(derivationPath);
+        }
+
         return Collections.unmodifiableList(derivation);
     }
 
-    public KeyDerivation extend(ChildNumber childNumber) {
-        List<ChildNumber> extendedDerivation = new ArrayList<>(derivation);
-        extendedDerivation.add(childNumber);
+    public KeyDerivation extend(ChildNumber extension) {
+        return extend(List.of(extension));
+    }
+
+    public KeyDerivation extend(List<ChildNumber> extension) {
+        List<ChildNumber> extendedDerivation = new ArrayList<>(getDerivation());
+        extendedDerivation.addAll(extension);
         return new KeyDerivation(masterFingerprint, writePath(extendedDerivation));
     }
 

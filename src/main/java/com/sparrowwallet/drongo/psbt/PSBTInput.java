@@ -496,7 +496,7 @@ public class PSBTInput {
             long prevValue = getWitnessUtxo().getValue();
             hash = transaction.hashForWitnessSignature(index, connectedScript, prevValue, localSigHash);
         } else {
-            hash = transaction.hashForSignature(index, connectedScript, localSigHash);
+            hash = transaction.hashForLegacySignature(index, connectedScript, localSigHash);
         }
 
         return hash;
