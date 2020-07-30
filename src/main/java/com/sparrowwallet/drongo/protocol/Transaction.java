@@ -153,6 +153,16 @@ public class Transaction extends ChildMessage {
         }
     }
 
+    public boolean hasScriptSigs() {
+        for(TransactionInput in : inputs) {
+            if(in.getScriptBytes().length > 0) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     public boolean hasWitnesses() {
         for(TransactionInput in : inputs) {
             if(in.hasWitness()) {

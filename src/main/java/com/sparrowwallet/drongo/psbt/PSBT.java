@@ -393,6 +393,16 @@ public class PSBT {
         return true;
     }
 
+    public boolean isFinalized() {
+        for(PSBTInput psbtInput : getPsbtInputs()) {
+            if(psbtInput.getFinalScriptSig() != null || psbtInput.getFinalScriptWitness() != null) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     private List<PSBTEntry> getGlobalEntries() {
         List<PSBTEntry> entries = new ArrayList<>();
 
@@ -462,10 +472,8 @@ public class PSBT {
             throw new IllegalArgumentException("Provided PSBT does contain a matching global transaction");
         }
 
-        for(PSBTInput psbtInput : psbt.getPsbtInputs()) {
-            if(psbtInput.getFinalScriptSig() != null || psbtInput.getFinalScriptWitness() != null) {
-                throw new IllegalArgumentException("Cannot combine an already finalised PSBT");
-            }
+        if(isFinalized() || psbt.isFinalized()) {
+            throw new IllegalArgumentException("Cannot combine an already finalised PSBT");
         }
 
         if(psbt.getVersion() != null) {
@@ -499,12 +507,14 @@ public class PSBT {
             }
         }
 
-        if(hasWitness && !transaction.isSegwit()) {
-            transaction.setSegwitVersion(1);
+        Transaction finalTransaction = new Transaction(transaction.bitcoinSerialize());
+
+        if(hasWitness && !finalTransaction.isSegwit()) {
+            finalTransaction.setSegwitVersion(1);
         }
 
-        for(int i = 0; i < transaction.getInputs().size(); i++) {
-            TransactionInput txInput = transaction.getInputs().get(i);
+        for(int i = 0; i < finalTransaction.getInputs().size(); i++) {
+            TransactionInput txInput = finalTransaction.getInputs().get(i);
             PSBTInput psbtInput = getPsbtInputs().get(i);
             txInput.setScriptBytes(psbtInput.getFinalScriptSig().getProgram());
 
@@ -512,12 +522,12 @@ public class PSBT {
                 if(psbtInput.getFinalScriptWitness() != null) {
                     txInput.setWitness(psbtInput.getFinalScriptWitness());
                 } else {
-                    txInput.setWitness(new TransactionWitness(transaction));
+                    txInput.setWitness(new TransactionWitness(finalTransaction));
                 }
             }
         }
 
-        return transaction;
+        return finalTransaction;
     }
 
     public List<PSBTInput> getPsbtInputs() {

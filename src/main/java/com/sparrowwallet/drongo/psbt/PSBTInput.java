@@ -395,6 +395,16 @@ public class PSBTInput {
         }
     }
 
+    public Collection<TransactionSignature> getSignatures() {
+        if(getFinalScriptWitness() != null) {
+            return getFinalScriptWitness().getSignatures();
+        } else if(getFinalScriptSig() != null) {
+            return getFinalScriptSig().getSignatures();
+        } else {
+            return getPartialSignatures().values();
+        }
+    }
+
     public boolean sign(ECKey privKey) {
         SigHash localSigHash = getSigHash();
         if(localSigHash == null) {
