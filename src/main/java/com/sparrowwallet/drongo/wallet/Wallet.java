@@ -637,7 +637,10 @@ public class Wallet {
                 for(Map.Entry<PSBTInput, WalletNode> signingEntry : signingNodes.entrySet()) {
                     ECKey privKey = keystore.getKey(signingEntry.getValue());
                     PSBTInput psbtInput = signingEntry.getKey();
-                    psbtInput.sign(privKey);
+
+                    if(!psbtInput.isSigned()) {
+                        psbtInput.sign(privKey);
+                    }
                 }
             }
         }
@@ -680,8 +683,8 @@ public class Wallet {
                     finalizedTxInput = getScriptType().addSpendingInput(transaction, utxo, pubKey, transactionSignature);
                 } else if(getPolicyType().equals(PolicyType.MULTI)) {
                     List<ECKey> pubKeys = getPubKeys(signingNode);
-                    List<TransactionSignature> signatures = pubKeys.stream().map(psbtInput::getPartialSignature).collect(Collectors.toList());
-                    if(pubKeys.size() != signatures.size()) {
+                    List<TransactionSignature> signatures = pubKeys.stream().map(psbtInput::getPartialSignature).filter(Objects::nonNull).collect(Collectors.toList());
+                    if(signatures.size() < threshold) {
                         throw new IllegalArgumentException("Pubkeys of partial signatures do not match wallet pubkeys");
                     }
 

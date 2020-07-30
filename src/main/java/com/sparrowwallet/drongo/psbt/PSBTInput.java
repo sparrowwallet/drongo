@@ -386,7 +386,7 @@ public class PSBTInput {
                 //All partial sigs are already verified
                 int reqSigs = getSigningScript().getNumRequiredSignatures();
                 int sigs = getPartialSignatures().size();
-                return sigs == reqSigs;
+                return sigs >= reqSigs;
             } catch(NonStandardScriptException e) {
                 return false;
             }
@@ -455,6 +455,31 @@ public class PSBTInput {
         }
 
         return false;
+    }
+
+    public ScriptType getScriptType() {
+        Script signingScript = getUtxo().getScript();
+
+        boolean p2sh = false;
+        if(P2SH.isScriptType(signingScript)) {
+            p2sh = true;
+
+            if(getRedeemScript() != null) {
+                signingScript = getRedeemScript();
+            } else if(getFinalScriptSig() != null) {
+                signingScript = getFinalScriptSig().getFirstNestedScript();
+            } else {
+                return null;
+            }
+        }
+
+        if(P2WPKH.isScriptType(signingScript)) {
+            return p2sh ? P2SH_P2WPKH : P2WPKH;
+        } else if(P2WSH.isScriptType(signingScript)) {
+            return p2sh ? P2SH_P2WSH : P2WSH;
+        }
+
+        return ScriptType.getType(signingScript);
     }
 
     public Script getSigningScript() {

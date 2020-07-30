@@ -1,9 +1,12 @@
 package com.sparrowwallet.drongo.wallet;
 
+import com.sparrowwallet.drongo.KeyPurpose;
 import com.sparrowwallet.drongo.crypto.ECKey;
 import com.sparrowwallet.drongo.policy.Miniscript;
 import com.sparrowwallet.drongo.policy.Policy;
 import com.sparrowwallet.drongo.policy.PolicyType;
+import com.sparrowwallet.drongo.protocol.NonStandardScriptException;
+import com.sparrowwallet.drongo.protocol.Script;
 import com.sparrowwallet.drongo.protocol.ScriptType;
 import com.sparrowwallet.drongo.protocol.TransactionSignature;
 import com.sparrowwallet.drongo.psbt.PSBT;
@@ -15,7 +18,7 @@ import java.util.stream.IntStream;
 
 /**
  * This is a special wallet that is used solely to finalize a fully signed PSBT by reading from the partial signatures and UTXO scriptPubKey
- *
+ * It is used when the normal wallet is not available.
  */
 public class FinalizingPSBTWallet extends Wallet {
     private final Map<PSBTInput, WalletNode> signedInputNodes = new LinkedHashMap<>();
@@ -25,15 +28,43 @@ public class FinalizingPSBTWallet extends Wallet {
     public FinalizingPSBTWallet(PSBT psbt) {
         super("Finalizing PSBT Wallet");
 
-        Map<PSBTInput, WalletNode> signingNodes = new LinkedHashMap<>();
+        if(!psbt.isSigned() || psbt.isFinalized()) {
+            throw new IllegalArgumentException("Only a fully signed, unfinalized PSBT can be used");
+        }
+
+        WalletNode purposeNode = getNode(KeyPurpose.RECEIVE);
+        List<WalletNode> signedNodes = new ArrayList<>(purposeNode.getChildren());
+
         for(int i = 0; i < psbt.getPsbtInputs().size(); i++) {
             PSBTInput psbtInput = psbt.getPsbtInputs().get(i);
             Set<ECKey> keys = psbtInput.getPartialSignatures().keySet();
-            WalletNode signedNode = new WalletNode("m/" + i);
+
+            WalletNode signedNode = signedNodes.get(i);
             signedInputNodes.put(psbtInput, signedNode);
             signedNodeKeys.put(signedNode, new ArrayList<>(keys));
-            numSignatures = keys.size();
-            setScriptType(ScriptType.getType(psbtInput.getUtxo().getScript()));
+
+            ScriptType scriptType = psbtInput.getScriptType();
+            if(scriptType == null || (getScriptType() != null && scriptType.equals(getScriptType()))) {
+                throw new IllegalArgumentException("Cannot determine a single script type from the PSBT");
+            } else {
+                setScriptType(scriptType);
+            }
+
+            try {
+                Script signingScript = psbtInput.getSigningScript();
+                int sigsRequired = signingScript.getNumRequiredSignatures();
+                if(numSignatures > 0 && sigsRequired != numSignatures) {
+                    throw new IllegalArgumentException("Different number of signatures required in PSBT inputs");
+                } else {
+                    numSignatures = sigsRequired;
+                }
+
+                if(ScriptType.MULTISIG.isScriptType(signingScript)) {
+                    signedNodeKeys.put(signedNode, Arrays.asList(ScriptType.MULTISIG.getPublicKeysFromScript(signingScript)));
+                }
+            } catch(NonStandardScriptException e) {
+                throw new IllegalArgumentException(e.getMessage());
+            }
         }
 
         setPolicyType(numSignatures == 1 ? PolicyType.SINGLE : PolicyType.MULTI);
@@ -72,5 +103,16 @@ public class FinalizingPSBTWallet extends Wallet {
     @Override
     public List<ECKey> getPubKeys(WalletNode node) {
         return signedNodeKeys.get(node);
+    }
+
+    @Override
+    public Script getOutputScript(WalletNode node) {
+        for(Map.Entry<PSBTInput, WalletNode> entry : signedInputNodes.entrySet()) {
+            if(node.equals(entry.getValue())) {
+                return entry.getKey().getUtxo().getScript();
+            }
+        }
+
+        return new Script(new byte[10]);
     }
 }
