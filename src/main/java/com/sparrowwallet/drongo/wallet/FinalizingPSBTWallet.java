@@ -18,7 +18,7 @@ import java.util.stream.IntStream;
 
 /**
  * This is a special wallet that is used solely to finalize a fully signed PSBT by reading from the partial signatures and UTXO scriptPubKey
- * It is used when the normal wallet is not available.
+ * It is used when the normal wallet is not available, for example when the wallet file is kept in an offline only setting
  */
 public class FinalizingPSBTWallet extends Wallet {
     private final Map<PSBTInput, WalletNode> signedInputNodes = new LinkedHashMap<>();
@@ -28,8 +28,8 @@ public class FinalizingPSBTWallet extends Wallet {
     public FinalizingPSBTWallet(PSBT psbt) {
         super("Finalizing PSBT Wallet");
 
-        if(!psbt.isSigned() || psbt.isFinalized()) {
-            throw new IllegalArgumentException("Only a fully signed, unfinalized PSBT can be used");
+        if(!psbt.isSigned()) {
+            throw new IllegalArgumentException("Only a fully signed or finalized PSBT can be used");
         }
 
         WalletNode purposeNode = getNode(KeyPurpose.RECEIVE);
