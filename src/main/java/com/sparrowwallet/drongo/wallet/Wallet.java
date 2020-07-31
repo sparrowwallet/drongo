@@ -578,7 +578,7 @@ public class Wallet {
     }
 
     public boolean canSign(PSBT psbt) {
-        return !getSigningNodes(psbt).isEmpty();
+        return isValid() && !getSigningNodes(psbt).isEmpty();
     }
 
     /**

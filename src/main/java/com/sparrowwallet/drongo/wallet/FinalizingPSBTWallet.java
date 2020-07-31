@@ -115,4 +115,9 @@ public class FinalizingPSBTWallet extends Wallet {
 
         return new Script(new byte[10]);
     }
+
+    @Override
+    public boolean canSign(PSBT psbt) {
+        return !getSigningNodes(psbt).isEmpty();
+    }
 }
