@@ -605,23 +605,4 @@ public class Transaction extends ChildMessage {
 
         return Sha256Hash.twiceOf(bos.toByteArray());
     }
-
-    public static final void main(String[] args) throws NonStandardScriptException {
-        String hex = "0100000002fe3dc9208094f3ffd12645477b3dc56f60ec4fa8e6f5d67c565d1c6b9216b36e0000000000ffffffff0815cf020f013ed6cf91d29f4202e8a58726b1ac6c79da47c23d1bee0a6925f80000000000ffffffff0100f2052a010000001976a914a30741f8145e5acadf23f751864167f32e0963f788ac00000000";
-        byte[] transactionBytes = Utils.hexToBytes(hex);
-        Transaction transaction = new Transaction(transactionBytes);
-
-        ECKey pubKey = ECKey.fromPublicOnly(Utils.hexToBytes("026dccc749adc2a9d0d89497ac511f760f45c47dc5ed9cf352a58ac706453880ae"));
-        System.out.println(ScriptType.P2PKH.getOutputScript(pubKey.getPubKeyHash()).getProgram().length);
-        Script script = new Script(Utils.hexToBytes("21026dccc749adc2a9d0d89497ac511f760f45c47dc5ed9cf352a58ac706453880aeadab210255a9626aebf5e29c0e6538428ba0d1dcf6ca98ffdf086aa8ced5e0d0215ea465ac"));
-        Sha256Hash hash = transaction.hashForWitnessSignature(1, script,4900000000L, SigHash.SINGLE);
-        System.out.println("Sighash: " + hash.toString());
-        TransactionSignature signature = TransactionSignature.decodeFromBitcoin(Utils.hexToBytes("3044022027dc95ad6b740fe5129e7e62a75dd00f291a2aeb1200b84b09d9e3789406b6c002201a9ecd315dd6a0e632ab20bbb98948bc0c6fb204f2c286963bb48517a7058e2703"), true, true);
-        if(pubKey.verify(hash, signature)) {
-            System.out.println("Verified!");
-        }
-
-        Address[] addresses = transaction.getOutputs().get(0).getScript().getToAddresses();
-        System.out.println(addresses[0]);
-    }
 }

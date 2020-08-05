@@ -1,10 +1,14 @@
 package com.sparrowwallet.drongo.wallet;
 
 import com.sparrowwallet.drongo.protocol.Transaction;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.*;
 
 public class BnBUtxoSelector implements UtxoSelector {
+    private static final Logger log = LoggerFactory.getLogger(BnBUtxoSelector.class);
+
     private static final int TOTAL_TRIES = 100000;
 
     private final long noInputsFee;
@@ -23,7 +27,7 @@ public class BnBUtxoSelector implements UtxoSelector {
 
         ArrayDeque<Boolean> currentSelection = new ArrayDeque<>(utxoPool.size());
         long actualTargetValue = targetValue + noInputsFee;
-        System.out.println("Selected must be: " + actualTargetValue + " < x < " + (actualTargetValue + costOfChangeValue));
+        log.debug("Selected must be: " + actualTargetValue + " < x < " + (actualTargetValue + costOfChangeValue));
 
         long currentAvailableValue = utxoPool.stream().mapToLong(OutputGroup::getEffectiveValue).sum();
         if(currentAvailableValue < targetValue) {
@@ -100,7 +104,7 @@ public class BnBUtxoSelector implements UtxoSelector {
 
         // Check for solution
         if(bestSelection == null || bestSelection.isEmpty()) {
-            System.out.println("No result found");
+            log.debug("No result found");
             return Collections.emptyList();
         }
 
@@ -137,6 +141,6 @@ public class BnBUtxoSelector implements UtxoSelector {
             }
         }
         long noChangeFeeRequiredAmt = noInputsFee + inputsFee;
-        System.out.println(joiner.toString() + " = " + currentValue + " (plus fee of " + noChangeFeeRequiredAmt + ")");
+        log.debug(joiner.toString() + " = " + currentValue + " (plus fee of " + noChangeFeeRequiredAmt + ")");
     }
 }
