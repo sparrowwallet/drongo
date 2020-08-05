@@ -101,7 +101,7 @@ public class Keystore {
     public ExtendedKey getExtendedPrivateKey() throws MnemonicException {
         List<ChildNumber> derivation = getKeyDerivation().getDerivation();
         DeterministicKey derivedKey = getExtendedMasterPrivateKey().getKey(derivation);
-        ExtendedKey xprv = new ExtendedKey(derivedKey, derivedKey.getParentFingerprint(), derivation.get(derivation.size() - 1));
+        ExtendedKey xprv = new ExtendedKey(derivedKey, derivedKey.getParentFingerprint(), derivation.isEmpty() ? ChildNumber.ZERO : derivation.get(derivation.size() - 1));
         //Recreate from xprv string to reset path to single ChildNumber at the derived depth
         return ExtendedKey.fromDescriptor(xprv.toString());
     }
@@ -156,7 +156,7 @@ public class Keystore {
                     List<ChildNumber> derivation = getKeyDerivation().getDerivation();
                     DeterministicKey derivedKey = getExtendedMasterPrivateKey().getKey(derivation);
                     DeterministicKey derivedKeyPublicOnly = derivedKey.dropPrivateBytes().dropParent();
-                    ExtendedKey xpub = new ExtendedKey(derivedKeyPublicOnly, derivedKey.getParentFingerprint(), derivation.get(derivation.size() - 1));
+                    ExtendedKey xpub = new ExtendedKey(derivedKeyPublicOnly, derivedKey.getParentFingerprint(), derivation.isEmpty() ? ChildNumber.ZERO : derivation.get(derivation.size() - 1));
                     if(!xpub.equals(getExtendedPublicKey())) {
                         return false;
                     }
@@ -192,7 +192,7 @@ public class Keystore {
         String masterFingerprint = Utils.bytesToHex(xprv.getKey().getFingerprint());
         DeterministicKey derivedKey = xprv.getKey(derivation);
         DeterministicKey derivedKeyPublicOnly = derivedKey.dropPrivateBytes().dropParent();
-        ExtendedKey xpub = new ExtendedKey(derivedKeyPublicOnly, derivedKey.getParentFingerprint(), derivation.get(derivation.size() - 1));
+        ExtendedKey xpub = new ExtendedKey(derivedKeyPublicOnly, derivedKey.getParentFingerprint(), derivation.isEmpty() ? ChildNumber.ZERO : derivation.get(derivation.size() - 1));
 
         keystore.setLabel(seed.getType().name());
         keystore.setSource(KeystoreSource.SW_SEED);

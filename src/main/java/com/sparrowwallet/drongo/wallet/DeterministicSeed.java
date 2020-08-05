@@ -341,7 +341,7 @@ public class DeterministicSeed implements EncryptableItem {
     }
 
     public enum Type {
-        BIP39() {
+        BIP39("Mnemonic Words (BIP39)") {
             public byte[] getEntropyBytes(List<String> mnemonicCode) throws MnemonicException {
                 return Bip39MnemonicCode.INSTANCE.toEntropy(mnemonicCode);
             }
@@ -354,7 +354,7 @@ public class DeterministicSeed implements EncryptableItem {
                 return Bip39MnemonicCode.toSeed(mnemonicCode, passphrase);
             }
         },
-        ELECTRUM() {
+        ELECTRUM("Mnemonic Words (Electrum Seed Version System)") {
             public byte[] getEntropyBytes(List<String> mnemonicCode) throws MnemonicException {
                 throw new MnemonicException("Electrum seeds do not provide entropy bytes");
             }
@@ -367,6 +367,16 @@ public class DeterministicSeed implements EncryptableItem {
                 return ElectrumMnemonicCode.toSeed(mnemonicCode, passphrase);
             }
         };
+
+        Type(String name) {
+            this.name = name;
+        }
+
+        private final String name;
+
+        public String getName() {
+            return name;
+        }
 
         public abstract byte[] getEntropyBytes(List<String> mnemonicCode) throws MnemonicException;
 
