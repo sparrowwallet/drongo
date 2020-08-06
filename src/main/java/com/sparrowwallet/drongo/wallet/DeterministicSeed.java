@@ -18,7 +18,7 @@ public class DeterministicSeed implements EncryptableItem {
     private long creationTimeSeconds;
 
     //Session only storage
-    private transient String passphrase;
+    private transient SecureString passphrase;
 
     public DeterministicSeed(CharSequence mnemonicString, String passphrase, long creationTimeSeconds, Type type) {
         this(decodeMnemonicCode(mnemonicString), passphrase, creationTimeSeconds, type);
@@ -26,7 +26,7 @@ public class DeterministicSeed implements EncryptableItem {
 
     public DeterministicSeed(List<String> mnemonic, String passphrase, long creationTimeSeconds, Type type) {
         this(mnemonic, needsPassphrase(passphrase), creationTimeSeconds, type);
-        this.passphrase = passphrase;
+        this.passphrase = (passphrase == null ? null : new SecureString(passphrase));
     }
 
     public DeterministicSeed(List<String> mnemonic, boolean needsPassphrase, long creationTimeSeconds, Type type) {
@@ -84,11 +84,12 @@ public class DeterministicSeed implements EncryptableItem {
         }
         this.encryptedMnemonicCode = null;
         this.needsPassphrase = needsPassphrase(passphrase);
+        this.passphrase = new SecureString(passphrase);
         this.creationTimeSeconds = creationTimeSeconds;
         this.type = Type.BIP39;
     }
 
-    public static boolean needsPassphrase(String passphrase) {
+    private static boolean needsPassphrase(String passphrase) {
         return passphrase != null && !passphrase.isEmpty();
     }
 
@@ -96,12 +97,16 @@ public class DeterministicSeed implements EncryptableItem {
         return needsPassphrase;
     }
 
-    public String getPassphrase() {
+    public SecureString getPassphrase() {
         return passphrase;
     }
 
-    public void setPassphrase(String passphrase) {
+    public void setPassphrase(SecureString passphrase) {
         this.passphrase = passphrase;
+    }
+
+    public void setPassphrase(String passphrase) {
+        this.passphrase = new SecureString(passphrase);
     }
 
     private static byte[] getEntropy(SecureRandom random, int bits) {
@@ -139,7 +144,7 @@ public class DeterministicSeed implements EncryptableItem {
             throw new MnemonicException("Passphrase required but not provided");
         }
 
-        return type.toSeed(mnemonicCode, passphrase);
+        return type.toSeed(mnemonicCode, passphrase == null ? null : passphrase.asString());
     }
 
     @Override
@@ -266,7 +271,7 @@ public class DeterministicSeed implements EncryptableItem {
             mnemonicCode.clear();
         }
         if(passphrase != null) {
-            passphrase = "";
+            passphrase = new SecureString("");
         }
     }
 
