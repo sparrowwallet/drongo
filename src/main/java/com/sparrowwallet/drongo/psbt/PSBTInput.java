@@ -54,9 +54,10 @@ public class PSBTInput {
 
         if(Arrays.asList(ScriptType.WITNESS_TYPES).contains(scriptType)) {
             this.witnessUtxo = utxo.getOutputs().get(utxoIndex);
-        } else {
-            this.nonWitnessUtxo = utxo;
         }
+
+        //Add non-witness UTXO to segwit types to handle Trezor and Ledger requirements
+        this.nonWitnessUtxo = utxo;
 
         this.redeemScript = redeemScript;
         this.witnessScript = witnessScript;
@@ -70,9 +71,6 @@ public class PSBTInput {
             switch(entry.getKeyType()) {
                 case PSBT_IN_NON_WITNESS_UTXO:
                     entry.checkOneByteKey();
-                    if(witnessUtxo != null) {
-                        throw new PSBTParseException("Cannot have both witness and non-witness utxos in PSBT input");
-                    }
                     Transaction nonWitnessTx = new Transaction(entry.getData());
                     nonWitnessTx.verify();
                     Sha256Hash inputHash = nonWitnessTx.calculateTxId(false);
@@ -96,9 +94,6 @@ public class PSBTInput {
                     break;
                 case PSBT_IN_WITNESS_UTXO:
                     entry.checkOneByteKey();
-                    if(nonWitnessUtxo != null) {
-                        throw new PSBTParseException("Cannot have both witness and non-witness utxos in PSBT input");
-                    }
                     TransactionOutput witnessTxOutput = new TransactionOutput(null, entry.getData(), 0);
                     if(!P2SH.isScriptType(witnessTxOutput.getScript()) && !P2WPKH.isScriptType(witnessTxOutput.getScript()) && !P2WSH.isScriptType(witnessTxOutput.getScript())) {
                         throw new PSBTParseException("Witness UTXO provided for non-witness or unknown input");
@@ -527,6 +522,12 @@ public class PSBTInput {
 
     private Sha256Hash getHashForSignature(Script connectedScript, SigHash localSigHash) {
         Sha256Hash hash;
+
+        ScriptType scriptType = getScriptType();
+        if(getWitnessUtxo() == null && Arrays.asList(WITNESS_TYPES).contains(scriptType)) {
+            throw new IllegalStateException("Trying to get signature hash for " + scriptType + " script without a PSBT witness UTXO");
+        }
+
         if(getWitnessUtxo() != null) {
             long prevValue = getWitnessUtxo().getValue();
             hash = transaction.hashForWitnessSignature(index, connectedScript, prevValue, localSigHash);

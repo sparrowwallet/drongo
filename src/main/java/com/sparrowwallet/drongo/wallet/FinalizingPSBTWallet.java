@@ -45,7 +45,7 @@ public class FinalizingPSBTWallet extends Wallet {
 
             ScriptType scriptType = psbtInput.getScriptType();
             if(scriptType == null || (getScriptType() != null && scriptType.equals(getScriptType()))) {
-                throw new IllegalArgumentException("Cannot determine a single script type from the PSBT");
+                throw new IllegalArgumentException("Cannot determine the script type from the PSBT, or there are multiple script types");
             } else {
                 setScriptType(scriptType);
             }
