@@ -6,6 +6,9 @@ import java.util.Date;
 import java.util.Objects;
 
 public abstract class BlockTransactionHash {
+    public static final int BLOCKS_TO_CONFIRM = 6;
+    public static final int BLOCKS_TO_FULLY_CONFIRM = 100;
+
     private final Sha256Hash hash;
     private final int height;
     private final Date date;
@@ -30,6 +33,14 @@ public abstract class BlockTransactionHash {
 
     public int getHeight() {
         return height;
+    }
+
+    public int getConfirmations(int currentBlockHeight) {
+        if(height <= 0) {
+            return 0;
+        }
+
+        return currentBlockHeight - height + 1;
     }
 
     public Date getDate() {
