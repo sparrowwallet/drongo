@@ -650,9 +650,6 @@ public class Wallet {
     }
 
     public void finalise(PSBT psbt) {
-        System.out.println("Before finalise: ");
-        System.out.println(Utils.bytesToHex(psbt.serialize()));
-
         int threshold = getDefaultPolicy().getNumSignaturesRequired();
         Map<PSBTInput, WalletNode> signingNodes = getSigningNodes(psbt);
 
@@ -710,9 +707,6 @@ public class Wallet {
                 psbtInput.clearFinalised();
             }
         }
-
-        System.out.println("After finalise: ");
-        System.out.println(Utils.bytesToHex(psbt.serialize()));
     }
 
     public BitcoinUnit getAutoUnit() {
