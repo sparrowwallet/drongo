@@ -9,7 +9,8 @@ import org.junit.Test;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.util.List;
+import java.util.Map;
+import java.util.TreeMap;
 
 public class TransactionTest {
     @Test
@@ -302,8 +303,13 @@ public class TransactionTest {
         ECKey key1 = redeemScript.getChunks().get(2).getPubKey();
         ECKey key2 = redeemScript.getChunks().get(3).getPubKey();
 
+        Map<ECKey, TransactionSignature> pubKeySignatures = new TreeMap<>(new ECKey.LexicographicECKeyComparator());
+        pubKeySignatures.put(key0, signature0);
+        pubKeySignatures.put(key1, signature1);
+        pubKeySignatures.put(key2, null);
+
         Transaction transaction = new Transaction();
-        spent0ScriptType.addMultisigSpendingInput(transaction, spent0Output, 2, List.of(key0, key1, key2), List.of(signature0, signature1));
+        spent0ScriptType.addMultisigSpendingInput(transaction, spent0Output, 2, pubKeySignatures);
 
         transaction.addOutput(833300, Address.fromString("31mKrRn3xQoGppLY5dU92Dbm4kN4ddkknE"));
         transaction.addOutput(1222480000, Address.fromString("1CL9kj1seXif6agPfeh6vpKkzc2Hxq1UpM"));
@@ -376,9 +382,14 @@ public class TransactionTest {
         ECKey key1 = witnessScript.getChunks().get(2).getPubKey();
         ECKey key2 = witnessScript.getChunks().get(3).getPubKey();
 
+        Map<ECKey, TransactionSignature> pubKeySignatures = new TreeMap<>(new ECKey.LexicographicECKeyComparator());
+        pubKeySignatures.put(key0, signature0);
+        pubKeySignatures.put(key1, signature1);
+        pubKeySignatures.put(key2, null);
+
         Transaction transaction = new Transaction();
         transaction.setSegwitVersion(1);
-        TransactionInput input = ScriptType.P2SH_P2WSH.addMultisigSpendingInput(transaction, spent0Output, 2, List.of(key0, key1, key2), List.of(signature0, signature1));
+        TransactionInput input = ScriptType.P2SH_P2WSH.addMultisigSpendingInput(transaction, spent0Output, 2, pubKeySignatures);
 
         transaction.addOutput(59287429, Address.fromString("3PBjKH4FRuEKy4sD3NfL7tqfZTG5K42owu"));
         transaction.addOutput(212571, Address.fromString("3KRUgU4XGuErXkjBtFhksPzTGJ4AMwF4jB"));
@@ -447,9 +458,14 @@ public class TransactionTest {
         ECKey key1 = witnessScript.getChunks().get(2).getPubKey();
         ECKey key2 = witnessScript.getChunks().get(3).getPubKey();
 
+        Map<ECKey, TransactionSignature> pubKeySignatures = new TreeMap<>(new ECKey.LexicographicECKeyComparator());
+        pubKeySignatures.put(key0, signature0);
+        pubKeySignatures.put(key1, signature1);
+        pubKeySignatures.put(key2, null);
+
         Transaction transaction = new Transaction();
         transaction.setSegwitVersion(1);
-        spent0ScriptType.addMultisigSpendingInput(transaction, spent0Output, 2, List.of(key0, key1, key2), List.of(signature0, signature1));
+        spent0ScriptType.addMultisigSpendingInput(transaction, spent0Output, 2, pubKeySignatures);
 
         transaction.addOutput(10900000, Address.fromString("3Dt17mpd8FDXBjP56rCD7a4Sx7wpL91uhn"));
         transaction.addOutput(332500000, Address.fromString("1K6igqzm36x8jxRTavPhgWXLVcVZVDTGc9"));

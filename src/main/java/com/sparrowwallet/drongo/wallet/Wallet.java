@@ -2,6 +2,7 @@ package com.sparrowwallet.drongo.wallet;
 
 import com.sparrowwallet.drongo.BitcoinUnit;
 import com.sparrowwallet.drongo.KeyPurpose;
+import com.sparrowwallet.drongo.Utils;
 import com.sparrowwallet.drongo.address.Address;
 import com.sparrowwallet.drongo.crypto.ECKey;
 import com.sparrowwallet.drongo.crypto.Key;
@@ -14,7 +15,6 @@ import com.sparrowwallet.drongo.psbt.PSBTInput;
 import java.util.*;
 import java.util.function.Function;
 import java.util.stream.Collectors;
-import java.util.stream.IntStream;
 
 import static com.sparrowwallet.drongo.protocol.Transaction.WITNESS_SCALE_FACTOR;
 
@@ -390,11 +390,11 @@ public class Wallet {
         } else if(getPolicyType().equals(PolicyType.MULTI)) {
             List<ECKey> pubKeys = getPubKeys(receiveNode);
             int threshold = getDefaultPolicy().getNumSignaturesRequired();
-            List<TransactionSignature> signatures = new ArrayList<>(threshold);
-            for(int i = 0; i < threshold; i++) {
-                signatures.add(TransactionSignature.dummy());
+            Map<ECKey, TransactionSignature> pubKeySignatures = new TreeMap<>(new ECKey.LexicographicECKeyComparator());
+            for(int i = 0; i < pubKeys.size(); i++) {
+                pubKeySignatures.put(pubKeys.get(i), i < threshold ? TransactionSignature.dummy() : null);
             }
-            txInput = getScriptType().addMultisigSpendingInput(transaction, prevTxOut, threshold, pubKeys, signatures);
+            txInput = getScriptType().addMultisigSpendingInput(transaction, prevTxOut, threshold, pubKeySignatures);
         }
 
         assert txInput != null;
@@ -491,8 +491,11 @@ public class Wallet {
         } else if(getPolicyType().equals(PolicyType.MULTI)) {
             List<ECKey> pubKeys = getPubKeys(walletNode);
             int threshold = getDefaultPolicy().getNumSignaturesRequired();
-            List<TransactionSignature> signatures = IntStream.range(0, threshold).mapToObj(i -> TransactionSignature.dummy()).collect(Collectors.toList());
-            return getScriptType().addMultisigSpendingInput(transaction, prevTxOut, threshold, pubKeys, signatures);
+            Map<ECKey, TransactionSignature> pubKeySignatures = new TreeMap<>(new ECKey.LexicographicECKeyComparator());
+            for(int i = 0; i < pubKeys.size(); i++) {
+                pubKeySignatures.put(pubKeys.get(i), i < threshold ? TransactionSignature.dummy() : null);
+            }
+            return getScriptType().addMultisigSpendingInput(transaction, prevTxOut, threshold, pubKeySignatures);
         } else {
             throw new UnsupportedOperationException("Cannot create transaction for policy type " + getPolicyType());
         }
@@ -647,6 +650,9 @@ public class Wallet {
     }
 
     public void finalise(PSBT psbt) {
+        System.out.println("Before finalise: ");
+        System.out.println(Utils.bytesToHex(psbt.serialize()));
+
         int threshold = getDefaultPolicy().getNumSignaturesRequired();
         Map<PSBTInput, WalletNode> signingNodes = getSigningNodes(psbt);
 
@@ -683,12 +689,18 @@ public class Wallet {
                     finalizedTxInput = getScriptType().addSpendingInput(transaction, utxo, pubKey, transactionSignature);
                 } else if(getPolicyType().equals(PolicyType.MULTI)) {
                     List<ECKey> pubKeys = getPubKeys(signingNode);
-                    List<TransactionSignature> signatures = pubKeys.stream().map(psbtInput::getPartialSignature).filter(Objects::nonNull).collect(Collectors.toList());
+
+                    Map<ECKey, TransactionSignature> pubKeySignatures = new TreeMap<>(new ECKey.LexicographicECKeyComparator());
+                    for(ECKey pubKey : pubKeys) {
+                        pubKeySignatures.put(pubKey, psbtInput.getPartialSignature(pubKey));
+                    }
+
+                    List<TransactionSignature> signatures = pubKeySignatures.values().stream().filter(Objects::nonNull).collect(Collectors.toList());
                     if(signatures.size() < threshold) {
                         throw new IllegalArgumentException("Pubkeys of partial signatures do not match wallet pubkeys");
                     }
 
-                    finalizedTxInput = getScriptType().addMultisigSpendingInput(transaction, utxo, threshold, pubKeys, signatures);
+                    finalizedTxInput = getScriptType().addMultisigSpendingInput(transaction, utxo, threshold, pubKeySignatures);
                 } else {
                     throw new UnsupportedOperationException("Cannot finalise PSBT for policy type " + getPolicyType());
                 }
@@ -698,6 +710,9 @@ public class Wallet {
                 psbtInput.clearFinalised();
             }
         }
+
+        System.out.println("After finalise: ");
+        System.out.println(Utils.bytesToHex(psbt.serialize()));
     }
 
     public BitcoinUnit getAutoUnit() {

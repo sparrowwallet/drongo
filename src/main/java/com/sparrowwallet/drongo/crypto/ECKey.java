@@ -909,4 +909,26 @@ public class ECKey implements EncryptableItem {
     public String toString() {
         return pub.toString();
     }
+
+    public static class LexicographicECKeyComparator implements Comparator<ECKey> {
+        @Override
+        public int compare(ECKey leftKey, ECKey rightKey) {
+            byte[] left = leftKey.getPubKey();
+            byte[] right = rightKey.getPubKey();
+
+            int minLength = Math.min(left.length, right.length);
+            for (int i = 0; i < minLength; i++) {
+                int result = compare(left[i], right[i]);
+                if (result != 0) {
+                    return result;
+                }
+            }
+
+            return left.length - right.length;
+        }
+
+        public static int compare(byte a, byte b) {
+            return Byte.toUnsignedInt(a) - Byte.toUnsignedInt(b);
+        }
+    }
 }
