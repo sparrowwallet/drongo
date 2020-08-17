@@ -34,7 +34,7 @@ public class BlockTransaction extends BlockTransactionHash implements Comparable
     @Override
     public int compareTo(BlockTransaction blkTx) {
         if(getHeight() != blkTx.getHeight()) {
-            return (getHeight() > 0 ? getHeight() : Integer.MAX_VALUE) - (blkTx.getHeight() > 0 ? blkTx.getHeight() : Integer.MAX_VALUE);
+            return getComparisonHeight() - blkTx.getComparisonHeight();
         }
 
         if(getReferencedOutpoints(this).removeAll(getOutputs(blkTx))) {
@@ -46,6 +46,15 @@ public class BlockTransaction extends BlockTransactionHash implements Comparable
         }
 
         return super.compareTo(blkTx);
+    }
+
+    /**
+     * Calculates a special height value that places txes with unconfirmed parents first, then normal unconfirmed txes, then confirmed txes
+     *
+     * @return the modified height value
+     */
+    private int getComparisonHeight() {
+        return (getHeight() > 0 ? getHeight() : (getHeight() == -1 ? Integer.MAX_VALUE : Integer.MAX_VALUE - getHeight() - 1));
     }
 
     private static List<HashIndex> getReferencedOutpoints(BlockTransaction blockchainTransaction) {
