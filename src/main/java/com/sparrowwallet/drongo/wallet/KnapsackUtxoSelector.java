@@ -6,7 +6,7 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 public class KnapsackUtxoSelector implements UtxoSelector {
-    private static final long MIN_CHANGE = Transaction.SATOSHIS_PER_BITCOIN / 100;
+    private static final long MIN_CHANGE = Transaction.SATOSHIS_PER_BITCOIN / 1000;
 
     private final long noInputsFee;
 
