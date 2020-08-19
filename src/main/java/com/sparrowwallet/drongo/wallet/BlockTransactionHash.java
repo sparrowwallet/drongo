@@ -35,6 +35,15 @@ public abstract class BlockTransactionHash {
         return height;
     }
 
+    /**
+     * Calculates a special height value that places txes with unconfirmed parents first, then normal unconfirmed txes, then confirmed txes
+     *
+     * @return the modified height value
+     */
+    public int getComparisonHeight() {
+        return (getHeight() > 0 ? getHeight() : (getHeight() == -1 ? Integer.MAX_VALUE : Integer.MAX_VALUE - getHeight() - 1));
+    }
+
     public int getConfirmations(int currentBlockHeight) {
         if(height <= 0) {
             return 0;
@@ -79,7 +88,7 @@ public abstract class BlockTransactionHash {
 
     public int compareTo(BlockTransactionHash reference) {
         if(height != reference.height) {
-            return (height > 0 ? height : Integer.MAX_VALUE) - (reference.height > 0 ? reference.height : Integer.MAX_VALUE);
+            return getComparisonHeight() - reference.getComparisonHeight();
         }
 
         return hash.compareTo(reference.hash);
