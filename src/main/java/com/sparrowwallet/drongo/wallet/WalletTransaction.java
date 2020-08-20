@@ -86,8 +86,12 @@ public class WalletTransaction {
         return selectedUtxos.keySet().stream().mapToLong(BlockTransactionHashIndex::getValue).sum();
     }
 
+    /**
+     * Fee percentage matches the Coldcard implementation of total fee as a percentage of total value out
+     * @return the fee percentage
+     */
     public double getFeePercentage() {
-        return (double)getFee() / getTotal();
+        return (double)getFee() / (getTotal() - getFee());
     }
 
     public boolean isCoinControlUsed() {
