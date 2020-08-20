@@ -10,8 +10,8 @@ import java.util.stream.Collectors;
 public class WalletNode implements Comparable<WalletNode> {
     private final String derivationPath;
     private String label;
-    private Set<WalletNode> children = new TreeSet<>();
-    private Set<BlockTransactionHashIndex> transactionOutputs = new TreeSet<>();
+    private TreeSet<WalletNode> children = new TreeSet<>();
+    private TreeSet<BlockTransactionHashIndex> transactionOutputs = new TreeSet<>();
 
     private transient KeyPurpose keyPurpose;
     private transient int index = -1;
@@ -90,7 +90,7 @@ public class WalletNode implements Comparable<WalletNode> {
         return children == null ? null : Collections.unmodifiableSet(children);
     }
 
-    public void setChildren(Set<WalletNode> children) {
+    public void setChildren(TreeSet<WalletNode> children) {
         this.children = children;
     }
 
@@ -98,7 +98,7 @@ public class WalletNode implements Comparable<WalletNode> {
         return transactionOutputs == null ? null : Collections.unmodifiableSet(transactionOutputs);
     }
 
-    public void setTransactionOutputs(Set<BlockTransactionHashIndex> transactionOutputs) {
+    public void setTransactionOutputs(TreeSet<BlockTransactionHashIndex> transactionOutputs) {
         this.transactionOutputs = transactionOutputs;
     }
 

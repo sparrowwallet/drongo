@@ -26,7 +26,7 @@ public class Wallet {
     private ScriptType scriptType;
     private Policy defaultPolicy;
     private List<Keystore> keystores = new ArrayList<>();
-    private final Set<WalletNode> purposeNodes = new TreeSet<>();
+    private final TreeSet<WalletNode> purposeNodes = new TreeSet<>();
     private final Map<Sha256Hash, BlockTransaction> transactions = new HashMap<>();
     private Integer storedBlockHeight;
 
