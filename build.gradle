@@ -24,7 +24,7 @@ if(hasPlugin) {
 }
 
 group 'com.sparrowwallet'
-version '0.1'
+version '0.9'
 
 sourceCompatibility = 1.9
 targetCompatibility = 1.9
@@ -71,10 +71,10 @@ jar {
     exclude('logback.xml')
 
     archiveBaseName = 'drongo'
-    archiveVersion = '0.1'
+    archiveVersion = '0.9'
 }
 
 shadowJar {
-    archiveVersion = '0.1'
+    archiveVersion = '0.9'
     classifier = 'all'
 }
