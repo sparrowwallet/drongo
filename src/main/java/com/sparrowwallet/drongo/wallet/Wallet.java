@@ -555,10 +555,11 @@ public class Wallet {
      * @param txId The txid
      * @return Whether the transaction was created entirely from inputs that reference outputs that belong to this wallet
      */
-    private boolean allInputsFromWallet(Sha256Hash txId) {
+    public boolean allInputsFromWallet(Sha256Hash txId) {
         BlockTransaction utxoBlkTx = getTransactions().get(txId);
         if(utxoBlkTx == null) {
-            throw new IllegalArgumentException("Provided txId was not a wallet transaction");
+            //Provided txId was not a wallet transaction
+            return false;
         }
 
         for(int i = 0; i < utxoBlkTx.getTransaction().getInputs().size(); i++) {
