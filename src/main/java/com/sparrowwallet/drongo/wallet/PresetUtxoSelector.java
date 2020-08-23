@@ -14,8 +14,17 @@ public class PresetUtxoSelector implements UtxoSelector {
 
     @Override
     public Collection<BlockTransactionHashIndex> select(long targetValue, Collection<OutputGroup> candidates) {
-        List<BlockTransactionHashIndex> utxos = new ArrayList<>(presetUtxos);
-        utxos.retainAll(candidates.stream().flatMap(outputGroup -> outputGroup.getUtxos().stream()).collect(Collectors.toList()));
+        List<BlockTransactionHashIndex> flattenedCandidates = candidates.stream().flatMap(outputGroup -> outputGroup.getUtxos().stream()).collect(Collectors.toList());
+        List<BlockTransactionHashIndex> utxos = new ArrayList<>();
+
+        //Don't use equals() here as we don't want to consider height which may change as txes are confirmed
+        for(BlockTransactionHashIndex candidate : flattenedCandidates) {
+            for(BlockTransactionHashIndex presetUtxo : presetUtxos) {
+                if(candidate.getHash().equals(presetUtxo.getHash()) && candidate.getIndex() == presetUtxo.getIndex()) {
+                    utxos.add(candidate);
+                }
+            }
+        }
 
         return utxos;
     }
