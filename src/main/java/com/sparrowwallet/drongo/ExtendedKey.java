@@ -107,7 +107,7 @@ public class ExtendedKey {
             throw new IllegalArgumentException("Found unexpected data in key");
         }
 
-        if(header.isPrivate()) {
+        if(header.isPrivateKey()) {
             DeterministicKey prvKey = HDKeyDerivation.createMasterPrivKeyFromBytes(Arrays.copyOfRange(data, 1, 33), chainCode, path);
             return new ExtendedKey(prvKey, parentFingerprint, childNumber);
         } else {
@@ -145,35 +145,39 @@ public class ExtendedKey {
     }
 
     public enum Header {
-        xprv("xprv", 0x0488ADE4, ScriptType.P2PKH),
-        xpub("xpub", 0x0488B21E, ScriptType.P2PKH),
-        yprv("yprv", 0x049D7878, ScriptType.P2SH_P2WPKH),
-        ypub("ypub", 0x049D7CB2, ScriptType.P2SH_P2WPKH),
-        zprv("zprv", 0x04b2430c, ScriptType.P2WPKH),
-        zpub("zpub", 0x04B24746, ScriptType.P2WPKH),
-        Yprv("Yprv", 0x0295b005, ScriptType.P2SH_P2WSH),
-        Ypub("Ypub", 0x0295b43f, ScriptType.P2SH_P2WSH),
-        Zprv("Zprv", 0x02aa7a99, ScriptType.P2WSH),
-        Zpub("Zpub", 0x02aa7ed3, ScriptType.P2WSH),
-        tpub("tpub", 0x043587cf, ScriptType.P2PKH),
-        tprv("tprv", 0x04358394, ScriptType.P2PKH),
-        uprv("uprv", 0x044a4e28, ScriptType.P2SH_P2WPKH),
-        upub("upub", 0x044a5262, ScriptType.P2SH_P2WPKH),
-        vprv("vprv", 0x045f18bc, ScriptType.P2WPKH),
-        vpub("vpub", 0x045f1cf6, ScriptType.P2WPKH),
-        Uprv("Uprv", 0x024285b5, ScriptType.P2SH_P2WSH),
-        Upub("Upub", 0x024289ef, ScriptType.P2SH_P2WSH),
-        Vprv("Vprv", 0x02575048, ScriptType.P2WSH),
-        Vpub("Vpub", 0x02575483, ScriptType.P2WSH);
+        xprv("xprv", 0x0488ADE4, ScriptType.P2PKH, true, true),
+        xpub("xpub", 0x0488B21E, ScriptType.P2PKH, false, true),
+        yprv("yprv", 0x049D7878, ScriptType.P2SH_P2WPKH, true, true),
+        ypub("ypub", 0x049D7CB2, ScriptType.P2SH_P2WPKH, false, true),
+        zprv("zprv", 0x04b2430c, ScriptType.P2WPKH, true, true),
+        zpub("zpub", 0x04B24746, ScriptType.P2WPKH, false, true),
+        Yprv("Yprv", 0x0295b005, ScriptType.P2SH_P2WSH, true, true),
+        Ypub("Ypub", 0x0295b43f, ScriptType.P2SH_P2WSH, false, true),
+        Zprv("Zprv", 0x02aa7a99, ScriptType.P2WSH, true, true),
+        Zpub("Zpub", 0x02aa7ed3, ScriptType.P2WSH, false, true),
+        tprv("tprv", 0x04358394, ScriptType.P2PKH, true, false),
+        tpub("tpub", 0x043587cf, ScriptType.P2PKH, false, false),
+        uprv("uprv", 0x044a4e28, ScriptType.P2SH_P2WPKH, true, false),
+        upub("upub", 0x044a5262, ScriptType.P2SH_P2WPKH, false, false),
+        vprv("vprv", 0x045f18bc, ScriptType.P2WPKH, true, false),
+        vpub("vpub", 0x045f1cf6, ScriptType.P2WPKH, false, false),
+        Uprv("Uprv", 0x024285b5, ScriptType.P2SH_P2WSH, true, false),
+        Upub("Upub", 0x024289ef, ScriptType.P2SH_P2WSH, false, false),
+        Vprv("Vprv", 0x02575048, ScriptType.P2WSH, true, false),
+        Vpub("Vpub", 0x02575483, ScriptType.P2WSH, false, false);
 
         private final String name;
         private final int header;
         private final ScriptType defaultScriptType;
+        private final boolean privateKey;
+        private final boolean mainnet;
 
-        Header(String name, int header, ScriptType defaultScriptType) {
+        Header(String name, int header, ScriptType defaultScriptType, boolean privateKey, boolean mainnet) {
             this.name = name;
             this.header = header;
             this.defaultScriptType = defaultScriptType;
+            this.privateKey = privateKey;
+            this.mainnet = mainnet;
         }
 
         public String getName() {
@@ -188,6 +192,14 @@ public class ExtendedKey {
             return defaultScriptType;
         }
 
+        public boolean isPrivateKey() {
+            return privateKey;
+        }
+
+        public boolean isMainnet() {
+            return mainnet;
+        }
+
         public static Header fromExtendedKey(String xkey) {
             for(Header extendedKeyHeader : Header.values()) {
                 if(xkey.startsWith(extendedKeyHeader.name)) {
@@ -200,16 +212,12 @@ public class ExtendedKey {
 
         public static Header fromScriptType(ScriptType scriptType, boolean privateKey) {
             for(Header header : Header.values()) {
-                if(header.defaultScriptType != null && header.defaultScriptType.equals(scriptType) && header.isPrivate() == privateKey) {
+                if(header.defaultScriptType != null && header.defaultScriptType.equals(scriptType) && header.isPrivateKey() == privateKey) {
                     return header;
                 }
             }
 
             return Header.xpub;
-        }
-
-        private boolean isPrivate() {
-            return name.endsWith("prv");
         }
 
         public static Header getHeader(int header) {
