@@ -11,7 +11,7 @@ public class PropertyDefiner extends PropertyDefinerBase {
 
     @Override
     public String getPropertyValue() {
-        return isWindows() ? System.getenv("APPDATA") + "/" + application.substring(0, 1).toUpperCase() + application.substring(1) : System.getProperty("user.home") + "/." + application;
+        return isWindows() ? System.getenv("APPDATA") + "/" + application.substring(0, 1).toUpperCase() + application.substring(1).toLowerCase() : System.getProperty("user.home") + "/." + application.toLowerCase();
     }
 
     private boolean isWindows() {
