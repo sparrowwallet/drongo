@@ -23,6 +23,11 @@ if(hasPlugin) {
     apply plugin: "org.javamodularity.moduleplugin"
 }
 
+tasks.withType(AbstractArchiveTask) {
+    preserveFileTimestamps = false
+    reproducibleFileOrder = true
+}
+
 group 'com.sparrowwallet'
 version '0.9'
 
