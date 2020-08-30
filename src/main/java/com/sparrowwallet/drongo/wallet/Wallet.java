@@ -840,6 +840,7 @@ public class Wallet {
         for(Sha256Hash hash : transactions.keySet()) {
             copy.transactions.put(hash, transactions.get(hash));
         }
+        copy.setStoredBlockHeight(getStoredBlockHeight());
 
         return copy;
     }
