@@ -259,9 +259,14 @@ public class Wallet {
     }
 
     public Map<Script, WalletNode> getWalletOutputScripts() {
+        return getWalletOutputScripts(KeyPurpose.RECEIVE, KeyPurpose.CHANGE);
+    }
+
+    public Map<Script, WalletNode> getWalletOutputScripts(KeyPurpose... keyPurposes) {
         Map<Script, WalletNode> walletOutputScripts = new LinkedHashMap<>();
-        getWalletOutputScripts(walletOutputScripts, getNode(KeyPurpose.RECEIVE));
-        getWalletOutputScripts(walletOutputScripts, getNode(KeyPurpose.CHANGE));
+        for(KeyPurpose keyPurpose : keyPurposes) {
+            getWalletOutputScripts(walletOutputScripts, getNode(keyPurpose));
+        }
         return walletOutputScripts;
     }
 
