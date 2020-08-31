@@ -452,6 +452,26 @@ public class PSBTInput {
         return false;
     }
 
+    public Map<ECKey, TransactionSignature> getSigningKeys(Set<ECKey> availableKeys) {
+        Collection<TransactionSignature> signatures = getSignatures();
+        Script signingScript = getSigningScript();
+
+        Map<ECKey, TransactionSignature> signingKeys = new LinkedHashMap<>();
+        if(signingScript != null) {
+            Sha256Hash hash = getHashForSignature(signingScript, getSigHash() == null ? SigHash.ALL : getSigHash());
+
+            for(ECKey sigPublicKey : availableKeys) {
+                for(TransactionSignature signature : signatures) {
+                    if(sigPublicKey.verify(hash, signature)) {
+                        signingKeys.put(sigPublicKey, signature);
+                    }
+                }
+            }
+        }
+
+        return signingKeys;
+    }
+
     public ScriptType getScriptType() {
         Script signingScript = getUtxo().getScript();
 

@@ -611,13 +611,14 @@ public class Wallet {
     }
 
     /**
-     * Determines which keystores have signed a partially signed (unfinalized) PSBT
+     * Determines which keystores have signed a PSBT
      *
-     * @param psbt The partially signed PSBT
+     * @param psbt The partially signed or finalized PSBT
+     * @return A map keyed with the PSBTInput mapped to a map of the signatures and associated keystores that signed it
      */
-    public Map<PSBTInput, List<Keystore>> getSignedKeystores(PSBT psbt) {
+    public Map<PSBTInput, Map<TransactionSignature, Keystore>> getSignedKeystores(PSBT psbt) {
         Map<PSBTInput, WalletNode> signingNodes = getSigningNodes(psbt);
-        Map<PSBTInput, List<Keystore>> signedKeystores = new LinkedHashMap<>();
+        Map<PSBTInput, Map<TransactionSignature, Keystore>> signedKeystores = new LinkedHashMap<>();
 
         for(PSBTInput psbtInput : signingNodes.keySet()) {
             WalletNode walletNode = signingNodes.get(psbtInput);
@@ -625,10 +626,21 @@ public class Wallet {
                     (u, v) -> { throw new IllegalStateException("Duplicate keys from different keystores for node " + walletNode.getDerivationPath()); },
                     LinkedHashMap::new));
 
-            keystoreKeysForNode.keySet().retainAll(psbtInput.getPartialSignatures().keySet());
+            Map<ECKey, TransactionSignature> keySignatureMap;
+            if(psbt.isFinalized()) {
+                keySignatureMap = psbtInput.getSigningKeys(keystoreKeysForNode.keySet());
+            } else {
+                keySignatureMap = psbtInput.getPartialSignatures();
+            }
 
-            List<Keystore> inputSignedKeystores = new ArrayList<>(keystoreKeysForNode.values());
-            signedKeystores.put(psbtInput, inputSignedKeystores);
+            keystoreKeysForNode.keySet().retainAll(keySignatureMap.keySet());
+
+            Map<TransactionSignature, Keystore> inputSignatureKeystores = new LinkedHashMap<>();
+            for(ECKey signingKey : keystoreKeysForNode.keySet()) {
+                inputSignatureKeystores.put(keySignatureMap.get(signingKey), keystoreKeysForNode.get(signingKey));
+            }
+
+            signedKeystores.put(psbtInput, inputSignatureKeystores);
         }
 
         return signedKeystores;

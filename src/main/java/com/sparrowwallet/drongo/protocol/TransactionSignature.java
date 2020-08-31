@@ -5,6 +5,7 @@ import com.sparrowwallet.drongo.crypto.ECKey;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.math.BigInteger;
+import java.util.Objects;
 
 public class TransactionSignature extends ECKey.ECDSASignature {
     /**
@@ -129,6 +130,26 @@ public class TransactionSignature extends ECKey.ECDSASignature {
     @Override
     public ECKey.ECDSASignature toCanonicalised() {
         return new TransactionSignature(super.toCanonicalised(), getSigHash());
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if(this == o) {
+            return true;
+        }
+        if(o == null || getClass() != o.getClass()) {
+            return false;
+        }
+        if(!super.equals(o)) {
+            return false;
+        }
+        TransactionSignature signature = (TransactionSignature) o;
+        return sighashFlags == signature.sighashFlags;
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(super.hashCode(), sighashFlags);
     }
 
     /**

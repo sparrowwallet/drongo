@@ -44,7 +44,7 @@ public class FinalizingPSBTWallet extends Wallet {
             signedNodeKeys.put(signedNode, new ArrayList<>(keys));
 
             ScriptType scriptType = psbtInput.getScriptType();
-            if(scriptType == null || (getScriptType() != null && scriptType.equals(getScriptType()))) {
+            if(scriptType == null || (getScriptType() != null && !scriptType.equals(getScriptType()))) {
                 throw new IllegalArgumentException("Cannot determine the script type from the PSBT, or there are multiple script types");
             } else {
                 setScriptType(scriptType);
@@ -71,12 +71,17 @@ public class FinalizingPSBTWallet extends Wallet {
     }
 
     @Override
-    public Map<PSBTInput, List<Keystore>> getSignedKeystores(PSBT psbt) {
-        Map<PSBTInput, List<Keystore>> signedKeystores = new LinkedHashMap<>();
+    public Map<PSBTInput, Map<TransactionSignature, Keystore>> getSignedKeystores(PSBT psbt) {
+        Map<PSBTInput, Map<TransactionSignature, Keystore>> signedKeystores = new LinkedHashMap<>();
         for(PSBTInput psbtInput : psbt.getPsbtInputs()) {
-            Collection<TransactionSignature> signatures = psbtInput.getSignatures();
-            signedKeystores.put(psbtInput, IntStream.range(1, signatures.size() + 1).mapToObj(i -> new Keystore("Keystore " + i)).collect(Collectors.toList()));
+            List<TransactionSignature> signatures = new ArrayList<>(psbtInput.getSignatures());
+            Map<TransactionSignature, Keystore> signatureKeystoreMap = new LinkedHashMap<>();
+            for(int i = 0; i < signatures.size(); i++) {
+                signatureKeystoreMap.put(signatures.get(i), new Keystore("Keystore " + (i + 1)));
+            }
+            signedKeystores.put(psbtInput, signatureKeystoreMap);
         }
+
         return signedKeystores;
     }
 
