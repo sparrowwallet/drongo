@@ -97,4 +97,12 @@ public class WalletTransaction {
     public boolean isCoinControlUsed() {
         return !utxoSelectors.isEmpty() && utxoSelectors.get(0) instanceof PresetUtxoSelector;
     }
+
+    public boolean isConsolidationSend() {
+        if(getRecipientAddress() != null && getWallet() != null) {
+            return getWallet().isWalletOutputScript(getRecipientAddress().getOutputScript());
+        }
+
+        return false;
+    }
 }
