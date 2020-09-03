@@ -1,6 +1,7 @@
 package com.sparrowwallet.drongo.crypto;
 
 import com.sparrowwallet.drongo.Utils;
+import com.sparrowwallet.drongo.protocol.ScriptType;
 import com.sparrowwallet.drongo.protocol.Sha256Hash;
 import com.sparrowwallet.drongo.protocol.SignatureDecodeException;
 import com.sparrowwallet.drongo.protocol.VarInt;
@@ -716,17 +717,36 @@ public class ECKey implements EncryptableItem {
      * @throws IllegalStateException if this ECKey does not have the private part.
      * @throws KeyCrypterException   if this ECKey is encrypted and no AESKey is provided or it does not decrypt the ECKey.
      */
-    public String signMessage(String message, Key aesKey) throws KeyCrypterException {
+    public String signMessage(String message, ScriptType scriptType, Key aesKey) throws KeyCrypterException {
         byte[] data = formatMessageForSigning(message);
         Sha256Hash hash = Sha256Hash.twiceOf(data);
         ECDSASignature sig = sign(hash, aesKey);
         byte recId = findRecoveryId(hash, sig);
-        int headerByte = recId + 27 + (isCompressed() ? 4 : 0);
+        int headerByte = recId + getSigningTypeConstant(scriptType);
         byte[] sigData = new byte[65];  // 1 header + 32 bytes for R + 32 bytes for S
         sigData[0] = (byte) headerByte;
         System.arraycopy(Utils.bigIntegerToBytes(sig.r, 32), 0, sigData, 1, 32);
         System.arraycopy(Utils.bigIntegerToBytes(sig.s, 32), 0, sigData, 33, 32);
         return new String(Base64.getEncoder().encode(sigData), StandardCharsets.UTF_8);
+    }
+
+    /**
+     * Although no standard has yet been decided on, we follow Trezor's approach for now as documented in
+     * https://github.com/bitcoin/bips/blob/master/bip-0137.mediawiki
+     *
+     * @param scriptType The script type of the address used to sign
+     * @return A constant used to alter the header of the signature in order to distinguish between different script types
+     */
+    private int getSigningTypeConstant(ScriptType scriptType) {
+        if(scriptType == ScriptType.P2PKH) {
+            return 27 + (isCompressed() ? 4 : 0);
+        } else if(scriptType == ScriptType.P2SH_P2WPKH) {
+            return 35;
+        } else if(scriptType == ScriptType.P2WPKH) {
+            return 39;
+        }
+
+        throw new IllegalArgumentException("Script type of " + scriptType + " is not supported for message signing");
     }
 
     /**
@@ -738,9 +758,10 @@ public class ECKey implements EncryptableItem {
      *
      * @param message         Some piece of human readable text.
      * @param signatureBase64 The Bitcoin-format message signature in base64
+     * @param electrumFormat  Whether to generate a key following Electrum's approach of regarding P2SH-P2WSH as the same as P2PKH uncompressed
      * @throws SignatureException If the public key could not be recovered or if there was a signature format error.
      */
-    public static ECKey signedMessageToKey(String message, String signatureBase64) throws SignatureException {
+    public static ECKey signedMessageToKey(String message, String signatureBase64, boolean electrumFormat) throws SignatureException {
         byte[] signatureEncoded;
         try {
             signatureEncoded = Base64.getDecoder().decode(signatureBase64);
@@ -755,7 +776,7 @@ public class ECKey implements EncryptableItem {
         int header = signatureEncoded[0] & 0xFF;
         // The header byte: 0x1B = first key with even y, 0x1C = first key with odd y,
         //                  0x1D = second key with even y, 0x1E = second key with odd y
-        if(header < 27 || header > 34) {
+        if(header < 27 || header > 42) {
             throw new SignatureException("Header byte out of range: " + header);
         }
         BigInteger r = new BigInteger(1, Arrays.copyOfRange(signatureEncoded, 1, 33));
@@ -766,7 +787,15 @@ public class ECKey implements EncryptableItem {
         // JSON-SPIRIT hands back. Assume UTF-8 for now.
         Sha256Hash messageHash = Sha256Hash.twiceOf(messageBytes);
         boolean compressed = false;
-        if(header >= 31) {
+        if(header >= 39) { // this is a bech32 signature
+            header -= 12;
+            compressed = true;
+        }
+        else if(header >= 35 && !electrumFormat) { // this is a segwit p2sh signature
+            compressed = true;
+            header -= 8;
+        }
+        else if(header >= 31) { // this is a compressed key signature
             compressed = true;
             header -= 4;
         }
@@ -779,11 +808,11 @@ public class ECKey implements EncryptableItem {
     }
 
     /**
-     * Convenience wrapper around {@link ECKey#signedMessageToKey(String, String)}. If the key derived from the
+     * Convenience wrapper around {@link ECKey#signedMessageToKey(String, String, boolean)}. If the key derived from the
      * signature is not the same as this one, throws a SignatureException.
      */
     public void verifyMessage(String message, String signatureBase64) throws SignatureException {
-        ECKey key = ECKey.signedMessageToKey(message, signatureBase64);
+        ECKey key = ECKey.signedMessageToKey(message, signatureBase64, false);
         if(!key.pub.equals(pub)) {
             throw new SignatureException("Signature did not match for message");
         }
