@@ -4,8 +4,14 @@ import com.sparrowwallet.drongo.address.*;
 import com.sparrowwallet.drongo.crypto.ChildNumber;
 import com.sparrowwallet.drongo.crypto.DeterministicKey;
 import com.sparrowwallet.drongo.crypto.ECKey;
+import com.sparrowwallet.drongo.policy.Policy;
+import com.sparrowwallet.drongo.policy.PolicyType;
 import com.sparrowwallet.drongo.protocol.Script;
 import com.sparrowwallet.drongo.protocol.ScriptType;
+import com.sparrowwallet.drongo.wallet.Keystore;
+import com.sparrowwallet.drongo.wallet.KeystoreSource;
+import com.sparrowwallet.drongo.wallet.Wallet;
+import com.sparrowwallet.drongo.wallet.WalletModel;
 
 import java.util.*;
 import java.util.regex.Matcher;
@@ -210,6 +216,34 @@ public class OutputDescriptor {
         }
 
         return keyPath;
+    }
+
+    public Wallet toWallet() {
+        Wallet wallet = new Wallet();
+        wallet.setPolicyType(isMultisig() ? PolicyType.MULTI : PolicyType.SINGLE);
+        wallet.setScriptType(scriptType);
+
+        for(Map.Entry<ExtendedKey,KeyDerivation> extKeyEntry : extendedPublicKeys.entrySet()) {
+            Keystore keystore = new Keystore();
+            keystore.setSource(KeystoreSource.SW_WATCH);
+            keystore.setWalletModel(WalletModel.SPARROW);
+            keystore.setKeyDerivation(extKeyEntry.getValue());
+            keystore.setExtendedPublicKey(extKeyEntry.getKey());
+            wallet.makeLabelsUnique(keystore);
+            wallet.getKeystores().add(keystore);
+        }
+
+        wallet.setDefaultPolicy(Policy.getPolicy(wallet.getPolicyType(), wallet.getScriptType(), wallet.getKeystores(), getMultisigThreshold()));
+        return wallet;
+    }
+
+    public static OutputDescriptor getOutputDescriptor(Wallet wallet) {
+        Map<ExtendedKey, KeyDerivation> extendedKeyDerivationMap = new LinkedHashMap<>();
+        for(Keystore keystore : wallet.getKeystores()) {
+            extendedKeyDerivationMap.put(keystore.getExtendedPublicKey(), keystore.getKeyDerivation());
+        }
+
+        return new OutputDescriptor(wallet.getScriptType(), wallet.getDefaultPolicy().getNumSignaturesRequired(), extendedKeyDerivationMap);
     }
 
     // See https://github.com/bitcoin/bitcoin/blob/master/doc/descriptors.md
