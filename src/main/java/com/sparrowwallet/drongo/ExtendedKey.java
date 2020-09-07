@@ -207,7 +207,7 @@ public class ExtendedKey {
                 }
             }
 
-            throw new IllegalArgumentException("Unrecognised extended key header for extended key: " + xpub);
+            throw new IllegalArgumentException("Unrecognised extended key header for extended key: " + xkey);
         }
 
         public static Header fromScriptType(ScriptType scriptType, boolean privateKey) {

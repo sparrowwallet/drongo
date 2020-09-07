@@ -3,6 +3,9 @@ package com.sparrowwallet.drongo;
 import org.junit.Assert;
 import org.junit.Test;
 
+import java.util.Iterator;
+import java.util.Set;
+
 public class OutputDescriptorTest {
 
     @Test
@@ -44,10 +47,48 @@ public class OutputDescriptorTest {
     @Test
     public void masterP2PKH() {
         OutputDescriptor descriptor = OutputDescriptor.getOutputDescriptor("pkh([d34db33f/44'/0'/0']xpub6ERApfZwUNrhLCkDtcHTcxd75RbzS1ed54G1LkBUHQVHQKqhMkhgbmJbZRkrgZw4koxb5JaHWkY4ALHY2grBGRjaDMzQLcgJvLJuZZvRcEL/1/*)");
-        Assert.assertEquals("pkh(xpub6ERApfZwUNrhLCkDtcHTcxd75RbzS1ed54G1LkBUHQVHQKqhMkhgbmJbZRkrgZw4koxb5JaHWkY4ALHY2grBGRjaDMzQLcgJvLJuZZvRcEL/1/*)", descriptor.toString());
+        Assert.assertEquals("pkh([d34db33f/44'/0'/0']xpub6ERApfZwUNrhLCkDtcHTcxd75RbzS1ed54G1LkBUHQVHQKqhMkhgbmJbZRkrgZw4koxb5JaHWkY4ALHY2grBGRjaDMzQLcgJvLJuZZvRcEL/1/*)", descriptor.toString());
         ExtendedKey extendedPublicKey = descriptor.getSingletonExtendedPublicKey();
         KeyDerivation derivation = descriptor.getKeyDerivation(extendedPublicKey);
         Assert.assertEquals("d34db33f", derivation.getMasterFingerprint());
         Assert.assertEquals("m/44'/0'/0'", derivation.getDerivationPath());
+        Assert.assertEquals("14qCH92HCyDDBFFZdhDt1WMfrMDYnBFYMF", descriptor.getAddress(descriptor.getChangeDerivation(0)).toString());
+    }
+
+    @Test
+    public void singleP2SH_P2WPKH() {
+        OutputDescriptor descriptor = OutputDescriptor.getOutputDescriptor("sh(wpkh([f09a3b29/49h/0h/0h]xpub6CjUWYtkq9KT1zkM5NPMxoJTCMm8JSFw7JPyMG6YLBzv5AsCTkASnsVyJhqL1aaqF5XSsFinHK3FDi8RoeEWcTG3DQA2TjqrZ6HJtatYbsU/0/*))");
+        Assert.assertEquals("sh(wpkh([f09a3b29/49'/0'/0']xpub6CjUWYtkq9KT1zkM5NPMxoJTCMm8JSFw7JPyMG6YLBzv5AsCTkASnsVyJhqL1aaqF5XSsFinHK3FDi8RoeEWcTG3DQA2TjqrZ6HJtatYbsU/0/*))", descriptor.toString());
+        ExtendedKey extendedPublicKey = descriptor.getSingletonExtendedPublicKey();
+        KeyDerivation derivation = descriptor.getKeyDerivation(extendedPublicKey);
+        Assert.assertEquals("f09a3b29", derivation.getMasterFingerprint());
+        Assert.assertEquals("m/49'/0'/0'", derivation.getDerivationPath());
+        Assert.assertEquals("31sNBFoYAaFggvNBAnnnLAc5ygfjZRCK6s", descriptor.getAddress(descriptor.getChangeDerivation(0)).toString());
+    }
+
+    @Test
+    public void multisigP2WSH() {
+        OutputDescriptor descriptor = OutputDescriptor.getOutputDescriptor("wsh(multi(2,xpub661MyMwAqRbcFW31YEwpkMuc5THy2PSt5bDMsktWQcFF8syAmRUapSCGu8ED9W6oDMSgv6Zz8idoc4a6mr8BDzTJY47LJhkJ8UB7WEGuduB/0/*,xpub69H7F5d8KSRgmmdJg2KhpAK8SR3DjMwAdkxj3ZuxV27CprR9LgpeyGmXUbC6wb7ERfvrnKZjXoUmmDznezpbZb7ap6r1D3tgFxHmwMkQTPH/0/*))");
+        Assert.assertEquals("wsh(multi(2,xpub661MyMwAqRbcFW31YEwpkMuc5THy2PSt5bDMsktWQcFF8syAmRUapSCGu8ED9W6oDMSgv6Zz8idoc4a6mr8BDzTJY47LJhkJ8UB7WEGuduB/0/*,xpub69H7F5d8KSRgmmdJg2KhpAK8SR3DjMwAdkxj3ZuxV27CprR9LgpeyGmXUbC6wb7ERfvrnKZjXoUmmDznezpbZb7ap6r1D3tgFxHmwMkQTPH/0/*))", descriptor.toString());
+        Assert.assertEquals(2, descriptor.getMultisigThreshold());
+        Assert.assertEquals("bc1qf5l7g5t5v2tp2wnwfeqlktkds7zvprmm7afjn6f85fdesc2pwedsh42kcl", descriptor.getAddress(KeyDerivation.parsePath("0/0")).toString());
+    }
+
+    @Test
+    public void multisigP2WSH2() {
+        OutputDescriptor descriptor = OutputDescriptor.getOutputDescriptor("wsh(sortedmulti(2,[04fefef0/48h/0h/0h/2h]xpub661MyMwAqRbcFW31YEwpkMuc5THy2PSt5bDMsktWQcFF8syAmRUapSCGu8ED9W6oDMSgv6Zz8idoc4a6mr8BDzTJY47LJhkJ8UB7WEGuduB/0/*,[04ba1ef0/48h/0h/0h/2h]xpub69H7F5d8KSRgmmdJg2KhpAK8SR3DjMwAdkxj3ZuxV27CprR9LgpeyGmXUbC6wb7ERfvrnKZjXoUmmDznezpbZb7ap6r1D3tgFxHmwMkQTPH/0/*))");
+        Set<ExtendedKey> extendedPublicKeys = descriptor.getExtendedPublicKeys();
+        Iterator<ExtendedKey> iter = extendedPublicKeys.iterator();
+        ExtendedKey extendedPublicKey1 = iter.next();
+        Assert.assertEquals("xpub661MyMwAqRbcFW31YEwpkMuc5THy2PSt5bDMsktWQcFF8syAmRUapSCGu8ED9W6oDMSgv6Zz8idoc4a6mr8BDzTJY47LJhkJ8UB7WEGuduB", extendedPublicKey1.toString());
+        KeyDerivation derivation = descriptor.getKeyDerivation(extendedPublicKey1);
+        Assert.assertEquals("04fefef0", derivation.getMasterFingerprint());
+        Assert.assertEquals("m/48'/0'/0'/2'", derivation.getDerivationPath());
+
+        ExtendedKey extendedPublicKey2 = iter.next();
+        Assert.assertEquals("xpub69H7F5d8KSRgmmdJg2KhpAK8SR3DjMwAdkxj3ZuxV27CprR9LgpeyGmXUbC6wb7ERfvrnKZjXoUmmDznezpbZb7ap6r1D3tgFxHmwMkQTPH", extendedPublicKey2.toString());
+        KeyDerivation derivation2 = descriptor.getKeyDerivation(extendedPublicKey2);
+        Assert.assertEquals("04ba1ef0", derivation2.getMasterFingerprint());
+        Assert.assertEquals("m/48'/0'/0'/2'", derivation2.getDerivationPath());
     }
 }

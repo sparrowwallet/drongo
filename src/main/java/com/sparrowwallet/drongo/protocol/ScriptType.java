@@ -1102,9 +1102,12 @@ public enum ScriptType {
     }
 
     public static ScriptType fromDescriptor(String descriptor) {
-        for(ScriptType type : values()) {
-            if(type.getDescriptor().equals(descriptor.toLowerCase())) {
-                return type;
+        List<ScriptType> scriptTypes = Arrays.asList(values());
+        scriptTypes.sort((o1, o2) -> o2.getDescriptor().length() - o1.getDescriptor().length());
+
+        for(ScriptType scriptType : scriptTypes) {
+            if(descriptor.toLowerCase().startsWith(scriptType.getDescriptor())) {
+                return scriptType;
             }
         }
 

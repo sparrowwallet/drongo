@@ -3,9 +3,8 @@ package com.sparrowwallet.drongo;
 import com.sparrowwallet.drongo.address.*;
 import com.sparrowwallet.drongo.crypto.ChildNumber;
 import com.sparrowwallet.drongo.crypto.DeterministicKey;
+import com.sparrowwallet.drongo.crypto.ECKey;
 import com.sparrowwallet.drongo.protocol.Script;
-import com.sparrowwallet.drongo.protocol.ScriptChunk;
-import com.sparrowwallet.drongo.protocol.ScriptOpCodes;
 import com.sparrowwallet.drongo.protocol.ScriptType;
 
 import java.util.*;
@@ -15,29 +14,29 @@ import java.util.regex.Pattern;
 import static com.sparrowwallet.drongo.KeyDerivation.parsePath;
 
 public class OutputDescriptor {
-    private static final Pattern XPUB_PATTERN = Pattern.compile("(\\[[^\\]]+\\])?(.pub[^/\\)]+)(/[/\\d*']+)?");
+    private static final Pattern XPUB_PATTERN = Pattern.compile("(\\[[^\\]]+\\])?(.pub[^/\\)]{100,112})(/[/\\d*'hH]+)?");
     private static final Pattern MULTI_PATTERN = Pattern.compile("multi\\(([\\d+])");
-    private static final Pattern KEY_ORIGIN_PATTERN = Pattern.compile("\\[([a-f0-9]+)([/\\d']+)\\]");
+    private static final Pattern KEY_ORIGIN_PATTERN = Pattern.compile("\\[([A-Fa-f0-9]{8})([/\\d'hH]+)\\]");
 
-    private final String script;
+    private final ScriptType scriptType;
     private final int multisigThreshold;
     private final Map<ExtendedKey, KeyDerivation> extendedPublicKeys;
     private final Map<ExtendedKey, String> mapChildrenDerivations;
 
-    public OutputDescriptor(String script, ExtendedKey extendedPublicKey, KeyDerivation keyDerivation) {
-        this(script, Collections.singletonMap(extendedPublicKey, keyDerivation));
+    public OutputDescriptor(ScriptType scriptType, ExtendedKey extendedPublicKey, KeyDerivation keyDerivation) {
+        this(scriptType, Collections.singletonMap(extendedPublicKey, keyDerivation));
     }
 
-    public OutputDescriptor(String script, Map<ExtendedKey, KeyDerivation> extendedPublicKeys) {
-        this(script, 0, extendedPublicKeys);
+    public OutputDescriptor(ScriptType scriptType, Map<ExtendedKey, KeyDerivation> extendedPublicKeys) {
+        this(scriptType, 0, extendedPublicKeys);
     }
 
-    public OutputDescriptor(String script, int multisigThreshold, Map<ExtendedKey, KeyDerivation> extendedPublicKeys) {
-        this(script, multisigThreshold, extendedPublicKeys, new LinkedHashMap<>());
+    public OutputDescriptor(ScriptType scriptType, int multisigThreshold, Map<ExtendedKey, KeyDerivation> extendedPublicKeys) {
+        this(scriptType, multisigThreshold, extendedPublicKeys, new LinkedHashMap<>());
     }
 
-    public OutputDescriptor(String script, int multisigThreshold, Map<ExtendedKey, KeyDerivation> extendedPublicKeys, Map<ExtendedKey, String> mapChildrenDerivations) {
-        this.script = script;
+    public OutputDescriptor(ScriptType scriptType, int multisigThreshold, Map<ExtendedKey, KeyDerivation> extendedPublicKeys, Map<ExtendedKey, String> mapChildrenDerivations) {
+        this.scriptType = scriptType;
         this.multisigThreshold = multisigThreshold;
         this.extendedPublicKeys = extendedPublicKeys;
         this.mapChildrenDerivations = mapChildrenDerivations;
@@ -49,6 +48,10 @@ public class OutputDescriptor {
 
     public KeyDerivation getKeyDerivation(ExtendedKey extendedPublicKey) {
         return extendedPublicKeys.get(extendedPublicKey);
+    }
+
+    public int getMultisigThreshold() {
+        return multisigThreshold;
     }
 
     public String getChildDerivationPath(ExtendedKey extendedPublicKey) {
@@ -81,8 +84,8 @@ public class OutputDescriptor {
                 return getChildDerivation(extendedPublicKey.getKey().getChildNumber(), childDerivationPath.replace("0/*", "1/*"), wildCardReplacement);
             }
 
-            if(extendedPublicKey.getKeyChildNumber().num() == 1 && childDerivationPath.endsWith("/*")) {
-                return getChildDerivation(new ChildNumber(1, extendedPublicKey.getKey().getChildNumber().isHardened()), childDerivationPath, wildCardReplacement);
+            if(childDerivationPath.endsWith("/*")) {
+                return getChildDerivation(extendedPublicKey.getKey().getChildNumber(), childDerivationPath, wildCardReplacement);
             }
         }
 
@@ -118,8 +121,8 @@ public class OutputDescriptor {
         return extendedPublicKeys.keySet().iterator().next();
     }
 
-    public String getScript() {
-        return script;
+    public ScriptType getScriptType() {
+        return scriptType;
     }
 
     public boolean describesMultipleAddresses() {
@@ -178,101 +181,83 @@ public class OutputDescriptor {
     }
 
     public Address getAddress(DeterministicKey childKey) {
-        Address address = null;
-        if(script.equals("pkh")) {
-            address = new P2PKHAddress(childKey.getPubKeyHash());
-        } else if(script.equals("sh(wpkh")) {
-            Script receivingP2wpkhScript = ScriptType.P2WPKH.getOutputScript(childKey.getPubKeyHash());
-            address = P2SHAddress.fromProgram(receivingP2wpkhScript.getProgram());
-        } else if(script.equals("wpkh")) {
-            address = new P2WPKHAddress(childKey.getPubKeyHash());
-        } else {
-            throw new IllegalStateException("Cannot determine address for script " + script);
-        }
-
-        return address;
+        return scriptType.getAddress(childKey);
     }
 
     private Address getAddress(Script multisigScript) {
-        Address address = null;
-        if(script.equals("sh(multi")) {
-            address = P2SHAddress.fromProgram(multisigScript.getProgram());
-        } else if(script.equals("wsh(multi")) {
-            address = P2WSHAddress.fromProgram(multisigScript.getProgram());
-        } else {
-            throw new IllegalStateException("Cannot determine address for multisig script " + script);
-        }
-
-        return address;
+        return scriptType.getAddress(multisigScript);
     }
 
-    private Script getMultisigScript(List<ChildNumber> path) {
-        List<ScriptChunk> chunks = new ArrayList<>();
-        chunks.add(new ScriptChunk(Script.encodeToOpN(multisigThreshold), null));
-
+    private Script getMultisigScript(List<ChildNumber> childPath) {
+        List<ECKey> keys = new ArrayList<>();
         for(ExtendedKey pubKey : extendedPublicKeys.keySet()) {
-            List<ChildNumber> keyPath = null;
-            if(path.get(0).num() == 0) {
-                keyPath = getReceivingDerivation(pubKey, path.get(1).num());
-            } else if(path.get(0).num() == 1) {
-                keyPath = getChangeDerivation(pubKey, path.get(1).num());
-            } else {
-                keyPath = getChildDerivation(pubKey, path.get(1).num());
-            }
+            List<ChildNumber> keyPath = getKeyPath(pubKey, childPath);
 
-            byte[] pubKeyBytes = pubKey.getKey(keyPath).getPubKey();
-            chunks.add(new ScriptChunk(pubKeyBytes.length, pubKeyBytes));
+            keys.add(pubKey.getKey(keyPath));
         }
 
-        chunks.add(new ScriptChunk(Script.encodeToOpN(extendedPublicKeys.size()), null));
-        chunks.add(new ScriptChunk(ScriptOpCodes.OP_CHECKMULTISIG, null));
+        return ScriptType.MULTISIG.getOutputScript(multisigThreshold, keys);
+    }
 
-        return new Script(chunks);
+    private List<ChildNumber> getKeyPath(ExtendedKey pubKey, List<ChildNumber> childPath) {
+        List<ChildNumber> keyPath;
+        if(childPath.get(0).num() == 0) {
+            keyPath = getReceivingDerivation(pubKey, childPath.get(1).num());
+        } else if(childPath.get(0).num() == 1) {
+            keyPath = getChangeDerivation(pubKey, childPath.get(1).num());
+        } else {
+            keyPath = getChildDerivation(pubKey, childPath.get(1).num());
+        }
+
+        return keyPath;
     }
 
     // See https://github.com/bitcoin/bitcoin/blob/master/doc/descriptors.md
     public static OutputDescriptor getOutputDescriptor(String descriptor) {
-        if(descriptor.startsWith("pkh") || descriptor.startsWith("xpub")) {
-            return getOutputDescriptorImpl("pkh", 0, descriptor);
-        } else if(descriptor.startsWith("wpkh") || descriptor.startsWith("zpub")) {
-            return getOutputDescriptorImpl("wpkh", 0, descriptor);
-        } else if(descriptor.startsWith("sh(wpkh") || descriptor.startsWith("ypub")) {
-            return getOutputDescriptorImpl("sh(wpkh", 0, descriptor);
-        } else if(descriptor.startsWith("sh(multi") || descriptor.startsWith("Ypub")) {
-            return getOutputDescriptorImpl("sh(multi", getMultsigThreshold(descriptor), descriptor);
-        } else if(descriptor.startsWith("wsh(multi") || descriptor.startsWith("Zpub")) {
-            return getOutputDescriptorImpl("wsh(multi", getMultsigThreshold(descriptor), descriptor);
-        } else {
-            throw new IllegalArgumentException("Could not parse output descriptor:" + descriptor);
+        ScriptType scriptType = ScriptType.fromDescriptor(descriptor);
+        if(scriptType == null) {
+            ExtendedKey.Header header = ExtendedKey.Header.fromExtendedKey(descriptor);
+            scriptType = header.getDefaultScriptType();
         }
+
+        if(scriptType == null) {
+            throw new IllegalArgumentException("Cannot determine script type from descriptor: " + descriptor);
+        }
+
+        int threshold = getMultisigThreshold(descriptor);
+        return getOutputDescriptorImpl(scriptType, threshold, descriptor);
     }
 
-    private static int getMultsigThreshold(String descriptor) {
+    private static int getMultisigThreshold(String descriptor) {
         Matcher matcher = MULTI_PATTERN.matcher(descriptor);
         if(matcher.find()) {
             String threshold = matcher.group(1);
             return Integer.parseInt(threshold);
         } else {
-            throw new IllegalArgumentException("Could not find multisig threshold in output descriptor:" + descriptor);
+            return 1;
         }
     }
 
-    private static OutputDescriptor getOutputDescriptorImpl(String script, int multisigThreshold, String descriptor) {
+    private static OutputDescriptor getOutputDescriptorImpl(ScriptType scriptType, int multisigThreshold, String descriptor) {
         Map<ExtendedKey, KeyDerivation> keyDerivationMap = new LinkedHashMap<>();
         Map<ExtendedKey, String> keyChildDerivationMap = new LinkedHashMap<>();
         Matcher matcher = XPUB_PATTERN.matcher(descriptor);
         while(matcher.find()) {
             String masterFingerprint = null;
             String keyDerivationPath = null;
-            String extPubKey = null;
+            String extPubKey;
             String childDerivationPath = "/0/*";
 
             if(matcher.group(1) != null) {
                 String keyOrigin = matcher.group(1);
                 Matcher keyOriginMatcher = KEY_ORIGIN_PATTERN.matcher(keyOrigin);
                 if(keyOriginMatcher.matches()) {
-                    masterFingerprint = keyOriginMatcher.group(1);
-                    keyDerivationPath = "m" + keyOriginMatcher.group(2);
+                    byte[] masterFingerprintBytes = Utils.hexToBytes(keyOriginMatcher.group(1));
+                    if(masterFingerprintBytes.length != 4) {
+                        throw new IllegalArgumentException("Master fingerprint must be 4 bytes: " + Utils.bytesToHex(masterFingerprintBytes));
+                    }
+                    masterFingerprint = Utils.bytesToHex(masterFingerprintBytes);
+                    keyDerivationPath = KeyDerivation.writePath(KeyDerivation.parsePath(keyOriginMatcher.group(2)));
                 }
             }
 
@@ -287,34 +272,55 @@ public class OutputDescriptor {
             keyChildDerivationMap.put(extendedPublicKey, childDerivationPath);
         }
 
-        return new OutputDescriptor(script, multisigThreshold, keyDerivationMap, keyChildDerivationMap);
+        return new OutputDescriptor(scriptType, multisigThreshold, keyDerivationMap, keyChildDerivationMap);
     }
 
     public String toString() {
         StringBuilder builder = new StringBuilder();
-        builder.append(script);
-        builder.append("(");
+        builder.append(scriptType.getDescriptor());
 
         if(isMultisig()) {
+            builder.append(ScriptType.MULTISIG.getDescriptor());
             StringJoiner joiner = new StringJoiner(",");
             joiner.add(Integer.toString(multisigThreshold));
             for(ExtendedKey pubKey : extendedPublicKeys.keySet()) {
-                joiner.add(pubKey.toString());
-                joiner.add(mapChildrenDerivations.get(pubKey));
+                String extKeyString = toString(pubKey);
+                joiner.add(extKeyString);
             }
             builder.append(joiner.toString());
+            builder.append(ScriptType.MULTISIG.getCloseDescriptor());
         } else {
             ExtendedKey extendedPublicKey = getSingletonExtendedPublicKey();
-            builder.append(extendedPublicKey);
-            builder.append(mapChildrenDerivations.get(extendedPublicKey));
+            builder.append(toString(extendedPublicKey));
         }
-
-        builder.append(")");
-
-        if(script.contains("(")){
-            builder.append(")");
-        }
+        builder.append(scriptType.getCloseDescriptor());
 
         return builder.toString();
+    }
+
+    private String toString(ExtendedKey pubKey) {
+        StringBuilder keyBuilder = new StringBuilder();
+        KeyDerivation keyDerivation = extendedPublicKeys.get(pubKey);
+        if(keyDerivation != null && keyDerivation.getDerivationPath() != null) {
+            keyBuilder.append("[");
+            if(keyDerivation.getMasterFingerprint() != null) {
+                keyBuilder.append(keyDerivation.getMasterFingerprint());
+                keyBuilder.append("/");
+            }
+            keyBuilder.append(keyDerivation.getDerivationPath().replaceFirst("^m?/", ""));
+            keyBuilder.append("]");
+        }
+
+        keyBuilder.append(pubKey.toString());
+        String childDerivation = mapChildrenDerivations.get(pubKey);
+        if(childDerivation != null) {
+            if(!childDerivation.startsWith("/")) {
+                keyBuilder.append("/");
+            }
+
+            keyBuilder.append(childDerivation);
+        }
+
+        return keyBuilder.toString();
     }
 }
