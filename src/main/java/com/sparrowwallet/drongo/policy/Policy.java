@@ -37,19 +37,19 @@ public class Policy {
 
     public static Policy getPolicy(PolicyType policyType, ScriptType scriptType, List<Keystore> keystores, Integer threshold) {
         if(SINGLE.equals(policyType)) {
-            if(P2PK.equals(scriptType)) {
-                return new Policy(new Miniscript("pk(" + keystores.get(0).getScriptName() + ")"));
-            }
-            return new Policy(new Miniscript("pkh(" + keystores.get(0).getScriptName() + ")"));
+            return new Policy(new Miniscript(scriptType.getDescriptor() + keystores.get(0).getScriptName() + scriptType.getCloseDescriptor()));
         }
 
         if(MULTI.equals(policyType)) {
-            StringBuilder builder = new StringBuilder("multi(");
+            StringBuilder builder = new StringBuilder();
+            builder.append(scriptType.getDescriptor());
+            builder.append(MULTISIG.getDescriptor());
             builder.append(threshold);
             for(Keystore keystore : keystores) {
                 builder.append(",").append(keystore.getScriptName());
             }
-            builder.append(")");
+            builder.append(MULTISIG.getCloseDescriptor());
+            builder.append(scriptType.getCloseDescriptor());
             return new Policy(new Miniscript(builder.toString()));
         }
 

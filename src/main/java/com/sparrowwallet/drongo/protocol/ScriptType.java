@@ -58,12 +58,17 @@ public enum ScriptType {
 
         @Override
         public String getOutputDescriptor(ECKey key) {
-            return "pk(" + Utils.bytesToHex(key.getPubKey()) + ")";
+            return getDescriptor() + Utils.bytesToHex(key.getPubKey()) + getCloseDescriptor();
         }
 
         @Override
         public String getOutputDescriptor(Script script) {
             throw new ProtocolException("No script derived output descriptor for non pay to script type");
+        }
+
+        @Override
+        public String getDescriptor() {
+            return "pk(";
         }
 
         @Override
@@ -165,12 +170,17 @@ public enum ScriptType {
 
         @Override
         public String getOutputDescriptor(ECKey key) {
-            return "pkh(" + Utils.bytesToHex(key.getPubKey()) + ")";
+            return getDescriptor() + Utils.bytesToHex(key.getPubKey()) + getCloseDescriptor();
         }
 
         @Override
         public String getOutputDescriptor(Script script) {
             throw new ProtocolException("No script derived output descriptor for non pay to script type");
+        }
+
+        @Override
+        public String getDescriptor() {
+            return "pkh(";
         }
 
         @Override
@@ -320,7 +330,12 @@ public enum ScriptType {
                 joiner.add(Utils.bytesToHex(pubKey));
             }
 
-            return "multi(" + threshold + "," + joiner.toString() + ")";
+            return getDescriptor() + threshold + "," + joiner.toString() + getCloseDescriptor();
+        }
+
+        @Override
+        public String getDescriptor() {
+            return "multi(";
         }
 
         @Override
@@ -461,7 +476,12 @@ public enum ScriptType {
                 throw new IllegalArgumentException("Can only create output descriptor from multisig script");
             }
 
-            return "sh(" + MULTISIG.getOutputDescriptor(script) + ")";
+            return getDescriptor() + MULTISIG.getOutputDescriptor(script) + getCloseDescriptor();
+        }
+
+        @Override
+        public String getDescriptor() {
+            return "sh(";
         }
 
         @Override
@@ -577,12 +597,17 @@ public enum ScriptType {
 
         @Override
         public String getOutputDescriptor(ECKey key) {
-            return "sh(wpkh(" + Utils.bytesToHex(key.getPubKey()) + "))";
+            return getDescriptor() + Utils.bytesToHex(key.getPubKey()) + getCloseDescriptor();
         }
 
         @Override
         public String getOutputDescriptor(Script script) {
             throw new ProtocolException("No script derived output descriptor for non pay to script type");
+        }
+
+        @Override
+        public String getDescriptor() {
+            return "sh(wpkh(";
         }
 
         @Override
@@ -676,7 +701,12 @@ public enum ScriptType {
                 throw new IllegalArgumentException("Can only create output descriptor from multisig script");
             }
 
-            return "sh(wsh(" + MULTISIG.getOutputDescriptor(script) + "))";
+            return getDescriptor() + MULTISIG.getOutputDescriptor(script) + getCloseDescriptor();
+        }
+
+        @Override
+        public String getDescriptor() {
+            return "sh(wsh(";
         }
 
         @Override
@@ -765,12 +795,17 @@ public enum ScriptType {
 
         @Override
         public String getOutputDescriptor(ECKey key) {
-            return "wpkh(" + Utils.bytesToHex(key.getPubKey()) + ")";
+            return getDescriptor() + Utils.bytesToHex(key.getPubKey()) + getCloseDescriptor();
         }
 
         @Override
         public String getOutputDescriptor(Script script) {
             throw new ProtocolException("No script derived output descriptor for non pay to script type");
+        }
+
+        @Override
+        public String getDescriptor() {
+            return "wpkh(";
         }
 
         @Override
@@ -874,7 +909,12 @@ public enum ScriptType {
                 throw new IllegalArgumentException("Can only create output descriptor from multisig script");
             }
 
-            return "wsh(" + MULTISIG.getOutputDescriptor(script) + ")";
+            return getDescriptor() + MULTISIG.getOutputDescriptor(script) + getCloseDescriptor();
+        }
+
+        @Override
+        public String getDescriptor() {
+            return "wsh(";
         }
 
         @Override
@@ -1003,6 +1043,12 @@ public enum ScriptType {
 
     public abstract String getOutputDescriptor(Script script);
 
+    public abstract String getDescriptor();
+
+    public String getCloseDescriptor() {
+        return getDescriptor().chars().filter(ch -> ch == '(').boxed().map(n -> ")").collect(Collectors.joining());
+    }
+
     public abstract boolean isScriptType(Script script);
 
     public abstract byte[] getHashFromScript(Script script);
@@ -1048,6 +1094,16 @@ public enum ScriptType {
     public static ScriptType getType(Script script) {
         for(ScriptType type : values()) {
             if(type.isScriptType(script)) {
+                return type;
+            }
+        }
+
+        return null;
+    }
+
+    public static ScriptType fromDescriptor(String descriptor) {
+        for(ScriptType type : values()) {
+            if(type.getDescriptor().equals(descriptor.toLowerCase())) {
                 return type;
             }
         }
