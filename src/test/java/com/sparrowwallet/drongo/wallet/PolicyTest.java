@@ -28,15 +28,15 @@ public class PolicyTest {
         Assert.assertEquals(1, policy3.getNumSignaturesRequired());
 
         Policy policy4 = Policy.getPolicy(PolicyType.MULTI, ScriptType.P2SH, List.of(keystore1, keystore2, keystore3), 2);
-        Assert.assertEquals("sh(multi(2,keystore1,keystore2,keystore3))", policy4.getMiniscript().toString());
+        Assert.assertEquals("sh(sortedmulti(2,keystore1,keystore2,keystore3))", policy4.getMiniscript().toString());
         Assert.assertEquals(2, policy4.getNumSignaturesRequired());
 
         Policy policy5 = Policy.getPolicy(PolicyType.MULTI, ScriptType.P2SH_P2WSH, List.of(keystore1, keystore2, keystore3), 2);
-        Assert.assertEquals("sh(wsh(multi(2,keystore1,keystore2,keystore3)))", policy5.getMiniscript().toString());
+        Assert.assertEquals("sh(wsh(sortedmulti(2,keystore1,keystore2,keystore3)))", policy5.getMiniscript().toString());
         Assert.assertEquals(2, policy5.getNumSignaturesRequired());
 
         Policy policy6 = Policy.getPolicy(PolicyType.MULTI, ScriptType.P2WSH, List.of(keystore1, keystore2, keystore3), 2);
-        Assert.assertEquals("wsh(multi(2,keystore1,keystore2,keystore3))", policy6.getMiniscript().toString());
+        Assert.assertEquals("wsh(sortedmulti(2,keystore1,keystore2,keystore3))", policy6.getMiniscript().toString());
         Assert.assertEquals(2, policy6.getNumSignaturesRequired());
     }
 }

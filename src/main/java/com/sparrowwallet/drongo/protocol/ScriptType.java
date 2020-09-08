@@ -335,7 +335,7 @@ public enum ScriptType {
 
         @Override
         public String getDescriptor() {
-            return "multi(";
+            return "sortedmulti(";
         }
 
         @Override
