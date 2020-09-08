@@ -13,6 +13,7 @@ import com.sparrowwallet.drongo.wallet.KeystoreSource;
 import com.sparrowwallet.drongo.wallet.Wallet;
 import com.sparrowwallet.drongo.wallet.WalletModel;
 
+import java.math.BigInteger;
 import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -20,9 +21,13 @@ import java.util.regex.Pattern;
 import static com.sparrowwallet.drongo.KeyDerivation.parsePath;
 
 public class OutputDescriptor {
-    private static final Pattern XPUB_PATTERN = Pattern.compile("(\\[[^\\]]+\\])?(.pub[^/\\)]{100,112})(/[/\\d*'hH]+)?");
+    private static final String INPUT_CHARSET = "0123456789()[],'/*abcdefgh@:$%{}IJKLMNOPQRSTUVWXYZ&+-.;<=>?!^_|~ijklmnopqrstuvwxyzABCDEFGH`#\"\\ ";
+    private static final String CHECKSUM_CHARSET = "qpzry9x8gf2tvdw0s3jn54khce6mua7l";
+
+    private static final Pattern XPUB_PATTERN = Pattern.compile("(\\[[^\\]]+\\])?(.pub[^/\\,)]{100,112})(/[/\\d*'hH]+)?");
     private static final Pattern MULTI_PATTERN = Pattern.compile("multi\\(([\\d+])");
     private static final Pattern KEY_ORIGIN_PATTERN = Pattern.compile("\\[([A-Fa-f0-9]{8})([/\\d'hH]+)\\]");
+    private static final Pattern CHECKSUM_PATTERN = Pattern.compile("#([" + CHECKSUM_CHARSET + "]{8})$");
 
     private final ScriptType scriptType;
     private final int multisigThreshold;
@@ -65,11 +70,15 @@ public class OutputDescriptor {
     }
 
     public boolean describesMultipleAddresses(ExtendedKey extendedPublicKey) {
-        return getChildDerivationPath(extendedPublicKey).endsWith("/*");
+        return getChildDerivationPath(extendedPublicKey) == null || getChildDerivationPath(extendedPublicKey).endsWith("/*");
     }
 
     public List<ChildNumber> getReceivingDerivation(ExtendedKey extendedPublicKey, int wildCardReplacement) {
         String childDerivationPath = getChildDerivationPath(extendedPublicKey);
+        if(childDerivationPath == null) {
+            childDerivationPath = "/0/*";
+        }
+
         if(describesMultipleAddresses(extendedPublicKey)) {
             if(childDerivationPath.endsWith("0/*")) {
                 return getChildDerivation(extendedPublicKey.getKey().getChildNumber(), childDerivationPath, wildCardReplacement);
@@ -85,6 +94,10 @@ public class OutputDescriptor {
 
     public List<ChildNumber> getChangeDerivation(ExtendedKey extendedPublicKey, int wildCardReplacement) {
         String childDerivationPath = getChildDerivationPath(extendedPublicKey);
+        if(childDerivationPath == null) {
+            childDerivationPath = "/1/*";
+        }
+
         if(describesMultipleAddresses(extendedPublicKey)) {
             if(childDerivationPath.endsWith("0/*")) {
                 return getChildDerivation(extendedPublicKey.getKey().getChildNumber(), childDerivationPath.replace("0/*", "1/*"), wildCardReplacement);
@@ -273,6 +286,15 @@ public class OutputDescriptor {
     }
 
     private static OutputDescriptor getOutputDescriptorImpl(ScriptType scriptType, int multisigThreshold, String descriptor) {
+        Matcher checksumMatcher = CHECKSUM_PATTERN.matcher(descriptor);
+        if(checksumMatcher.find()) {
+            String checksum = checksumMatcher.group(1);
+            String calculatedChecksum = getChecksum(descriptor.substring(0, checksumMatcher.start()));
+            if(!checksum.equals(calculatedChecksum)) {
+                throw new IllegalArgumentException("Descriptor checksum invalid - checksum of " + checksum + " did not match calculated checksum of " + calculatedChecksum);
+            }
+        }
+
         Map<ExtendedKey, KeyDerivation> keyDerivationMap = new LinkedHashMap<>();
         Map<ExtendedKey, String> keyChildDerivationMap = new LinkedHashMap<>();
         Matcher matcher = XPUB_PATTERN.matcher(descriptor);
@@ -280,7 +302,7 @@ public class OutputDescriptor {
             String masterFingerprint = null;
             String keyDerivationPath = null;
             String extPubKey;
-            String childDerivationPath = "/0/*";
+            String childDerivationPath = null;
 
             if(matcher.group(1) != null) {
                 String keyOrigin = matcher.group(1);
@@ -309,7 +331,74 @@ public class OutputDescriptor {
         return new OutputDescriptor(scriptType, multisigThreshold, keyDerivationMap, keyChildDerivationMap);
     }
 
+    private static String getChecksum(String descriptor) {
+        BigInteger c = BigInteger.valueOf(1);
+        int cls = 0;
+        int clscount = 0;
+        for(int i = 0; i < descriptor.length(); i++) {
+            char ch = descriptor.charAt(i);
+            int pos = INPUT_CHARSET.indexOf(ch);
+
+            if(pos < 0) {
+                return "";
+            }
+
+            c = polyMod(c, pos & 31); // Emit a symbol for the position inside the group, for every character.
+            cls = cls * 3 + (pos >> 5); // Accumulate the group numbers
+            if(++clscount == 3) {
+                // Emit an extra symbol representing the group numbers, for every 3 characters.
+                c = polyMod(c, cls);
+                cls = 0;
+                clscount = 0;
+            }
+        }
+
+        if(clscount > 0) {
+            c = polyMod(c, cls);
+        }
+        for(int j = 0; j < 8; ++j) {
+            c = polyMod(c, 0); // Shift further to determine the checksum.
+        }
+        c = c.xor(BigInteger.valueOf(1)); // Prevent appending zeroes from not affecting the checksum.
+
+        StringBuilder ret = new StringBuilder();
+        for(int j = 0; j < 8; ++j) {
+            BigInteger index = c.shiftRight(5 * (7 - j)).and(BigInteger.valueOf(31));
+            ret.append(CHECKSUM_CHARSET.charAt(index.intValue()));
+        }
+
+        return ret.toString();
+    }
+
+    private static BigInteger polyMod(BigInteger c, int val)
+    {
+        byte c0 = c.shiftRight(35).byteValue();
+        c = c.and(new BigInteger("7ffffffff", 16)).shiftLeft(5).or(BigInteger.valueOf(val));
+
+        if((c0 & 1) > 0) {
+            c = c.xor(new BigInteger("f5dee51989", 16));
+        }
+        if((c0 & 2) > 0) {
+            c = c.xor(new BigInteger("a9fdca3312", 16));
+        }
+        if((c0 & 4) > 0) {
+            c = c.xor(new BigInteger("1bab10e32d", 16));
+        }
+        if((c0 & 8) > 0) {
+            c = c.xor(new BigInteger("3706b1677a", 16));
+        }
+        if((c0 & 16) > 0) {
+            c = c.xor(new BigInteger("644d626ffd", 16));
+        }
+
+        return c;
+    }
+
     public String toString() {
+        return toString(false);
+    }
+
+    public String toString(boolean addChecksum) {
         StringBuilder builder = new StringBuilder();
         builder.append(scriptType.getDescriptor());
 
@@ -328,6 +417,12 @@ public class OutputDescriptor {
             builder.append(toString(extendedPublicKey));
         }
         builder.append(scriptType.getCloseDescriptor());
+
+        if(addChecksum) {
+            String descriptor = builder.toString();
+            builder.append("#");
+            builder.append(getChecksum(descriptor));
+        }
 
         return builder.toString();
     }
