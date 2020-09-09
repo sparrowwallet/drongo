@@ -2,7 +2,6 @@ package com.sparrowwallet.drongo.wallet;
 
 import com.sparrowwallet.drongo.BitcoinUnit;
 import com.sparrowwallet.drongo.KeyPurpose;
-import com.sparrowwallet.drongo.Utils;
 import com.sparrowwallet.drongo.address.Address;
 import com.sparrowwallet.drongo.crypto.ECKey;
 import com.sparrowwallet.drongo.crypto.Key;
@@ -29,6 +28,7 @@ public class Wallet {
     private final TreeSet<WalletNode> purposeNodes = new TreeSet<>();
     private final Map<Sha256Hash, BlockTransaction> transactions = new HashMap<>();
     private Integer storedBlockHeight;
+    private Integer gapLimit;
 
     public Wallet() {
     }
@@ -103,6 +103,14 @@ public class Wallet {
         this.storedBlockHeight = storedBlockHeight;
     }
 
+    public int getGapLimit() {
+        return gapLimit == null ? DEFAULT_LOOKAHEAD : gapLimit;
+    }
+
+    public void setGapLimit(int gapLimit) {
+        this.gapLimit = gapLimit;
+    }
+
     public synchronized WalletNode getNode(KeyPurpose keyPurpose) {
         WalletNode purposeNode;
         Optional<WalletNode> optionalPurposeNode = purposeNodes.stream().filter(node -> node.getKeyPurpose().equals(keyPurpose)).findFirst();
@@ -118,10 +126,10 @@ public class Wallet {
     }
 
     public int getLookAheadIndex(WalletNode node) {
-        int lookAheadIndex = DEFAULT_LOOKAHEAD - 1;
+        int lookAheadIndex = getGapLimit() - 1;
         Integer highestUsed = node.getHighestUsedIndex();
         if(highestUsed != null) {
-            lookAheadIndex = highestUsed + DEFAULT_LOOKAHEAD;
+            lookAheadIndex = highestUsed + getGapLimit();
         }
 
         return lookAheadIndex;
@@ -863,6 +871,7 @@ public class Wallet {
             copy.transactions.put(hash, transactions.get(hash));
         }
         copy.setStoredBlockHeight(getStoredBlockHeight());
+        copy.gapLimit = gapLimit;
 
         return copy;
     }
