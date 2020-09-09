@@ -66,6 +66,25 @@ public class WalletTest {
         wallet.makeLabelsUnique(eekeystore2);
         Assert.assertEquals("Electrum 1", eekeystore.getLabel());
         Assert.assertEquals("Electrum 2", eekeystore2.getLabel());
+
+        Keystore defaultKeystore = new Keystore();
+        wallet.getKeystores().add(defaultKeystore);
+        Keystore defaultKeystore2 = new Keystore();
+        wallet.makeLabelsUnique(defaultKeystore2);
+        Assert.assertEquals("Keystore 2", defaultKeystore2.getLabel());
+        wallet.getKeystores().add(defaultKeystore2);
+        Keystore defaultKeystore3 = new Keystore();
+        wallet.makeLabelsUnique(defaultKeystore3);
+        Assert.assertEquals("Keystore 3", defaultKeystore3.getLabel());
+        wallet.getKeystores().add(defaultKeystore3);
+        Keystore defaultKeystore4 = new Keystore("Keystore");
+        wallet.makeLabelsUnique(defaultKeystore4);
+        Assert.assertEquals("Keystore 4", defaultKeystore4.getLabel());
+        wallet.getKeystores().add(defaultKeystore4);
+        Keystore defaultKeystore5 = new Keystore("Keystore 4");
+        wallet.makeLabelsUnique(defaultKeystore5);
+        Assert.assertEquals("Keystore 4 2", defaultKeystore5.getLabel());
+        wallet.getKeystores().add(defaultKeystore5);
     }
 
     @Test

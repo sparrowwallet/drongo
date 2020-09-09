@@ -776,7 +776,7 @@ public class Wallet {
             return false;
         }
 
-        if(policyType.equals(PolicyType.MULTI) && (numSigs <= 1 || numSigs > keystores.size())) {
+        if(policyType.equals(PolicyType.MULTI) && (numSigs < 1 || numSigs > keystores.size())) {
             return false;
         }
 
@@ -819,9 +819,10 @@ public class Wallet {
     private int makeLabelsUnique(Keystore newKeystore, boolean duplicateFound) {
         int max = 0;
         for(Keystore keystore : getKeystores()) {
-            if(newKeystore != keystore && keystore.getLabel().startsWith(newKeystore.getLabel())) {
+            String newKeystoreLabel = newKeystore.getLabel().equals(Keystore.DEFAULT_LABEL) ? Keystore.DEFAULT_LABEL.substring(0, Keystore.DEFAULT_LABEL.length() - 2) : newKeystore.getLabel();
+            if(newKeystore != keystore && keystore.getLabel().startsWith(newKeystoreLabel)) {
                 duplicateFound = true;
-                String remainder = keystore.getLabel().substring(newKeystore.getLabel().length());
+                String remainder = keystore.getLabel().substring(newKeystoreLabel.length());
                 if(remainder.length() == 0) {
                     max = makeLabelsUnique(keystore, true);
                 } else {
@@ -837,7 +838,11 @@ public class Wallet {
 
         if(duplicateFound) {
             max++;
-            newKeystore.setLabel(newKeystore.getLabel() + " " + max);
+            if(newKeystore.getLabel().equals(Keystore.DEFAULT_LABEL)) {
+                newKeystore.setLabel(Keystore.DEFAULT_LABEL.substring(0, Keystore.DEFAULT_LABEL.length() - 2) + " " + max);
+            } else {
+                newKeystore.setLabel(newKeystore.getLabel() + " " + max);
+            }
         }
 
         return max;
