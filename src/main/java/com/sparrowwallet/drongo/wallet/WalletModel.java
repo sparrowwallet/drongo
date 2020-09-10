@@ -23,6 +23,14 @@ public enum WalletModel {
         return this.toString().toLowerCase();
     }
 
+    public boolean requiresPinPrompt() {
+        return (this == TREZOR_1 || this == KEEPKEY);
+    }
+
+    public boolean externalPassphraseEntry() {
+        return (this == TREZOR_1 || this == KEEPKEY);
+    }
+
     public static WalletModel fromType(String type) {
         for(WalletModel model : values()) {
             if(model.getType().equalsIgnoreCase(type)) {
