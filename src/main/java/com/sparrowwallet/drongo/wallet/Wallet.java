@@ -91,7 +91,6 @@ public class Wallet {
             optionalLabel.ifPresent(blockTx::setLabel);
         }
 
-        transactions.clear();
         transactions.putAll(updatedTransactions);
     }
 
