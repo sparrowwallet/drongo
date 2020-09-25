@@ -82,6 +82,10 @@ public class WalletTransaction {
         return fee;
     }
 
+    public double getFeeRate() {
+        return (double)fee / transaction.getVirtualSize();
+    }
+
     public long getTotal() {
         return selectedUtxos.keySet().stream().mapToLong(BlockTransactionHashIndex::getValue).sum();
     }
