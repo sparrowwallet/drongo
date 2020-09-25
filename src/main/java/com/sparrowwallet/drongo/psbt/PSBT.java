@@ -31,6 +31,8 @@ public class PSBT {
     private static final int STATE_OUTPUTS = 3;
     private static final int STATE_END = 4;
 
+    private Network network;
+
     private int inputs = 0;
     private int outputs = 0;
 
@@ -46,7 +48,8 @@ public class PSBT {
 
     private static final Logger log = LoggerFactory.getLogger(PSBT.class);
 
-    public PSBT(Transaction transaction) {
+    public PSBT(Network network, Transaction transaction) {
+        this.network = network;
         this.transaction = transaction;
 
         for(int i = 0; i < transaction.getInputs().size(); i++) {
@@ -64,6 +67,7 @@ public class PSBT {
 
     public PSBT(WalletTransaction walletTransaction, Integer version, boolean includeGlobalXpubs) {
         Wallet wallet = walletTransaction.getWallet();
+        this.network = wallet.getNetwork();
 
         transaction = new Transaction(walletTransaction.getTransaction().bitcoinSerialize());
 
@@ -119,7 +123,7 @@ public class PSBT {
         List<WalletNode> outputNodes = new ArrayList<>();
         for(TransactionOutput txOutput : transaction.getOutputs()) {
             try {
-                Address address = txOutput.getScript().getToAddresses()[0];
+                Address address = txOutput.getScript().getToAddresses(network)[0];
                 if(address.equals(walletTransaction.getRecipientAddress())) {
                     outputNodes.add(wallet.getWalletAddresses().getOrDefault(walletTransaction.getRecipientAddress(), null));
                 } else if(address.equals(wallet.getAddress(walletTransaction.getChangeNode()))) {
@@ -164,7 +168,8 @@ public class PSBT {
         }
     }
 
-    public PSBT(byte[] psbt) throws PSBTParseException {
+    public PSBT(Network network, byte[] psbt) throws PSBTParseException {
+        this.network = network;
         this.psbtBytes = psbt;
         parse();
     }
@@ -279,7 +284,7 @@ public class PSBT {
                     }
                     for(TransactionOutput output: transaction.getOutputs()) {
                         try {
-                            log.debug(" Transaction output value: " + output.getValue() + " to addresses " + Arrays.asList(output.getScript().getToAddresses()) + " with script hex " + Utils.bytesToHex(output.getScript().getProgram()) + " to script " + output.getScript());
+                            log.debug(" Transaction output value: " + output.getValue() + " to addresses " + Arrays.asList(output.getScript().getToAddresses(network)) + " with script hex " + Utils.bytesToHex(output.getScript().getProgram()) + " to script " + output.getScript());
                         } catch(NonStandardScriptException e) {
                             log.debug(" Transaction output value: " + output.getValue() + " with script hex " + Utils.bytesToHex(output.getScript().getProgram()) + " to script " + output.getScript());
                         }
@@ -317,7 +322,7 @@ public class PSBT {
             }
 
             int inputIndex = this.psbtInputs.size();
-            PSBTInput input = new PSBTInput(inputEntries, transaction, inputIndex);
+            PSBTInput input = new PSBTInput(network, inputEntries, transaction, inputIndex);
 
             boolean verified = input.verifySignatures();
             if(!verified && input.getPartialSignatures().size() > 0) {
@@ -586,7 +591,7 @@ public class PSBT {
         }
     }
 
-    public static PSBT fromString(String strPSBT) throws PSBTParseException {
+    public static PSBT fromString(Network network, String strPSBT) throws PSBTParseException {
         if (!isPSBT(strPSBT)) {
             throw new PSBTParseException("Provided string is not a PSBT");
         }
@@ -596,6 +601,6 @@ public class PSBT {
         }
 
         byte[] psbtBytes = Utils.hexToBytes(strPSBT);
-        return new PSBT(psbtBytes);
+        return new PSBT(network, psbtBytes);
     }
 }

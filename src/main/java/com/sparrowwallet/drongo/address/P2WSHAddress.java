@@ -2,11 +2,11 @@ package com.sparrowwallet.drongo.address;
 
 import com.sparrowwallet.drongo.protocol.*;
 
-import static com.sparrowwallet.drongo.address.P2WPKHAddress.HRP;
+import com.sparrowwallet.drongo.protocol.Network;
 
 public class P2WSHAddress extends Address {
-    public P2WSHAddress(byte[] scriptHash) {
-        super(scriptHash);
+    public P2WSHAddress(Network network, byte[] scriptHash) {
+        super(network, scriptHash);
     }
 
     public int getVersion() {
@@ -14,7 +14,7 @@ public class P2WSHAddress extends Address {
     }
 
     public String getAddress() {
-        return Bech32.encode(HRP, getVersion(), hash);
+        return Bech32.encode(network.hrp, getVersion(), hash);
     }
 
     public ScriptType getScriptType() {
@@ -36,7 +36,7 @@ public class P2WSHAddress extends Address {
         return "Witness Script Hash";
     }
 
-    public static P2WSHAddress fromProgram(byte[] program) {
-        return new P2WSHAddress(Sha256Hash.hash(program));
+    public static P2WSHAddress fromProgram(Network network, byte[] program) {
+        return new P2WSHAddress(network, Sha256Hash.hash(program));
     }
 }

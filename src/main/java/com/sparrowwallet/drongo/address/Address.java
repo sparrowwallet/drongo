@@ -2,18 +2,24 @@ package com.sparrowwallet.drongo.address;
 
 import com.sparrowwallet.drongo.protocol.Base58;
 import com.sparrowwallet.drongo.protocol.Bech32;
+import com.sparrowwallet.drongo.protocol.Network;
 import com.sparrowwallet.drongo.protocol.Script;
 import com.sparrowwallet.drongo.protocol.ScriptType;
 
+import java.io.Console;
 import java.util.Arrays;
 
-import static com.sparrowwallet.drongo.address.P2WPKHAddress.HRP;
-
 public abstract class Address {
+    protected final Network network;
     protected final byte[] hash;
 
-    public Address(byte[] hash) {
+    public Address(Network network, byte[] hash) {
+        this.network = network;
         this.hash = hash;
+    }
+
+    public Network getNetwork() {
+        return network;
     }
 
     public byte[] getHash() {
@@ -51,20 +57,20 @@ public abstract class Address {
         return getAddress().hashCode();
     }
 
-    public static Address fromString(String address) throws InvalidAddressException {
+    public static Address fromString(Network network, String address) throws InvalidAddressException {
         Exception nested = null;
 
-        if(address != null && (address.startsWith("1") || address.startsWith("3"))) {
+        if(address != null && address.length() > 0 && network.legacyPrefixes.contains(String.valueOf(address.charAt(0)))) {
             try {
                 byte[] decodedBytes = Base58.decodeChecked(address);
                 if(decodedBytes.length == 21) {
-                    int version = decodedBytes[0];
+                    int version = Byte.toUnsignedInt(decodedBytes[0]);
                     byte[] hash = Arrays.copyOfRange(decodedBytes, 1, 21);
-                    if(version == 0) {
-                        return new P2PKHAddress(hash);
+                    if(version == network.pkhVersion) {
+                        return new P2PKHAddress(network, hash);
                     }
-                    if(version == 5) {
-                        return new P2SHAddress(hash);
+                    if(version == network.shVersion) {
+                        return new P2SHAddress(network, hash);
                     }
                 }
             } catch (Exception e) {
@@ -72,19 +78,19 @@ public abstract class Address {
             }
         }
 
-        if(address != null && address.startsWith(HRP)) {
+        if(address != null && address.startsWith(network.hrp)) {
             try {
                 Bech32.Bech32Data data = Bech32.decode(address);
-                if (data.hrp.equals(HRP)) {
+                if (data.hrp.equals(network.hrp)) {
                     int witnessVersion = data.data[0];
                     if (witnessVersion == 0) {
                         byte[] convertedProgram = Arrays.copyOfRange(data.data, 1, data.data.length);
                         byte[] witnessProgram = Bech32.convertBits(convertedProgram, 0, convertedProgram.length, 5, 8, false);
                         if (witnessProgram.length == 20) {
-                            return new P2WPKHAddress(witnessProgram);
+                            return new P2WPKHAddress(network, witnessProgram);
                         }
                         if (witnessProgram.length == 32) {
-                            return new P2WSHAddress(witnessProgram);
+                            return new P2WSHAddress(network, witnessProgram);
                         }
                     }
                 }

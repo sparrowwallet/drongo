@@ -3,6 +3,7 @@ package com.sparrowwallet.drongo.protocol;
 import com.sparrowwallet.drongo.Utils;
 import com.sparrowwallet.drongo.address.*;
 import com.sparrowwallet.drongo.crypto.ECKey;
+import com.sparrowwallet.drongo.protocol.Network;
 import org.bouncycastle.util.encoders.Hex;
 
 import java.io.ByteArrayInputStream;
@@ -153,22 +154,22 @@ public class Script {
     /**
      * Gets the destination address from this script, if it's in the required form.
      */
-    public Address[] getToAddresses() throws NonStandardScriptException {
+    public Address[] getToAddresses(Network network) throws NonStandardScriptException {
         for(ScriptType scriptType : SINGLE_HASH_TYPES) {
             if(scriptType.isScriptType(this)) {
-                return new Address[] { scriptType.getAddress(scriptType.getHashFromScript(this)) };
+                return new Address[] { scriptType.getAddress(network, scriptType.getHashFromScript(this)) };
             }
         }
 
         if(P2PK.isScriptType(this)) {
-            return new Address[] { P2PK.getAddress(P2PK.getPublicKeyFromScript(this).getPubKey()) };
+            return new Address[] { P2PK.getAddress(network, P2PK.getPublicKeyFromScript(this).getPubKey()) };
         }
 
         if(MULTISIG.isScriptType(this)) {
             List<Address> addresses = new ArrayList<>();
             ECKey[] pubKeys = MULTISIG.getPublicKeysFromScript(this);
             for(ECKey pubKey : pubKeys) {
-                addresses.add(new P2PKAddress(pubKey.getPubKey()));
+                addresses.add(new P2PKAddress(network, pubKey.getPubKey()));
             }
 
             return addresses.toArray(new Address[addresses.size()]);

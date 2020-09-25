@@ -5,6 +5,7 @@ import com.sparrowwallet.drongo.crypto.ECKey;
 import com.sparrowwallet.drongo.policy.Miniscript;
 import com.sparrowwallet.drongo.policy.Policy;
 import com.sparrowwallet.drongo.policy.PolicyType;
+import com.sparrowwallet.drongo.protocol.Network;
 import com.sparrowwallet.drongo.protocol.NonStandardScriptException;
 import com.sparrowwallet.drongo.protocol.Script;
 import com.sparrowwallet.drongo.protocol.ScriptType;
@@ -25,8 +26,8 @@ public class FinalizingPSBTWallet extends Wallet {
     private final Map<WalletNode, List<ECKey>> signedNodeKeys = new LinkedHashMap<>();
     private int numSignatures;
 
-    public FinalizingPSBTWallet(PSBT psbt) {
-        super("Finalizing PSBT Wallet");
+    public FinalizingPSBTWallet(Network network, PSBT psbt) {
+        super(network, "Finalizing PSBT Wallet");
 
         if(!psbt.isSigned()) {
             throw new IllegalArgumentException("Only a fully signed or finalized PSBT can be used");

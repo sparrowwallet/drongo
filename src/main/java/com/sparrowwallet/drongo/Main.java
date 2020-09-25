@@ -8,6 +8,8 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.util.*;
 
+import com.sparrowwallet.drongo.protocol.Network;
+
 public class Main {
     private static final Logger log = LoggerFactory.getLogger(Main.class);
 
@@ -27,6 +29,8 @@ public class Main {
         } catch (IOException e) {
             log.error("Could not load properties from provided path " + propertiesFile);
         }
+
+        Network network = Network.valueOf(properties.getProperty("network", Network.BITCOIN.name()));
 
         String nodeZmqAddress = properties.getProperty("node.zmqpubrawtx");
         if(nodeZmqAddress == null) {
@@ -61,15 +65,16 @@ public class Main {
             System.exit(1);
         }
 
-        Drongo drongo = new Drongo(nodeZmqAddress, rpcConnection, watchWallets, notifyRecipients.split(","));
+        Drongo drongo = new Drongo(network, nodeZmqAddress, rpcConnection, watchWallets, notifyRecipients.split(","));
         drongo.start();
     }
 
     private static WatchWallet getWalletFromProperties(Properties properties, int walletNumber) {
+        Network network = Network.valueOf(properties.getProperty("network", Network.BITCOIN.name()));
         String walletName = properties.getProperty("wallet.name." + walletNumber);
         String walletDescriptor = properties.getProperty("wallet.descriptor." + walletNumber);
         if(walletName != null && walletDescriptor != null) {
-            return new WatchWallet(walletName, walletDescriptor);
+            return new WatchWallet(network, walletName, walletDescriptor);
         }
 
         return null;

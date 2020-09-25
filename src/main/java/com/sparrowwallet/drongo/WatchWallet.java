@@ -2,6 +2,7 @@ package com.sparrowwallet.drongo;
 
 import com.sparrowwallet.drongo.address.Address;
 import com.sparrowwallet.drongo.crypto.*;
+import com.sparrowwallet.drongo.protocol.Network;
 
 import java.util.HashMap;
 import java.util.List;
@@ -14,9 +15,9 @@ public class WatchWallet {
 
     private HashMap<Address,List<ChildNumber>> addresses = new HashMap<>(LOOK_AHEAD_LIMIT*2);
 
-    public WatchWallet(String name, String descriptor) {
+    public WatchWallet(Network network, String name, String descriptor) {
         this.name = name;
-        this.outputDescriptor = OutputDescriptor.getOutputDescriptor(descriptor);
+        this.outputDescriptor = OutputDescriptor.getOutputDescriptor(network, descriptor);
     }
 
     public void initialiseAddresses() {

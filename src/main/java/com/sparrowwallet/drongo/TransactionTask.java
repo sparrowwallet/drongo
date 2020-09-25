@@ -45,7 +45,7 @@ public class TransactionTask implements Runnable {
                 TransactionOutput referencedOutput = referencedTransaction.getOutputs().get((int)referencedVout);
                 if(referencedOutput.getScript().containsToAddress()) {
                     try {
-                        Address[] inputAddresses = referencedOutput.getScript().getToAddresses();
+                        Address[] inputAddresses = referencedOutput.getScript().getToAddresses(drongo.getNetwork());
                         input.getOutpoint().setAddresses(inputAddresses);
                         inputJoiner.add((inputAddresses.length == 1 ? inputAddresses[0] : Arrays.asList(inputAddresses)) + ":" + vin);
                     } catch(NonStandardScriptException e) {
@@ -67,7 +67,7 @@ public class TransactionTask implements Runnable {
             try {
                 if(output.getScript().containsToAddress()) {
                     try {
-                        Address[] outputAddresses = output.getScript().getToAddresses();
+                        Address[] outputAddresses = output.getScript().getToAddresses(drongo.getNetwork());
                         output.setAddresses(outputAddresses);
                         outputJoiner.add((outputAddresses.length == 1 ? outputAddresses[0] : Arrays.asList(outputAddresses)) + ":" + vout + " (" + output.getValue() + ")");
                     } catch(NonStandardScriptException e) {

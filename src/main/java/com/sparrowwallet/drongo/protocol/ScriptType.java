@@ -6,6 +6,7 @@ import com.sparrowwallet.drongo.address.*;
 import com.sparrowwallet.drongo.crypto.ChildNumber;
 import com.sparrowwallet.drongo.crypto.ECKey;
 import com.sparrowwallet.drongo.policy.PolicyType;
+import com.sparrowwallet.drongo.protocol.Network;
 
 import java.util.*;
 import java.util.stream.Collectors;
@@ -18,23 +19,23 @@ import static com.sparrowwallet.drongo.protocol.Transaction.WITNESS_SCALE_FACTOR
 public enum ScriptType {
     P2PK("P2PK", "m/44'/0'/0'") {
         @Override
-        public Address getAddress(byte[] pubKey) {
-            return new P2PKAddress(pubKey);
+        public Address getAddress(Network network, byte[] pubKey) {
+            return new P2PKAddress(network, pubKey);
         }
 
         @Override
-        public Address getAddress(ECKey key) {
-            return getAddress(key.getPubKey());
+        public Address getAddress(Network network, ECKey key) {
+            return getAddress(network, key.getPubKey());
         }
 
         @Override
-        public Address getAddress(Script script) {
+        public Address getAddress(Network network, Script script) {
             throw new ProtocolException("No script derived address for non pay to script type");
         }
 
         @Override
-        public Address[] getAddresses(Script script) {
-            return new Address[] { getAddress(getPublicKeyFromScript(script).getPubKey()) };
+        public Address[] getAddresses(Network network, Script script) {
+            return new Address[] { getAddress(network, getPublicKeyFromScript(script).getPubKey()) };
         }
 
         @Override
@@ -132,17 +133,17 @@ public enum ScriptType {
     },
     P2PKH("P2PKH", "m/44'/0'/0'") {
         @Override
-        public Address getAddress(byte[] pubKeyHash) {
-            return new P2PKHAddress(pubKeyHash);
+        public Address getAddress(Network network, byte[] pubKeyHash) {
+            return new P2PKHAddress(network, pubKeyHash);
         }
 
         @Override
-        public Address getAddress(ECKey key) {
-            return getAddress(key.getPubKeyHash());
+        public Address getAddress(Network network, ECKey key) {
+            return getAddress(network, key.getPubKeyHash());
         }
 
         @Override
-        public Address getAddress(Script script) {
+        public Address getAddress(Network network, Script script) {
             throw new ProtocolException("No script derived address for non pay to script type");
         }
 
@@ -245,23 +246,23 @@ public enum ScriptType {
     },
     MULTISIG("Bare Multisig", "m/44'/0'/0'") {
         @Override
-        public Address getAddress(byte[] bytes) {
+        public Address getAddress(Network network, byte[] bytes) {
             throw new ProtocolException("No single address for multisig script type");
         }
 
         @Override
-        public Address getAddress(Script script) {
+        public Address getAddress(Network network, Script script) {
             throw new ProtocolException("No single address for multisig script type");
         }
 
         @Override
-        public Address getAddress(ECKey key) {
+        public Address getAddress(Network network, ECKey key) {
             throw new ProtocolException("No single key address for multisig script type");
         }
 
         @Override
-        public Address[] getAddresses(Script script) {
-            return Arrays.stream(getPublicKeysFromScript(script)).map(pubKey -> new P2PKAddress(pubKey.getPubKey())).toArray(Address[]::new);
+        public Address[] getAddresses(Network network, Script script) {
+            return Arrays.stream(getPublicKeysFromScript(script)).map(pubKey -> new P2PKAddress(network, pubKey.getPubKey())).toArray(Address[]::new);
         }
 
         @Override
@@ -431,18 +432,18 @@ public enum ScriptType {
     },
     P2SH("P2SH", "m/45'/0'/0'") {
         @Override
-        public Address getAddress(byte[] scriptHash) {
-            return new P2SHAddress(scriptHash);
+        public Address getAddress(Network network, byte[] scriptHash) {
+            return new P2SHAddress(network, scriptHash);
         }
 
         @Override
-        public Address getAddress(ECKey key) {
+        public Address getAddress(Network network, ECKey key) {
             throw new ProtocolException("No single key address for script hash type");
         }
 
         @Override
-        public Address getAddress(Script script) {
-            return getAddress(Utils.sha256hash160(script.getProgram()));
+        public Address getAddress(Network network, Script script) {
+            return getAddress(network, Utils.sha256hash160(script.getProgram()));
         }
 
         @Override
@@ -556,20 +557,20 @@ public enum ScriptType {
     },
     P2SH_P2WPKH("P2SH-P2WPKH", "m/49'/0'/0'") {
         @Override
-        public Address getAddress(byte[] scriptHash) {
-            return P2SH.getAddress(scriptHash);
+        public Address getAddress(Network network, byte[] scriptHash) {
+            return P2SH.getAddress(network, scriptHash);
         }
 
         @Override
-        public Address getAddress(ECKey key) {
+        public Address getAddress(Network network, ECKey key) {
             Script p2wpkhScript = P2WPKH.getOutputScript(key.getPubKeyHash());
-            return P2SH.getAddress(p2wpkhScript);
+            return P2SH.getAddress(network, p2wpkhScript);
         }
 
         @Override
-        public Address getAddress(Script script) {
+        public Address getAddress(Network network, Script script) {
             if(P2WPKH.isScriptType(script)) {
-                return P2SH.getAddress(script);
+                return P2SH.getAddress(network, script);
             }
 
             throw new ProtocolException("Provided script is not a P2WPKH script");
@@ -659,19 +660,19 @@ public enum ScriptType {
     },
     P2SH_P2WSH("P2SH-P2WSH", "m/48'/0'/0'/1'") {
         @Override
-        public Address getAddress(byte[] scriptHash) {
-            return P2SH.getAddress(scriptHash);
+        public Address getAddress(Network network, byte[] scriptHash) {
+            return P2SH.getAddress(network, scriptHash);
         }
 
         @Override
-        public Address getAddress(ECKey key) {
+        public Address getAddress(Network network, ECKey key) {
             throw new ProtocolException("No single key address for wrapped witness script hash type");
         }
 
         @Override
-        public Address getAddress(Script script) {
+        public Address getAddress(Network network, Script script) {
             Script p2wshScript = P2WSH.getOutputScript(script);
-            return P2SH.getAddress(p2wshScript);
+            return P2SH.getAddress(network, p2wshScript);
         }
 
         @Override
@@ -760,17 +761,17 @@ public enum ScriptType {
     },
     P2WPKH("P2WPKH", "m/84'/0'/0'") {
         @Override
-        public Address getAddress(byte[] pubKeyHash) {
-            return new P2WPKHAddress(pubKeyHash);
+        public Address getAddress(Network network, byte[] pubKeyHash) {
+            return new P2WPKHAddress(network, pubKeyHash);
         }
 
         @Override
-        public Address getAddress(ECKey key) {
-            return getAddress(key.getPubKeyHash());
+        public Address getAddress(Network network, ECKey key) {
+            return getAddress(network, key.getPubKeyHash());
         }
 
         @Override
-        public Address getAddress(Script script) {
+        public Address getAddress(Network network, Script script) {
             throw new ProtocolException("No script derived address for non pay to script type");
         }
 
@@ -865,18 +866,18 @@ public enum ScriptType {
     },
     P2WSH("P2WSH", "m/48'/0'/0'/2'") {
         @Override
-        public Address getAddress(byte[] scriptHash) {
-            return new P2WSHAddress(scriptHash);
+        public Address getAddress(Network network, byte[] scriptHash) {
+            return new P2WSHAddress(network, scriptHash);
         }
 
         @Override
-        public Address getAddress(ECKey key) {
+        public Address getAddress(Network network, ECKey key) {
             throw new ProtocolException("No single key address for witness script hash type");
         }
 
         @Override
-        public Address getAddress(Script script) {
-            return getAddress(Sha256Hash.hash(script.getProgram()));
+        public Address getAddress(Network network, Script script) {
+            return getAddress(network, Sha256Hash.hash(script.getProgram()));
         }
 
         @Override
@@ -1023,11 +1024,11 @@ public enum ScriptType {
         return getAllowedPolicyTypes().contains(policyType);
     }
 
-    public abstract Address getAddress(byte[] bytes);
+    public abstract Address getAddress(Network network, byte[] bytes);
 
-    public abstract Address getAddress(ECKey key);
+    public abstract Address getAddress(Network network, ECKey key);
 
-    public abstract Address getAddress(Script script);
+    public abstract Address getAddress(Network network, Script script);
 
     public abstract Script getOutputScript(byte[] bytes);
 
@@ -1053,8 +1054,8 @@ public enum ScriptType {
 
     public abstract byte[] getHashFromScript(Script script);
 
-    public Address[] getAddresses(Script script) {
-        return new Address[] { getAddress(getHashFromScript(script)) };
+    public Address[] getAddresses(Network network, Script script) {
+        return new Address[] { getAddress(network, getHashFromScript(script)) };
     }
 
     public ECKey getPublicKeyFromScript(Script script) {

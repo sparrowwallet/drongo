@@ -21,6 +21,7 @@ public class Wallet {
     public static final int DEFAULT_LOOKAHEAD = 20;
 
     private String name;
+    private Network network;
     private PolicyType policyType;
     private ScriptType scriptType;
     private Policy defaultPolicy;
@@ -30,19 +31,30 @@ public class Wallet {
     private Integer storedBlockHeight;
     private Integer gapLimit;
 
-    public Wallet() {
+    public Wallet(Network network) {
+        this.network = network;
     }
 
-    public Wallet(String name) {
+    public Wallet(Network network, String name) {
+        this.network = network;
         this.name = name;
     }
 
-    public Wallet(String name, PolicyType policyType, ScriptType scriptType) {
+    public Wallet(Network network, String name, PolicyType policyType, ScriptType scriptType) {
+        this.network = network;
         this.name = name;
         this.policyType = policyType;
         this.scriptType = scriptType;
         this.keystores = Collections.singletonList(new Keystore());
         this.defaultPolicy = Policy.getPolicy(policyType, scriptType, keystores, null);
+    }
+
+    public Network getNetwork() {
+        return network;
+    }
+
+    public void setNetwork(Network network) {
+        this.network = network;
     }
 
     public String getName() {
@@ -200,11 +212,11 @@ public class Wallet {
     public Address getAddress(KeyPurpose keyPurpose, int index) {
         if(policyType == PolicyType.SINGLE) {
             ECKey pubKey = getPubKey(keyPurpose, index);
-            return scriptType.getAddress(pubKey);
+            return scriptType.getAddress(network, pubKey);
         } else if(policyType == PolicyType.MULTI) {
             List<ECKey> pubKeys = getPubKeys(keyPurpose, index);
             Script script = ScriptType.MULTISIG.getOutputScript(defaultPolicy.getNumSignaturesRequired(), pubKeys);
-            return scriptType.getAddress(script);
+            return scriptType.getAddress(network, script);
         } else {
             throw new UnsupportedOperationException("Cannot determine addresses for custom policies");
         }
@@ -861,7 +873,7 @@ public class Wallet {
     }
 
     public Wallet copy() {
-        Wallet copy = new Wallet(name);
+        Wallet copy = new Wallet(network, name);
         copy.setPolicyType(policyType);
         copy.setScriptType(scriptType);
         copy.setDefaultPolicy(defaultPolicy.copy());
