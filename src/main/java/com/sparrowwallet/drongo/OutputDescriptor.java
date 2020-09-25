@@ -6,6 +6,7 @@ import com.sparrowwallet.drongo.crypto.DeterministicKey;
 import com.sparrowwallet.drongo.crypto.ECKey;
 import com.sparrowwallet.drongo.policy.Policy;
 import com.sparrowwallet.drongo.policy.PolicyType;
+import com.sparrowwallet.drongo.protocol.ProtocolException;
 import com.sparrowwallet.drongo.protocol.Script;
 import com.sparrowwallet.drongo.protocol.ScriptType;
 import com.sparrowwallet.drongo.wallet.Keystore;
@@ -323,9 +324,13 @@ public class OutputDescriptor {
             }
 
             KeyDerivation keyDerivation = new KeyDerivation(masterFingerprint, keyDerivationPath);
-            ExtendedKey extendedPublicKey = ExtendedKey.fromDescriptor(extPubKey);
-            keyDerivationMap.put(extendedPublicKey, keyDerivation);
-            keyChildDerivationMap.put(extendedPublicKey, childDerivationPath);
+            try {
+                ExtendedKey extendedPublicKey = ExtendedKey.fromDescriptor(extPubKey);
+                keyDerivationMap.put(extendedPublicKey, keyDerivation);
+                keyChildDerivationMap.put(extendedPublicKey, childDerivationPath);
+            } catch(ProtocolException e) {
+                throw new ProtocolException("Invalid xPub: " + e.getMessage());
+            }
         }
 
         return new OutputDescriptor(scriptType, multisigThreshold, keyDerivationMap, keyChildDerivationMap);
@@ -440,7 +445,10 @@ public class OutputDescriptor {
             keyBuilder.append("]");
         }
 
-        keyBuilder.append(pubKey.toString());
+        if(pubKey != null) {
+            keyBuilder.append(pubKey.toString());
+        }
+
         String childDerivation = mapChildrenDerivations.get(pubKey);
         if(childDerivation != null) {
             if(!childDerivation.startsWith("/")) {
