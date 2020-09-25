@@ -28,6 +28,9 @@ public class Transaction extends ChildMessage {
     //From: https://github.com/bitcoin/bitcoin/blob/0.19/src/policy/policy.h#L50
     public static final double DUST_RELAY_TX_FEE = 3d;
 
+    //Default min feerate, defined in sats/vByte
+    public static final double DEFAULT_MIN_RELAY_FEE = 1d;
+
     private long version;
     private long locktime;
     private boolean segwit;
