@@ -424,11 +424,11 @@ public class Wallet {
         return getFee(changeOutput, feeRate, longTermFeeRate);
     }
 
-    public WalletTransaction createWalletTransaction(List<UtxoSelector> utxoSelectors, Address recipientAddress, long recipientAmount, double feeRate, double longTermFeeRate, Long fee, Integer currentBlockHeight, boolean sendAll, boolean groupByAddress, boolean includeMempoolChange) throws InsufficientFundsException {
+    public WalletTransaction createWalletTransaction(List<UtxoSelector> utxoSelectors, List<UtxoFilter> utxoFilters, Address recipientAddress, long recipientAmount, double feeRate, double longTermFeeRate, Long fee, Integer currentBlockHeight, boolean sendAll, boolean groupByAddress, boolean includeMempoolChange) throws InsufficientFundsException {
         long valueRequiredAmt = recipientAmount;
 
         while(true) {
-            Map<BlockTransactionHashIndex, WalletNode> selectedUtxos = selectInputs(utxoSelectors, valueRequiredAmt, feeRate, longTermFeeRate, groupByAddress, includeMempoolChange);
+            Map<BlockTransactionHashIndex, WalletNode> selectedUtxos = selectInputs(utxoSelectors, utxoFilters, valueRequiredAmt, feeRate, longTermFeeRate, groupByAddress, includeMempoolChange);
             long totalSelectedAmt = selectedUtxos.keySet().stream().mapToLong(BlockTransactionHashIndex::getValue).sum();
 
             Transaction transaction = new Transaction();
@@ -513,8 +513,8 @@ public class Wallet {
         }
     }
 
-    private Map<BlockTransactionHashIndex, WalletNode> selectInputs(List<UtxoSelector> utxoSelectors, Long targetValue, double feeRate, double longTermFeeRate, boolean groupByAddress, boolean includeMempoolChange) throws InsufficientFundsException {
-        List<OutputGroup> utxoPool = getGroupedUtxos(feeRate, longTermFeeRate, groupByAddress);
+    private Map<BlockTransactionHashIndex, WalletNode> selectInputs(List<UtxoSelector> utxoSelectors, List<UtxoFilter> utxoFilters, Long targetValue, double feeRate, double longTermFeeRate, boolean groupByAddress, boolean includeMempoolChange) throws InsufficientFundsException {
+        List<OutputGroup> utxoPool = getGroupedUtxos(utxoFilters, feeRate, longTermFeeRate, groupByAddress);
 
         List<OutputGroup.Filter> filters = new ArrayList<>();
         filters.add(new OutputGroup.Filter(1, 6));
@@ -540,17 +540,22 @@ public class Wallet {
         throw new InsufficientFundsException("Not enough combined value in UTXOs for output value " + targetValue);
     }
 
-    private List<OutputGroup> getGroupedUtxos(double feeRate, double longTermFeeRate, boolean groupByAddress) {
+    private List<OutputGroup> getGroupedUtxos(List<UtxoFilter> utxoFilters, double feeRate, double longTermFeeRate, boolean groupByAddress) {
         List<OutputGroup> outputGroups = new ArrayList<>();
-        getGroupedUtxos(outputGroups, getNode(KeyPurpose.RECEIVE), feeRate, longTermFeeRate, groupByAddress);
-        getGroupedUtxos(outputGroups, getNode(KeyPurpose.CHANGE), feeRate, longTermFeeRate, groupByAddress);
+        getGroupedUtxos(outputGroups, getNode(KeyPurpose.RECEIVE), utxoFilters, feeRate, longTermFeeRate, groupByAddress);
+        getGroupedUtxos(outputGroups, getNode(KeyPurpose.CHANGE), utxoFilters, feeRate, longTermFeeRate, groupByAddress);
         return outputGroups;
     }
 
-    private void getGroupedUtxos(List<OutputGroup> outputGroups, WalletNode purposeNode, double feeRate, double longTermFeeRate, boolean groupByAddress) {
+    private void getGroupedUtxos(List<OutputGroup> outputGroups, WalletNode purposeNode, List<UtxoFilter> utxoFilters, double feeRate, double longTermFeeRate, boolean groupByAddress) {
         for(WalletNode addressNode : purposeNode.getChildren()) {
             OutputGroup outputGroup = null;
             for(BlockTransactionHashIndex utxo : addressNode.getUnspentTransactionOutputs()) {
+                Optional<UtxoFilter> matchedFilter = utxoFilters.stream().filter(utxoFilter -> !utxoFilter.isEligible(utxo)).findAny();
+                if(matchedFilter.isPresent()) {
+                    continue;
+                }
+
                 if(outputGroup == null || !groupByAddress) {
                     outputGroup = new OutputGroup(getStoredBlockHeight(), getInputWeightUnits(), feeRate, longTermFeeRate);
                     outputGroups.add(outputGroup);
