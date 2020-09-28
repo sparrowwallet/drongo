@@ -3,7 +3,6 @@ package com.sparrowwallet.drongo.protocol;
 import com.sparrowwallet.drongo.Utils;
 import com.sparrowwallet.drongo.address.*;
 import com.sparrowwallet.drongo.crypto.ECKey;
-import com.sparrowwallet.drongo.protocol.Network;
 import org.bouncycastle.util.encoders.Hex;
 
 import java.io.ByteArrayInputStream;

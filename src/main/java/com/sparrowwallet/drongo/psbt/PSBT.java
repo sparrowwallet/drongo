@@ -355,6 +355,10 @@ public class PSBT {
 
         return null;
     }
+    
+    public Network getNetwork() {
+        return network;
+    }
 
     public Long getFee() {
         long fee = 0L;

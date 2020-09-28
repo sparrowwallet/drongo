@@ -56,6 +56,17 @@ public abstract class Address {
     public int hashCode() {
         return getAddress().hashCode();
     }
+    
+    /* Convienience function to try all valid network types when parsing address string */
+    public static Address fromStringAnyNetwork(String address) throws InvalidAddressException {
+        for (Network network : Network.values()) {
+            try {
+                return Address.fromString(network, address);
+            } catch (InvalidAddressException e) {
+            }
+        }
+        throw new InvalidAddressException("Could not parse invalid address " + address);
+    }
 
     public static Address fromString(Network network, String address) throws InvalidAddressException {
         Exception nested = null;

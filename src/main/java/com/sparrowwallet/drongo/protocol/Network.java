@@ -1,8 +1,8 @@
 package com.sparrowwallet.drongo.protocol;
 
 public enum Network {
-    TESTNET("tb", "mn2", 111, 196),
-    BITCOIN("bc", "13", 0, 5);
+    BITCOIN("bc", "13", 0, 5),
+    TESTNET("tb", "mn2", 111, 196);
 
     public final String hrp;
     public final String legacyPrefixes;
