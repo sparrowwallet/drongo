@@ -66,7 +66,7 @@ public class PSBTInput {
         this.proprietary.putAll(proprietary);
     }
 
-    PSBTInput(List<PSBTEntry> inputEntries, Transaction transaction, int index) throws PSBTParseException {
+    PSBTInput(Network network, List<PSBTEntry> inputEntries, Transaction transaction, int index) throws PSBTParseException {
         for(PSBTEntry entry : inputEntries) {
             switch(entry.getKeyType()) {
                 case PSBT_IN_NON_WITNESS_UTXO:
@@ -86,7 +86,7 @@ public class PSBTInput {
                     }
                     for(TransactionOutput output: nonWitnessTx.getOutputs()) {
                         try {
-                            log.debug(" Transaction output value: " + output.getValue() + " to addresses " + Arrays.asList(output.getScript().getToAddresses()) + " with script hex " + Utils.bytesToHex(output.getScript().getProgram()) + " to script " + output.getScript());
+                            log.debug(" Transaction output value: " + output.getValue() + " to addresses " + Arrays.asList(output.getScript().getToAddresses(network)) + " with script hex " + Utils.bytesToHex(output.getScript().getProgram()) + " to script " + output.getScript());
                         } catch(NonStandardScriptException e) {
                             log.error("Unknown script type", e);
                         }
@@ -100,7 +100,7 @@ public class PSBTInput {
                     }
                     this.witnessUtxo = witnessTxOutput;
                     try {
-                        log.debug("Found input witness utxo amount " + witnessTxOutput.getValue() + " script hex " + Utils.bytesToHex(witnessTxOutput.getScript().getProgram()) + " script " + witnessTxOutput.getScript() + " addresses " + Arrays.asList(witnessTxOutput.getScript().getToAddresses()));
+                        log.debug("Found input witness utxo amount " + witnessTxOutput.getValue() + " script hex " + Utils.bytesToHex(witnessTxOutput.getScript().getProgram()) + " script " + witnessTxOutput.getScript() + " addresses " + Arrays.asList(witnessTxOutput.getScript().getToAddresses(network)));
                     } catch(NonStandardScriptException e) {
                         log.error("Unknown script type", e);
                     }

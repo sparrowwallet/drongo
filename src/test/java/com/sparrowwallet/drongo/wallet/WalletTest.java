@@ -6,6 +6,7 @@ import com.sparrowwallet.drongo.crypto.Key;
 import com.sparrowwallet.drongo.crypto.KeyDeriver;
 import com.sparrowwallet.drongo.policy.Policy;
 import com.sparrowwallet.drongo.policy.PolicyType;
+import com.sparrowwallet.drongo.protocol.Network;
 import com.sparrowwallet.drongo.protocol.ScriptType;
 import org.junit.Assert;
 import org.junit.Test;
@@ -15,7 +16,7 @@ public class WalletTest {
     public void encryptTest() throws MnemonicException {
         String words = "absent essay fox snake vast pumpkin height crouch silent bulb excuse razor";
         DeterministicSeed seed = new DeterministicSeed(words, "pp", 0, DeterministicSeed.Type.BIP39);
-        Wallet wallet = new Wallet();
+        Wallet wallet = new Wallet(Network.BITCOIN);
         wallet.setPolicyType(PolicyType.SINGLE);
         wallet.setScriptType(ScriptType.P2PKH);
         Keystore keystore = Keystore.fromSeed(seed, wallet.getScriptType().getDefaultDerivation());
@@ -31,7 +32,7 @@ public class WalletTest {
 
     @Test
     public void makeLabelsUnique() {
-        Wallet wallet = new Wallet();
+        Wallet wallet = new Wallet(Network.BITCOIN);
         Keystore keystore1 = new Keystore("BIP39");
         wallet.getKeystores().add(keystore1);
 
@@ -91,7 +92,7 @@ public class WalletTest {
     public void p2pkhDerivationTest() throws MnemonicException {
         String words = "absent essay fox snake vast pumpkin height crouch silent bulb excuse razor";
         DeterministicSeed seed = new DeterministicSeed(words, "pp", 0, DeterministicSeed.Type.BIP39);
-        Wallet wallet = new Wallet();
+        Wallet wallet = new Wallet(Network.BITCOIN);
         wallet.setPolicyType(PolicyType.SINGLE);
         wallet.setScriptType(ScriptType.P2PKH);
         Keystore keystore = Keystore.fromSeed(seed, wallet.getScriptType().getDefaultDerivation());
@@ -106,7 +107,7 @@ public class WalletTest {
     public void p2shP2wpkhDerivationTest() throws MnemonicException {
         String words = "absent essay fox snake vast pumpkin height crouch silent bulb excuse razor";
         DeterministicSeed seed = new DeterministicSeed(words, "pp", 0, DeterministicSeed.Type.BIP39);
-        Wallet wallet = new Wallet();
+        Wallet wallet = new Wallet(Network.BITCOIN);
         wallet.setPolicyType(PolicyType.SINGLE);
         wallet.setScriptType(ScriptType.P2SH_P2WPKH);
         Keystore keystore = Keystore.fromSeed(seed, wallet.getScriptType().getDefaultDerivation());
@@ -121,7 +122,7 @@ public class WalletTest {
     public void p2wpkhDerivationTest() throws MnemonicException {
         String words = "absent essay fox snake vast pumpkin height crouch silent bulb excuse razor";
         DeterministicSeed seed = new DeterministicSeed(words, "pp", 0, DeterministicSeed.Type.BIP39);
-        Wallet wallet = new Wallet();
+        Wallet wallet = new Wallet(Network.BITCOIN);
         wallet.setPolicyType(PolicyType.SINGLE);
         wallet.setScriptType(ScriptType.P2WPKH);
         Keystore keystore = Keystore.fromSeed(seed, wallet.getScriptType().getDefaultDerivation());
@@ -140,7 +141,7 @@ public class WalletTest {
         String words2 = "chef huge whisper year move obscure post pepper play minute foster lawn";
         DeterministicSeed seed2 = new DeterministicSeed(words2, "", 0, DeterministicSeed.Type.BIP39);
 
-        Wallet wallet = new Wallet();
+        Wallet wallet = new Wallet(Network.BITCOIN);
         wallet.setPolicyType(PolicyType.MULTI);
         wallet.setScriptType(ScriptType.P2SH);
         Keystore keystore = Keystore.fromSeed(seed, ScriptType.P2PKH.getDefaultDerivation());
@@ -165,7 +166,7 @@ public class WalletTest {
         String words2 = "chef huge whisper year move obscure post pepper play minute foster lawn";
         DeterministicSeed seed2 = new DeterministicSeed(words2, "", 0, DeterministicSeed.Type.BIP39);
 
-        Wallet wallet = new Wallet();
+        Wallet wallet = new Wallet(Network.BITCOIN);
         wallet.setPolicyType(PolicyType.MULTI);
         wallet.setScriptType(ScriptType.P2SH_P2WSH);
         Keystore keystore = Keystore.fromSeed(seed, ScriptType.P2PKH.getDefaultDerivation());
@@ -190,7 +191,7 @@ public class WalletTest {
         String words2 = "chef huge whisper year move obscure post pepper play minute foster lawn";
         DeterministicSeed seed2 = new DeterministicSeed(words2, "", 0, DeterministicSeed.Type.BIP39);
 
-        Wallet wallet = new Wallet();
+        Wallet wallet = new Wallet(Network.BITCOIN);
         wallet.setPolicyType(PolicyType.MULTI);
         wallet.setScriptType(ScriptType.P2WSH);
         Keystore keystore = Keystore.fromSeed(seed, ScriptType.P2PKH.getDefaultDerivation());

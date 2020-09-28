@@ -1,14 +1,14 @@
 package com.sparrowwallet.drongo.address;
 
 import com.sparrowwallet.drongo.protocol.Bech32;
+import com.sparrowwallet.drongo.protocol.Network;
 import com.sparrowwallet.drongo.protocol.Script;
 import com.sparrowwallet.drongo.protocol.ScriptType;
 
 public class P2WPKHAddress extends Address {
-    public static final String HRP = "bc";
 
-    public P2WPKHAddress(byte[] pubKeyHash) {
-        super(pubKeyHash);
+    public P2WPKHAddress(Network network, byte[] pubKeyHash) {
+        super(network, pubKeyHash);
     }
 
     public int getVersion() {
@@ -16,7 +16,7 @@ public class P2WPKHAddress extends Address {
     }
 
     public String getAddress() {
-        return Bech32.encode(HRP, getVersion(), hash);
+        return Bech32.encode(network.hrp, getVersion(), hash);
     }
 
     public ScriptType getScriptType() {

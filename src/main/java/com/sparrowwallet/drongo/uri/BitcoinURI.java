@@ -2,6 +2,7 @@ package com.sparrowwallet.drongo.uri;
 
 import com.sparrowwallet.drongo.address.Address;
 import com.sparrowwallet.drongo.address.InvalidAddressException;
+import com.sparrowwallet.drongo.protocol.Network;
 
 import java.math.BigDecimal;
 import java.net.URI;
@@ -79,7 +80,7 @@ public class BitcoinURI {
      * @param input The raw URI data to be parsed (see class comments for accepted formats)
      * @throws BitcoinURIParseException if the URI is not syntactically or semantically valid.
      */
-    public BitcoinURI(String input) throws BitcoinURIParseException {
+    public BitcoinURI(Network network, String input) throws BitcoinURIParseException {
         String scheme = BITCOIN_SCHEME;
 
         // Attempt to form the URI (fail fast syntax checking to official standards).
@@ -132,7 +133,7 @@ public class BitcoinURI {
         if(!addressToken.isEmpty()) {
             // Attempt to parse the addressToken as a Bitcoin address for this network
             try {
-                Address address = Address.fromString(addressToken);
+                Address address = Address.fromString(network, addressToken);
                 putWithValidation(FIELD_ADDRESS, address);
             } catch(final InvalidAddressException e) {
                 throw new BitcoinURIParseException("Invalid address", e);
@@ -294,11 +295,12 @@ public class BitcoinURI {
     /**
      * Constructs a new BitcoinURI from the given address.
      *
+     * @param network The bitcoin network
      * @param address The address forming the base of the URI
      */
-    public static BitcoinURI fromAddress(Address address) {
+    public static BitcoinURI fromAddress(Network network, Address address) {
         try {
-            return new BitcoinURI(BITCOIN_SCHEME + ":" + address.toString());
+            return new BitcoinURI(network, BITCOIN_SCHEME + ":" + address.toString());
         } catch(BitcoinURIParseException e) {
             //Can't happen
             return null;

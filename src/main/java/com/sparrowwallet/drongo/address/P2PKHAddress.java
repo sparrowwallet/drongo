@@ -1,15 +1,16 @@
 package com.sparrowwallet.drongo.address;
 
+import com.sparrowwallet.drongo.protocol.Network;
 import com.sparrowwallet.drongo.protocol.Script;
 import com.sparrowwallet.drongo.protocol.ScriptType;
 
 public class P2PKHAddress extends Address {
-    public P2PKHAddress(byte[] pubKeyHash) {
-        super(pubKeyHash);
+    public P2PKHAddress(Network network, byte[] pubKeyHash) {
+        super(network, pubKeyHash);
     }
 
     public int getVersion() {
-        return 0;
+        return network.pkhVersion;
     }
 
     public ScriptType getScriptType() {

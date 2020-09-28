@@ -6,6 +6,7 @@ import com.sparrowwallet.drongo.crypto.DeterministicKey;
 import com.sparrowwallet.drongo.crypto.ECKey;
 import com.sparrowwallet.drongo.policy.Policy;
 import com.sparrowwallet.drongo.policy.PolicyType;
+import com.sparrowwallet.drongo.protocol.Network;
 import com.sparrowwallet.drongo.protocol.ProtocolException;
 import com.sparrowwallet.drongo.protocol.Script;
 import com.sparrowwallet.drongo.protocol.ScriptType;
@@ -30,24 +31,26 @@ public class OutputDescriptor {
     private static final Pattern KEY_ORIGIN_PATTERN = Pattern.compile("\\[([A-Fa-f0-9]{8})([/\\d'hH]+)\\]");
     private static final Pattern CHECKSUM_PATTERN = Pattern.compile("#([" + CHECKSUM_CHARSET + "]{8})$");
 
+    private final Network network;
     private final ScriptType scriptType;
     private final int multisigThreshold;
     private final Map<ExtendedKey, KeyDerivation> extendedPublicKeys;
     private final Map<ExtendedKey, String> mapChildrenDerivations;
 
-    public OutputDescriptor(ScriptType scriptType, ExtendedKey extendedPublicKey, KeyDerivation keyDerivation) {
-        this(scriptType, Collections.singletonMap(extendedPublicKey, keyDerivation));
+    public OutputDescriptor(Network network, ScriptType scriptType, ExtendedKey extendedPublicKey, KeyDerivation keyDerivation) {
+        this(network, scriptType, Collections.singletonMap(extendedPublicKey, keyDerivation));
     }
 
-    public OutputDescriptor(ScriptType scriptType, Map<ExtendedKey, KeyDerivation> extendedPublicKeys) {
-        this(scriptType, 0, extendedPublicKeys);
+    public OutputDescriptor(Network network, ScriptType scriptType, Map<ExtendedKey, KeyDerivation> extendedPublicKeys) {
+        this(network, scriptType, 0, extendedPublicKeys);
     }
 
-    public OutputDescriptor(ScriptType scriptType, int multisigThreshold, Map<ExtendedKey, KeyDerivation> extendedPublicKeys) {
-        this(scriptType, multisigThreshold, extendedPublicKeys, new LinkedHashMap<>());
+    public OutputDescriptor(Network network, ScriptType scriptType, int multisigThreshold, Map<ExtendedKey, KeyDerivation> extendedPublicKeys) {
+        this(network, scriptType, multisigThreshold, extendedPublicKeys, new LinkedHashMap<>());
     }
 
-    public OutputDescriptor(ScriptType scriptType, int multisigThreshold, Map<ExtendedKey, KeyDerivation> extendedPublicKeys, Map<ExtendedKey, String> mapChildrenDerivations) {
+    public OutputDescriptor(Network network, ScriptType scriptType, int multisigThreshold, Map<ExtendedKey, KeyDerivation> extendedPublicKeys, Map<ExtendedKey, String> mapChildrenDerivations) {
+        this.network = network;
         this.scriptType = scriptType;
         this.multisigThreshold = multisigThreshold;
         this.extendedPublicKeys = extendedPublicKeys;
@@ -201,11 +204,11 @@ public class OutputDescriptor {
     }
 
     public Address getAddress(DeterministicKey childKey) {
-        return scriptType.getAddress(childKey);
+        return scriptType.getAddress(network, childKey);
     }
 
     private Address getAddress(Script multisigScript) {
-        return scriptType.getAddress(multisigScript);
+        return scriptType.getAddress(network, multisigScript);
     }
 
     private Script getMultisigScript(List<ChildNumber> childPath) {
@@ -233,7 +236,7 @@ public class OutputDescriptor {
     }
 
     public Wallet toWallet() {
-        Wallet wallet = new Wallet();
+        Wallet wallet = new Wallet(network);
         wallet.setPolicyType(isMultisig() ? PolicyType.MULTI : PolicyType.SINGLE);
         wallet.setScriptType(scriptType);
 
@@ -257,11 +260,11 @@ public class OutputDescriptor {
             extendedKeyDerivationMap.put(keystore.getExtendedPublicKey(), keystore.getKeyDerivation());
         }
 
-        return new OutputDescriptor(wallet.getScriptType(), wallet.getDefaultPolicy().getNumSignaturesRequired(), extendedKeyDerivationMap);
+        return new OutputDescriptor(wallet.getNetwork(), wallet.getScriptType(), wallet.getDefaultPolicy().getNumSignaturesRequired(), extendedKeyDerivationMap);
     }
 
     // See https://github.com/bitcoin/bitcoin/blob/master/doc/descriptors.md
-    public static OutputDescriptor getOutputDescriptor(String descriptor) {
+    public static OutputDescriptor getOutputDescriptor(Network network, String descriptor) {
         ScriptType scriptType = ScriptType.fromDescriptor(descriptor);
         if(scriptType == null) {
             ExtendedKey.Header header = ExtendedKey.Header.fromExtendedKey(descriptor);
@@ -273,7 +276,7 @@ public class OutputDescriptor {
         }
 
         int threshold = getMultisigThreshold(descriptor);
-        return getOutputDescriptorImpl(scriptType, threshold, descriptor);
+        return getOutputDescriptorImpl(network, scriptType, threshold, descriptor);
     }
 
     private static int getMultisigThreshold(String descriptor) {
@@ -286,7 +289,7 @@ public class OutputDescriptor {
         }
     }
 
-    private static OutputDescriptor getOutputDescriptorImpl(ScriptType scriptType, int multisigThreshold, String descriptor) {
+    private static OutputDescriptor getOutputDescriptorImpl(Network network, ScriptType scriptType, int multisigThreshold, String descriptor) {
         Matcher checksumMatcher = CHECKSUM_PATTERN.matcher(descriptor);
         if(checksumMatcher.find()) {
             String checksum = checksumMatcher.group(1);
@@ -333,7 +336,7 @@ public class OutputDescriptor {
             }
         }
 
-        return new OutputDescriptor(scriptType, multisigThreshold, keyDerivationMap, keyChildDerivationMap);
+        return new OutputDescriptor(network, scriptType, multisigThreshold, keyDerivationMap, keyChildDerivationMap);
     }
 
     private static String getChecksum(String descriptor) {
