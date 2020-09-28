@@ -1,13 +1,12 @@
 package com.sparrowwallet.drongo.address;
 
+import com.sparrowwallet.drongo.Network;
 import com.sparrowwallet.drongo.protocol.Base58;
 import com.sparrowwallet.drongo.protocol.Bech32;
 import com.sparrowwallet.drongo.protocol.Script;
 import com.sparrowwallet.drongo.protocol.ScriptType;
 
 import java.util.Arrays;
-
-import static com.sparrowwallet.drongo.address.P2WPKHAddress.HRP;
 
 public abstract class Address {
     protected final byte[] hash;
@@ -21,14 +20,26 @@ public abstract class Address {
     }
 
     public String getAddress() {
-        return Base58.encodeChecked(getVersion(), hash);
+        return getAddress(Network.get());
+    }
+
+    public String getAddress(Network network) {
+        return Base58.encodeChecked(getVersion(network), hash);
     }
 
     public String toString() {
-        return getAddress();
+        return getAddress(Network.get());
     }
 
-    public abstract int getVersion();
+    public String toString(Network network) {
+        return getAddress(network);
+    }
+
+    public int getVersion() {
+        return getVersion(Network.get());
+    }
+
+    public abstract int getVersion(Network network);
 
     public abstract ScriptType getScriptType();
 
@@ -52,18 +63,37 @@ public abstract class Address {
     }
 
     public static Address fromString(String address) throws InvalidAddressException {
+        try {
+            return fromString(Network.get(), address);
+        } catch(InvalidAddressException e) {
+            for(Network network : Network.values()) {
+                try {
+                    fromString(network, address);
+                    if(network != Network.get()) {
+                        throw new InvalidAddressException("Provided " + network.getName() + " address invalid on configured " + Network.get().getName() + " network: " + address + ". Use a " + network.getName() + " configuration to use this address.");
+                    }
+                } catch(InvalidAddressException i) {
+                    //ignore
+                }
+            }
+
+            throw e;
+        }
+    }
+
+    public static Address fromString(Network network, String address) throws InvalidAddressException {
         Exception nested = null;
 
-        if(address != null && (address.startsWith("1") || address.startsWith("3"))) {
+        if(address != null && (network.hasP2PKHAddressPrefix(address) || network.hasP2SHAddressPrefix(address))) {
             try {
                 byte[] decodedBytes = Base58.decodeChecked(address);
                 if(decodedBytes.length == 21) {
-                    int version = decodedBytes[0];
+                    int version = Byte.toUnsignedInt(decodedBytes[0]);
                     byte[] hash = Arrays.copyOfRange(decodedBytes, 1, 21);
-                    if(version == 0) {
+                    if(version == network.getP2PKHAddressHeader()) {
                         return new P2PKHAddress(hash);
                     }
-                    if(version == 5) {
+                    if(version == network.getP2SHAddressHeader()) {
                         return new P2SHAddress(hash);
                     }
                 }
@@ -72,10 +102,10 @@ public abstract class Address {
             }
         }
 
-        if(address != null && address.startsWith(HRP)) {
+        if(address != null && address.startsWith(network.getBech32AddressHRP())) {
             try {
                 Bech32.Bech32Data data = Bech32.decode(address);
-                if (data.hrp.equals(HRP)) {
+                if(data.hrp.equals(network.getBech32AddressHRP())) {
                     int witnessVersion = data.data[0];
                     if (witnessVersion == 0) {
                         byte[] convertedProgram = Arrays.copyOfRange(data.data, 1, data.data.length);

@@ -1,22 +1,24 @@
 package com.sparrowwallet.drongo.address;
 
+import com.sparrowwallet.drongo.Network;
 import com.sparrowwallet.drongo.protocol.*;
-
-import static com.sparrowwallet.drongo.address.P2WPKHAddress.HRP;
 
 public class P2WSHAddress extends Address {
     public P2WSHAddress(byte[] scriptHash) {
         super(scriptHash);
     }
 
-    public int getVersion() {
+    @Override
+    public int getVersion(Network network) {
         return 0;
     }
 
-    public String getAddress() {
-        return Bech32.encode(HRP, getVersion(), hash);
+    @Override
+    public String getAddress(Network network) {
+        return Bech32.encode(network.getBech32AddressHRP(), getVersion(), hash);
     }
 
+    @Override
     public ScriptType getScriptType() {
         return ScriptType.P2WSH;
     }
