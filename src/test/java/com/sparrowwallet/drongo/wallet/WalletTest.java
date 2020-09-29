@@ -1,7 +1,11 @@
 package com.sparrowwallet.drongo.wallet;
 
+import com.sparrowwallet.drongo.ExtendedKey;
+import com.sparrowwallet.drongo.KeyDerivation;
 import com.sparrowwallet.drongo.KeyPurpose;
+import com.sparrowwallet.drongo.Utils;
 import com.sparrowwallet.drongo.crypto.Argon2KeyDeriver;
+import com.sparrowwallet.drongo.crypto.ChildNumber;
 import com.sparrowwallet.drongo.crypto.Key;
 import com.sparrowwallet.drongo.crypto.KeyDeriver;
 import com.sparrowwallet.drongo.policy.Policy;
@@ -9,6 +13,8 @@ import com.sparrowwallet.drongo.policy.PolicyType;
 import com.sparrowwallet.drongo.protocol.ScriptType;
 import org.junit.Assert;
 import org.junit.Test;
+
+import java.util.List;
 
 public class WalletTest {
     @Test
@@ -205,5 +211,22 @@ public class WalletTest {
 
         Assert.assertEquals("bc1q20e4vm656h5lvmngz9ztz6hjzftvh39yzngqhuqzk8qzj7tqnzaqgclrwc", wallet.getAddress(KeyPurpose.RECEIVE, 0).toString());
         Assert.assertEquals("bc1q2epdx7dplwaas2jucfrzmxm8350rqh68hs6vqreysku80ye44mfqla85f2", wallet.getAddress(KeyPurpose.CHANGE, 1).toString());
+    }
+
+    @Test
+    public void testHighDerivationPath() {
+        Wallet wallet = new Wallet();
+        wallet.setPolicyType(PolicyType.SINGLE);
+        wallet.setScriptType(ScriptType.P2WPKH);
+        Keystore keystore = new Keystore();
+        keystore.setKeyDerivation(new KeyDerivation("ffffffff", "m/84'/0'/2147483646'"));
+        ExtendedKey extendedKey = ExtendedKey.fromDescriptor("ypub6WxQGZTrBdeYSD6ZnSxopCGnuS7dhbqc72S3sbjdFjxf8eBR3EJDB3iDMhny2tKogZnpaJcjoHC6zF5Cz1jSMrFFR1wrqfA1MFsWP3ACotd");
+        keystore.setExtendedPublicKey(extendedKey);
+        wallet.getKeystores().add(keystore);
+
+        List<ChildNumber> derivation = List.of(keystore.getExtendedPublicKey().getKeyChildNumber(), new ChildNumber(0));
+        Assert.assertEquals("027ecc656f4b91b92881b6f07cf876cd2e42b20df7acc4df54fc3315fbb2d13e1c", Utils.bytesToHex(extendedKey.getKey(derivation).getPubKey()));
+
+        Assert.assertEquals("bc1qarzeu6ncapyvjzdeayjq8vnzp6uvcn4eaeuuqq", wallet.getAddress(KeyPurpose.RECEIVE, 0).toString());
     }
 }

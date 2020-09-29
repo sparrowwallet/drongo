@@ -1,6 +1,7 @@
 package com.sparrowwallet.drongo.protocol;
 
 import com.sparrowwallet.drongo.KeyDerivation;
+import com.sparrowwallet.drongo.Network;
 import com.sparrowwallet.drongo.Utils;
 import com.sparrowwallet.drongo.address.*;
 import com.sparrowwallet.drongo.crypto.ChildNumber;
@@ -988,15 +989,15 @@ public enum ScriptType {
     }
 
     public String getDefaultDerivationPath() {
-        return defaultDerivationPath;
+        return Network.get() != Network.MAINNET ? defaultDerivationPath.replace("/0'/0'", "/1'/0'") : defaultDerivationPath;
     }
 
     public List<ChildNumber> getDefaultDerivation() {
-        return KeyDerivation.parsePath(defaultDerivationPath);
+        return KeyDerivation.parsePath(getDefaultDerivationPath());
     }
 
     public List<ChildNumber> getDefaultDerivation(int account) {
-        List<ChildNumber> copy = new ArrayList<>(KeyDerivation.parsePath(defaultDerivationPath));
+        List<ChildNumber> copy = new ArrayList<>(KeyDerivation.parsePath(getDefaultDerivationPath()));
         ChildNumber accountChildNumber = new ChildNumber(account, true);
         copy.set(2, accountChildNumber);
         return Collections.unmodifiableList(copy);

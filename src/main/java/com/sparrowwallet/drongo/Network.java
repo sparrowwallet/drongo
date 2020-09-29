@@ -84,4 +84,9 @@ public enum Network {
     private static boolean isTest() {
         return System.getProperty("org.gradle.test.worker") != null;
     }
+
+    @Override
+    public String toString() {
+        return getName();
+    }
 }

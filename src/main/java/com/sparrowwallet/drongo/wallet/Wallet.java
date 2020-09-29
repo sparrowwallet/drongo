@@ -2,6 +2,7 @@ package com.sparrowwallet.drongo.wallet;
 
 import com.sparrowwallet.drongo.BitcoinUnit;
 import com.sparrowwallet.drongo.KeyPurpose;
+import com.sparrowwallet.drongo.Network;
 import com.sparrowwallet.drongo.address.Address;
 import com.sparrowwallet.drongo.crypto.ECKey;
 import com.sparrowwallet.drongo.crypto.Key;
@@ -21,6 +22,7 @@ public class Wallet {
     public static final int DEFAULT_LOOKAHEAD = 20;
 
     private String name;
+    private Network network = Network.get();
     private PolicyType policyType;
     private ScriptType scriptType;
     private Policy defaultPolicy;
@@ -51,6 +53,14 @@ public class Wallet {
 
     public void setName(String name) {
         this.name = name;
+    }
+
+    public Network getNetwork() {
+        return network;
+    }
+
+    public void setNetwork(Network network) {
+        this.network = network;
     }
 
     public PolicyType getPolicyType() {
