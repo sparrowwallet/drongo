@@ -84,42 +84,46 @@ public abstract class Address {
     public static Address fromString(Network network, String address) throws InvalidAddressException {
         Exception nested = null;
 
-        if(address != null && (network.hasP2PKHAddressPrefix(address) || network.hasP2SHAddressPrefix(address))) {
-            try {
-                byte[] decodedBytes = Base58.decodeChecked(address);
-                if(decodedBytes.length == 21) {
-                    int version = Byte.toUnsignedInt(decodedBytes[0]);
-                    byte[] hash = Arrays.copyOfRange(decodedBytes, 1, 21);
-                    if(version == network.getP2PKHAddressHeader()) {
-                        return new P2PKHAddress(hash);
-                    }
-                    if(version == network.getP2SHAddressHeader()) {
-                        return new P2SHAddress(hash);
-                    }
-                }
-            } catch (Exception e) {
-                nested = e;
-            }
-        }
+        if(address != null) {
+            address = address.toLowerCase();
 
-        if(address != null && address.startsWith(network.getBech32AddressHRP())) {
-            try {
-                Bech32.Bech32Data data = Bech32.decode(address);
-                if(data.hrp.equals(network.getBech32AddressHRP())) {
-                    int witnessVersion = data.data[0];
-                    if (witnessVersion == 0) {
-                        byte[] convertedProgram = Arrays.copyOfRange(data.data, 1, data.data.length);
-                        byte[] witnessProgram = Bech32.convertBits(convertedProgram, 0, convertedProgram.length, 5, 8, false);
-                        if (witnessProgram.length == 20) {
-                            return new P2WPKHAddress(witnessProgram);
+            if(network.hasP2PKHAddressPrefix(address) || network.hasP2SHAddressPrefix(address)) {
+                try {
+                    byte[] decodedBytes = Base58.decodeChecked(address);
+                    if(decodedBytes.length == 21) {
+                        int version = Byte.toUnsignedInt(decodedBytes[0]);
+                        byte[] hash = Arrays.copyOfRange(decodedBytes, 1, 21);
+                        if(version == network.getP2PKHAddressHeader()) {
+                            return new P2PKHAddress(hash);
                         }
-                        if (witnessProgram.length == 32) {
-                            return new P2WSHAddress(witnessProgram);
+                        if(version == network.getP2SHAddressHeader()) {
+                            return new P2SHAddress(hash);
                         }
                     }
+                } catch (Exception e) {
+                    nested = e;
                 }
-            } catch (Exception e) {
-                nested = e;
+            }
+
+            if(address.startsWith(network.getBech32AddressHRP())) {
+                try {
+                    Bech32.Bech32Data data = Bech32.decode(address);
+                    if(data.hrp.equals(network.getBech32AddressHRP())) {
+                        int witnessVersion = data.data[0];
+                        if (witnessVersion == 0) {
+                            byte[] convertedProgram = Arrays.copyOfRange(data.data, 1, data.data.length);
+                            byte[] witnessProgram = Bech32.convertBits(convertedProgram, 0, convertedProgram.length, 5, 8, false);
+                            if (witnessProgram.length == 20) {
+                                return new P2WPKHAddress(witnessProgram);
+                            }
+                            if (witnessProgram.length == 32) {
+                                return new P2WSHAddress(witnessProgram);
+                            }
+                        }
+                    }
+                } catch (Exception e) {
+                    nested = e;
+                }
             }
         }
 

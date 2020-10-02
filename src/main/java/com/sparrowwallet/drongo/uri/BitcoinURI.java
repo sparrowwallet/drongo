@@ -165,7 +165,7 @@ public class BitcoinURI {
             if(FIELD_AMOUNT.equals(nameToken) && !valueToken.isEmpty()) {
                 // Decode the amount (contains an optional decimal component to 8dp).
                 try {
-                    long amount = new BigDecimal(valueToken).movePointRight(SMALLEST_UNIT_EXPONENT).longValueExact();
+                    long amount = new BigDecimal(valueToken.replace(',', '.')).movePointRight(SMALLEST_UNIT_EXPONENT).longValueExact();
                     if(amount > MAX_BITCOIN * SATOSHIS_PER_BITCOIN) {
                         throw new BitcoinURIParseException("Maximum amount exceeded");
                     }
