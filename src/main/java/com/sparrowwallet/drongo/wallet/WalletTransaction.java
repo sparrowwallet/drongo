@@ -109,4 +109,12 @@ public class WalletTransaction {
 
         return false;
     }
+
+    public WalletNode getConsolidationSendNode() {
+        if(getRecipientAddress() != null && getWallet() != null) {
+            return getWallet().getWalletOutputScripts().get(getRecipientAddress().getOutputScript());
+        }
+
+        return null;
+    }
 }
