@@ -85,8 +85,6 @@ public abstract class Address {
         Exception nested = null;
 
         if(address != null) {
-            address = address.toLowerCase();
-
             if(network.hasP2PKHAddressPrefix(address) || network.hasP2SHAddressPrefix(address)) {
                 try {
                     byte[] decodedBytes = Base58.decodeChecked(address);
@@ -105,7 +103,7 @@ public abstract class Address {
                 }
             }
 
-            if(address.startsWith(network.getBech32AddressHRP())) {
+            if(address.toLowerCase().startsWith(network.getBech32AddressHRP())) {
                 try {
                     Bech32.Bech32Data data = Bech32.decode(address);
                     if(data.hrp.equals(network.getBech32AddressHRP())) {
