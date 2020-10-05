@@ -185,6 +185,10 @@ public class ExtendedKey {
             return name;
         }
 
+        public String getDisplayName() {
+            return name.replace('p', 'P');
+        }
+
         public int getHeader() {
             return header;
         }
