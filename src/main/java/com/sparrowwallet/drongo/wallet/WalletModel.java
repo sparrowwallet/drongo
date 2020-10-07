@@ -1,7 +1,7 @@
 package com.sparrowwallet.drongo.wallet;
 
 public enum WalletModel {
-    SEED, SPARROW, BITCOIN_CORE, ELECTRUM, TREZOR_1, TREZOR_T, COLDCARD, LEDGER_NANO_S, LEDGER_NANO_X, DIGITALBITBOX_01, KEEPKEY, SPECTER;
+    SEED, SPARROW, BITCOIN_CORE, ELECTRUM, TREZOR_1, TREZOR_T, COLDCARD, LEDGER_NANO_S, LEDGER_NANO_X, DIGITALBITBOX_01, KEEPKEY, SPECTER, COBO_VAULT;
 
     public static WalletModel getModel(String model) {
         return valueOf(model.toUpperCase());
@@ -18,6 +18,10 @@ public enum WalletModel {
 
         if(this == DIGITALBITBOX_01) {
             return "digitalbitbox";
+        }
+
+        if(this == COBO_VAULT) {
+            return "cobovault";
         }
 
         return this.toString().toLowerCase();
