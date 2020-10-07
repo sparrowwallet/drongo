@@ -329,7 +329,7 @@ public class OutputDescriptor {
                 keyDerivationMap.put(extendedPublicKey, keyDerivation);
                 keyChildDerivationMap.put(extendedPublicKey, childDerivationPath);
             } catch(ProtocolException e) {
-                throw new ProtocolException("Invalid xPub: " + e.getMessage());
+                throw new ProtocolException("Invalid xpub: " + e.getMessage());
             }
         }
 
