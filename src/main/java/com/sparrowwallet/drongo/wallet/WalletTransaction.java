@@ -4,6 +4,7 @@ import com.sparrowwallet.drongo.address.Address;
 import com.sparrowwallet.drongo.protocol.Transaction;
 import com.sparrowwallet.drongo.psbt.PSBT;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -16,23 +17,21 @@ public class WalletTransaction {
     private final Transaction transaction;
     private final List<UtxoSelector> utxoSelectors;
     private final Map<BlockTransactionHashIndex, WalletNode> selectedUtxos;
-    private final Address recipientAddress;
-    private final long recipientAmount;
+    private final List<Payment> payments;
     private final WalletNode changeNode;
     private final long changeAmount;
     private final long fee;
 
-    public WalletTransaction(Wallet wallet, Transaction transaction, List<UtxoSelector> utxoSelectors, Map<BlockTransactionHashIndex, WalletNode> selectedUtxos, Address recipientAddress, long recipientAmount, long fee) {
-        this(wallet, transaction, utxoSelectors, selectedUtxos, recipientAddress, recipientAmount, null, 0L, fee);
+    public WalletTransaction(Wallet wallet, Transaction transaction, List<UtxoSelector> utxoSelectors, Map<BlockTransactionHashIndex, WalletNode> selectedUtxos, List<Payment> payments, long fee) {
+        this(wallet, transaction, utxoSelectors, selectedUtxos, payments, null, 0L, fee);
     }
 
-    public WalletTransaction(Wallet wallet, Transaction transaction, List<UtxoSelector> utxoSelectors, Map<BlockTransactionHashIndex, WalletNode> selectedUtxos, Address recipientAddress, long recipientAmount, WalletNode changeNode, long changeAmount, long fee) {
+    public WalletTransaction(Wallet wallet, Transaction transaction, List<UtxoSelector> utxoSelectors, Map<BlockTransactionHashIndex, WalletNode> selectedUtxos, List<Payment> payments, WalletNode changeNode, long changeAmount, long fee) {
         this.wallet = wallet;
         this.transaction = transaction;
         this.utxoSelectors = utxoSelectors;
         this.selectedUtxos = selectedUtxos;
-        this.recipientAddress = recipientAddress;
-        this.recipientAmount = recipientAmount;
+        this.payments = payments;
         this.changeNode = changeNode;
         this.changeAmount = changeAmount;
         this.fee = fee;
@@ -58,12 +57,8 @@ public class WalletTransaction {
         return selectedUtxos;
     }
 
-    public Address getRecipientAddress() {
-        return recipientAddress;
-    }
-
-    public long getRecipientAmount() {
-        return recipientAmount;
+    public List<Payment> getPayments() {
+        return payments;
     }
 
     public WalletNode getChangeNode() {
@@ -102,19 +97,25 @@ public class WalletTransaction {
         return !utxoSelectors.isEmpty() && utxoSelectors.get(0) instanceof PresetUtxoSelector;
     }
 
-    public boolean isConsolidationSend() {
-        if(getRecipientAddress() != null && getWallet() != null) {
-            return getWallet().isWalletOutputScript(getRecipientAddress().getOutputScript());
+    public boolean isConsolidationSend(Payment payment) {
+        if(payment.getAddress() != null && getWallet() != null) {
+            return getWallet().isWalletOutputScript(payment.getAddress().getOutputScript());
         }
 
         return false;
     }
 
-    public WalletNode getConsolidationSendNode() {
-        if(getRecipientAddress() != null && getWallet() != null) {
-            return getWallet().getWalletOutputScripts().get(getRecipientAddress().getOutputScript());
+    public List<WalletNode> getConsolidationSendNodes() {
+        List<WalletNode> walletNodes = new ArrayList<>();
+        for(Payment payment : payments) {
+            if(payment.getAddress() != null && getWallet() != null) {
+                WalletNode walletNode = getWallet().getWalletOutputScripts().get(payment.getAddress().getOutputScript());
+                if(walletNode != null) {
+                    walletNodes.add(walletNode);
+                }
+            }
         }
 
-        return null;
+        return walletNodes;
     }
 }

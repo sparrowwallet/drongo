@@ -434,8 +434,9 @@ public class Wallet {
         return getFee(changeOutput, feeRate, longTermFeeRate);
     }
 
-    public WalletTransaction createWalletTransaction(List<UtxoSelector> utxoSelectors, List<UtxoFilter> utxoFilters, Address recipientAddress, long recipientAmount, double feeRate, double longTermFeeRate, Long fee, Integer currentBlockHeight, boolean sendAll, boolean groupByAddress, boolean includeMempoolChange) throws InsufficientFundsException {
-        long valueRequiredAmt = recipientAmount;
+    public WalletTransaction createWalletTransaction(List<UtxoSelector> utxoSelectors, List<UtxoFilter> utxoFilters, List<Payment> payments, double feeRate, double longTermFeeRate, Long fee, Integer currentBlockHeight, boolean groupByAddress, boolean includeMempoolChange) throws InsufficientFundsException {
+        long totalPaymentAmount = payments.stream().map(Payment::getAmount).mapToLong(v -> v).sum();
+        long valueRequiredAmt = totalPaymentAmount;
 
         while(true) {
             Map<BlockTransactionHashIndex, WalletNode> selectedUtxos = selectInputs(utxoSelectors, utxoFilters, valueRequiredAmt, feeRate, longTermFeeRate, groupByAddress, includeMempoolChange);
@@ -457,8 +458,11 @@ public class Wallet {
                 txInput.setSequenceNumber(TransactionInput.SEQUENCE_RBF_ENABLED);
             }
 
-            //Add recipient output
-            transaction.addOutput(recipientAmount, recipientAddress);
+            //Add recipient outputs
+            for(Payment payment : payments) {
+                transaction.addOutput(payment.getAmount(), payment.getAddress());
+            }
+
             int noChangeVSize = transaction.getVirtualSize();
             long noChangeFeeRequiredAmt = (fee == null ? (long)(feeRate * noChangeVSize) : fee);
 
@@ -467,13 +471,19 @@ public class Wallet {
 
             //If sending all selected utxos, set the recipient amount to equal to total of those utxos less the no change fee
             long maxSendAmt = totalSelectedAmt - noChangeFeeRequiredAmt;
-            if(sendAll && recipientAmount != maxSendAmt) {
-                recipientAmount = maxSendAmt;
-                continue;
+            Optional<Payment> optMaxPayment = payments.stream().filter(payment -> payment.isSendMax()).findFirst();
+            if(optMaxPayment.isPresent()) {
+                Payment maxPayment = optMaxPayment.get();
+                maxSendAmt = maxSendAmt - payments.stream().filter(payment -> !maxPayment.equals(payment)).map(Payment::getAmount).mapToLong(v -> v).sum();
+                if(maxPayment.getAmount() != maxSendAmt) {
+                    maxPayment.setAmount(maxSendAmt);
+                    totalPaymentAmount = payments.stream().map(Payment::getAmount).mapToLong(v -> v).sum();
+                    continue;
+                }
             }
 
             //Calculate what is left over from selected utxos after paying recipient
-            long differenceAmt = totalSelectedAmt - recipientAmount;
+            long differenceAmt = totalSelectedAmt - totalPaymentAmount;
 
             //If insufficient fee, increase value required from inputs to include the fee and try again
             if(differenceAmt < noChangeFeeRequiredAmt) {
@@ -503,10 +513,10 @@ public class Wallet {
                 //Add change output
                 transaction.addOutput(changeAmt, getOutputScript(changeNode));
 
-                return new WalletTransaction(this, transaction, utxoSelectors, selectedUtxos, recipientAddress, recipientAmount, changeNode, changeAmt, changeFeeRequiredAmt);
+                return new WalletTransaction(this, transaction, utxoSelectors, selectedUtxos, payments, changeNode, changeAmt, changeFeeRequiredAmt);
             }
 
-            return new WalletTransaction(this, transaction, utxoSelectors, selectedUtxos, recipientAddress, recipientAmount, differenceAmt);
+            return new WalletTransaction(this, transaction, utxoSelectors, selectedUtxos, payments, differenceAmt);
         }
     }
 

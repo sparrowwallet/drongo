@@ -120,8 +120,8 @@ public class PSBT {
         for(TransactionOutput txOutput : transaction.getOutputs()) {
             try {
                 Address address = txOutput.getScript().getToAddresses()[0];
-                if(address.equals(walletTransaction.getRecipientAddress())) {
-                    outputNodes.add(wallet.getWalletAddresses().getOrDefault(walletTransaction.getRecipientAddress(), null));
+                if(walletTransaction.getPayments().stream().anyMatch(payment -> payment.getAddress().equals(address))) {
+                    outputNodes.add(wallet.getWalletAddresses().getOrDefault(address, null));
                 } else if(address.equals(wallet.getAddress(walletTransaction.getChangeNode()))) {
                     outputNodes.add(walletTransaction.getChangeNode());
                 }
