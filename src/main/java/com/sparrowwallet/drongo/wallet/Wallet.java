@@ -361,25 +361,27 @@ public class Wallet {
     /**
      * Determines the fee for a transaction from this wallet that has one output and no inputs
      *
-     * @param recipientAddress The address to create the output to send to
+     * @param payments The payment details to create the output to send to
      * @return The determined fee
      */
-    public long getNoInputsFee(Address recipientAddress, Double feeRate) {
-        return (long)Math.ceil((double)getNoInputsWeightUnits(recipientAddress) * feeRate / (double)WITNESS_SCALE_FACTOR);
+    public long getNoInputsFee(List<Payment> payments, Double feeRate) {
+        return (long)Math.ceil((double)getNoInputsWeightUnits(payments) * feeRate / (double)WITNESS_SCALE_FACTOR);
     }
 
     /**
      * Determines the weight units for a transaction from this wallet that has one output and no inputs
      *
-     * @param recipientAddress The address to create the output to send to
+     * @param payments The payment details to create the output to send to
      * @return The determined weight units
      */
-    public int getNoInputsWeightUnits(Address recipientAddress) {
+    public int getNoInputsWeightUnits(List<Payment> payments) {
         Transaction transaction = new Transaction();
         if(Arrays.asList(ScriptType.WITNESS_TYPES).contains(getScriptType())) {
             transaction.setSegwitVersion(0);
         }
-        transaction.addOutput(1L, recipientAddress);
+        for(Payment payment : payments) {
+            transaction.addOutput(payment.getAmount(), payment.getAddress());
+        }
         return transaction.getWeightUnits();
     }
 
