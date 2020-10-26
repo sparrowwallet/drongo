@@ -430,7 +430,7 @@ public enum ScriptType {
             return List.of(MULTI);
         }
     },
-    P2SH("P2SH", "m/45'/0'/0'") {
+    P2SH("P2SH", "m/45'") {
         @Override
         public Address getAddress(byte[] scriptHash) {
             return new P2SHAddress(scriptHash);
@@ -998,8 +998,11 @@ public enum ScriptType {
 
     public List<ChildNumber> getDefaultDerivation(int account) {
         List<ChildNumber> copy = new ArrayList<>(KeyDerivation.parsePath(getDefaultDerivationPath()));
-        ChildNumber accountChildNumber = new ChildNumber(account, true);
-        copy.set(2, accountChildNumber);
+        if(copy.size() > 2) {
+            ChildNumber accountChildNumber = new ChildNumber(account, true);
+            copy.set(2, accountChildNumber);
+        }
+
         return Collections.unmodifiableList(copy);
     }
 
