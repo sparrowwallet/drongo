@@ -34,7 +34,7 @@ public class BnBUtxoSelector implements UtxoSelector {
             return Collections.emptyList();
         }
 
-        utxoPool.sort((a, b) -> (int)(b.getEffectiveValue() - a.getEffectiveValue()));
+        utxoPool.sort((a, b) -> Long.compare(b.getEffectiveValue(), a.getEffectiveValue()));
 
         long currentWasteValue = 0;
         ArrayDeque<Boolean> bestSelection = null;

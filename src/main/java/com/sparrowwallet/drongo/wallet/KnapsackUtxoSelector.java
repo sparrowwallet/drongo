@@ -50,7 +50,7 @@ public class KnapsackUtxoSelector implements UtxoSelector {
         //We now have a list of UTXOs that are all smaller than the target + MIN_CHANGE, but together sum to greater than actualTargetValue
         // Solve subset sum by stochastic approximation
 
-        applicableGroups.sort((a, b) -> (int)(b.getEffectiveValue() - a.getEffectiveValue()));
+        applicableGroups.sort((a, b) -> Long.compare(b.getEffectiveValue(), a.getEffectiveValue()));
         boolean[] bestSelection = new boolean[applicableGroups.size()];
 
         long bestValue = findApproximateBestSubset(applicableGroups, totalLower, actualTargetValue, bestSelection);
