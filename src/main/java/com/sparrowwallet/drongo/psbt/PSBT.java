@@ -253,7 +253,9 @@ public class PSBT {
             }
         }
 
-        log.debug("Calculated fee at " + getFee());
+        if(log.isDebugEnabled()) {
+            log.debug("Calculated fee at " + getFee());
+        }
     }
 
     private void parseGlobalEntries(List<PSBTEntry> globalEntries) throws PSBTParseException {
@@ -395,12 +397,12 @@ public class PSBT {
 
     public boolean isFinalized() {
         for(PSBTInput psbtInput : getPsbtInputs()) {
-            if(psbtInput.getFinalScriptSig() != null || psbtInput.getFinalScriptWitness() != null) {
-                return true;
+            if(!psbtInput.isFinalized()) {
+                return false;
             }
         }
 
-        return false;
+        return true;
     }
 
     private List<PSBTEntry> getGlobalEntries() {
@@ -499,9 +501,6 @@ public class PSBT {
     public Transaction extractTransaction() {
         boolean hasWitness = false;
         for(PSBTInput psbtInput : getPsbtInputs()) {
-            if(psbtInput.getFinalScriptSig() == null) {
-                return null;
-            }
             if(psbtInput.getFinalScriptWitness() != null) {
                 hasWitness = true;
             }
@@ -516,7 +515,7 @@ public class PSBT {
         for(int i = 0; i < finalTransaction.getInputs().size(); i++) {
             TransactionInput txInput = finalTransaction.getInputs().get(i);
             PSBTInput psbtInput = getPsbtInputs().get(i);
-            txInput.setScriptBytes(psbtInput.getFinalScriptSig().getProgram());
+            txInput.setScriptBytes(psbtInput.getFinalScriptSig() == null ? new byte[0] : psbtInput.getFinalScriptSig().getProgram());
 
             if(hasWitness) {
                 if(psbtInput.getFinalScriptWitness() != null) {
@@ -528,6 +527,27 @@ public class PSBT {
         }
 
         return finalTransaction;
+    }
+
+    public PSBT getPublicCopy() {
+        try {
+            PSBT publicCopy = new PSBT(serialize());
+            publicCopy.extendedPublicKeys.clear();
+            for(PSBTInput psbtInput : publicCopy.getPsbtInputs()) {
+                psbtInput.clearPrivateFields();
+            }
+            for(PSBTOutput psbtOutput : publicCopy.getPsbtOutputs()) {
+                psbtOutput.getDerivedPublicKeys().clear();
+                psbtOutput.getProprietary().clear();
+            }
+            if(publicCopy.isFinalized()) {
+                publicCopy.transaction = publicCopy.extractTransaction();
+            }
+
+            return publicCopy;
+        } catch(PSBTParseException e) {
+            throw new IllegalStateException("Could not parse PSBT", e);
+        }
     }
 
     public List<PSBTInput> getPsbtInputs() {

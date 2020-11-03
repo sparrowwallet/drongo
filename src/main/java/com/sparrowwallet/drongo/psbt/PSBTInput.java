@@ -386,7 +386,7 @@ public class PSBTInput {
                 return false;
             }
         } else {
-            return getFinalScriptSig() != null;
+            return isFinalized();
         }
     }
 
@@ -525,12 +525,20 @@ public class PSBTInput {
         return signingScript;
     }
 
+    public boolean isFinalized() {
+        return getFinalScriptSig() != null || getFinalScriptWitness() != null;
+    }
+
+    public TransactionInput getInput() {
+        return transaction.getInputs().get(index);
+    }
+
     public TransactionOutput getUtxo() {
         int vout = (int)transaction.getInputs().get(index).getOutpoint().getIndex();
         return getWitnessUtxo() != null ? getWitnessUtxo() : (getNonWitnessUtxo() != null ?  getNonWitnessUtxo().getOutputs().get(vout) : null);
     }
 
-    public void clearFinalised() {
+    public void clearPrivateFields() {
         partialSignatures.clear();
         sigHash = null;
         redeemScript = null;

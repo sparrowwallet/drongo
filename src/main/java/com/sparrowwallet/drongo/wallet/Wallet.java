@@ -713,6 +713,10 @@ public class Wallet {
             TransactionInput txInput = psbt.getTransaction().getInputs().get(i);
             PSBTInput psbtInput = psbt.getPsbtInputs().get(i);
 
+            if(psbtInput.isFinalized()) {
+                continue;
+            }
+
             WalletNode signingNode = signingNodes.get(psbtInput);
 
             //Transaction parent on PSBT utxo might be null in a witness tx, so get utxo tx hash and utxo index from PSBT tx input
@@ -760,7 +764,7 @@ public class Wallet {
 
                 psbtInput.setFinalScriptSig(finalizedTxInput.getScriptSig());
                 psbtInput.setFinalScriptWitness(finalizedTxInput.getWitness());
-                psbtInput.clearFinalised();
+                psbtInput.clearPrivateFields();
             }
         }
     }
