@@ -2,6 +2,8 @@ package com.sparrowwallet.drongo.uri;
 
 import com.sparrowwallet.drongo.address.Address;
 import com.sparrowwallet.drongo.address.InvalidAddressException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.math.BigDecimal;
 import java.net.URI;
@@ -54,11 +56,15 @@ import static com.sparrowwallet.drongo.protocol.Transaction.*;
  * @see <a href="https://github.com/bitcoin/bips/blob/master/bip-0021.mediawiki">BIP 0021</a>
  */
 public class BitcoinURI {
+    private static final Logger log = LoggerFactory.getLogger(BitcoinURI.class);
+
     public static final String FIELD_MESSAGE = "message";
     public static final String FIELD_LABEL = "label";
     public static final String FIELD_AMOUNT = "amount";
     public static final String FIELD_ADDRESS = "address";
     public static final String FIELD_PAYMENT_REQUEST_URL = "r";
+    public static final String FIELD_PAYJOIN_URL = "pj";
+    public static final String FIELD_PAYJOIN_OUTPUT_SUBSTITUTION = "pjos";
 
     public static final String BITCOIN_SCHEME = "bitcoin";
     private static final String ENCODED_SPACE_CHARACTER = "%20";
@@ -265,6 +271,34 @@ public class BitcoinURI {
         }
         Collections.reverse(urls);
         return urls;
+    }
+
+    /**
+     * @return The URL where a payjoin endpoint (as specified in BIP 78) may be specified.
+     */
+    public final URI getPayjoinUrl() {
+        String payjoinUrl = (String)parameterMap.get(FIELD_PAYJOIN_URL);
+        if(payjoinUrl != null) {
+            try {
+                URI uri = new URI(payjoinUrl);
+                if(uri.getScheme().equals("https") || uri.getHost().endsWith(".onion")) {
+                    return uri;
+                } else {
+                    log.error("Insecure payjoin URL provided, must be https or .onion: " + payjoinUrl);
+                }
+            } catch(URISyntaxException e) {
+                log.error("Invalid payjoin URL provided", e);
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * @return Whether to allow output substitution in the payjoin proposal transaction.
+     */
+    public final boolean isPayjoinOutputSubstitutionAllowed() {
+        return !"0".equals(parameterMap.get(FIELD_PAYJOIN_OUTPUT_SUBSTITUTION));
     }
 
     /**
