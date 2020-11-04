@@ -569,8 +569,8 @@ public class PSBT {
         return extendedPublicKeys.get(publicKey);
     }
 
-    public List<ExtendedKey> getExtendedPublicKeys() {
-        return new ArrayList<ExtendedKey>(extendedPublicKeys.keySet());
+    public Map<ExtendedKey, KeyDerivation> getExtendedPublicKeys() {
+        return extendedPublicKeys;
     }
 
     public Map<String, String> getGlobalProprietary() {

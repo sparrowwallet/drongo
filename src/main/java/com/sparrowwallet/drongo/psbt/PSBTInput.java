@@ -543,7 +543,6 @@ public class PSBTInput {
         sigHash = null;
         redeemScript = null;
         witnessScript = null;
-        derivedPublicKeys.clear();
         porCommitment = null;
         proprietary.clear();
     }
