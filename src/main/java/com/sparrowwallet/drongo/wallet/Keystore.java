@@ -130,25 +130,55 @@ public class Keystore {
     }
 
     public boolean isValid() {
-        if(label == null || source == null || walletModel == null || keyDerivation == null || extendedPublicKey == null) {
+        try {
+            checkKeystore();
+        } catch(InvalidKeystoreException e) {
             return false;
         }
 
-        if(label.isEmpty() || label.replace(" ", "").length() > 16) {
-            return false;
+        return true;
+    }
+
+    public void checkKeystore() throws InvalidKeystoreException {
+        if(label == null) {
+            throw new InvalidKeystoreException("No label specified");
+        }
+
+        if(source == null) {
+            throw new InvalidKeystoreException("No source specified");
+        }
+
+        if(walletModel == null) {
+            throw new InvalidKeystoreException("No wallet model specified");
+        }
+
+        if(keyDerivation == null) {
+            throw new InvalidKeystoreException("No key derivation specified");
+        }
+
+        if(extendedPublicKey == null) {
+            throw new InvalidKeystoreException("No extended public key specified");
+        }
+
+        if(label.isEmpty()) {
+            throw new InvalidKeystoreException("Label too short");
+        }
+
+        if(label.replace(" ", "").length() > 16) {
+            throw new InvalidKeystoreException("Label too long");
         }
 
         if(keyDerivation.getDerivationPath() == null || keyDerivation.getDerivationPath().isEmpty() || !KeyDerivation.isValid(keyDerivation.getDerivationPath())) {
-            return false;
+            throw new InvalidKeystoreException("Invalid key derivation path of " + keyDerivation.getDerivationPath());
         }
 
         if(keyDerivation.getMasterFingerprint() == null || keyDerivation.getMasterFingerprint().length() != 8 || !Utils.isHex(keyDerivation.getMasterFingerprint())) {
-            return false;
+            throw new InvalidKeystoreException("Invalid master fingerprint of " + keyDerivation.getMasterFingerprint());
         }
 
         if(source == KeystoreSource.SW_SEED) {
             if(seed == null) {
-                return false;
+                throw new InvalidKeystoreException("Source of " + source + " but no seed is present");
             }
 
             if(!seed.isEncrypted()) {
@@ -158,15 +188,13 @@ public class Keystore {
                     DeterministicKey derivedKeyPublicOnly = derivedKey.dropPrivateBytes().dropParent();
                     ExtendedKey xpub = new ExtendedKey(derivedKeyPublicOnly, derivedKey.getParentFingerprint(), derivation.isEmpty() ? ChildNumber.ZERO : derivation.get(derivation.size() - 1));
                     if(!xpub.equals(getExtendedPublicKey())) {
-                        return false;
+                        throw new InvalidKeystoreException("Specified extended public key does not match public key derived from seed");
                     }
                 } catch(MnemonicException e) {
-                    return false;
+                    throw new InvalidKeystoreException("Invalid mnemonic specified for seed", e);
                 }
             }
         }
-
-        return true;
     }
 
     public Keystore copy() {

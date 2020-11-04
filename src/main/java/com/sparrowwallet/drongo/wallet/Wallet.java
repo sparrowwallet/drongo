@@ -764,7 +764,7 @@ public class Wallet {
 
                 psbtInput.setFinalScriptSig(finalizedTxInput.getScriptSig());
                 psbtInput.setFinalScriptWitness(finalizedTxInput.getWitness());
-                psbtInput.clearPrivateFields();
+                psbtInput.clearNonFinalFields();
             }
         }
     }
@@ -799,43 +799,66 @@ public class Wallet {
     }
 
     public boolean isValid() {
-        if(policyType == null || scriptType == null || defaultPolicy == null || keystores.isEmpty()) {
+        try {
+            checkWallet();
+        } catch(InvalidWalletException e) {
             return false;
         }
 
+        return true;
+    }
+
+    public void checkWallet() throws InvalidWalletException {
+        if(policyType == null) {
+            throw new InvalidWalletException("No policy type specified");
+        }
+
+        if(scriptType == null) {
+            throw new InvalidWalletException("No script type specified");
+        }
+
+        if(defaultPolicy == null) {
+            throw new InvalidWalletException("No default policy specified");
+        }
+
+        if(keystores.isEmpty()) {
+            throw new InvalidWalletException("No keystores specified");
+        }
+
         if(!ScriptType.getScriptTypesForPolicyType(policyType).contains(scriptType)) {
-            return false;
+            throw new InvalidWalletException("Script type of " + scriptType + " is not valid for a policy type of " + policyType);
         }
 
         int numSigs;
         try {
             numSigs = defaultPolicy.getNumSignaturesRequired();
         } catch (Exception e) {
-            return false;
+            throw new InvalidWalletException("Cannot determine number of required signatures to sign a transaction");
         }
 
         if(policyType.equals(PolicyType.SINGLE) && (numSigs != 1 || keystores.size() != 1)) {
-            return false;
+            throw new InvalidWalletException(policyType + " wallet needs " + numSigs + " and has " + keystores.size() + " keystores");
         }
 
         if(policyType.equals(PolicyType.MULTI) && (numSigs < 1 || numSigs > keystores.size())) {
-            return false;
+            throw new InvalidWalletException(policyType + " wallet needs " + numSigs + " and has " + keystores.size() + " keystores");
         }
 
         if(containsDuplicateKeystoreLabels()) {
-            return false;
+            throw new InvalidWalletException("Wallet keystores have duplicate labels");
         }
 
         for(Keystore keystore : keystores) {
-            if(!keystore.isValid()) {
-                return false;
+            try {
+                keystore.checkKeystore();
+            } catch(InvalidKeystoreException e) {
+                throw new InvalidWalletException("Keystore " + keystore.getLabel() + " is invalid (" + e.getMessage() + ")", e);
             }
+
             if(derivationMatchesAnotherScriptType(keystore.getKeyDerivation().getDerivationPath())) {
-                return false;
+                throw new InvalidWalletException("Keystore " + keystore.getLabel() + " derivation of " + keystore.getKeyDerivation().getDerivationPath() + " in " + scriptType.getName() + " wallet matches another default script type.");
             }
         }
-
-        return true;
     }
 
     public boolean derivationMatchesAnotherScriptType(String derivationPath) {

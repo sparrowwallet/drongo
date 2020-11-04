@@ -538,7 +538,7 @@ public class PSBTInput {
         return getWitnessUtxo() != null ? getWitnessUtxo() : (getNonWitnessUtxo() != null ?  getNonWitnessUtxo().getOutputs().get(vout) : null);
     }
 
-    public void clearPrivateFields() {
+    public void clearNonFinalFields() {
         partialSignatures.clear();
         sigHash = null;
         redeemScript = null;

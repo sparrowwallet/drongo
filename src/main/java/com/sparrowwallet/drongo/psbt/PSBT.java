@@ -533,15 +533,14 @@ public class PSBT {
         try {
             PSBT publicCopy = new PSBT(serialize());
             publicCopy.extendedPublicKeys.clear();
+            publicCopy.globalProprietary.clear();
             for(PSBTInput psbtInput : publicCopy.getPsbtInputs()) {
-                psbtInput.clearPrivateFields();
+                psbtInput.getDerivedPublicKeys().clear();
+                psbtInput.getProprietary().clear();
             }
             for(PSBTOutput psbtOutput : publicCopy.getPsbtOutputs()) {
                 psbtOutput.getDerivedPublicKeys().clear();
                 psbtOutput.getProprietary().clear();
-            }
-            if(publicCopy.isFinalized()) {
-                publicCopy.transaction = publicCopy.extractTransaction();
             }
 
             return publicCopy;
