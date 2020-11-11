@@ -42,6 +42,14 @@ public class DeterministicKey extends ECKey {
 
     public DeterministicKey(List<ChildNumber> childNumberPath,
                             byte[] chainCode,
+                            byte[] publicKey,
+                            int depth,
+                            byte[] parentFingerprint) {
+        this(childNumberPath, chainCode, new LazyECPoint(ECKey.CURVE.getCurve(), publicKey), depth, parentFingerprint);
+    }
+
+    public DeterministicKey(List<ChildNumber> childNumberPath,
+                            byte[] chainCode,
                             LazyECPoint publicAsPoint,
                             BigInteger priv,
                             DeterministicKey parent) {
