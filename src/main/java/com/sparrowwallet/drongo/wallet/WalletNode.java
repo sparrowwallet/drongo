@@ -113,8 +113,12 @@ public class WalletNode implements Comparable<WalletNode> {
     }
 
     public Set<BlockTransactionHashIndex> getUnspentTransactionOutputs() {
+        return getUnspentTransactionOutputs(false);
+    }
+
+    public Set<BlockTransactionHashIndex> getUnspentTransactionOutputs(boolean includeMempoolInputs) {
         Set<BlockTransactionHashIndex> unspentTXOs = new TreeSet<>(transactionOutputs);
-        return unspentTXOs.stream().filter(txo -> !txo.isSpent()).collect(Collectors.toCollection(HashSet::new));
+        return unspentTXOs.stream().filter(txo -> !txo.isSpent() || (includeMempoolInputs && txo.getSpentBy().getHeight() <= 0)).collect(Collectors.toCollection(HashSet::new));
     }
 
     public long getUnspentValue() {
