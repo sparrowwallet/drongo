@@ -9,6 +9,7 @@ public class BlockTransactionHashIndex extends BlockTransactionHash implements C
     private final long index;
     private final long value;
     private BlockTransactionHashIndex spentBy;
+    private Status status;
 
     public BlockTransactionHashIndex(Sha256Hash hash, int height, Date date, Long fee, long index, long value) {
         this(hash, height, date, fee, index, value, null);
@@ -39,6 +40,14 @@ public class BlockTransactionHashIndex extends BlockTransactionHash implements C
 
     public void setSpentBy(BlockTransactionHashIndex spentBy) {
         this.spentBy = spentBy;
+    }
+
+    public Status getStatus() {
+        return status;
+    }
+
+    public void setStatus(Status status) {
+        this.status = status;
     }
 
     @Override
