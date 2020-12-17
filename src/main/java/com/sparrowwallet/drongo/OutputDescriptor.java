@@ -252,12 +252,20 @@ public class OutputDescriptor {
     }
 
     public static OutputDescriptor getOutputDescriptor(Wallet wallet) {
+        return getOutputDescriptor(wallet, null);
+    }
+
+    public static OutputDescriptor getOutputDescriptor(Wallet wallet, KeyPurpose keyPurpose) {
         Map<ExtendedKey, KeyDerivation> extendedKeyDerivationMap = new LinkedHashMap<>();
+        Map<ExtendedKey, String> extendedKeyChildDerivationMap = new LinkedHashMap<>();
         for(Keystore keystore : wallet.getKeystores()) {
             extendedKeyDerivationMap.put(keystore.getExtendedPublicKey(), keystore.getKeyDerivation());
+            if(keyPurpose != null) {
+                extendedKeyChildDerivationMap.put(keystore.getExtendedPublicKey(), keyPurpose.getPathIndex().num() + "/*");
+            }
         }
 
-        return new OutputDescriptor(wallet.getScriptType(), wallet.getDefaultPolicy().getNumSignaturesRequired(), extendedKeyDerivationMap);
+        return new OutputDescriptor(wallet.getScriptType(), wallet.getDefaultPolicy().getNumSignaturesRequired(), extendedKeyDerivationMap, extendedKeyChildDerivationMap);
     }
 
     // See https://github.com/bitcoin/bitcoin/blob/master/doc/descriptors.md
@@ -404,6 +412,10 @@ public class OutputDescriptor {
     }
 
     public String toString(boolean addChecksum) {
+        return toString(true, addChecksum);
+    }
+
+    public String toString(boolean addKeyOrigin, boolean addChecksum) {
         StringBuilder builder = new StringBuilder();
         builder.append(scriptType.getDescriptor());
 
@@ -412,14 +424,14 @@ public class OutputDescriptor {
             StringJoiner joiner = new StringJoiner(",");
             joiner.add(Integer.toString(multisigThreshold));
             for(ExtendedKey pubKey : extendedPublicKeys.keySet()) {
-                String extKeyString = toString(pubKey);
+                String extKeyString = toString(pubKey, addKeyOrigin);
                 joiner.add(extKeyString);
             }
             builder.append(joiner.toString());
             builder.append(ScriptType.MULTISIG.getCloseDescriptor());
         } else {
             ExtendedKey extendedPublicKey = getSingletonExtendedPublicKey();
-            builder.append(toString(extendedPublicKey));
+            builder.append(toString(extendedPublicKey, addKeyOrigin));
         }
         builder.append(scriptType.getCloseDescriptor());
 
@@ -432,10 +444,10 @@ public class OutputDescriptor {
         return builder.toString();
     }
 
-    private String toString(ExtendedKey pubKey) {
+    private String toString(ExtendedKey pubKey, boolean addKeyOrigin) {
         StringBuilder keyBuilder = new StringBuilder();
         KeyDerivation keyDerivation = extendedPublicKeys.get(pubKey);
-        if(keyDerivation != null && keyDerivation.getDerivationPath() != null) {
+        if(keyDerivation != null && keyDerivation.getDerivationPath() != null && addKeyOrigin) {
             keyBuilder.append("[");
             if(keyDerivation.getMasterFingerprint() != null) {
                 keyBuilder.append(keyDerivation.getMasterFingerprint());
