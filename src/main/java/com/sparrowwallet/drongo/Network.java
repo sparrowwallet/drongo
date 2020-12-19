@@ -1,11 +1,11 @@
 package com.sparrowwallet.drongo;
 
 public enum Network {
-    MAINNET("mainnet", 0, "1", 5, "3", "bc", ExtendedKey.Header.xprv, ExtendedKey.Header.xpub),
-    TESTNET("testnet", 111, "mn", 196, "2", "tb", ExtendedKey.Header.tprv, ExtendedKey.Header.tpub),
-    REGTEST("regtest", 111, "mn", 196, "2", "bcrt", ExtendedKey.Header.tprv, ExtendedKey.Header.tpub);
+    MAINNET("mainnet", 0, "1", 5, "3", "bc", ExtendedKey.Header.xprv, ExtendedKey.Header.xpub, 8332),
+    TESTNET("testnet", 111, "mn", 196, "2", "tb", ExtendedKey.Header.tprv, ExtendedKey.Header.tpub, 18332),
+    REGTEST("regtest", 111, "mn", 196, "2", "bcrt", ExtendedKey.Header.tprv, ExtendedKey.Header.tpub, 18443);
 
-    Network(String name, int p2pkhAddressHeader, String p2pkhAddressPrefix, int p2shAddressHeader, String p2shAddressPrefix, String bech32AddressHrp, ExtendedKey.Header xprvHeader, ExtendedKey.Header xpubHeader) {
+    Network(String name, int p2pkhAddressHeader, String p2pkhAddressPrefix, int p2shAddressHeader, String p2shAddressPrefix, String bech32AddressHrp, ExtendedKey.Header xprvHeader, ExtendedKey.Header xpubHeader, int defaultPort) {
         this.name = name;
         this.p2pkhAddressHeader = p2pkhAddressHeader;
         this.p2pkhAddressPrefix = p2pkhAddressPrefix;
@@ -14,6 +14,7 @@ public enum Network {
         this.bech32AddressHrp = bech32AddressHrp;
         this.xprvHeader = xprvHeader;
         this.xpubHeader = xpubHeader;
+        this.defaultPort = defaultPort;
     }
 
     private final String name;
@@ -24,6 +25,7 @@ public enum Network {
     private final String bech32AddressHrp;
     private final ExtendedKey.Header xprvHeader;
     private final ExtendedKey.Header xpubHeader;
+    private final int defaultPort;
 
     private static Network currentNetwork;
 
@@ -49,6 +51,10 @@ public enum Network {
 
     public ExtendedKey.Header getXpubHeader() {
         return xpubHeader;
+    }
+
+    public int getDefaultPort() {
+        return defaultPort;
     }
 
     public boolean hasP2PKHAddressPrefix(String address) {

@@ -31,6 +31,7 @@ public class Wallet {
     private final Map<Sha256Hash, BlockTransaction> transactions = new HashMap<>();
     private Integer storedBlockHeight;
     private Integer gapLimit;
+    private Date birthDate;
 
     public Wallet() {
     }
@@ -40,9 +41,14 @@ public class Wallet {
     }
 
     public Wallet(String name, PolicyType policyType, ScriptType scriptType) {
+        this(name, policyType, scriptType, null);
+    }
+
+    public Wallet(String name, PolicyType policyType, ScriptType scriptType, Date birthDate) {
         this.name = name;
         this.policyType = policyType;
         this.scriptType = scriptType;
+        this.birthDate = birthDate;
         this.keystores = Collections.singletonList(new Keystore());
         this.defaultPolicy = Policy.getPolicy(policyType, scriptType, keystores, null);
     }
@@ -102,6 +108,10 @@ public class Wallet {
         }
 
         transactions.putAll(updatedTransactions);
+
+        if(!transactions.isEmpty()) {
+            birthDate = transactions.values().stream().map(BlockTransactionHash::getDate).filter(Objects::nonNull).min(Date::compareTo).orElse(birthDate);
+        }
     }
 
     public Integer getStoredBlockHeight() {
@@ -118,6 +128,14 @@ public class Wallet {
 
     public void setGapLimit(int gapLimit) {
         this.gapLimit = gapLimit;
+    }
+
+    public Date getBirthDate() {
+        return birthDate;
+    }
+
+    public void setBirthDate(Date birthDate) {
+        this.birthDate = birthDate;
     }
 
     public synchronized WalletNode getNode(KeyPurpose keyPurpose) {
@@ -933,6 +951,7 @@ public class Wallet {
         }
         copy.setStoredBlockHeight(getStoredBlockHeight());
         copy.gapLimit = gapLimit;
+        copy.birthDate = birthDate;
 
         return copy;
     }
