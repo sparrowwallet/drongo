@@ -26,6 +26,7 @@ public class OutputDescriptor {
     private static final String CHECKSUM_CHARSET = "qpzry9x8gf2tvdw0s3jn54khce6mua7l";
 
     private static final Pattern XPUB_PATTERN = Pattern.compile("(\\[[^\\]]+\\])?(.pub[^/\\,)]{100,112})(/[/\\d*'hH]+)?");
+    private static final Pattern PUBKEY_PATTERN = Pattern.compile("(\\[[^\\]]+\\])?(0[23][0-9a-fA-F]{32})");
     private static final Pattern MULTI_PATTERN = Pattern.compile("multi\\(([\\d+])");
     private static final Pattern KEY_ORIGIN_PATTERN = Pattern.compile("\\[([A-Fa-f0-9]{8})([/\\d'hH]+)\\]");
     private static final Pattern CHECKSUM_PATTERN = Pattern.compile("#([" + CHECKSUM_CHARSET + "]{8})$");
@@ -338,6 +339,13 @@ public class OutputDescriptor {
                 keyChildDerivationMap.put(extendedPublicKey, childDerivationPath);
             } catch(ProtocolException e) {
                 throw new ProtocolException("Invalid xpub: " + e.getMessage());
+            }
+        }
+
+        if(keyDerivationMap.isEmpty()) {
+            Matcher pubKeyMatcher = PUBKEY_PATTERN.matcher(descriptor);
+            if(pubKeyMatcher.find()) {
+                throw new IllegalArgumentException("Descriptors with single public keys are not supported - use descriptors with xpubs");
             }
         }
 
