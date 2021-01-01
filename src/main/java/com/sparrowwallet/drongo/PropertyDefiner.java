@@ -11,6 +11,10 @@ public class PropertyDefiner extends PropertyDefinerBase {
 
     @Override
     public String getPropertyValue() {
+        if(System.getProperty(application.toLowerCase() + ".home") != null) {
+            return System.getProperty(application.toLowerCase() + ".home");
+        }
+
         return isWindows() ? System.getenv("APPDATA") + "/" + application.substring(0, 1).toUpperCase() + application.substring(1).toLowerCase() : System.getProperty("user.home") + "/." + application.toLowerCase();
     }
 
