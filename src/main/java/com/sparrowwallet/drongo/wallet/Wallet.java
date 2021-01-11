@@ -16,6 +16,7 @@ import java.util.*;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
+import static com.sparrowwallet.drongo.protocol.ScriptType.*;
 import static com.sparrowwallet.drongo.protocol.Transaction.WITNESS_SCALE_FACTOR;
 
 public class Wallet {
@@ -644,6 +645,101 @@ public class Wallet {
         }
 
         return true;
+    }
+
+    public boolean canSign(Transaction transaction) {
+        return isValid() && !getSigningNodes(transaction).isEmpty();
+    }
+
+    /**
+     * Determines which nodes in this wallet can sign which inputs in the provided transaction
+     *
+     * @param transaction The transaction to be signed, or that has been signed
+     * @return A map if the PSBT inputs and the nodes that can sign them
+     */
+    public Map<TransactionInput, WalletNode> getSigningNodes(Transaction transaction) {
+        Map<TransactionInput, WalletNode> signingNodes = new LinkedHashMap<>();
+        Map<Script, WalletNode> walletOutputScripts = getWalletOutputScripts();
+
+        for(TransactionInput txInput : transaction.getInputs()) {
+            BlockTransaction blockTransaction = transactions.get(txInput.getOutpoint().getHash());
+            if(blockTransaction != null && blockTransaction.getTransaction().getOutputs().size() > txInput.getOutpoint().getIndex()) {
+                TransactionOutput utxo = blockTransaction.getTransaction().getOutputs().get((int)txInput.getOutpoint().getIndex());
+
+                if(utxo != null) {
+                    Script scriptPubKey = utxo.getScript();
+                    WalletNode signingNode = walletOutputScripts.get(scriptPubKey);
+                    if(signingNode != null) {
+                        signingNodes.put(txInput, signingNode);
+                    }
+                }
+            }
+        }
+
+        return signingNodes;
+    }
+
+    /**
+     * Determines which keystores have signed a transaction
+     *
+     * @param transaction The signed transaction
+     * @return A map keyed with the transactionInput mapped to a map of the signatures and associated keystores that signed it
+     */
+    public Map<TransactionInput, Map<TransactionSignature, Keystore>> getSignedKeystores(Transaction transaction) {
+        Map<TransactionInput, WalletNode> signingNodes = getSigningNodes(transaction);
+        Map<TransactionInput, Map<TransactionSignature, Keystore>> signedKeystores = new LinkedHashMap<>();
+
+        for(TransactionInput txInput : signingNodes.keySet()) {
+            WalletNode walletNode = signingNodes.get(txInput);
+            Map<ECKey, Keystore> keystoreKeysForNode = getKeystores().stream().collect(Collectors.toMap(keystore -> keystore.getPubKey(walletNode), Function.identity(),
+                    (u, v) -> { throw new IllegalStateException("Duplicate keys from different keystores for node " + walletNode.getDerivationPath()); },
+                    LinkedHashMap::new));
+
+            Map<ECKey, TransactionSignature> keySignatureMap = new LinkedHashMap<>();
+
+            BlockTransaction blockTransaction = transactions.get(txInput.getOutpoint().getHash());
+            if(blockTransaction != null && blockTransaction.getTransaction().getOutputs().size() > txInput.getOutpoint().getIndex()) {
+                TransactionOutput spentTxo = blockTransaction.getTransaction().getOutputs().get((int)txInput.getOutpoint().getIndex());
+
+                Script signingScript = getSigningScript(txInput, spentTxo);
+                Sha256Hash hash = txInput.hasWitness() ? transaction.hashForWitnessSignature(txInput.getIndex(), signingScript, spentTxo.getValue(), SigHash.ALL) : transaction.hashForLegacySignature(txInput.getIndex(), signingScript, SigHash.ALL);
+
+                for(ECKey sigPublicKey : keystoreKeysForNode.keySet()) {
+                    for(TransactionSignature signature : txInput.hasWitness() ? txInput.getWitness().getSignatures() : txInput.getScriptSig().getSignatures()) {
+                        if(sigPublicKey.verify(hash, signature)) {
+                            keySignatureMap.put(sigPublicKey, signature);
+                        }
+                    }
+                }
+
+                keystoreKeysForNode.keySet().retainAll(keySignatureMap.keySet());
+
+                Map<TransactionSignature, Keystore> inputSignatureKeystores = new LinkedHashMap<>();
+                for(ECKey signingKey : keystoreKeysForNode.keySet()) {
+                    inputSignatureKeystores.put(keySignatureMap.get(signingKey), keystoreKeysForNode.get(signingKey));
+                }
+
+                signedKeystores.put(txInput, inputSignatureKeystores);
+            }
+        }
+
+        return signedKeystores;
+    }
+
+    private Script getSigningScript(TransactionInput txInput, TransactionOutput spentTxo) {
+        Script signingScript = spentTxo.getScript();
+
+        if(P2SH.isScriptType(signingScript)) {
+            signingScript = txInput.getScriptSig().getFirstNestedScript();
+        }
+
+        if(P2WPKH.isScriptType(signingScript)) {
+            signingScript = ScriptType.P2PKH.getOutputScript(signingScript.getPubKeyHash());
+        } else if(P2WSH.isScriptType(signingScript) && txInput.hasWitness()) {
+            signingScript = txInput.getWitness().getWitnessScript();
+        }
+
+        return signingScript;
     }
 
     public boolean canSign(PSBT psbt) {
