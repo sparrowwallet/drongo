@@ -10,6 +10,7 @@ import java.util.List;
 
 public class Keystore {
     public static final String DEFAULT_LABEL = "Keystore 1";
+    public static final int MAX_LABEL_LENGTH = 16;
 
     private String label;
     private KeystoreSource source = KeystoreSource.SW_WATCH;
@@ -164,7 +165,7 @@ public class Keystore {
             throw new InvalidKeystoreException("Label too short");
         }
 
-        if(label.replace(" ", "").length() > 16) {
+        if(label.replace(" ", "").length() > MAX_LABEL_LENGTH) {
             throw new InvalidKeystoreException("Label too long");
         }
 
