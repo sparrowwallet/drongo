@@ -17,6 +17,8 @@
 
 package com.sparrowwallet.drongo.protocol;
 
+import com.sparrowwallet.drongo.crypto.Groestl;
+
 import java.math.BigInteger;
 import java.util.Arrays;
 
@@ -99,7 +101,7 @@ public class Base58 {
         // data bytes + 4 bytes check code (a truncated hash)
         byte[] addressBytes = new byte[payload.length + 4];
         System.arraycopy(payload, 0, addressBytes, 0, payload.length);
-        byte[] checksum = Sha256Hash.hashTwice(addressBytes, 0, payload.length);
+        byte[] checksum = Groestl.digest(addressBytes, 0, payload.length);
         System.arraycopy(checksum, 0, addressBytes, payload.length, 4);
         return Base58.encode(addressBytes);
     }
@@ -184,7 +186,7 @@ public class Base58 {
             throw new ProtocolException("Input too short: " + decoded.length);
         byte[] data = Arrays.copyOfRange(decoded, 0, decoded.length - 4);
         byte[] checksum = Arrays.copyOfRange(decoded, decoded.length - 4, decoded.length);
-        byte[] actualChecksum = Arrays.copyOfRange(Sha256Hash.hashTwice(data), 0, 4);
+        byte[] actualChecksum = Arrays.copyOfRange(Groestl.digest(data), 0, 4);
         if (!Arrays.equals(checksum, actualChecksum))
             throw new ProtocolException("Invalid checksum");
         return data;

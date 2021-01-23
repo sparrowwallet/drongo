@@ -719,7 +719,7 @@ public class ECKey implements EncryptableItem {
      */
     public String signMessage(String message, ScriptType scriptType, Key aesKey) throws KeyCrypterException {
         byte[] data = formatMessageForSigning(message);
-        Sha256Hash hash = Sha256Hash.twiceOf(data);
+        Sha256Hash hash = Sha256Hash.of(data);
         ECDSASignature sig = sign(hash, aesKey);
         byte recId = findRecoveryId(hash, sig);
         int headerByte = recId + getSigningTypeConstant(scriptType);
@@ -785,7 +785,7 @@ public class ECKey implements EncryptableItem {
         byte[] messageBytes = formatMessageForSigning(message);
         // Note that the C++ code doesn't actually seem to specify any character encoding. Presumably it's whatever
         // JSON-SPIRIT hands back. Assume UTF-8 for now.
-        Sha256Hash messageHash = Sha256Hash.twiceOf(messageBytes);
+        Sha256Hash messageHash = Sha256Hash.of(messageBytes);
         boolean compressed = false;
         if(header >= 39) { // this is a bech32 signature
             header -= 12;
@@ -1156,7 +1156,7 @@ public class ECKey implements EncryptableItem {
     }
 
     /** The string that prefixes all text messages signed using Bitcoin keys. */
-    private static final String BITCOIN_SIGNED_MESSAGE_HEADER = "Bitcoin Signed Message:\n";
+    private static final String BITCOIN_SIGNED_MESSAGE_HEADER = "GroestlCoin Signed Message:\n";
     private static final byte[] BITCOIN_SIGNED_MESSAGE_HEADER_BYTES = BITCOIN_SIGNED_MESSAGE_HEADER.getBytes(StandardCharsets.UTF_8);
 
     /**
