@@ -6,7 +6,7 @@ import org.junit.Test;
 public class BitcoinUriTest {
     @Test
     public void testSamourai() throws BitcoinURIParseException {
-        String uri = "bitcoin:BC1QT4NRM47695YWDG9N30N68JARMXRJNKFMR36994?amount=0,001";
+        String uri = "groestlcoin:BC1QT4NRM47695YWDG9N30N68JARMXRJNKFMR36994?amount=0,001";
         BitcoinURI bitcoinURI = new BitcoinURI(uri);
 
         Assert.assertEquals("BC1QT4NRM47695YWDG9N30N68JARMXRJNKFMR36994".toLowerCase(), bitcoinURI.getAddress().toString());
