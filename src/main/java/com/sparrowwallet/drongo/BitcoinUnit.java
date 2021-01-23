@@ -6,15 +6,15 @@ public enum BitcoinUnit {
     AUTO("Auto") {
         @Override
         public long getSatsValue(double unitValue) {
-            throw new UnsupportedOperationException("Auto unit cannot convert bitcoin values");
+            throw new UnsupportedOperationException("Auto unit cannot convert groestlcoin values");
         }
 
         @Override
         public double getValue(long satsValue) {
-            throw new UnsupportedOperationException("Auto unit cannot convert bitcoin values");
+            throw new UnsupportedOperationException("Auto unit cannot convert groestlcoin values");
         }
     },
-    BTC("BTC") {
+    BTC("GRS") {
         @Override
         public long getSatsValue(double unitValue) {
             return (long)(unitValue * Transaction.SATOSHIS_PER_BITCOIN);
@@ -25,7 +25,7 @@ public enum BitcoinUnit {
             return (double)satsValue / Transaction.SATOSHIS_PER_BITCOIN;
         }
     },
-    SATOSHIS("sats") {
+    SATOSHIS("gro") {
         @Override
         public long getSatsValue(double unitValue) {
             return (long)unitValue;
