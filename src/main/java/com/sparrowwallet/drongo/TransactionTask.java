@@ -123,7 +123,7 @@ public class TransactionTask implements Runnable {
                 builder.append("Wallet ").append(wallet.getName()).append(" received to address").append(toAddresses.size() == 1 ? " " : "es ");
                 StringJoiner toJoiner = new StringJoiner(", ", "[", "]");
                 for(Address address : toAddresses.keySet()) {
-                    toJoiner.add(address.toString() + " [" + Utils.formatHDPath(wallet.getAddressPath(address)) + "]" + " (" + toAddresses.get(address) + " sats)");
+                    toJoiner.add(address.toString() + " [" + Utils.formatHDPath(wallet.getAddressPath(address)) + "]" + " (" + toAddresses.get(address) + " gros)");
                 }
                 builder.append(toJoiner.toString()).append(" in txid ").append(transaction.getTxId());
                 log.info(builder.toString());

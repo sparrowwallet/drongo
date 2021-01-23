@@ -52,7 +52,7 @@ public class BitcoinJSONRPCClient {
 
             conn.setRequestProperty("Authorization", "Basic " + authStr);
             byte[] r = prepareRequest(method, o);
-            log.debug("Bitcoin JSON-RPC request: " + new String(r, QUERY_CHARSET));
+            log.debug("Groestlcoin JSON-RPC request: " + new String(r, QUERY_CHARSET));
             conn.getOutputStream().write(r);
             conn.getOutputStream().close();
             int responseCode = conn.getResponseCode();
@@ -101,7 +101,7 @@ public class BitcoinJSONRPCClient {
     public Object loadResponse(InputStream in, Object expectedID, boolean close) throws IOException, BitcoinRPCException {
         try {
             String r = new String(loadStream(in, close), QUERY_CHARSET);
-            log.debug("Bitcoin JSON-RPC response: " + r);
+            log.debug("Groestlcoin JSON-RPC response: " + r);
             try {
                 JSONParser jsonParser = new JSONParser();
                 Map response = (Map) jsonParser.parse(r);

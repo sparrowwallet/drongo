@@ -359,9 +359,9 @@ public class DeterministicSeed implements EncryptableItem {
                 return Bip39MnemonicCode.toSeed(mnemonicCode, passphrase);
             }
         },
-        ELECTRUM("Mnemonic Words (Electrum Seed Version System)") {
+        ELECTRUM("Mnemonic Words (Electrum-GRS Seed Version System)") {
             public byte[] getEntropyBytes(List<String> mnemonicCode) throws MnemonicException {
-                throw new MnemonicException("Electrum seeds do not provide entropy bytes");
+                throw new MnemonicException("Electrum-GRS seeds do not provide entropy bytes");
             }
 
             public void check(List<String> mnemonicCode) throws MnemonicException {
