@@ -60,6 +60,7 @@ dependencies {
         exclude group: 'org.hamcrest', module: 'hamcrest-core'
     }
     testImplementation group: 'org.hamcrest', name: 'hamcrest-core', version: '2.2'
+    implementation 'de.sfuhrm:saphir-hash-core:3.0.5'
 }
 
 task(runDrongo, dependsOn: 'classes', type: JavaExec) {
