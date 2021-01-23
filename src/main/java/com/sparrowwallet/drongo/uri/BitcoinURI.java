@@ -66,7 +66,7 @@ public class BitcoinURI {
     public static final String FIELD_PAYJOIN_URL = "pj";
     public static final String FIELD_PAYJOIN_OUTPUT_SUBSTITUTION = "pjos";
 
-    public static final String BITCOIN_SCHEME = "bitcoin";
+    public static final String BITCOIN_SCHEME = "groestlcoin";
     private static final String ENCODED_SPACE_CHARACTER = "%20";
     private static final String AMPERSAND_SEPARATOR = "&";
     private static final String QUESTION_MARK_SEPARATOR = "?";
@@ -119,7 +119,7 @@ public class BitcoinURI {
         // Split off the address from the rest of the query parameters.
         String[] addressSplitTokens = schemeSpecificPart.split("\\?", 2);
         if(addressSplitTokens.length == 0) {
-            throw new BitcoinURIParseException("No data found after the bitcoin: prefix");
+            throw new BitcoinURIParseException("No data found after the groestlcoin: prefix");
         }
         String addressToken = addressSplitTokens[0];  // may be empty!
 
@@ -159,10 +159,10 @@ public class BitcoinURI {
         for(String nameValuePairToken : nameValuePairTokens) {
             final int sepIndex = nameValuePairToken.indexOf('=');
             if(sepIndex == -1) {
-                throw new BitcoinURIParseException("Malformed Bitcoin URI - no separator in '" + nameValuePairToken + "'");
+                throw new BitcoinURIParseException("Malformed Groestlcoin URI - no separator in '" + nameValuePairToken + "'");
             }
             if(sepIndex == 0) {
-                throw new BitcoinURIParseException("Malformed Bitcoin URI - empty name '" + nameValuePairToken + "'");
+                throw new BitcoinURIParseException("Malformed Groestlcoin URI - empty name '" + nameValuePairToken + "'");
             }
             final String nameToken = nameValuePairToken.substring(0, sepIndex).toLowerCase(Locale.ENGLISH);
             final String valueToken = nameValuePairToken.substring(sepIndex + 1);
@@ -226,7 +226,7 @@ public class BitcoinURI {
 
     /**
      * @return The amount name encoded using a pure integer value based at
-     * 10,000,000 units is 1 BTC. May be null if no amount is specified
+     * 10,000,000 units is 1 GRS. May be null if no amount is specified
      */
     public Long getAmount() {
         return (Long)parameterMap.get(FIELD_AMOUNT);
@@ -311,7 +311,7 @@ public class BitcoinURI {
 
     @Override
     public String toString() {
-        StringBuilder builder = new StringBuilder("BitcoinURI[");
+        StringBuilder builder = new StringBuilder("GroestlcoinURI[");
         boolean first = true;
         for(Map.Entry<String, Object> entry : parameterMap.entrySet()) {
             if(first) {
