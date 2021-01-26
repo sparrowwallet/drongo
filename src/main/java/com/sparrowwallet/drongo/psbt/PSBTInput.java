@@ -48,16 +48,20 @@ public class PSBTInput {
         this.index = index;
     }
 
-    PSBTInput(ScriptType scriptType, Transaction transaction, int index, Transaction utxo, int utxoIndex, Script redeemScript, Script witnessScript, Map<ECKey, KeyDerivation> derivedPublicKeys, Map<String, String> proprietary) {
+    PSBTInput(ScriptType scriptType, Transaction transaction, int index, Transaction utxo, int utxoIndex, Script redeemScript, Script witnessScript, Map<ECKey, KeyDerivation> derivedPublicKeys, Map<String, String> proprietary, boolean alwaysAddNonWitnessTx) {
         this(transaction, index);
         sigHash = SigHash.ALL;
 
         if(Arrays.asList(ScriptType.WITNESS_TYPES).contains(scriptType)) {
             this.witnessUtxo = utxo.getOutputs().get(utxoIndex);
+        } else {
+            this.nonWitnessUtxo = utxo;
         }
 
-        //Add non-witness UTXO to segwit types to handle Trezor and Ledger requirements
-        this.nonWitnessUtxo = utxo;
+        if(alwaysAddNonWitnessTx) {
+            //Add non-witness UTXO to segwit types to handle Trezor, Bitbox and Ledger requirements
+            this.nonWitnessUtxo = utxo;
+        }
 
         this.redeemScript = redeemScript;
         this.witnessScript = witnessScript;

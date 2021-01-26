@@ -35,6 +35,14 @@ public enum WalletModel {
         return this.toString().toLowerCase();
     }
 
+    public boolean alwaysIncludeNonWitnessUtxo() {
+        if(this == COLDCARD || this == COBO_VAULT) {
+            return false;
+        }
+
+        return true;
+    }
+
     public boolean requiresPinPrompt() {
         return (this == TREZOR_1 || this == KEEPKEY);
     }

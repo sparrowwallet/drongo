@@ -87,6 +87,8 @@ public class PSBT {
             this.version = version;
         }
 
+        boolean alwaysIncludeWitnessUtxo = wallet.getKeystores().stream().anyMatch(keystore -> keystore.getWalletModel().alwaysIncludeNonWitnessUtxo());
+
         int inputIndex = 0;
         for(Iterator<Map.Entry<BlockTransactionHashIndex, WalletNode>> iter = walletTransaction.getSelectedUtxos().entrySet().iterator(); iter.hasNext(); inputIndex++) {
             Map.Entry<BlockTransactionHashIndex, WalletNode> utxoEntry = iter.next();
@@ -112,7 +114,7 @@ public class PSBT {
                 derivedPublicKeys.put(keystore.getPubKey(walletNode), keystore.getKeyDerivation().extend(walletNode.getDerivation()));
             }
 
-            PSBTInput psbtInput = new PSBTInput(wallet.getScriptType(), transaction, inputIndex, utxo, utxoIndex, redeemScript, witnessScript, derivedPublicKeys, Collections.emptyMap());
+            PSBTInput psbtInput = new PSBTInput(wallet.getScriptType(), transaction, inputIndex, utxo, utxoIndex, redeemScript, witnessScript, derivedPublicKeys, Collections.emptyMap(), alwaysIncludeWitnessUtxo);
             psbtInputs.add(psbtInput);
         }
 
