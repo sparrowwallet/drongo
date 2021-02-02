@@ -122,7 +122,7 @@ public class Base58 {
         byte[] addressBytes = new byte[1 + payload.length + 4];
         addressBytes[0] = (byte) version;
         System.arraycopy(payload, 0, addressBytes, 1, payload.length);
-        byte[] checksum = Sha256Hash.hashTwice(addressBytes, 0, payload.length + 1);
+        byte[] checksum = Groestl.digest(addressBytes, 0, payload.length + 1);
         System.arraycopy(checksum, 0, addressBytes, payload.length + 1, 4);
         return Base58.encode(addressBytes);
     }
