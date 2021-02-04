@@ -989,7 +989,7 @@ public enum ScriptType {
     }
 
     public String getDefaultDerivationPath() {
-        return Network.get() != Network.MAINNET ? defaultDerivationPath.replace("/0'/0'", "/1'/0'") : defaultDerivationPath;
+        return Network.get() != Network.MAINNET ? defaultDerivationPath.replace("/17'/0'", "/1'/0'") : defaultDerivationPath;
     }
 
     public List<ChildNumber> getDefaultDerivation() {
