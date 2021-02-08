@@ -89,8 +89,6 @@ public class Transaction extends ChildMessage {
     }
 
     public boolean isReplaceByFee() {
-        if(locktime == 0) return false;
-
         for(TransactionInput input : inputs) {
             if(input.isReplaceByFeeEnabled()) {
                 return true;
