@@ -16,7 +16,11 @@ public class BlockTransactionHashIndex extends BlockTransactionHash implements C
     }
 
     public BlockTransactionHashIndex(Sha256Hash hash, int height, Date date, Long fee, long index, long value, BlockTransactionHashIndex spentBy) {
-        super(hash, height, date, fee);
+        this(hash, height, date, fee, index, value, spentBy, null);
+    }
+
+    public BlockTransactionHashIndex(Sha256Hash hash, int height, Date date, Long fee, long index, long value, BlockTransactionHashIndex spentBy, String label) {
+        super(hash, height, date, fee, label);
         this.index = index;
         this.value = value;
         this.spentBy = spentBy;
@@ -92,6 +96,6 @@ public class BlockTransactionHashIndex extends BlockTransactionHash implements C
     }
 
     public BlockTransactionHashIndex copy() {
-        return new BlockTransactionHashIndex(super.getHash(), super.getHeight(), super.getDate(), super.getFee(), index, value, spentBy == null ? null : spentBy.copy());
+        return new BlockTransactionHashIndex(super.getHash(), super.getHeight(), super.getDate(), super.getFee(), index, value, spentBy == null ? null : spentBy.copy(), super.getLabel());
     }
 }

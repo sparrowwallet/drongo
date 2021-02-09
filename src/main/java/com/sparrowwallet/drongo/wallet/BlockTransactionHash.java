@@ -16,11 +16,12 @@ public abstract class BlockTransactionHash {
 
     private String label;
 
-    public BlockTransactionHash(Sha256Hash hash, int height, Date date, Long fee) {
+    public BlockTransactionHash(Sha256Hash hash, int height, Date date, Long fee, String label) {
         this.hash = hash;
         this.height = height;
         this.date = date;
         this.fee = fee;
+        this.label = label;
     }
 
     public Sha256Hash getHash() {

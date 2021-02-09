@@ -18,7 +18,11 @@ public class BlockTransaction extends BlockTransactionHash implements Comparable
     }
 
     public BlockTransaction(Sha256Hash hash, int height, Date date, Long fee, Transaction transaction, Sha256Hash blockHash) {
-        super(hash, height, date, fee);
+        this(hash, height, date, fee, transaction, blockHash, null);
+    }
+
+    public BlockTransaction(Sha256Hash hash, int height, Date date, Long fee, Transaction transaction, Sha256Hash blockHash, String label) {
+        super(hash, height, date, fee, label);
         this.transaction = transaction;
         this.blockHash = blockHash;
     }
