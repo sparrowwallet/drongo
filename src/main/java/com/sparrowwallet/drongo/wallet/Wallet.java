@@ -21,6 +21,7 @@ import static com.sparrowwallet.drongo.protocol.Transaction.WITNESS_SCALE_FACTOR
 
 public class Wallet {
     public static final int DEFAULT_LOOKAHEAD = 20;
+    public static final String ALLOW_DERIVATIONS_MATCHING_OTHER_SCRIPT_TYPES_PROPERTY = "com.sparrowwallet.allowDerivationsMatchingOtherScriptTypes";
 
     private String name;
     private Network network = Network.get();
@@ -980,6 +981,10 @@ public class Wallet {
     }
 
     public boolean derivationMatchesAnotherScriptType(String derivationPath) {
+        if(Boolean.TRUE.toString().equals(System.getProperty(ALLOW_DERIVATIONS_MATCHING_OTHER_SCRIPT_TYPES_PROPERTY))) {
+            return false;
+        }
+
         if(scriptType != null && scriptType.getAccount(derivationPath) > -1) {
             return false;
         }
