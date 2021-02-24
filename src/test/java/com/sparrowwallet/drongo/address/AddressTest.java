@@ -45,6 +45,10 @@ public class AddressTest {
         Address address9 = Address.fromString(Network.TESTNET, "2NCZUtUt6gzXyBiPEQi5yQyrgR6f6F6Ki6A");
         Assert.assertTrue(address9 instanceof P2SHAddress);
         Assert.assertEquals("2NCZUtUt6gzXyBiPEQi5yQyrgR6f6F6Ki6A", address9.toString(Network.TESTNET));
+
+        Address address10 = Address.fromString(Network.SIGNET, "2NCZUtUt6gzXyBiPEQi5yQyrgR6f6F6Ki6A");
+        Assert.assertTrue(address10 instanceof P2SHAddress);
+        Assert.assertEquals("2NCZUtUt6gzXyBiPEQi5yQyrgR6f6F6Ki6A", address10.toString(Network.SIGNET));
     }
 
     @Test
