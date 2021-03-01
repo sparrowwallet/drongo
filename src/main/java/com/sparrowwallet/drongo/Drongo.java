@@ -3,6 +3,7 @@ package com.sparrowwallet.drongo;
 import com.sparrowwallet.drongo.rpc.BitcoinJSONRPCClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.event.Level;
 import org.zeromq.SocketType;
 import org.zeromq.ZContext;
 import org.zeromq.ZMQ;
@@ -73,5 +74,10 @@ public class Drongo {
 
     public List<WatchWallet> getWallets() {
         return watchWallets;
+    }
+
+    public static void setRootLogLevel(Level level) {
+        ch.qos.logback.classic.Logger root = (ch.qos.logback.classic.Logger)LoggerFactory.getLogger(org.slf4j.Logger.ROOT_LOGGER_NAME);
+        root.setLevel(ch.qos.logback.classic.Level.toLevel(level.toString()));
     }
 }

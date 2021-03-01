@@ -3,6 +3,7 @@ open module com.sparrowwallet.drongo {
     requires de.mkammerer.argon2;
     requires slf4j.api;
     requires logback.core;
+    requires logback.classic;
     requires json.simple;
     requires jeromq;
     exports com.sparrowwallet.drongo;
