@@ -497,11 +497,15 @@ public class Wallet {
 
             //If sending all selected utxos, set the recipient amount to equal to total of those utxos less the no change fee
             long maxSendAmt = totalSelectedAmt - noChangeFeeRequiredAmt;
+            if(maxSendAmt < 0) {
+                throw new InsufficientFundsException("Not enough combined value in selected UTXOs for fee of " + noChangeFeeRequiredAmt);
+            }
+
             Optional<Payment> optMaxPayment = payments.stream().filter(payment -> payment.isSendMax()).findFirst();
             if(optMaxPayment.isPresent()) {
                 Payment maxPayment = optMaxPayment.get();
                 maxSendAmt = maxSendAmt - payments.stream().filter(payment -> !maxPayment.equals(payment)).map(Payment::getAmount).mapToLong(v -> v).sum();
-                if(maxPayment.getAmount() != maxSendAmt) {
+                if(maxSendAmt > 0 && maxPayment.getAmount() != maxSendAmt) {
                     maxPayment.setAmount(maxSendAmt);
                     totalPaymentAmount = payments.stream().map(Payment::getAmount).mapToLong(v -> v).sum();
                     continue;
