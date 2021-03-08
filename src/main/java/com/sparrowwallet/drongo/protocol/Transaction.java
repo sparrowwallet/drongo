@@ -303,8 +303,8 @@ public class Transaction extends ChildMessage {
         return length;
     }
 
-    public int getVirtualSize() {
-        return (int)Math.ceil((double)getWeightUnits() / (double)WITNESS_SCALE_FACTOR);
+    public double getVirtualSize() {
+        return (double)getWeightUnits() / (double)WITNESS_SCALE_FACTOR;
     }
 
     public int getWeightUnits() {
