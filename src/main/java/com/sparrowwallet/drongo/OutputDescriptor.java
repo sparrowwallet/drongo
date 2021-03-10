@@ -9,10 +9,7 @@ import com.sparrowwallet.drongo.policy.PolicyType;
 import com.sparrowwallet.drongo.protocol.ProtocolException;
 import com.sparrowwallet.drongo.protocol.Script;
 import com.sparrowwallet.drongo.protocol.ScriptType;
-import com.sparrowwallet.drongo.wallet.Keystore;
-import com.sparrowwallet.drongo.wallet.KeystoreSource;
-import com.sparrowwallet.drongo.wallet.Wallet;
-import com.sparrowwallet.drongo.wallet.WalletModel;
+import com.sparrowwallet.drongo.wallet.*;
 
 import java.math.BigInteger;
 import java.util.*;
@@ -257,12 +254,16 @@ public class OutputDescriptor {
     }
 
     public static OutputDescriptor getOutputDescriptor(Wallet wallet, KeyPurpose keyPurpose) {
+        return getOutputDescriptor(wallet, keyPurpose, null);
+    }
+
+    public static OutputDescriptor getOutputDescriptor(Wallet wallet, KeyPurpose keyPurpose, Integer index) {
         Map<ExtendedKey, KeyDerivation> extendedKeyDerivationMap = new LinkedHashMap<>();
         Map<ExtendedKey, String> extendedKeyChildDerivationMap = new LinkedHashMap<>();
         for(Keystore keystore : wallet.getKeystores()) {
             extendedKeyDerivationMap.put(keystore.getExtendedPublicKey(), keystore.getKeyDerivation());
             if(keyPurpose != null) {
-                extendedKeyChildDerivationMap.put(keystore.getExtendedPublicKey(), keyPurpose.getPathIndex().num() + "/*");
+                extendedKeyChildDerivationMap.put(keystore.getExtendedPublicKey(), keyPurpose.getPathIndex().num() + "/" + (index == null ? "*" : index));
             }
         }
 
@@ -431,7 +432,7 @@ public class OutputDescriptor {
             builder.append(ScriptType.MULTISIG.getDescriptor());
             StringJoiner joiner = new StringJoiner(",");
             joiner.add(Integer.toString(multisigThreshold));
-            for(ExtendedKey pubKey : extendedPublicKeys.keySet()) {
+            for(ExtendedKey pubKey : sortExtendedPubKeys(extendedPublicKeys.keySet())) {
                 String extKeyString = toString(pubKey, addKeyOrigin);
                 joiner.add(extKeyString);
             }
@@ -450,6 +451,26 @@ public class OutputDescriptor {
         }
 
         return builder.toString();
+    }
+
+    private List<ExtendedKey> sortExtendedPubKeys(Collection<ExtendedKey> keys) {
+        List<ExtendedKey> sortedKeys = new ArrayList<>(keys);
+        if(mapChildrenDerivations == null || mapChildrenDerivations.isEmpty()) {
+            return sortedKeys;
+        }
+
+        Utils.LexicographicByteArrayComparator lexicographicByteArrayComparator = new Utils.LexicographicByteArrayComparator();
+        sortedKeys.sort((o1, o2) -> {
+            List<ChildNumber> derivation1 = KeyDerivation.parsePath(mapChildrenDerivations.get(o1));
+            derivation1.add(0, o1.getKeyChildNumber());
+            ECKey key1 = o1.getKey(derivation1);
+            List<ChildNumber> derivation2 = KeyDerivation.parsePath(mapChildrenDerivations.get(o2));
+            derivation2.add(0, o2.getKeyChildNumber());
+            ECKey key2 = o2.getKey(derivation2);
+            return lexicographicByteArrayComparator.compare(key1.getPubKey(), key2.getPubKey());
+        });
+
+        return sortedKeys;
     }
 
     private String toString(ExtendedKey pubKey, boolean addKeyOrigin) {
