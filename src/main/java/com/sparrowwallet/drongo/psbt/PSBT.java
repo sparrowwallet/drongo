@@ -600,11 +600,17 @@ public class PSBT {
     }
 
     public static boolean isPSBT(String s) {
-        if (Utils.isHex(s) && s.startsWith(PSBT_MAGIC_HEX)) {
-            return true;
-        } else {
-            return Utils.isBase64(s) && Utils.bytesToHex(Base64.decode(s)).startsWith(PSBT_MAGIC_HEX);
+        try {
+            if(Utils.isHex(s) && s.startsWith(PSBT_MAGIC_HEX)) {
+                return true;
+            } else {
+                return Utils.isBase64(s) && Utils.bytesToHex(Base64.decode(s)).startsWith(PSBT_MAGIC_HEX);
+            }
+        } catch(Exception e) {
+            //ignore
         }
+
+        return false;
     }
 
     public static PSBT fromString(String strPSBT) throws PSBTParseException {
