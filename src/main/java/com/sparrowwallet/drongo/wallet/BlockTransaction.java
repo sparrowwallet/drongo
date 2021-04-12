@@ -37,6 +37,15 @@ public class BlockTransaction extends BlockTransactionHash implements Comparable
 
     @Override
     public int compareTo(BlockTransaction blkTx) {
+        int blockOrder = compareBlockOrder(blkTx);
+        if(blockOrder != 0) {
+            return blockOrder;
+        }
+
+        return super.compareTo(blkTx);
+    }
+
+    public int compareBlockOrder(BlockTransaction blkTx) {
         if(getHeight() != blkTx.getHeight()) {
             return getComparisonHeight() - blkTx.getComparisonHeight();
         }
@@ -49,7 +58,7 @@ public class BlockTransaction extends BlockTransactionHash implements Comparable
             return -1;
         }
 
-        return super.compareTo(blkTx);
+        return 0;
     }
 
     private static List<HashIndex> getReferencedOutpoints(BlockTransaction blockchainTransaction) {
