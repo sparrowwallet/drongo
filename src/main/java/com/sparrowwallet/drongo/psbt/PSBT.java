@@ -16,6 +16,8 @@ import java.nio.ByteBuffer;
 import java.util.*;
 
 import static com.sparrowwallet.drongo.psbt.PSBTEntry.*;
+import static com.sparrowwallet.drongo.psbt.PSBTInput.PSBT_IN_BIP32_DERIVATION;
+import static com.sparrowwallet.drongo.psbt.PSBTOutput.*;
 
 public class PSBT {
     public static final byte PSBT_GLOBAL_UNSIGNED_TX = 0x00;
@@ -432,6 +434,10 @@ public class PSBT {
     }
 
     public byte[] serialize() {
+        return serialize(true);
+    }
+
+    public byte[] serialize(boolean includeXpubs) {
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
 
         baos.writeBytes(Utils.hexToBytes(PSBT_MAGIC_HEX));
@@ -439,14 +445,18 @@ public class PSBT {
 
         List<PSBTEntry> globalEntries = getGlobalEntries();
         for(PSBTEntry entry : globalEntries) {
-            entry.serializeToStream(baos);
+            if(includeXpubs || (entry.getKeyType() != PSBT_GLOBAL_BIP32_PUBKEY && entry.getKeyType() != PSBT_GLOBAL_PROPRIETARY)) {
+                entry.serializeToStream(baos);
+            }
         }
         baos.writeBytes(new byte[] {(byte)0x00});
 
         for(PSBTInput psbtInput : getPsbtInputs()) {
             List<PSBTEntry> inputEntries = psbtInput.getInputEntries();
             for(PSBTEntry entry : inputEntries) {
-                entry.serializeToStream(baos);
+                if(includeXpubs || entry.getKeyType() != PSBT_IN_BIP32_DERIVATION) {
+                    entry.serializeToStream(baos);
+                }
             }
             baos.writeBytes(new byte[] {(byte)0x00});
         }
@@ -454,7 +464,9 @@ public class PSBT {
         for(PSBTOutput psbtOutput : getPsbtOutputs()) {
             List<PSBTEntry> outputEntries = psbtOutput.getOutputEntries();
             for(PSBTEntry entry : outputEntries) {
-                entry.serializeToStream(baos);
+                if(includeXpubs || (entry.getKeyType() != PSBT_OUT_REDEEM_SCRIPT && entry.getKeyType() != PSBT_OUT_WITNESS_SCRIPT && entry.getKeyType() != PSBT_OUT_BIP32_DERIVATION && entry.getKeyType() != PSBT_OUT_PROPRIETARY)) {
+                    entry.serializeToStream(baos);
+                }
             }
             baos.writeBytes(new byte[] {(byte)0x00});
         }
@@ -584,7 +596,11 @@ public class PSBT {
     }
 
     public String toBase64String() {
-        return Base64.toBase64String(serialize());
+        return toBase64String(true);
+    }
+
+    public String toBase64String(boolean includeXpubs) {
+        return Base64.toBase64String(serialize(includeXpubs));
     }
 
     public static boolean isPSBT(byte[] b) {

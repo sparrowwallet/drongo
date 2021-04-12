@@ -31,8 +31,8 @@ tasks.withType(AbstractArchiveTask) {
 group 'com.sparrowwallet'
 version '0.9'
 
-sourceCompatibility = 1.9
-targetCompatibility = 1.9
+sourceCompatibility = 11
+targetCompatibility = 11
 
 repositories {
     mavenCentral()
