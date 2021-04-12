@@ -555,7 +555,7 @@ public enum ScriptType {
             return List.of(MULTI);
         }
     },
-    P2SH_P2WPKH("P2SH-P2WPKH", "Nested Segwit (P2SH-P2WSH)", "m/49'/0'/0'") {
+    P2SH_P2WPKH("P2SH-P2WPKH", "Nested Segwit (P2SH-P2WPKH)", "m/49'/0'/0'") {
         @Override
         public Address getAddress(byte[] scriptHash) {
             return P2SH.getAddress(scriptHash);
