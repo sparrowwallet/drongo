@@ -437,6 +437,9 @@ public class Transaction extends ChildMessage {
 
     public static boolean isTransaction(byte[] bytes) {
         //Incomplete quick test
+        if(bytes.length == 0) {
+            return false;
+        }
         long version = Utils.readUint32(bytes, 0);
         return version > 0 && version < 5;
     }
