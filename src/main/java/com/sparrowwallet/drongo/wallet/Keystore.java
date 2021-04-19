@@ -32,7 +32,7 @@ public class Keystore {
     }
 
     public String getScriptName() {
-        return label.replace(" ", "").toLowerCase();
+        return label.replace(" ", "");
     }
 
     public void setLabel(String label) {
