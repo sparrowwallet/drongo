@@ -574,7 +574,7 @@ public class Wallet {
         filters.add(new OutputGroup.Filter(1, 6));
         filters.add(new OutputGroup.Filter(1, 1));
         if(includeMempoolChange) {
-            filters.add(new OutputGroup.Filter(0, 1));
+            filters.add(new OutputGroup.Filter(0, 0));
         }
 
         for(OutputGroup.Filter filter : filters) {
