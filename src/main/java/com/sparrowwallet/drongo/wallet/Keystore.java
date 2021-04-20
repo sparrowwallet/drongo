@@ -17,6 +17,7 @@ public class Keystore {
     private WalletModel walletModel = WalletModel.SPARROW;
     private KeyDerivation keyDerivation;
     private ExtendedKey extendedPublicKey;
+    private MasterPrivateExtendedKey masterPrivateExtendedKey;
     private DeterministicSeed seed;
 
     public Keystore() {
@@ -71,6 +72,22 @@ public class Keystore {
         this.extendedPublicKey = extendedPublicKey;
     }
 
+    public boolean hasMasterPrivateExtendedKey() {
+        return masterPrivateExtendedKey != null;
+    }
+
+    public MasterPrivateExtendedKey getMasterPrivateExtendedKey() {
+        return masterPrivateExtendedKey;
+    }
+
+    public void setMasterPrivateExtendedKey(MasterPrivateExtendedKey masterPrivateExtendedKey) {
+        this.masterPrivateExtendedKey = masterPrivateExtendedKey;
+    }
+
+    public boolean hasSeed() {
+        return seed != null;
+    }
+
     public DeterministicSeed getSeed() {
         return seed;
     }
@@ -79,16 +96,28 @@ public class Keystore {
         this.seed = seed;
     }
 
+    public boolean hasPrivateKey() {
+        return hasSeed() || hasMasterPrivateExtendedKey();
+    }
+
     public DeterministicKey getMasterPrivateKey() throws MnemonicException {
-        if(seed == null) {
-            throw new IllegalArgumentException("Keystore does not contain a seed");
+        if(seed == null && masterPrivateExtendedKey == null) {
+            throw new IllegalArgumentException("Keystore does not contain a master private key, or seed to derive one from");
         }
 
-        if(seed.isEncrypted()) {
-            throw new IllegalArgumentException("Seed is encrypted");
+        if(seed != null) {
+            if(seed.isEncrypted()) {
+                throw new IllegalArgumentException("Seed is encrypted");
+            }
+
+            return HDKeyDerivation.createMasterPrivateKey(seed.getSeedBytes());
         }
 
-        return HDKeyDerivation.createMasterPrivateKey(seed.getSeedBytes());
+        if(masterPrivateExtendedKey.isEncrypted()) {
+            throw new IllegalArgumentException("Master private key is encrypted");
+        }
+
+        return masterPrivateExtendedKey.getPrivateKey();
     }
 
     public ExtendedKey getExtendedMasterPrivateKey() throws MnemonicException {
@@ -178,11 +207,11 @@ public class Keystore {
         }
 
         if(source == KeystoreSource.SW_SEED) {
-            if(seed == null) {
-                throw new InvalidKeystoreException("Source of " + source + " but no seed is present");
+            if(seed == null && masterPrivateExtendedKey == null) {
+                throw new InvalidKeystoreException("Source of " + source + " but no seed or master private key is present");
             }
 
-            if(!seed.isEncrypted()) {
+            if((seed != null && !seed.isEncrypted()) || (masterPrivateExtendedKey != null && !masterPrivateExtendedKey.isEncrypted())) {
                 try {
                     List<ChildNumber> derivation = getKeyDerivation().getDerivation();
                     DeterministicKey derivedKey = getExtendedMasterPrivateKey().getKey(derivation);
@@ -208,6 +237,9 @@ public class Keystore {
         if(extendedPublicKey != null) {
             copy.setExtendedPublicKey(extendedPublicKey.copy());
         }
+        if(masterPrivateExtendedKey != null) {
+            copy.setMasterPrivateExtendedKey(masterPrivateExtendedKey.copy());
+        }
         if(seed != null) {
             copy.setSeed(seed.copy());
         }
@@ -217,32 +249,42 @@ public class Keystore {
     public static Keystore fromSeed(DeterministicSeed seed, List<ChildNumber> derivation) throws MnemonicException {
         Keystore keystore = new Keystore();
         keystore.setSeed(seed);
+        keystore.setLabel(seed.getType().name());
+        rederiveKeystoreFromMaster(keystore, derivation);
+        return keystore;
+    }
+
+    public static Keystore fromMasterPrivateExtendedKey(MasterPrivateExtendedKey masterPrivateExtendedKey, List<ChildNumber> derivation) throws MnemonicException {
+        Keystore keystore = new Keystore();
+        keystore.setMasterPrivateExtendedKey(masterPrivateExtendedKey);
+        keystore.setLabel("Master Key");
+        rederiveKeystoreFromMaster(keystore, derivation);
+        return keystore;
+    }
+
+    private static void rederiveKeystoreFromMaster(Keystore keystore, List<ChildNumber> derivation) throws MnemonicException {
         ExtendedKey xprv = keystore.getExtendedMasterPrivateKey();
         String masterFingerprint = Utils.bytesToHex(xprv.getKey().getFingerprint());
         DeterministicKey derivedKey = xprv.getKey(derivation);
         DeterministicKey derivedKeyPublicOnly = derivedKey.dropPrivateBytes().dropParent();
         ExtendedKey xpub = new ExtendedKey(derivedKeyPublicOnly, derivedKey.getParentFingerprint(), derivation.isEmpty() ? ChildNumber.ZERO : derivation.get(derivation.size() - 1));
 
-        keystore.setLabel(seed.getType().name());
         keystore.setSource(KeystoreSource.SW_SEED);
         keystore.setWalletModel(WalletModel.SPARROW);
         keystore.setKeyDerivation(new KeyDerivation(masterFingerprint, KeyDerivation.writePath(derivation)));
         keystore.setExtendedPublicKey(ExtendedKey.fromDescriptor(xpub.toString()));
-
-        return keystore;
-    }
-
-    public boolean hasSeed() {
-        return seed != null;
     }
 
     public boolean isEncrypted() {
-        return seed != null && seed.isEncrypted();
+        return (seed != null && seed.isEncrypted()) || (masterPrivateExtendedKey != null && masterPrivateExtendedKey.isEncrypted());
     }
 
     public void encrypt(Key key) {
         if(hasSeed() && !seed.isEncrypted()) {
             seed = seed.encrypt(key);
+        }
+        if(hasMasterPrivateExtendedKey() && !masterPrivateExtendedKey.isEncrypted()) {
+            masterPrivateExtendedKey = masterPrivateExtendedKey.encrypt(key);
         }
     }
 
@@ -250,17 +292,26 @@ public class Keystore {
         if(hasSeed() && seed.isEncrypted()) {
             seed = seed.decrypt(password);
         }
+        if(hasMasterPrivateExtendedKey() && masterPrivateExtendedKey.isEncrypted()) {
+            masterPrivateExtendedKey = masterPrivateExtendedKey.decrypt(password);
+        }
     }
 
     public void decrypt(Key key) {
         if(hasSeed() && seed.isEncrypted()) {
             seed = seed.decrypt(key);
         }
+        if(hasMasterPrivateExtendedKey() && masterPrivateExtendedKey.isEncrypted()) {
+            masterPrivateExtendedKey = masterPrivateExtendedKey.decrypt(key);
+        }
     }
 
     public void clearPrivate() {
         if(hasSeed()) {
             seed.clear();
+        }
+        if(hasMasterPrivateExtendedKey()) {
+            masterPrivateExtendedKey.clear();
         }
     }
 }

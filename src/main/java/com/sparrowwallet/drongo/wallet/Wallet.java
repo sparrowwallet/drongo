@@ -815,7 +815,7 @@ public class Wallet {
     public void sign(PSBT psbt) throws MnemonicException {
         Map<PSBTInput, WalletNode> signingNodes = getSigningNodes(psbt);
         for(Keystore keystore : getKeystores()) {
-            if(keystore.hasSeed()) {
+            if(keystore.hasPrivateKey()) {
                 for(Map.Entry<PSBTInput, WalletNode> signingEntry : signingNodes.entrySet()) {
                     ECKey privKey = keystore.getKey(signingEntry.getValue());
                     PSBTInput psbtInput = signingEntry.getKey();
@@ -1061,9 +1061,9 @@ public class Wallet {
         return copy;
     }
 
-    public boolean containsSeeds() {
+    public boolean containsPrivateKeys() {
         for(Keystore keystore : keystores) {
-            if(keystore.hasSeed()) {
+            if(keystore.hasPrivateKey()) {
                 return true;
             }
         }
