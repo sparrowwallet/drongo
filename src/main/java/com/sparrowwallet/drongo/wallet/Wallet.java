@@ -336,16 +336,16 @@ public class Wallet {
         return getWalletUtxos(false);
     }
 
-    public Map<BlockTransactionHashIndex, WalletNode> getWalletUtxos(boolean includeMempoolInputs) {
+    public Map<BlockTransactionHashIndex, WalletNode> getWalletUtxos(boolean includeSpentMempoolOutputs) {
         Map<BlockTransactionHashIndex, WalletNode> walletUtxos = new TreeMap<>();
-        getWalletUtxos(walletUtxos, getNode(KeyPurpose.RECEIVE), includeMempoolInputs);
-        getWalletUtxos(walletUtxos, getNode(KeyPurpose.CHANGE), includeMempoolInputs);
+        getWalletUtxos(walletUtxos, getNode(KeyPurpose.RECEIVE), includeSpentMempoolOutputs);
+        getWalletUtxos(walletUtxos, getNode(KeyPurpose.CHANGE), includeSpentMempoolOutputs);
         return walletUtxos;
     }
 
-    private void getWalletUtxos(Map<BlockTransactionHashIndex, WalletNode> walletUtxos, WalletNode purposeNode, boolean includeMempoolInputs) {
+    private void getWalletUtxos(Map<BlockTransactionHashIndex, WalletNode> walletUtxos, WalletNode purposeNode, boolean includeSpentMempoolOutputs) {
         for(WalletNode addressNode : purposeNode.getChildren()) {
-            for(BlockTransactionHashIndex utxo : addressNode.getUnspentTransactionOutputs(includeMempoolInputs)) {
+            for(BlockTransactionHashIndex utxo : addressNode.getUnspentTransactionOutputs(includeSpentMempoolOutputs)) {
                 walletUtxos.put(utxo, addressNode);
             }
         }
@@ -460,12 +460,12 @@ public class Wallet {
         return getFee(changeOutput, feeRate, longTermFeeRate);
     }
 
-    public WalletTransaction createWalletTransaction(List<UtxoSelector> utxoSelectors, List<UtxoFilter> utxoFilters, List<Payment> payments, double feeRate, double longTermFeeRate, Long fee, Integer currentBlockHeight, boolean groupByAddress, boolean includeMempoolChange, boolean includeMempoolInputs) throws InsufficientFundsException {
+    public WalletTransaction createWalletTransaction(List<UtxoSelector> utxoSelectors, List<UtxoFilter> utxoFilters, List<Payment> payments, double feeRate, double longTermFeeRate, Long fee, Integer currentBlockHeight, boolean groupByAddress, boolean includeMempoolOutputs, boolean includeSpentMempoolOutputs) throws InsufficientFundsException {
         long totalPaymentAmount = payments.stream().map(Payment::getAmount).mapToLong(v -> v).sum();
         long valueRequiredAmt = totalPaymentAmount;
 
         while(true) {
-            Map<BlockTransactionHashIndex, WalletNode> selectedUtxos = selectInputs(utxoSelectors, utxoFilters, valueRequiredAmt, feeRate, longTermFeeRate, groupByAddress, includeMempoolChange, includeMempoolInputs);
+            Map<BlockTransactionHashIndex, WalletNode> selectedUtxos = selectInputs(utxoSelectors, utxoFilters, valueRequiredAmt, feeRate, longTermFeeRate, groupByAddress, includeMempoolOutputs, includeSpentMempoolOutputs);
             long totalSelectedAmt = selectedUtxos.keySet().stream().mapToLong(BlockTransactionHashIndex::getValue).sum();
 
             Transaction transaction = new Transaction();
@@ -567,13 +567,13 @@ public class Wallet {
         }
     }
 
-    private Map<BlockTransactionHashIndex, WalletNode> selectInputs(List<UtxoSelector> utxoSelectors, List<UtxoFilter> utxoFilters, Long targetValue, double feeRate, double longTermFeeRate, boolean groupByAddress, boolean includeMempoolChange, boolean includeMempoolInputs) throws InsufficientFundsException {
-        List<OutputGroup> utxoPool = getGroupedUtxos(utxoFilters, feeRate, longTermFeeRate, groupByAddress, includeMempoolInputs);
+    private Map<BlockTransactionHashIndex, WalletNode> selectInputs(List<UtxoSelector> utxoSelectors, List<UtxoFilter> utxoFilters, Long targetValue, double feeRate, double longTermFeeRate, boolean groupByAddress, boolean includeMempoolOutputs, boolean includeSpentMempoolOutputs) throws InsufficientFundsException {
+        List<OutputGroup> utxoPool = getGroupedUtxos(utxoFilters, feeRate, longTermFeeRate, groupByAddress, includeSpentMempoolOutputs);
 
         List<OutputGroup.Filter> filters = new ArrayList<>();
         filters.add(new OutputGroup.Filter(1, 6));
         filters.add(new OutputGroup.Filter(1, 1));
-        if(includeMempoolChange) {
+        if(includeMempoolOutputs) {
             filters.add(new OutputGroup.Filter(0, 0));
         }
 
@@ -584,7 +584,7 @@ public class Wallet {
                 Collection<BlockTransactionHashIndex> selectedInputs = utxoSelector.select(targetValue, filteredPool);
                 long total = selectedInputs.stream().mapToLong(BlockTransactionHashIndex::getValue).sum();
                 if(total > targetValue) {
-                    Map<BlockTransactionHashIndex, WalletNode> utxos = getWalletUtxos(includeMempoolInputs);
+                    Map<BlockTransactionHashIndex, WalletNode> utxos = getWalletUtxos(includeSpentMempoolOutputs);
                     utxos.keySet().retainAll(selectedInputs);
                     return utxos;
                 }
@@ -594,17 +594,17 @@ public class Wallet {
         throw new InsufficientFundsException("Not enough combined value in UTXOs for output value " + targetValue);
     }
 
-    private List<OutputGroup> getGroupedUtxos(List<UtxoFilter> utxoFilters, double feeRate, double longTermFeeRate, boolean groupByAddress, boolean includeMempoolInputs) {
+    private List<OutputGroup> getGroupedUtxos(List<UtxoFilter> utxoFilters, double feeRate, double longTermFeeRate, boolean groupByAddress, boolean includeSpentMempoolOutputs) {
         List<OutputGroup> outputGroups = new ArrayList<>();
-        getGroupedUtxos(outputGroups, getNode(KeyPurpose.RECEIVE), utxoFilters, feeRate, longTermFeeRate, groupByAddress, includeMempoolInputs);
-        getGroupedUtxos(outputGroups, getNode(KeyPurpose.CHANGE), utxoFilters, feeRate, longTermFeeRate, groupByAddress, includeMempoolInputs);
+        getGroupedUtxos(outputGroups, getNode(KeyPurpose.RECEIVE), utxoFilters, feeRate, longTermFeeRate, groupByAddress, includeSpentMempoolOutputs);
+        getGroupedUtxos(outputGroups, getNode(KeyPurpose.CHANGE), utxoFilters, feeRate, longTermFeeRate, groupByAddress, includeSpentMempoolOutputs);
         return outputGroups;
     }
 
-    private void getGroupedUtxos(List<OutputGroup> outputGroups, WalletNode purposeNode, List<UtxoFilter> utxoFilters, double feeRate, double longTermFeeRate, boolean groupByAddress, boolean includeMempoolInputs) {
+    private void getGroupedUtxos(List<OutputGroup> outputGroups, WalletNode purposeNode, List<UtxoFilter> utxoFilters, double feeRate, double longTermFeeRate, boolean groupByAddress, boolean includeSpentMempoolOutputs) {
         for(WalletNode addressNode : purposeNode.getChildren()) {
             OutputGroup outputGroup = null;
-            for(BlockTransactionHashIndex utxo : addressNode.getUnspentTransactionOutputs(includeMempoolInputs)) {
+            for(BlockTransactionHashIndex utxo : addressNode.getUnspentTransactionOutputs(includeSpentMempoolOutputs)) {
                 Optional<UtxoFilter> matchedFilter = utxoFilters.stream().filter(utxoFilter -> !utxoFilter.isEligible(utxo)).findAny();
                 if(matchedFilter.isPresent()) {
                     continue;
