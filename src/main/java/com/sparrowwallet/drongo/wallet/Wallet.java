@@ -494,7 +494,7 @@ public class Wallet {
             long noChangeFeeRequiredAmt = (fee == null ? (long)(feeRate * noChangeVSize) : fee);
 
             //Add 1 satoshi to accommodate longer signatures when feeRate equals default min relay fee to ensure fee is sufficient
-            noChangeFeeRequiredAmt = (feeRate == Transaction.DEFAULT_MIN_RELAY_FEE ? noChangeFeeRequiredAmt + 1 : noChangeFeeRequiredAmt);
+            noChangeFeeRequiredAmt = (fee == null && feeRate == Transaction.DEFAULT_MIN_RELAY_FEE ? noChangeFeeRequiredAmt + 1 : noChangeFeeRequiredAmt);
 
             //If sending all selected utxos, set the recipient amount to equal to total of those utxos less the no change fee
             long maxSendAmt = totalSelectedAmt - noChangeFeeRequiredAmt;
@@ -531,7 +531,7 @@ public class Wallet {
                 TransactionOutput changeOutput = new TransactionOutput(transaction, changeAmt, getOutputScript(changeNode));
                 double changeVSize = noChangeVSize + changeOutput.getLength();
                 long changeFeeRequiredAmt = (fee == null ? (long)(feeRate * changeVSize) : fee);
-                changeFeeRequiredAmt = (feeRate == Transaction.DEFAULT_MIN_RELAY_FEE ? changeFeeRequiredAmt + 1 : changeFeeRequiredAmt);
+                changeFeeRequiredAmt = (fee == null && feeRate == Transaction.DEFAULT_MIN_RELAY_FEE ? changeFeeRequiredAmt + 1 : changeFeeRequiredAmt);
 
                 //Recalculate the change amount with the new fee
                 changeAmt = differenceAmt - changeFeeRequiredAmt;
