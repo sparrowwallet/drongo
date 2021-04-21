@@ -461,11 +461,12 @@ public class Wallet {
     }
 
     public WalletTransaction createWalletTransaction(List<UtxoSelector> utxoSelectors, List<UtxoFilter> utxoFilters, List<Payment> payments, double feeRate, double longTermFeeRate, Long fee, Integer currentBlockHeight, boolean groupByAddress, boolean includeMempoolOutputs, boolean includeSpentMempoolOutputs) throws InsufficientFundsException {
+        boolean sendMax = payments.stream().anyMatch(Payment::isSendMax);
         long totalPaymentAmount = payments.stream().map(Payment::getAmount).mapToLong(v -> v).sum();
         long valueRequiredAmt = totalPaymentAmount;
 
         while(true) {
-            Map<BlockTransactionHashIndex, WalletNode> selectedUtxos = selectInputs(utxoSelectors, utxoFilters, valueRequiredAmt, feeRate, longTermFeeRate, groupByAddress, includeMempoolOutputs, includeSpentMempoolOutputs);
+            Map<BlockTransactionHashIndex, WalletNode> selectedUtxos = selectInputs(utxoSelectors, utxoFilters, valueRequiredAmt, feeRate, longTermFeeRate, groupByAddress, includeMempoolOutputs, includeSpentMempoolOutputs, sendMax);
             long totalSelectedAmt = selectedUtxos.keySet().stream().mapToLong(BlockTransactionHashIndex::getValue).sum();
 
             Transaction transaction = new Transaction();
@@ -501,7 +502,7 @@ public class Wallet {
                 throw new InsufficientFundsException("Not enough combined value in selected UTXOs for fee of " + noChangeFeeRequiredAmt);
             }
 
-            Optional<Payment> optMaxPayment = payments.stream().filter(payment -> payment.isSendMax()).findFirst();
+            Optional<Payment> optMaxPayment = payments.stream().filter(Payment::isSendMax).findFirst();
             if(optMaxPayment.isPresent()) {
                 Payment maxPayment = optMaxPayment.get();
                 maxSendAmt = maxSendAmt - payments.stream().filter(payment -> !maxPayment.equals(payment)).map(Payment::getAmount).mapToLong(v -> v).sum();
@@ -567,7 +568,7 @@ public class Wallet {
         }
     }
 
-    private Map<BlockTransactionHashIndex, WalletNode> selectInputs(List<UtxoSelector> utxoSelectors, List<UtxoFilter> utxoFilters, Long targetValue, double feeRate, double longTermFeeRate, boolean groupByAddress, boolean includeMempoolOutputs, boolean includeSpentMempoolOutputs) throws InsufficientFundsException {
+    private Map<BlockTransactionHashIndex, WalletNode> selectInputs(List<UtxoSelector> utxoSelectors, List<UtxoFilter> utxoFilters, Long targetValue, double feeRate, double longTermFeeRate, boolean groupByAddress, boolean includeMempoolOutputs, boolean includeSpentMempoolOutputs, boolean sendMax) throws InsufficientFundsException {
         List<OutputGroup> utxoPool = getGroupedUtxos(utxoFilters, feeRate, longTermFeeRate, groupByAddress, includeSpentMempoolOutputs);
 
         List<OutputGroup.Filter> filters = new ArrayList<>();
@@ -575,6 +576,10 @@ public class Wallet {
         filters.add(new OutputGroup.Filter(1, 1));
         if(includeMempoolOutputs) {
             filters.add(new OutputGroup.Filter(0, 0));
+        }
+
+        if(sendMax) {
+            Collections.reverse(filters);
         }
 
         for(OutputGroup.Filter filter : filters) {
