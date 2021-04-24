@@ -555,12 +555,8 @@ public class PSBTInput {
         Sha256Hash hash;
 
         ScriptType scriptType = getScriptType();
-        if(getWitnessUtxo() == null && Arrays.asList(WITNESS_TYPES).contains(scriptType)) {
-            throw new IllegalStateException("Trying to get signature hash for " + scriptType + " script without a PSBT witness UTXO");
-        }
-
-        if(getWitnessUtxo() != null) {
-            long prevValue = getWitnessUtxo().getValue();
+        if(Arrays.asList(WITNESS_TYPES).contains(scriptType)) {
+            long prevValue = getUtxo().getValue();
             hash = transaction.hashForWitnessSignature(index, connectedScript, prevValue, localSigHash);
         } else {
             hash = transaction.hashForLegacySignature(index, connectedScript, localSigHash);
