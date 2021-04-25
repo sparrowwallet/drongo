@@ -470,7 +470,8 @@ public class ECKey implements EncryptableItem {
         }
 
         protected boolean hasLowR() {
-            return r.toByteArray().length <= 32;
+            //A low R signature will have less than 71 bytes when encoded to DER
+            return toCanonicalised().encodeToDER().length < 71;
         }
 
         @Override
@@ -530,14 +531,14 @@ public class ECKey implements EncryptableItem {
         }
 
         ECDSASignature signature;
-        int counter = 0;
+        Integer counter = null;
         do {
             ECDSASigner signer = new ECDSASigner(new HMacDSANonceKCalculator(new SHA256Digest(), counter));
             ECPrivateKeyParameters privKey = new ECPrivateKeyParameters(privateKeyForSigning, CURVE);
             signer.init(true, privKey);
             BigInteger[] components = signer.generateSignature(input.getBytes());
             signature = new ECDSASignature(components[0], components[1]).toCanonicalised();
-            counter++;
+            counter = (counter == null ? 1 : counter+1);
         } while(!signature.hasLowR());
 
         return signature;

@@ -21,7 +21,7 @@ public class HMacDSANonceKCalculator implements DSAKCalculator {
     private final HMac hMac;
     private final byte[] K;
     private final byte[] V;
-    private final long counter;
+    private final Long counter;
 
     private BigInteger n;
 
@@ -31,11 +31,11 @@ public class HMacDSANonceKCalculator implements DSAKCalculator {
      * @param digest digest to build the HMAC on.
      * @param counter additional data as per RFC 6979 3.6
      */
-    public HMacDSANonceKCalculator(Digest digest, int counter) {
+    public HMacDSANonceKCalculator(Digest digest, Integer counter) {
         this.hMac = new HMac(digest);
         this.V = new byte[hMac.getMacSize()];
         this.K = new byte[hMac.getMacSize()];
-        this.counter = Integer.toUnsignedLong(counter);
+        this.counter = (counter == null ? null : Integer.toUnsignedLong(counter));
     }
 
     public boolean isDeterministic()
@@ -74,8 +74,12 @@ public class HMacDSANonceKCalculator implements DSAKCalculator {
 
         System.arraycopy(mVal, 0, m, m.length - mVal.length, mVal.length);
 
-        BigInteger additional = BigInteger.valueOf(counter);
-        byte[] aData = Utils.bigIntegerToBytes(additional, size);
+        byte[] c = null;
+        if(counter != null) {
+            BigInteger additional = BigInteger.valueOf(counter);
+            c = Utils.bigIntegerToBytes(additional, size);
+            Utils.reverse(c);
+        }
 
         hMac.init(new KeyParameter(K));
 
@@ -83,7 +87,9 @@ public class HMacDSANonceKCalculator implements DSAKCalculator {
         hMac.update((byte)0x00);
         hMac.update(x, 0, x.length);
         hMac.update(m, 0, m.length);
-        hMac.update(aData, 0, aData.length);
+        if(c != null) {
+            hMac.update(c, 0, c.length);
+        }
 
         hMac.doFinal(K, 0);
 
@@ -97,6 +103,9 @@ public class HMacDSANonceKCalculator implements DSAKCalculator {
         hMac.update((byte)0x01);
         hMac.update(x, 0, x.length);
         hMac.update(m, 0, m.length);
+        if(counter != null) {
+            hMac.update(c, 0, c.length);
+        }
 
         hMac.doFinal(K, 0);
 

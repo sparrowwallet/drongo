@@ -12,10 +12,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.math.BigInteger;
-import java.nio.Buffer;
-import java.nio.ByteBuffer;
-import java.nio.CharBuffer;
-import java.nio.charset.StandardCharsets;
 import java.util.*;
 
 public class Utils {
@@ -113,6 +109,14 @@ public class Utils {
         System.arraycopy(src, srcPos, dest, destPos, length);
         Arrays.fill(src, (byte)0);
         return dest;
+    }
+
+    public static void reverse(byte[] array) {
+        for (int i = 0; i < array.length / 2; i++) {
+            byte temp = array[i];
+            array[i] = array[array.length - i - 1];
+            array[array.length - i - 1] = temp;
+        }
     }
 
     /** Parse 4 bytes from the byte array (starting at the offset) as unsigned 32-bit integer in little endian format. */

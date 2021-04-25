@@ -83,7 +83,7 @@ public class PSBTEntry {
 
         do {
             bb.get(buf);
-            reverse(buf);
+            Utils.reverse(buf);
             ByteBuffer pbuf = ByteBuffer.wrap(buf);
             path.add(new ChildNumber(pbuf.getInt()));
         } while(bb.hasRemaining());
@@ -200,14 +200,6 @@ public class PSBTEntry {
         }
 
         return bb.array();
-    }
-
-    private static void reverse(byte[] array) {
-        for (int i = 0; i < array.length / 2; i++) {
-            byte temp = array[i];
-            array[i] = array[array.length - i - 1];
-            array[array.length - i - 1] = temp;
-        }
     }
 
     public void checkOneByteKey() throws PSBTParseException {
