@@ -465,6 +465,10 @@ public class Wallet {
         long totalPaymentAmount = payments.stream().map(Payment::getAmount).mapToLong(v -> v).sum();
         long totalUtxoValue = getWalletUtxos().keySet().stream().mapToLong(BlockTransactionHashIndex::getValue).sum();
 
+        if(fee != null && feeRate != Transaction.DEFAULT_MIN_RELAY_FEE) {
+            throw new IllegalArgumentException("Use an input fee rate of 1 sat/vB when using a defined fee amount so UTXO selectors overestimate effective value");
+        }
+
         long maxSpendableAmt = getMaxSpendable(payments.stream().map(Payment::getAddress).collect(Collectors.toList()), feeRate);
         if(maxSpendableAmt < 0) {
             throw new InsufficientFundsException("Not enough combined value in all available UTXOs to send a transaction to the provided addresses at this fee rate");
@@ -528,6 +532,7 @@ public class Wallet {
             //If insufficient fee, increase value required from inputs to include the fee and try again
             if(differenceAmt < noChangeFeeRequiredAmt) {
                 valueRequiredAmt = totalSelectedAmt + 1;
+                //If we haven't selected all UTXOs yet, don't require more than the max spendable amount
                 if(valueRequiredAmt > maxSpendableAmt && transaction.getInputs().size() < getWalletUtxos().size()) {
                     valueRequiredAmt =  maxSpendableAmt;
                 }
