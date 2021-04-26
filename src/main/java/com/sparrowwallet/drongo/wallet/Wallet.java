@@ -419,9 +419,9 @@ public class Wallet {
     }
 
     /**
-     * Return the number of vBytes required for an input created by this wallet.
+     * Return the number of weight units required for an input created by this wallet.
      *
-     * @return the number of vBytes
+     * @return the number of weight units (WU)
      */
     public int getInputWeightUnits() {
         //Estimate assuming an input spending from a fresh receive node - it does not matter this node has no real utxos
@@ -463,7 +463,19 @@ public class Wallet {
     public WalletTransaction createWalletTransaction(List<UtxoSelector> utxoSelectors, List<UtxoFilter> utxoFilters, List<Payment> payments, double feeRate, double longTermFeeRate, Long fee, Integer currentBlockHeight, boolean groupByAddress, boolean includeMempoolOutputs, boolean includeSpentMempoolOutputs) throws InsufficientFundsException {
         boolean sendMax = payments.stream().anyMatch(Payment::isSendMax);
         long totalPaymentAmount = payments.stream().map(Payment::getAmount).mapToLong(v -> v).sum();
-        long valueRequiredAmt = totalPaymentAmount;
+        long totalUtxoValue = getWalletUtxos().keySet().stream().mapToLong(BlockTransactionHashIndex::getValue).sum();
+
+        long maxSpendableAmt = getMaxSpendable(payments.stream().map(Payment::getAddress).collect(Collectors.toList()), feeRate);
+        if(maxSpendableAmt < 0) {
+            throw new InsufficientFundsException("Not enough combined value in all available UTXOs to send a transaction to the provided addresses at this fee rate");
+        }
+
+        //When a user fee is set, we can calculate the fees to spend all UTXOs because we assume all UTXOs are spendable at a fee rate of 1 sat/vB
+        //We can then add the user set fee less this amount as a "phantom payment amount" to the value required to find (which cannot include transaction fees)
+        long valueRequiredAmt = totalPaymentAmount + (fee != null ? fee - (totalUtxoValue - maxSpendableAmt) : 0);
+        if(maxSpendableAmt < valueRequiredAmt) {
+            throw new InsufficientFundsException("Not enough combined value in all available UTXOs to send a transaction to send the provided payments at the user set fee" + (fee == null ? " rate" : ""));
+        }
 
         while(true) {
             Map<BlockTransactionHashIndex, WalletNode> selectedUtxos = selectInputs(utxoSelectors, utxoFilters, valueRequiredAmt, feeRate, longTermFeeRate, groupByAddress, includeMempoolOutputs, includeSpentMempoolOutputs, sendMax);
@@ -491,16 +503,13 @@ public class Wallet {
             }
 
             double noChangeVSize = transaction.getVirtualSize();
-            long noChangeFeeRequiredAmt = (fee == null ? (long)(feeRate * noChangeVSize) : fee);
+            long noChangeFeeRequiredAmt = (fee == null ? (long)Math.floor(feeRate * noChangeVSize) : fee);
 
             //Add 1 satoshi to accommodate longer signatures when feeRate equals default min relay fee to ensure fee is sufficient
             noChangeFeeRequiredAmt = (fee == null && feeRate == Transaction.DEFAULT_MIN_RELAY_FEE ? noChangeFeeRequiredAmt + 1 : noChangeFeeRequiredAmt);
 
             //If sending all selected utxos, set the recipient amount to equal to total of those utxos less the no change fee
             long maxSendAmt = totalSelectedAmt - noChangeFeeRequiredAmt;
-            if(maxSendAmt < 0) {
-                throw new InsufficientFundsException("Not enough combined value in selected UTXOs for fee of " + noChangeFeeRequiredAmt);
-            }
 
             Optional<Payment> optMaxPayment = payments.stream().filter(Payment::isSendMax).findFirst();
             if(optMaxPayment.isPresent()) {
@@ -519,18 +528,23 @@ public class Wallet {
             //If insufficient fee, increase value required from inputs to include the fee and try again
             if(differenceAmt < noChangeFeeRequiredAmt) {
                 valueRequiredAmt = totalSelectedAmt + 1;
+                if(valueRequiredAmt > maxSpendableAmt && transaction.getInputs().size() < getWalletUtxos().size()) {
+                    valueRequiredAmt =  maxSpendableAmt;
+                }
+
                 continue;
             }
 
             //Determine if a change output is required by checking if its value is greater than its dust threshold
             long changeAmt = differenceAmt - noChangeFeeRequiredAmt;
-            long costOfChangeAmt = getCostOfChange(feeRate, longTermFeeRate);
+            double noChangeFeeRate = (fee == null ? feeRate : noChangeFeeRequiredAmt / transaction.getVirtualSize());
+            long costOfChangeAmt = getCostOfChange(noChangeFeeRate, longTermFeeRate);
             if(changeAmt > costOfChangeAmt) {
                 //Change output is required, determine new fee once change output has been added
                 WalletNode changeNode = getFreshNode(KeyPurpose.CHANGE);
                 TransactionOutput changeOutput = new TransactionOutput(transaction, changeAmt, getOutputScript(changeNode));
                 double changeVSize = noChangeVSize + changeOutput.getLength();
-                long changeFeeRequiredAmt = (fee == null ? (long)(feeRate * changeVSize) : fee);
+                long changeFeeRequiredAmt = (fee == null ? (long)Math.floor(feeRate * changeVSize) : fee);
                 changeFeeRequiredAmt = (fee == null && feeRate == Transaction.DEFAULT_MIN_RELAY_FEE ? changeFeeRequiredAmt + 1 : changeFeeRequiredAmt);
 
                 //Recalculate the change amount with the new fee
@@ -655,6 +669,36 @@ public class Wallet {
         }
 
         return true;
+    }
+
+    /**
+     * Determines the maximum total amount this wallet can send for the number and type of addresses at the given fee rate
+     *
+     * @param paymentAddresses the addresses to sent to (amounts are irrelevant)
+     * @param feeRate the fee rate in sats/vB
+     * @return the maximum spendable amount (can be negative if the fee is higher than the combined UTXO value)
+     */
+    public long getMaxSpendable(List<Address> paymentAddresses, double feeRate) {
+        long maxInputValue = 0;
+        int inputWeightUnits = getInputWeightUnits();
+        long minInputValue = (long)Math.ceil(feeRate * inputWeightUnits / WITNESS_SCALE_FACTOR);
+
+        Transaction transaction = new Transaction();
+        for(Map.Entry<BlockTransactionHashIndex, WalletNode> utxo : getWalletUtxos().entrySet()) {
+            if(utxo.getKey().getValue() > minInputValue) {
+                Transaction prevTx = getTransactions().get(utxo.getKey().getHash()).getTransaction();
+                TransactionOutput prevTxOut = prevTx.getOutputs().get((int)utxo.getKey().getIndex());
+                addDummySpendingInput(transaction, utxo.getValue(), prevTxOut);
+                maxInputValue += utxo.getKey().getValue();
+            }
+        }
+
+        for(Address address : paymentAddresses) {
+            transaction.addOutput(1L, address);
+        }
+
+        long fee = (long)Math.floor(transaction.getVirtualSize() * feeRate);
+        return maxInputValue - fee;
     }
 
     public boolean canSign(Transaction transaction) {
