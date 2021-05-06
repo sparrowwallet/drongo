@@ -2,6 +2,7 @@ package com.sparrowwallet.drongo.uri;
 
 import com.sparrowwallet.drongo.address.Address;
 import com.sparrowwallet.drongo.address.InvalidAddressException;
+import com.sparrowwallet.drongo.wallet.Payment;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -323,6 +324,11 @@ public class BitcoinURI {
         }
         builder.append("]");
         return builder.toString();
+    }
+
+    public Payment toPayment() {
+        long amount = getAmount() == null ? -1 : getAmount();
+        return new Payment(getAddress(), getLabel(), amount, false);
     }
 
     /**
