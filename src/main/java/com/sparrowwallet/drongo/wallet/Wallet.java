@@ -24,6 +24,7 @@ public class Wallet {
     public static final String ALLOW_DERIVATIONS_MATCHING_OTHER_SCRIPT_TYPES_PROPERTY = "com.sparrowwallet.allowDerivationsMatchingOtherScriptTypes";
 
     private String name;
+    private Wallet masterWallet;
     private Network network = Network.get();
     private PolicyType policyType;
     private ScriptType scriptType;
@@ -138,6 +139,14 @@ public class Wallet {
 
     public void setBirthDate(Date birthDate) {
         this.birthDate = birthDate;
+    }
+
+    public Wallet getMasterWallet() {
+        return masterWallet;
+    }
+
+    public void setMasterWallet(Wallet masterWallet) {
+        this.masterWallet = masterWallet;
     }
 
     public synchronized WalletNode getNode(KeyPurpose keyPurpose) {
