@@ -469,7 +469,7 @@ public class Wallet {
         return getFee(changeOutput, feeRate, longTermFeeRate);
     }
 
-    public WalletTransaction createWalletTransaction(List<UtxoSelector> utxoSelectors, List<UtxoFilter> utxoFilters, List<Payment> payments, double feeRate, double longTermFeeRate, Long fee, Integer currentBlockHeight, boolean groupByAddress, boolean includeMempoolOutputs, boolean includeSpentMempoolOutputs) throws InsufficientFundsException {
+    public WalletTransaction createWalletTransaction(List<UtxoSelector> utxoSelectors, List<UtxoFilter> utxoFilters, List<Payment> payments, List<WalletNode> excludedChangeNodes, double feeRate, double longTermFeeRate, Long fee, Integer currentBlockHeight, boolean groupByAddress, boolean includeMempoolOutputs, boolean includeSpentMempoolOutputs) throws InsufficientFundsException {
         boolean sendMax = payments.stream().anyMatch(Payment::isSendMax);
         long totalPaymentAmount = payments.stream().map(Payment::getAmount).mapToLong(v -> v).sum();
         long totalUtxoValue = getWalletUtxos().keySet().stream().mapToLong(BlockTransactionHashIndex::getValue).sum();
@@ -556,6 +556,9 @@ public class Wallet {
             if(changeAmt > costOfChangeAmt) {
                 //Change output is required, determine new fee once change output has been added
                 WalletNode changeNode = getFreshNode(KeyPurpose.CHANGE);
+                while(excludedChangeNodes.contains(changeNode)) {
+                    changeNode = getFreshNode(KeyPurpose.CHANGE, changeNode);
+                }
                 TransactionOutput changeOutput = new TransactionOutput(transaction, changeAmt, getOutputScript(changeNode));
                 double changeVSize = noChangeVSize + changeOutput.getLength();
                 long changeFeeRequiredAmt = (fee == null ? (long)Math.floor(feeRate * changeVSize) : fee);
