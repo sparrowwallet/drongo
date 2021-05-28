@@ -136,11 +136,15 @@ public class PSBTInput {
                             throw new PSBTParseException("Witness UTXO provided but redeem script is not P2WPKH or P2WSH");
                         }
                     }
-                    if(scriptPubKey == null || !P2SH.isScriptType(scriptPubKey)) {
-                        throw new PSBTParseException("PSBT provided a redeem script for a transaction output that does not need one");
-                    }
-                    if(!Arrays.equals(Utils.sha256hash160(redeemScript.getProgram()), scriptPubKey.getPubKeyHash())) {
-                        throw new PSBTParseException("Redeem script hash does not match transaction output script pubkey hash " + Utils.bytesToHex(scriptPubKey.getPubKeyHash()));
+                    if(scriptPubKey == null) {
+                        log.warn("PSBT provided a redeem script for a transaction output that was not provided");
+                    } else {
+                        if(!P2SH.isScriptType(scriptPubKey)) {
+                            throw new PSBTParseException("PSBT provided a redeem script for a transaction output that does not need one");
+                        }
+                        if(!Arrays.equals(Utils.sha256hash160(redeemScript.getProgram()), scriptPubKey.getPubKeyHash())) {
+                            throw new PSBTParseException("Redeem script hash does not match transaction output script pubkey hash " + Utils.bytesToHex(scriptPubKey.getPubKeyHash()));
+                        }
                     }
 
                     this.redeemScript = redeemScript;
@@ -156,7 +160,7 @@ public class PSBTInput {
                         pubKeyHash = this.witnessUtxo.getScript().getPubKeyHash();
                     }
                     if(pubKeyHash == null) {
-                        throw new PSBTParseException("Witness script provided without P2WSH witness utxo or P2SH redeem script");
+                        log.warn("Witness script provided without P2WSH witness utxo or P2SH redeem script");
                     } else if(!Arrays.equals(Sha256Hash.hash(witnessScript.getProgram()), pubKeyHash)) {
                         throw new PSBTParseException("Witness script hash does not match provided pay to script hash " + Utils.bytesToHex(pubKeyHash));
                     }
@@ -428,7 +432,7 @@ public class PSBTInput {
         return false;
     }
 
-    boolean verifySignatures() throws PSBTParseException {
+    boolean verifySignatures() throws PSBTSignatureException {
         SigHash localSigHash = getSigHash();
         if(localSigHash == null) {
             //Assume SigHash.ALL
@@ -443,7 +447,7 @@ public class PSBTInput {
                 for(ECKey sigPublicKey : getPartialSignatures().keySet()) {
                     TransactionSignature signature = getPartialSignature(sigPublicKey);
                     if(!sigPublicKey.verify(hash, signature)) {
-                        throw new PSBTParseException("Partial signature does not verify against provided public key");
+                        throw new PSBTSignatureException("Partial signature does not verify against provided public key");
                     }
                 }
 

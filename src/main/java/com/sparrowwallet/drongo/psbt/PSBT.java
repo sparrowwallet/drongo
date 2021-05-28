@@ -16,7 +16,7 @@ import java.nio.ByteBuffer;
 import java.util.*;
 
 import static com.sparrowwallet.drongo.psbt.PSBTEntry.*;
-import static com.sparrowwallet.drongo.psbt.PSBTInput.PSBT_IN_BIP32_DERIVATION;
+import static com.sparrowwallet.drongo.psbt.PSBTInput.*;
 import static com.sparrowwallet.drongo.psbt.PSBTOutput.*;
 
 public class PSBT {
@@ -169,11 +169,15 @@ public class PSBT {
     }
 
     public PSBT(byte[] psbt) throws PSBTParseException {
-        this.psbtBytes = psbt;
-        parse();
+        this(psbt, true);
     }
 
-    private void parse() throws PSBTParseException {
+    public PSBT(byte[] psbt, boolean verifySignatures) throws PSBTParseException {
+        this.psbtBytes = psbt;
+        parse(verifySignatures);
+    }
+
+    private void parse(boolean verifySignatures) throws PSBTParseException {
         int seenInputs = 0;
         int seenOutputs = 0;
 
@@ -214,7 +218,7 @@ public class PSBT {
                         seenInputs++;
                         if (seenInputs == inputs) {
                             currentState = STATE_OUTPUTS;
-                            parseInputEntries(inputEntryLists);
+                            parseInputEntries(inputEntryLists, verifySignatures);
                         }
                         break;
                     case STATE_OUTPUTS:
@@ -315,7 +319,7 @@ public class PSBT {
         }
     }
 
-    private void parseInputEntries(List<List<PSBTEntry>> inputEntryLists) throws PSBTParseException {
+    private void parseInputEntries(List<List<PSBTEntry>> inputEntryLists, boolean verifySignatures) throws PSBTParseException {
         for(List<PSBTEntry> inputEntries : inputEntryLists) {
             PSBTEntry duplicate = findDuplicateKey(inputEntries);
             if(duplicate != null) {
@@ -325,9 +329,11 @@ public class PSBT {
             int inputIndex = this.psbtInputs.size();
             PSBTInput input = new PSBTInput(inputEntries, transaction, inputIndex);
 
-            boolean verified = input.verifySignatures();
-            if(!verified && input.getPartialSignatures().size() > 0) {
-                throw new PSBTParseException("Unverifiable partial signatures provided");
+            if(verifySignatures) {
+                boolean verified = input.verifySignatures();
+                if(!verified && input.getPartialSignatures().size() > 0) {
+                    throw new PSBTSignatureException("Unverifiable partial signatures provided");
+                }
             }
 
             this.psbtInputs.add(input);
@@ -377,6 +383,19 @@ public class PSBT {
         }
 
         return fee;
+    }
+
+    public void verifySignatures() throws PSBTSignatureException {
+        for(PSBTInput input : getPsbtInputs()) {
+            boolean verified = input.verifySignatures();
+            if(!verified) {
+                if(input.getPartialSignatures().size() > 0) {
+                    throw new PSBTSignatureException("Unverifiable partial signatures provided");
+                }
+
+                throw new PSBTSignatureException("No UTXO data provided");
+            }
+        }
     }
 
     public boolean hasSignatures() {
@@ -630,6 +649,10 @@ public class PSBT {
     }
 
     public static PSBT fromString(String strPSBT) throws PSBTParseException {
+        return fromString(strPSBT, true);
+    }
+
+    public static PSBT fromString(String strPSBT, boolean verifySignatures) throws PSBTParseException {
         if (!isPSBT(strPSBT)) {
             throw new PSBTParseException("Provided string is not a PSBT");
         }
@@ -639,6 +662,6 @@ public class PSBT {
         }
 
         byte[] psbtBytes = Utils.hexToBytes(strPSBT);
-        return new PSBT(psbtBytes);
+        return new PSBT(psbtBytes, verifySignatures);
     }
 }
