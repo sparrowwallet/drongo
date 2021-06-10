@@ -5,7 +5,7 @@ import com.sparrowwallet.drongo.protocol.Sha256Hash;
 import java.util.Date;
 import java.util.Objects;
 
-public abstract class BlockTransactionHash {
+public abstract class BlockTransactionHash extends Persistable {
     public static final int BLOCKS_TO_CONFIRM = 6;
     public static final int BLOCKS_TO_FULLY_CONFIRM = 100;
 

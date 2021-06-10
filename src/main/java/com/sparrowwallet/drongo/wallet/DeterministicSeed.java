@@ -7,7 +7,7 @@ import com.sparrowwallet.drongo.crypto.*;
 import java.security.SecureRandom;
 import java.util.*;
 
-public class DeterministicSeed implements EncryptableItem {
+public class DeterministicSeed extends Persistable implements EncryptableItem {
     public static final int DEFAULT_SEED_ENTROPY_BITS = 128;
     public static final int MAX_SEED_ENTROPY_BITS = 512;
 
@@ -341,6 +341,7 @@ public class DeterministicSeed implements EncryptableItem {
             seed = new DeterministicSeed(new ArrayList<>(mnemonicCode), needsPassphrase, creationTimeSeconds, type);
         }
 
+        seed.setId(getId());
         seed.setPassphrase(passphrase);
         return seed;
     }

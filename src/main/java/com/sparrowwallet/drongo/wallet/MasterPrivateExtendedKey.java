@@ -6,7 +6,7 @@ import com.sparrowwallet.drongo.crypto.*;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
 
-public class MasterPrivateExtendedKey implements EncryptableItem {
+public class MasterPrivateExtendedKey extends Persistable implements EncryptableItem {
     private final byte[] privateKey;
     private final byte[] chainCode;
 
@@ -112,11 +112,15 @@ public class MasterPrivateExtendedKey implements EncryptableItem {
     }
 
     public MasterPrivateExtendedKey copy() {
+        MasterPrivateExtendedKey copy;
         if(isEncrypted()) {
-            return new MasterPrivateExtendedKey(encryptedKey.copy());
+            copy = new MasterPrivateExtendedKey(encryptedKey.copy());
+        } else {
+            copy = new MasterPrivateExtendedKey(Arrays.copyOf(privateKey, 32), Arrays.copyOf(chainCode, 32));
         }
 
-        return new MasterPrivateExtendedKey(Arrays.copyOf(privateKey, 32), Arrays.copyOf(chainCode, 32));
+        copy.setId(getId());
+        return copy;
     }
 
     public void clear() {

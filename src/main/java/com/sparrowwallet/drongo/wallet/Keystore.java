@@ -8,7 +8,7 @@ import com.sparrowwallet.drongo.crypto.*;
 
 import java.util.List;
 
-public class Keystore {
+public class Keystore extends Persistable {
     public static final String DEFAULT_LABEL = "Keystore 1";
     public static final int MAX_LABEL_LENGTH = 16;
 
@@ -229,6 +229,7 @@ public class Keystore {
 
     public Keystore copy() {
         Keystore copy = new Keystore(label);
+        copy.setId(getId());
         copy.setSource(source);
         copy.setWalletModel(walletModel);
         if(keyDerivation != null) {

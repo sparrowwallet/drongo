@@ -2,13 +2,14 @@ package com.sparrowwallet.drongo.policy;
 
 import com.sparrowwallet.drongo.protocol.ScriptType;
 import com.sparrowwallet.drongo.wallet.Keystore;
+import com.sparrowwallet.drongo.wallet.Persistable;
 
 import java.util.List;
 
 import static com.sparrowwallet.drongo.protocol.ScriptType.*;
 import static com.sparrowwallet.drongo.policy.PolicyType.*;
 
-public class Policy {
+public class Policy extends Persistable {
     private static final String DEFAULT_NAME = "Default";
 
     private String name;
@@ -21,6 +22,10 @@ public class Policy {
     public Policy(String name, Miniscript miniscript) {
         this.name = name;
         this.miniscript = miniscript;
+    }
+
+    public String getName() {
+        return name;
     }
 
     public Miniscript getMiniscript() {
@@ -57,6 +62,8 @@ public class Policy {
     }
 
     public Policy copy() {
-        return new Policy(name, miniscript.copy());
+        Policy policy = new Policy(name, miniscript.copy());
+        policy.setId(getId());
+        return policy;
     }
 }

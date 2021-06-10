@@ -55,7 +55,9 @@ dependencies {
     }
     implementation ('ch.qos.logback:logback-classic:1.2.3') {
         exclude group: 'org.hamcrest', module: 'hamcrest-core'
+        exclude group: 'org.slf4j'
     }
+    implementation ('org.slf4j:slf4j-api:1.7.30')
     testImplementation ('junit:junit:4.12') {
         exclude group: 'org.hamcrest', module: 'hamcrest-core'
     }

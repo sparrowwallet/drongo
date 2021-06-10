@@ -7,7 +7,7 @@ import com.sparrowwallet.drongo.crypto.ChildNumber;
 import java.util.*;
 import java.util.stream.Collectors;
 
-public class WalletNode implements Comparable<WalletNode> {
+public class WalletNode extends Persistable implements Comparable<WalletNode> {
     private final String derivationPath;
     private String label;
     private TreeSet<WalletNode> children = new TreeSet<>();
@@ -87,7 +87,7 @@ public class WalletNode implements Comparable<WalletNode> {
     }
 
     public Set<WalletNode> getChildren() {
-        return children == null ? null : Collections.unmodifiableSet(children);
+        return children;
     }
 
     public void setChildren(TreeSet<WalletNode> children) {
@@ -95,7 +95,7 @@ public class WalletNode implements Comparable<WalletNode> {
     }
 
     public Set<BlockTransactionHashIndex> getTransactionOutputs() {
-        return transactionOutputs == null ? null : Collections.unmodifiableSet(transactionOutputs);
+        return transactionOutputs;
     }
 
     public void setTransactionOutputs(TreeSet<BlockTransactionHashIndex> transactionOutputs) {
@@ -195,6 +195,7 @@ public class WalletNode implements Comparable<WalletNode> {
 
     public WalletNode copy() {
         WalletNode copy = new WalletNode(derivationPath);
+        copy.setId(getId());
         copy.setLabel(label);
 
         for(WalletNode child : getChildren()) {

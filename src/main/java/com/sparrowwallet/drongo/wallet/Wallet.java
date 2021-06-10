@@ -19,12 +19,13 @@ import java.util.stream.Collectors;
 import static com.sparrowwallet.drongo.protocol.ScriptType.*;
 import static com.sparrowwallet.drongo.protocol.Transaction.WITNESS_SCALE_FACTOR;
 
-public class Wallet {
+public class Wallet extends Persistable {
     public static final int DEFAULT_LOOKAHEAD = 20;
     public static final String ALLOW_DERIVATIONS_MATCHING_OTHER_SCRIPT_TYPES_PROPERTY = "com.sparrowwallet.allowDerivationsMatchingOtherScriptTypes";
 
     private String name;
     private Wallet masterWallet;
+    private List<Wallet> childWallets = new ArrayList<>();
     private Network network = Network.get();
     private PolicyType policyType;
     private ScriptType scriptType;
@@ -125,8 +126,16 @@ public class Wallet {
         this.storedBlockHeight = storedBlockHeight;
     }
 
+    public Integer gapLimit() {
+        return gapLimit;
+    }
+
     public int getGapLimit() {
         return gapLimit == null ? DEFAULT_LOOKAHEAD : gapLimit;
+    }
+
+    public void gapLimit(Integer gapLimit) {
+        this.gapLimit = gapLimit;
     }
 
     public void setGapLimit(int gapLimit) {
@@ -141,12 +150,32 @@ public class Wallet {
         this.birthDate = birthDate;
     }
 
+    public boolean isMasterWallet() {
+        return masterWallet == null;
+    }
+
     public Wallet getMasterWallet() {
         return masterWallet;
     }
 
     public void setMasterWallet(Wallet masterWallet) {
         this.masterWallet = masterWallet;
+    }
+
+    public Wallet getChildWallet(String name) {
+        return childWallets.stream().filter(wallet -> wallet.getName().equals(name)).findFirst().orElse(null);
+    }
+
+    public List<Wallet> getChildWallets() {
+        return childWallets;
+    }
+
+    public void setChildWallets(List<Wallet> childWallets) {
+        this.childWallets = childWallets;
+    }
+
+    public TreeSet<WalletNode> getPurposeNodes() {
+        return purposeNodes;
     }
 
     public synchronized WalletNode getNode(KeyPurpose keyPurpose) {
@@ -1108,6 +1137,9 @@ public class Wallet {
 
     public Wallet copy() {
         Wallet copy = new Wallet(name);
+        copy.setId(getId());
+        copy.setMasterWallet(masterWallet);
+        copy.setChildWallets(childWallets);
         copy.setPolicyType(policyType);
         copy.setScriptType(scriptType);
         copy.setDefaultPolicy(defaultPolicy.copy());
