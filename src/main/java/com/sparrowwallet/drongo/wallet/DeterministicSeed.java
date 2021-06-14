@@ -184,6 +184,7 @@ public class DeterministicSeed extends Persistable implements EncryptableItem {
         Arrays.fill(mnemonicBytes != null ? mnemonicBytes : new byte[0], (byte)0);
         
         DeterministicSeed seed = new DeterministicSeed(encryptedMnemonic, needsPassphrase, creationTimeSeconds, type);
+        seed.setId(getId());
         seed.setPassphrase(passphrase);
 
         return seed;
@@ -209,6 +210,7 @@ public class DeterministicSeed extends Persistable implements EncryptableItem {
         KeyDeriver keyDeriver = getEncryptionType().getDeriver().getKeyDeriver(encryptedMnemonicCode.getKeySalt());
         Key key = keyDeriver.deriveKey(password);
         DeterministicSeed seed = decrypt(key);
+        seed.setId(getId());
         key.clear();
 
         return seed;
@@ -225,6 +227,7 @@ public class DeterministicSeed extends Persistable implements EncryptableItem {
         Arrays.fill(decrypted, (byte)0);
 
         DeterministicSeed seed = new DeterministicSeed(mnemonic, needsPassphrase, creationTimeSeconds, type);
+        seed.setId(getId());
         seed.setPassphrase(passphrase);
 
         return seed;

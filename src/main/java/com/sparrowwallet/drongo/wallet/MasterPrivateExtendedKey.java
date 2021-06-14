@@ -81,7 +81,10 @@ public class MasterPrivateExtendedKey extends Persistable implements Encryptable
         EncryptedData encryptedKeyData = keyCrypter.encrypt(secretBytes, null, key);
         Arrays.fill(secretBytes != null ? secretBytes : new byte[0], (byte)0);
 
-        return new MasterPrivateExtendedKey(encryptedKeyData);
+        MasterPrivateExtendedKey mpek = new MasterPrivateExtendedKey(encryptedKeyData);
+        mpek.setId(getId());
+
+        return mpek;
     }
 
     public MasterPrivateExtendedKey decrypt(CharSequence password) {
@@ -91,10 +94,11 @@ public class MasterPrivateExtendedKey extends Persistable implements Encryptable
 
         KeyDeriver keyDeriver = getEncryptionType().getDeriver().getKeyDeriver(encryptedKey.getKeySalt());
         Key key = keyDeriver.deriveKey(password);
-        MasterPrivateExtendedKey seed = decrypt(key);
+        MasterPrivateExtendedKey mpek = decrypt(key);
+        mpek.setId(getId());
         key.clear();
 
-        return seed;
+        return mpek;
     }
 
     public MasterPrivateExtendedKey decrypt(Key key) {
@@ -105,7 +109,9 @@ public class MasterPrivateExtendedKey extends Persistable implements Encryptable
         KeyCrypter keyCrypter = getEncryptionType().getCrypter().getKeyCrypter();
         byte[] decrypted = keyCrypter.decrypt(encryptedKey, key);
         try {
-            return new MasterPrivateExtendedKey(Arrays.copyOfRange(decrypted, 0, 32), Arrays.copyOfRange(decrypted, 32, 64));
+            MasterPrivateExtendedKey mpek = new MasterPrivateExtendedKey(Arrays.copyOfRange(decrypted, 0, 32), Arrays.copyOfRange(decrypted, 32, 64));
+            mpek.setId(getId());
+            return mpek;
         } finally {
             Arrays.fill(decrypted, (byte)0);
         }
