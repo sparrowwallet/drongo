@@ -1139,7 +1139,11 @@ public class Wallet extends Persistable {
         Wallet copy = new Wallet(name);
         copy.setId(getId());
         copy.setMasterWallet(masterWallet);
-        copy.setChildWallets(childWallets);
+        for(Wallet childWallet : childWallets) {
+            Wallet copyChildWallet = childWallet.copy();
+            copyChildWallet.setMasterWallet(copy);
+            copy.childWallets.add(copyChildWallet);
+        }
         copy.setPolicyType(policyType);
         copy.setScriptType(scriptType);
         copy.setDefaultPolicy(defaultPolicy.copy());
