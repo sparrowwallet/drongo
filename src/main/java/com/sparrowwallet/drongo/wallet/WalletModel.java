@@ -20,6 +20,10 @@ public enum WalletModel {
             return "digitalbitbox";
         }
 
+        if(this == BITCOIN_CORE) {
+            return "bitcoincore";
+        }
+
         if(this == BITBOX_02) {
             return "bitbox02";
         }
