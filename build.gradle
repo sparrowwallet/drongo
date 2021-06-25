@@ -4,23 +4,12 @@ buildscript {
             url "https://plugins.gradle.org/m2/"
         }
     }
-    dependencies {
-        classpath "org.javamodularity:moduleplugin:1.6.0"
-    }
 }
 
 plugins {
-    id 'java'
+    id 'java-library'
+    id 'extra-java-module-info'
     id 'com.github.johnrengelman.shadow' version '5.2.0'
-}
-
-def javamodularityPluginId = 'org.javamodularity.moduleplugin'
-final hasPlugin = project.getPlugins().hasPlugin(javamodularityPluginId);
-if(hasPlugin) {
-    final Plugin plugin = project.getPlugins().getPlugin(javamodularityPluginId)
-    println 'Plugin already applied - version ' + plugin.properties['javamodularityPluginId']
-} else {
-    apply plugin: "org.javamodularity.moduleplugin"
 }
 
 tasks.withType(AbstractArchiveTask) {
@@ -65,7 +54,7 @@ dependencies {
 }
 
 task(runDrongo, dependsOn: 'classes', type: JavaExec) {
-    main = 'com.sparrowwallet.drongo.Main'
+    mainClass = 'com.sparrowwallet.drongo.Main'
     classpath = sourceSets.main.runtimeClasspath
     args 'drongo.properties'
 }
@@ -84,4 +73,31 @@ jar {
 shadowJar {
     archiveVersion = '0.9'
     classifier = 'all'
+}
+
+extraJavaModuleInfo {
+    module('logback-core-1.2.3.jar', 'logback.core', '1.2.3') {
+        exports('ch.qos.logback.core')
+        exports('ch.qos.logback.core.spi')
+        requires('java.xml')
+    }
+    module('logback-classic-1.2.3.jar', 'logback.classic', '1.2.3') {
+        exports('ch.qos.logback.classic')
+        exports('ch.qos.logback.classic.spi')
+        requires('org.slf4j')
+        requires('logback.core')
+        requires('java.xml')
+        requires('java.logging')
+    }
+    module('jeromq-0.5.0.jar', 'jeromq', '0.5.0') {
+        exports('org.zeromq')
+    }
+    module('json-simple-1.1.1.jar', 'json.simple', '1.1.1') {
+        exports('org.json.simple')
+        exports('org.json.simple.parser')
+    }
+    module('jnacl-1.0.0.jar', 'eu.neilalexander.jnacl', '1.0.0')
+    module('junit-4.12.jar', 'junit', '4.12') {
+        exports('org.junit')
+    }
 }
