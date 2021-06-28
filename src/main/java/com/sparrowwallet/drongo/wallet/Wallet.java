@@ -351,6 +351,10 @@ public class Wallet extends Persistable {
         }
     }
 
+    public boolean isWalletTxo(TransactionInput txInput) {
+        return getWalletTxos().keySet().stream().anyMatch(ref -> ref.getHash().equals(txInput.getOutpoint().getHash()) && ref.getIndex() == txInput.getOutpoint().getIndex());
+    }
+
     public boolean isWalletTxo(BlockTransactionHashIndex txo) {
         return getWalletTxos().containsKey(txo);
     }
