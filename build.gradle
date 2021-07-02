@@ -18,7 +18,13 @@ tasks.withType(AbstractArchiveTask) {
 }
 
 group 'com.sparrowwallet'
-version '0.9'
+version '1.0'
+
+def os = org.gradle.internal.os.OperatingSystem.current()
+def osName = os.getFamilyName()
+if(os.macOsX) {
+    osName = "osx"
+}
 
 sourceCompatibility = 11
 targetCompatibility = 11
@@ -51,6 +57,14 @@ dependencies {
         exclude group: 'org.hamcrest', module: 'hamcrest-core'
     }
     testImplementation group: 'org.hamcrest', name: 'hamcrest-core', version: '2.2'
+}
+
+processResources {
+    doLast {
+        delete fileTree("$buildDir/resources/main/native").matching {
+            exclude "${osName}/**"
+        }
+    }
 }
 
 task(runDrongo, dependsOn: 'classes', type: JavaExec) {
