@@ -108,14 +108,28 @@ public abstract class Address {
                     Bech32.Bech32Data data = Bech32.decode(address);
                     if(data.hrp.equals(network.getBech32AddressHRP())) {
                         int witnessVersion = data.data[0];
-                        if (witnessVersion == 0) {
+                        if(witnessVersion == 0) {
+                            if(data.encoding != Bech32.Encoding.BECH32) {
+                                throw new InvalidAddressException("Invalid address - witness version is 0 but encoding is " + data.encoding);
+                            }
+
                             byte[] convertedProgram = Arrays.copyOfRange(data.data, 1, data.data.length);
                             byte[] witnessProgram = Bech32.convertBits(convertedProgram, 0, convertedProgram.length, 5, 8, false);
-                            if (witnessProgram.length == 20) {
+                            if(witnessProgram.length == 20) {
                                 return new P2WPKHAddress(witnessProgram);
                             }
-                            if (witnessProgram.length == 32) {
+                            if(witnessProgram.length == 32) {
                                 return new P2WSHAddress(witnessProgram);
+                            }
+                        } else if(witnessVersion == 1) {
+                            if(data.encoding != Bech32.Encoding.BECH32M) {
+                                throw new InvalidAddressException("Invalid address - witness version is 1 but encoding is " + data.encoding);
+                            }
+
+                            byte[] convertedProgram = Arrays.copyOfRange(data.data, 1, data.data.length);
+                            byte[] witnessProgram = Bech32.convertBits(convertedProgram, 0, convertedProgram.length, 5, 8, false);
+                            if(witnessProgram.length == 32) {
+                                return new P2TRAddress(witnessProgram);
                             }
                         }
                     }

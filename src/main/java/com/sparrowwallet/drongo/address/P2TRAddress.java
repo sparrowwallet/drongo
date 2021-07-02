@@ -2,26 +2,34 @@ package com.sparrowwallet.drongo.address;
 
 import com.sparrowwallet.drongo.Network;
 import com.sparrowwallet.drongo.Utils;
+import com.sparrowwallet.drongo.protocol.Bech32;
 import com.sparrowwallet.drongo.protocol.Script;
 import com.sparrowwallet.drongo.protocol.ScriptType;
 
-public class P2PKAddress extends Address {
+public class P2TRAddress extends Address {
     private final byte[] pubKey;
 
-    public P2PKAddress(byte[] pubKey) {
+    public P2TRAddress(byte[] pubKey) {
         super(Utils.sha256hash160(pubKey));
         this.pubKey = pubKey;
     }
 
     @Override
     public int getVersion(Network network) {
-        return network.getP2PKHAddressHeader();
+        return 1;
     }
 
+    @Override
+    public String getAddress(Network network) {
+        return Bech32.encode(network.getBech32AddressHRP(), getVersion(), pubKey);
+    }
+
+    @Override
     public ScriptType getScriptType() {
-        return ScriptType.P2PK;
+        return ScriptType.P2TR;
     }
 
+    @Override
     public Script getOutputScript() {
         return getScriptType().getOutputScript(pubKey);
     }
@@ -33,6 +41,6 @@ public class P2PKAddress extends Address {
 
     @Override
     public String getOutputScriptDataType() {
-        return "Public Key";
+        return "Taproot";
     }
 }

@@ -49,6 +49,14 @@ public class AddressTest {
         Address address10 = Address.fromString(Network.SIGNET, "2NCZUtUt6gzXyBiPEQi5yQyrgR6f6F6Ki6A");
         Assert.assertTrue(address10 instanceof P2SHAddress);
         Assert.assertEquals("2NCZUtUt6gzXyBiPEQi5yQyrgR6f6F6Ki6A", address10.toString(Network.SIGNET));
+
+        Address address11 = Address.fromString("bc1p0xlxvlhemja6c4dqv22uapctqupfhlxm9h8z3k2e72q4k9hcz7vqzk5jj0");
+        Assert.assertTrue(address11 instanceof P2TRAddress);
+        Assert.assertEquals("bc1p0xlxvlhemja6c4dqv22uapctqupfhlxm9h8z3k2e72q4k9hcz7vqzk5jj0", address11.toString());
+
+        Address address12 = Address.fromString(Network.TESTNET, "tb1pqqqqp399et2xygdj5xreqhjjvcmzhxw4aywxecjdzew6hylgvsesf3hn0c");
+        Assert.assertTrue(address12 instanceof P2TRAddress);
+        Assert.assertEquals("tb1pqqqqp399et2xygdj5xreqhjjvcmzhxw4aywxecjdzew6hylgvsesf3hn0c", address12.toString(Network.TESTNET));
     }
 
     @Test
@@ -74,6 +82,10 @@ public class AddressTest {
         Address address9 = Address.fromString("2NCZUtUt6gzXyBiPEQi5yQyrgR6f6F6Ki6A");
         Assert.assertTrue(address9 instanceof P2SHAddress);
         Assert.assertEquals("2NCZUtUt6gzXyBiPEQi5yQyrgR6f6F6Ki6A", address9.toString());
+
+        Address address12 = Address.fromString("tb1pqqqqp399et2xygdj5xreqhjjvcmzhxw4aywxecjdzew6hylgvsesf3hn0c");
+        Assert.assertTrue(address12 instanceof P2TRAddress);
+        Assert.assertEquals("tb1pqqqqp399et2xygdj5xreqhjjvcmzhxw4aywxecjdzew6hylgvsesf3hn0c", address12.toString());
     }
 
     @Test
@@ -117,6 +129,11 @@ public class AddressTest {
     @Test(expected = InvalidAddressException.class)
     public void invalidChecksumAddressTest2() throws InvalidAddressException {
         Address address1 = Address.fromString("bc1qrp33g0q5c5txsp9arysrx4k6zdkfs4nce4xj0gdcccefvpysxf3qccfmb3");
+    }
+
+    @Test(expected = InvalidAddressException.class)
+    public void invalidEncodingAddressTest() throws InvalidAddressException {
+        Address address1 = Address.fromString("bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kemeawh");
     }
 
     @After

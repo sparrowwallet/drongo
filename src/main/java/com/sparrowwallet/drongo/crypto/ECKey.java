@@ -340,6 +340,13 @@ public class ECKey implements EncryptableItem {
         return pub.getEncoded();
     }
 
+    /**
+     * Gets the x coordinate of the raw public key value. This appears in transaction scriptPubKeys for Taproot outputs.
+     */
+    public byte[] getPubKeyXCoord() {
+        return pub.getEncodedXCoord();
+    }
+
     /** Gets the public key in the form of an elliptic curve point object from Bouncy Castle. */
     public ECPoint getPubKeyPoint() {
         return pub.get();
@@ -625,8 +632,10 @@ public class ECKey implements EncryptableItem {
      * Returns true if the given pubkey is canonical, i.e. the correct length taking into account compression.
      */
     public static boolean isPubKeyCanonical(byte[] pubkey) {
-        if (pubkey.length < 33)
+        if (pubkey.length < 32)
             return false;
+        if (pubkey.length == 32)
+            return true;
         if (pubkey[0] == 0x04) {
             // Uncompressed pubkey
             if (pubkey.length != 65)
@@ -644,7 +653,7 @@ public class ECKey implements EncryptableItem {
      * Returns true if the given pubkey is in its compressed form.
      */
     public static boolean isPubKeyCompressed(byte[] encoded) {
-        if (encoded.length == 33 && (encoded[0] == 0x02 || encoded[0] == 0x03))
+        if (encoded.length == 32 || (encoded.length == 33 && (encoded[0] == 0x02 || encoded[0] == 0x03)))
             return true;
         else if (encoded.length == 65 && encoded[0] == 0x04)
             return false;

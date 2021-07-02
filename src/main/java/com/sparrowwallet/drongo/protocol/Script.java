@@ -136,6 +136,21 @@ public class Script {
     }
 
     /**
+     * <p>If the program somehow pays to a pubkey, returns the pubkey.</p>
+     *
+     * <p>Otherwise this method throws a ScriptException.</p>
+     */
+    public ECKey getPubKey() throws ProtocolException {
+        for(ScriptType scriptType : SINGLE_KEY_TYPES) {
+            if(scriptType.isScriptType(this)) {
+                return scriptType.getPublicKeyFromScript(this);
+            }
+        }
+
+        throw new ProtocolException("Script not a standard form that contains a single key");
+    }
+
+    /**
      * <p>If the program somehow pays to a hash, returns the hash.</p>
      *
      * <p>Otherwise this method throws a ScriptException.</p>
@@ -160,8 +175,10 @@ public class Script {
             }
         }
 
-        if(P2PK.isScriptType(this)) {
-            return new Address[] { P2PK.getAddress(P2PK.getPublicKeyFromScript(this).getPubKey()) };
+        for(ScriptType scriptType : SINGLE_KEY_TYPES) {
+            if(scriptType.isScriptType(this)) {
+                return new Address[] { scriptType.getAddress(scriptType.getPublicKeyFromScript(this)) };
+            }
         }
 
         if(MULTISIG.isScriptType(this)) {

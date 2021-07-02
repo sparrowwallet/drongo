@@ -974,6 +974,106 @@ public enum ScriptType {
         public List<PolicyType> getAllowedPolicyTypes() {
             return List.of(MULTI, CUSTOM);
         }
+    },
+    P2TR("P2TR", "Taproot (P2TR)", "m/6789'/0'/0'") {
+        @Override
+        public Address getAddress(byte[] pubKey) {
+            return new P2TRAddress(pubKey);
+        }
+
+        @Override
+        public Address getAddress(ECKey key) {
+            return getAddress(key.getPubKeyXCoord());
+        }
+
+        @Override
+        public Address getAddress(Script script) {
+            throw new ProtocolException("Cannot create a taproot address without a keypath");
+        }
+
+        @Override
+        public Script getOutputScript(byte[] pubKey) {
+            List<ScriptChunk> chunks = new ArrayList<>();
+            chunks.add(new ScriptChunk(OP_1, null));
+            chunks.add(new ScriptChunk(pubKey.length, pubKey));
+
+            return new Script(chunks);
+        }
+
+        @Override
+        public Script getOutputScript(ECKey key) {
+            return getOutputScript(key.getPubKeyXCoord());
+        }
+
+        @Override
+        public Script getOutputScript(Script script) {
+            throw new ProtocolException("Cannot create a taproot output script without a keypath");
+        }
+
+        @Override
+        public String getOutputDescriptor(ECKey key) {
+            return getDescriptor() + Utils.bytesToHex(key.getPubKeyXCoord()) + getCloseDescriptor();
+        }
+
+        @Override
+        public String getOutputDescriptor(Script script) {
+            throw new ProtocolException("Cannot create a taproot output descriptor without a keypath");
+        }
+
+        @Override
+        public String getDescriptor() {
+            return "tr(";
+        }
+
+        @Override
+        public boolean isScriptType(Script script) {
+            List<ScriptChunk> chunks = script.chunks;
+            if (chunks.size() != 2)
+                return false;
+            if (!chunks.get(0).equalsOpCode(OP_1))
+                return false;
+            byte[] chunk1data = chunks.get(1).data;
+            if (chunk1data == null)
+                return false;
+            if (chunk1data.length != 32)
+                return false;
+            return true;
+        }
+
+        @Override
+        public byte[] getHashFromScript(Script script) {
+            throw new ProtocolException("P2TR script does not contain a hash, use getPublicKeyFromScript(script) to retrieve public key");
+        }
+
+        @Override
+        public ECKey getPublicKeyFromScript(Script script) {
+            return ECKey.fromPublicOnly(script.chunks.get(1).data);
+        }
+
+        @Override
+        public Script getScriptSig(Script scriptPubKey, ECKey pubKey, TransactionSignature signature) {
+            throw new UnsupportedOperationException("Constructing Taproot inputs is not yet supported");
+        }
+
+        @Override
+        public TransactionInput addSpendingInput(Transaction transaction, TransactionOutput prevOutput, ECKey pubKey, TransactionSignature signature) {
+            throw new UnsupportedOperationException("Constructing Taproot inputs is not yet supported");
+        }
+
+        @Override
+        public Script getMultisigScriptSig(Script scriptPubKey, int threshold, Map<ECKey, TransactionSignature> pubKeySignatures) {
+            throw new UnsupportedOperationException("Constructing Taproot inputs is not yet supported");
+        }
+
+        @Override
+        public TransactionInput addMultisigSpendingInput(Transaction transaction, TransactionOutput prevOutput, int threshold, Map<ECKey, TransactionSignature> pubKeySignatures) {
+            throw new UnsupportedOperationException("Constructing Taproot inputs is not yet supported");
+        }
+
+        @Override
+        public List<PolicyType> getAllowedPolicyTypes() {
+            return Collections.emptyList();
+        }
     };
 
     private final String name;
@@ -1087,18 +1187,22 @@ public enum ScriptType {
 
     public abstract TransactionInput addMultisigSpendingInput(Transaction transaction, TransactionOutput prevOutput, int threshold, Map<ECKey, TransactionSignature> pubKeySignatures);
 
+    public static final ScriptType[] SINGLE_KEY_TYPES = {P2PK, P2TR};
+
     public static final ScriptType[] SINGLE_HASH_TYPES = {P2PKH, P2SH, P2SH_P2WPKH, P2SH_P2WSH, P2WPKH, P2WSH};
+
+    public static final ScriptType[] ADDRESSABLE_TYPES = {P2PKH, P2SH, P2SH_P2WPKH, P2SH_P2WSH, P2WPKH, P2WSH, P2TR};
 
     public static final ScriptType[] NON_WITNESS_TYPES = {P2PK, P2PKH, P2SH};
 
-    public static final ScriptType[] WITNESS_TYPES = {P2SH_P2WPKH, P2SH_P2WSH, P2WPKH, P2WSH};
+    public static final ScriptType[] WITNESS_TYPES = {P2SH_P2WPKH, P2SH_P2WSH, P2WPKH, P2WSH, P2TR};
 
     public static List<ScriptType> getScriptTypesForPolicyType(PolicyType policyType) {
         return Arrays.stream(values()).filter(scriptType -> scriptType.isAllowed(policyType)).collect(Collectors.toList());
     }
 
     public static List<ScriptType> getAddressableScriptTypes(PolicyType policyType) {
-        return Arrays.stream(values()).filter(scriptType -> scriptType.isAllowed(policyType) && Arrays.asList(SINGLE_HASH_TYPES).contains(scriptType)).collect(Collectors.toList());
+        return Arrays.stream(ADDRESSABLE_TYPES).filter(scriptType -> scriptType.isAllowed(policyType)).collect(Collectors.toList());
     }
 
     public static ScriptType getType(Script script) {
@@ -1166,6 +1270,9 @@ public enum ScriptType {
             return (32 + 4 + 1 + 13 + (107 / WITNESS_SCALE_FACTOR) + 4);
         } else if(P2SH_P2WSH.equals(this)) {
             return (32 + 4 + 1 + 35 + (107 / WITNESS_SCALE_FACTOR) + 4);
+        } else if(P2TR.equals(this)) {
+            //Assume a default keypath spend
+            return (32 + 4 + 1 + (66 / WITNESS_SCALE_FACTOR) + 4);
         } else if(Arrays.asList(WITNESS_TYPES).contains(this)) {
             //Return length of spending input with 75% discount to script size
             return (32 + 4 + 1 + (107 / WITNESS_SCALE_FACTOR) + 4);
