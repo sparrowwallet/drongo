@@ -443,7 +443,7 @@ public class Wallet extends Persistable {
     public int getNoInputsWeightUnits(List<Payment> payments) {
         Transaction transaction = new Transaction();
         if(Arrays.asList(ScriptType.WITNESS_TYPES).contains(getScriptType())) {
-            transaction.setSegwitVersion(1);
+            transaction.setSegwitFlag(Transaction.DEFAULT_SEGWIT_FLAG);
         }
         for(Payment payment : payments) {
             transaction.addOutput(payment.getAmount(), payment.getAddress());

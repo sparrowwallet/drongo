@@ -542,7 +542,7 @@ public class PSBT {
         Transaction finalTransaction = new Transaction(transaction.bitcoinSerialize());
 
         if(hasWitness && !finalTransaction.isSegwit()) {
-            finalTransaction.setSegwitVersion(1);
+            finalTransaction.setSegwitFlag(Transaction.DEFAULT_SEGWIT_FLAG);
         }
 
         for(int i = 0; i < finalTransaction.getInputs().size(); i++) {

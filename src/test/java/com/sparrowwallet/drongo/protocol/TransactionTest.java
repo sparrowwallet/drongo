@@ -162,7 +162,7 @@ public class TransactionTest {
 
         Transaction transaction = new Transaction();
         transaction.setVersion(parsedTransaction.getVersion());
-        transaction.setSegwitVersion(parsedTransaction.getSegwitVersion());
+        transaction.setSegwitFlag(parsedTransaction.getSegwitFlag());
         for(TransactionInput txInput : parsedTransaction.getInputs()) {
             transaction.addInput(txInput.getOutpoint().getHash(), txInput.getOutpoint().getIndex(), txInput.getScriptSig(), txInput.getWitness());
         }
@@ -188,7 +188,7 @@ public class TransactionTest {
 
         Transaction transaction = new Transaction();
         transaction.setVersion(parsedTransaction.getVersion());
-        transaction.setSegwitVersion(parsedTransaction.getSegwitVersion());
+        transaction.setSegwitFlag(parsedTransaction.getSegwitFlag());
         transaction.setLocktime(parsedTransaction.getLocktime());
         for(TransactionInput txInput : parsedTransaction.getInputs()) {
             TransactionInput newInput = transaction.addInput(txInput.getOutpoint().getHash(), txInput.getOutpoint().getIndex(), txInput.getScriptSig(), txInput.getWitness());
@@ -344,7 +344,7 @@ public class TransactionTest {
         ECKey pubKey0 = ECKey.fromPublicOnly(witness0.getPushes().get(1));
 
         Transaction transaction = new Transaction();
-        transaction.setSegwitVersion(1);
+        transaction.setSegwitFlag(1);
         TransactionInput input = ScriptType.P2SH_P2WPKH.addSpendingInput(transaction, spent0Output, pubKey0, signature0);
         input.setSequenceNumber(TransactionInput.SEQUENCE_RBF_ENABLED);
 
@@ -388,7 +388,7 @@ public class TransactionTest {
         pubKeySignatures.put(key2, null);
 
         Transaction transaction = new Transaction();
-        transaction.setSegwitVersion(1);
+        transaction.setSegwitFlag(1);
         TransactionInput input = ScriptType.P2SH_P2WSH.addMultisigSpendingInput(transaction, spent0Output, 2, pubKeySignatures);
 
         transaction.addOutput(59287429, Address.fromString("3PBjKH4FRuEKy4sD3NfL7tqfZTG5K42owu"));
@@ -422,7 +422,7 @@ public class TransactionTest {
 
         Transaction transaction = new Transaction();
         transaction.setVersion(2);
-        transaction.setSegwitVersion(1);
+        transaction.setSegwitFlag(1);
         spent0ScriptType.addSpendingInput(transaction, spent0Output, key0, signature0);
 
         transaction.addOutput(211584990, Address.fromString("bc1q9k6aan6ncahvlslw8w54jzv897k55zh077un6s"));
@@ -464,7 +464,7 @@ public class TransactionTest {
         pubKeySignatures.put(key2, null);
 
         Transaction transaction = new Transaction();
-        transaction.setSegwitVersion(1);
+        transaction.setSegwitFlag(1);
         spent0ScriptType.addMultisigSpendingInput(transaction, spent0Output, 2, pubKeySignatures);
 
         transaction.addOutput(10900000, Address.fromString("3Dt17mpd8FDXBjP56rCD7a4Sx7wpL91uhn"));
