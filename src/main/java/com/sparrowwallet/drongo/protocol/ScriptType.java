@@ -975,15 +975,15 @@ public enum ScriptType {
             return List.of(MULTI, CUSTOM);
         }
     },
-    P2TR("P2TR", "Taproot (P2TR)", "m/6789'/0'/0'") {
+    P2TR("P2TR", "Taproot (P2TR)", "m/86'/0'/0'") {
         @Override
         public Address getAddress(byte[] pubKey) {
             return new P2TRAddress(pubKey);
         }
 
         @Override
-        public Address getAddress(ECKey key) {
-            return getAddress(key.getPubKeyXCoord());
+        public Address getAddress(ECKey derivedKey) {
+            return getAddress(derivedKey.getTweakedOutputKey().getPubKeyXCoord());
         }
 
         @Override
@@ -1001,8 +1001,8 @@ public enum ScriptType {
         }
 
         @Override
-        public Script getOutputScript(ECKey key) {
-            return getOutputScript(key.getPubKeyXCoord());
+        public Script getOutputScript(ECKey derivedKey) {
+            return getOutputScript(derivedKey.getTweakedOutputKey().getPubKeyXCoord());
         }
 
         @Override
@@ -1011,8 +1011,8 @@ public enum ScriptType {
         }
 
         @Override
-        public String getOutputDescriptor(ECKey key) {
-            return getDescriptor() + Utils.bytesToHex(key.getPubKeyXCoord()) + getCloseDescriptor();
+        public String getOutputDescriptor(ECKey derivedKey) {
+            return getDescriptor() + Utils.bytesToHex(derivedKey.getPubKeyXCoord()) + getCloseDescriptor();
         }
 
         @Override
@@ -1052,7 +1052,15 @@ public enum ScriptType {
 
         @Override
         public Script getScriptSig(Script scriptPubKey, ECKey pubKey, TransactionSignature signature) {
-            throw new UnsupportedOperationException("Constructing Taproot inputs is not yet supported");
+            if(!isScriptType(scriptPubKey)) {
+                throw new ProtocolException("Provided scriptPubKey is not a " + getName() + " script");
+            }
+
+            if(!scriptPubKey.equals(getOutputScript(pubKey))) {
+                throw new ProtocolException("Provided P2TR scriptPubKey does not match constructed pubkey script");
+            }
+
+            return new Script(new byte[0]);
         }
 
         @Override
@@ -1072,7 +1080,7 @@ public enum ScriptType {
 
         @Override
         public List<PolicyType> getAllowedPolicyTypes() {
-            return Collections.emptyList();
+            return Network.get() == Network.REGTEST || Network.get() == Network.SIGNET ? List.of(SINGLE) : Collections.emptyList();
         }
     };
 

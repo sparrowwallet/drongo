@@ -17,10 +17,7 @@ import org.bouncycastle.crypto.params.ECKeyGenerationParameters;
 import org.bouncycastle.crypto.params.ECPrivateKeyParameters;
 import org.bouncycastle.crypto.params.ECPublicKeyParameters;
 import org.bouncycastle.crypto.signers.ECDSASigner;
-import org.bouncycastle.math.ec.ECAlgorithms;
-import org.bouncycastle.math.ec.ECPoint;
-import org.bouncycastle.math.ec.FixedPointCombMultiplier;
-import org.bouncycastle.math.ec.FixedPointUtil;
+import org.bouncycastle.math.ec.*;
 import org.bouncycastle.math.ec.custom.sec.SecP256K1Curve;
 import org.bouncycastle.util.Properties;
 import org.bouncycastle.util.encoders.Hex;
@@ -30,6 +27,7 @@ import org.slf4j.LoggerFactory;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.math.BigInteger;
+import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.security.SecureRandom;
 import java.security.SignatureException;
@@ -626,6 +624,40 @@ public class ECKey implements EncryptableItem {
         if (!ECKey.verify(sigHash.getBytes(), signature, getPubKey())) {
             throw new SignatureException();
         }
+    }
+
+    public ECKey getTweakedOutputKey() {
+        ECPoint internalKey = liftX(getPubKeyXCoord());
+        byte[] taggedHash = taggedHash("TapTweak", internalKey.getXCoord().getEncoded());
+        ECPoint outputKey = internalKey.add(ECKey.fromPrivate(taggedHash).getPubKeyPoint());
+        return ECKey.fromPublicOnly(outputKey, true);
+    }
+
+    private static ECPoint liftX(byte[] bytes) {
+        SecP256K1Curve secP256K1Curve = (SecP256K1Curve)CURVE_PARAMS.getCurve();
+        BigInteger x = new BigInteger(1, bytes);
+        BigInteger p = secP256K1Curve.getQ();
+        if(x.compareTo(p) > -1) {
+            throw new IllegalArgumentException("Provided bytes must be less than secp256k1 field size");
+        }
+
+        BigInteger y_sq = x.modPow(BigInteger.valueOf(3), p).add(BigInteger.valueOf(7)).mod(p);
+        BigInteger y = y_sq.modPow(p.add(BigInteger.valueOf(1)).divide(BigInteger.valueOf(4)), p);
+        if(!y.modPow(BigInteger.valueOf(2), p).equals(y_sq)) {
+            throw new IllegalStateException("Calculated invalid y_sq when solving for y co-ordinate");
+        }
+
+        return secP256K1Curve.createPoint(x, y.and(BigInteger.ONE).equals(BigInteger.ZERO) ? y : p.subtract(y));
+    }
+
+    private static byte[] taggedHash(String tag, byte[] msg) {
+        byte[] hash = Sha256Hash.hash(tag.getBytes(StandardCharsets.UTF_8));
+        ByteBuffer buffer = ByteBuffer.allocate(hash.length + hash.length + msg.length);
+        buffer.put(hash);
+        buffer.put(hash);
+        buffer.put(msg);
+
+        return Sha256Hash.hash(buffer.array());
     }
 
     /**

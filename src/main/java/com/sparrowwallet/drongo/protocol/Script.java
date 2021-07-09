@@ -175,6 +175,11 @@ public class Script {
             }
         }
 
+        //Special handling for taproot tweaked keys - we don't want to tweak them again
+        if(P2TR.isScriptType(this)) {
+            return new Address[] { new P2TRAddress(P2TR.getPublicKeyFromScript(this).getPubKeyXCoord()) };
+        }
+
         for(ScriptType scriptType : SINGLE_KEY_TYPES) {
             if(scriptType.isScriptType(this)) {
                 return new Address[] { scriptType.getAddress(scriptType.getPublicKeyFromScript(this)) };
