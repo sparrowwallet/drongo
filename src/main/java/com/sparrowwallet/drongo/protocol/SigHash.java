@@ -12,7 +12,7 @@ public enum SigHash {
     ANYONECANPAY_ALL("All + Anyone Can Pay", (byte)0x81),
     ANYONECANPAY_NONE("None + Anyone Can Pay", (byte)0x82),
     ANYONECANPAY_SINGLE("Single + Anyone Can Pay", (byte)0x83),
-    UNSET("Unset", (byte)0); // Caution: Using this type in isolation is non-standard. Treated similar to ALL.
+    ALL_TAPROOT("All (Taproot)", (byte)0);
 
     private final String name;
     public final byte value;

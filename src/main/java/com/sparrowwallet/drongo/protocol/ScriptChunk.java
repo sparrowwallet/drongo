@@ -110,8 +110,8 @@ public class ScriptChunk {
         }
 
         try {
-            ECKey.ECDSASignature.decodeFromDER(data);
-        } catch(SignatureDecodeException e) {
+            TransactionSignature.decodeFromBitcoin(data, false);
+        } catch(Exception e) {
             return false;
         }
 
@@ -120,7 +120,7 @@ public class ScriptChunk {
 
     public TransactionSignature getSignature() {
         try {
-            return TransactionSignature.decodeFromBitcoin(data, false, false);
+            return TransactionSignature.decodeFromBitcoin(data, false);
         } catch(SignatureDecodeException e) {
             throw new ProtocolException("Could not decode signature", e);
         }

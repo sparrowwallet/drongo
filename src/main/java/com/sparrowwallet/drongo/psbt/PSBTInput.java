@@ -2,6 +2,7 @@ package com.sparrowwallet.drongo.psbt;
 
 import com.sparrowwallet.drongo.KeyDerivation;
 import com.sparrowwallet.drongo.Utils;
+import com.sparrowwallet.drongo.crypto.ECDSASignature;
 import com.sparrowwallet.drongo.crypto.ECKey;
 import com.sparrowwallet.drongo.protocol.*;
 import org.slf4j.Logger;
@@ -113,7 +114,7 @@ public class PSBTInput {
                     entry.checkOneBytePlusPubKey();
                     ECKey sigPublicKey = ECKey.fromPublicOnly(entry.getKeyData());
                     //TODO: Verify signature
-                    TransactionSignature signature = TransactionSignature.decodeFromBitcoin(entry.getData(), true, false);
+                    TransactionSignature signature = TransactionSignature.decodeFromBitcoin(TransactionSignature.Type.ECDSA, entry.getData(), true);
                     this.partialSignatures.put(sigPublicKey, signature);
                     log.debug("Found input partial signature with public key " + sigPublicKey + " signature " + Utils.bytesToHex(entry.getData()));
                     break;
@@ -419,7 +420,7 @@ public class PSBTInput {
             Script signingScript = getSigningScript();
             if(signingScript != null) {
                 Sha256Hash hash = getHashForSignature(signingScript, localSigHash);
-                ECKey.ECDSASignature ecdsaSignature = privKey.sign(hash);
+                ECDSASignature ecdsaSignature = privKey.signEcdsa(hash);
                 TransactionSignature transactionSignature = new TransactionSignature(ecdsaSignature, localSigHash);
 
                 ECKey pubKey = ECKey.fromPublicOnly(privKey);

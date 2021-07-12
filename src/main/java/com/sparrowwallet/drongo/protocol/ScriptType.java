@@ -127,6 +127,11 @@ public enum ScriptType {
         }
 
         @Override
+        public TransactionSignature.Type getSignatureType() {
+            return TransactionSignature.Type.ECDSA;
+        };
+
+        @Override
         public List<PolicyType> getAllowedPolicyTypes() {
             return List.of(SINGLE);
         }
@@ -238,6 +243,11 @@ public enum ScriptType {
         public TransactionInput addMultisigSpendingInput(Transaction transaction, TransactionOutput prevOutput, int threshold, Map<ECKey, TransactionSignature> pubKeySignatures) {
             throw new ProtocolException(getName() + " is not a multisig script type");
         }
+
+        @Override
+        public TransactionSignature.Type getSignatureType() {
+            return TransactionSignature.Type.ECDSA;
+        };
 
         @Override
         public List<PolicyType> getAllowedPolicyTypes() {
@@ -426,6 +436,11 @@ public enum ScriptType {
         }
 
         @Override
+        public TransactionSignature.Type getSignatureType() {
+            return TransactionSignature.Type.ECDSA;
+        };
+
+        @Override
         public List<PolicyType> getAllowedPolicyTypes() {
             return List.of(MULTI);
         }
@@ -551,6 +566,11 @@ public enum ScriptType {
         }
 
         @Override
+        public TransactionSignature.Type getSignatureType() {
+            return TransactionSignature.Type.ECDSA;
+        };
+
+        @Override
         public List<PolicyType> getAllowedPolicyTypes() {
             return List.of(MULTI);
         }
@@ -654,6 +674,11 @@ public enum ScriptType {
         }
 
         @Override
+        public TransactionSignature.Type getSignatureType() {
+            return TransactionSignature.Type.ECDSA;
+        };
+
+        @Override
         public List<PolicyType> getAllowedPolicyTypes() {
             return List.of(SINGLE);
         }
@@ -753,6 +778,11 @@ public enum ScriptType {
             TransactionWitness witness = new TransactionWitness(transaction, pubKeySignatures.values().stream().filter(Objects::nonNull).collect(Collectors.toList()), witnessScript);
             return transaction.addInput(prevOutput.getHash(), prevOutput.getIndex(), scriptSig, witness);
         }
+
+        @Override
+        public TransactionSignature.Type getSignatureType() {
+            return TransactionSignature.Type.ECDSA;
+        };
 
         @Override
         public List<PolicyType> getAllowedPolicyTypes() {
@@ -858,6 +888,11 @@ public enum ScriptType {
         public TransactionInput addMultisigSpendingInput(Transaction transaction, TransactionOutput prevOutput, int threshold, Map<ECKey, TransactionSignature> pubKeySignatures) {
             throw new ProtocolException(getName() + " is not a multisig script type");
         }
+
+        @Override
+        public TransactionSignature.Type getSignatureType() {
+            return TransactionSignature.Type.ECDSA;
+        };
 
         @Override
         public List<PolicyType> getAllowedPolicyTypes() {
@@ -971,6 +1006,11 @@ public enum ScriptType {
         }
 
         @Override
+        public TransactionSignature.Type getSignatureType() {
+            return TransactionSignature.Type.ECDSA;
+        };
+
+        @Override
         public List<PolicyType> getAllowedPolicyTypes() {
             return List.of(MULTI, CUSTOM);
         }
@@ -1077,6 +1117,11 @@ public enum ScriptType {
         public TransactionInput addMultisigSpendingInput(Transaction transaction, TransactionOutput prevOutput, int threshold, Map<ECKey, TransactionSignature> pubKeySignatures) {
             throw new UnsupportedOperationException("Constructing Taproot inputs is not yet supported");
         }
+
+        @Override
+        public TransactionSignature.Type getSignatureType() {
+            return TransactionSignature.Type.SCHNORR;
+        };
 
         @Override
         public List<PolicyType> getAllowedPolicyTypes() {
@@ -1194,6 +1239,8 @@ public enum ScriptType {
     public abstract Script getMultisigScriptSig(Script scriptPubKey, int threshold, Map<ECKey, TransactionSignature> pubKeySignatures);
 
     public abstract TransactionInput addMultisigSpendingInput(Transaction transaction, TransactionOutput prevOutput, int threshold, Map<ECKey, TransactionSignature> pubKeySignatures);
+
+    public abstract TransactionSignature.Type getSignatureType();
 
     public static final ScriptType[] SINGLE_KEY_TYPES = {P2PK, P2TR};
 

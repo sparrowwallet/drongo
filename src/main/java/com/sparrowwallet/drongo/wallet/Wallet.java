@@ -475,14 +475,14 @@ public class Wallet extends Persistable {
         TransactionInput txInput = null;
         if(getPolicyType().equals(PolicyType.SINGLE)) {
             ECKey pubKey = getPubKey(receiveNode);
-            TransactionSignature signature = TransactionSignature.dummy();
+            TransactionSignature signature = TransactionSignature.dummy(getScriptType().getSignatureType());
             txInput = getScriptType().addSpendingInput(transaction, prevTxOut, pubKey, signature);
         } else if(getPolicyType().equals(PolicyType.MULTI)) {
             List<ECKey> pubKeys = getPubKeys(receiveNode);
             int threshold = getDefaultPolicy().getNumSignaturesRequired();
             Map<ECKey, TransactionSignature> pubKeySignatures = new TreeMap<>(new ECKey.LexicographicECKeyComparator());
             for(int i = 0; i < pubKeys.size(); i++) {
-                pubKeySignatures.put(pubKeys.get(i), i < threshold ? TransactionSignature.dummy() : null);
+                pubKeySignatures.put(pubKeys.get(i), i < threshold ? TransactionSignature.dummy(getScriptType().getSignatureType()) : null);
             }
             txInput = getScriptType().addMultisigSpendingInput(transaction, prevTxOut, threshold, pubKeySignatures);
         }
@@ -618,13 +618,13 @@ public class Wallet extends Persistable {
     public TransactionInput addDummySpendingInput(Transaction transaction, WalletNode walletNode, TransactionOutput prevTxOut) {
         if(getPolicyType().equals(PolicyType.SINGLE)) {
             ECKey pubKey = getPubKey(walletNode);
-            return getScriptType().addSpendingInput(transaction, prevTxOut, pubKey, TransactionSignature.dummy());
+            return getScriptType().addSpendingInput(transaction, prevTxOut, pubKey, TransactionSignature.dummy(getScriptType().getSignatureType()));
         } else if(getPolicyType().equals(PolicyType.MULTI)) {
             List<ECKey> pubKeys = getPubKeys(walletNode);
             int threshold = getDefaultPolicy().getNumSignaturesRequired();
             Map<ECKey, TransactionSignature> pubKeySignatures = new TreeMap<>(new ECKey.LexicographicECKeyComparator());
             for(int i = 0; i < pubKeys.size(); i++) {
-                pubKeySignatures.put(pubKeys.get(i), i < threshold ? TransactionSignature.dummy() : null);
+                pubKeySignatures.put(pubKeys.get(i), i < threshold ? TransactionSignature.dummy(getScriptType().getSignatureType()) : null);
             }
             return getScriptType().addMultisigSpendingInput(transaction, prevTxOut, threshold, pubKeySignatures);
         } else {

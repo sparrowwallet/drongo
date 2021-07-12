@@ -1,13 +1,19 @@
 package com.sparrowwallet.drongo.protocol;
 
+import com.sparrowwallet.drongo.crypto.ECDSASignature;
 import com.sparrowwallet.drongo.crypto.ECKey;
+import com.sparrowwallet.drongo.crypto.SchnorrSignature;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.math.BigInteger;
+import java.nio.ByteBuffer;
 import java.util.Objects;
 
-public class TransactionSignature extends ECKey.ECDSASignature {
+public class TransactionSignature {
+    private final ECDSASignature ecdsaSignature;
+    private final SchnorrSignature schnorrSignature;
+
     /**
      * A byte that controls which parts of a transaction are signed. This is exposed because signatures
      * parsed off the wire may have sighash flags that aren't "normal" serializations of the enum values.
@@ -16,21 +22,26 @@ public class TransactionSignature extends ECKey.ECDSASignature {
      */
     public final byte sighashFlags;
 
-    /** Constructs a signature with the given components and SIGHASH_ALL. */
-    public TransactionSignature(BigInteger r, BigInteger s) {
-        this(r, s, SigHash.ALL.value);
-    }
-
-    /** Constructs a signature with the given components and raw sighash flag bytes (needed for rule compatibility). */
-    public TransactionSignature(BigInteger r, BigInteger s, byte sighashFlags) {
-        super(r, s);
-        this.sighashFlags = sighashFlags;
+    /** Constructs a signature with the given components of the given type and SIGHASH_ALL. */
+    public TransactionSignature(BigInteger r, BigInteger s, Type type) {
+        this(r, s, type, SigHash.ALL.value);
     }
 
     /** Constructs a transaction signature based on the ECDSA signature. */
-    public TransactionSignature(ECKey.ECDSASignature signature, SigHash sigHash) {
-        super(signature.r, signature.s);
-        sighashFlags = sigHash.value;
+    public TransactionSignature(ECDSASignature signature, SigHash sigHash) {
+        this(signature.r, signature.s, Type.ECDSA, sigHash.value);
+    }
+
+    /** Constructs a transaction signature based on the Schnorr signature. */
+    public TransactionSignature(SchnorrSignature signature, SigHash sigHash) {
+        this(signature.r, signature.s, Type.SCHNORR, sigHash.value);
+    }
+
+    /** Constructs a signature with the given components, type and raw sighash flag bytes (needed for rule compatibility). */
+    public TransactionSignature(BigInteger r, BigInteger s, Type type, byte sighashFlags) {
+        ecdsaSignature = type == Type.ECDSA ? new ECDSASignature(r, s) : null;
+        schnorrSignature = type == Type.SCHNORR ? new SchnorrSignature(r, s) : null;
+        this.sighashFlags = sighashFlags;
     }
 
     /**
@@ -39,61 +50,9 @@ public class TransactionSignature extends ECKey.ECDSASignature {
      * right size (e.g. for fee calculations) but don't have the requisite signing key yet and will fill out the
      * real signature later.
      */
-    public static TransactionSignature dummy() {
+    public static TransactionSignature dummy(Type type) {
         BigInteger val = ECKey.HALF_CURVE_ORDER;
-        return new TransactionSignature(val, val);
-    }
-
-    /**
-     * Returns true if the given signature is has canonical encoding, and will thus be accepted as standard by
-     * Bitcoin Core. DER and the SIGHASH encoding allow for quite some flexibility in how the same structures
-     * are encoded, and this can open up novel attacks in which a man in the middle takes a transaction and then
-     * changes its signature such that the transaction hash is different but it's still valid. This can confuse wallets
-     * and generally violates people's mental model of how Bitcoin should work, thus, non-canonical signatures are now
-     * not relayed by default.
-     */
-    public static boolean isEncodingCanonical(byte[] signature) {
-        // See Bitcoin Core's IsCanonicalSignature, https://bitcointalk.org/index.php?topic=8392.msg127623#msg127623
-        // A canonical signature exists of: <30> <total len> <02> <len R> <R> <02> <len S> <S> <hashtype>
-        // Where R and S are not negative (their first byte has its highest bit not set), and not
-        // excessively padded (do not start with a 0 byte, unless an otherwise negative number follows,
-        // in which case a single 0 byte is necessary and even required).
-
-        // Empty signatures, while not strictly DER encoded, are allowed.
-        if (signature.length == 0)
-            return true;
-
-        if (signature.length < 9 || signature.length > 73)
-            return false;
-
-        int hashType = (signature[signature.length-1] & 0xff) & ~SigHash.ANYONECANPAY.value; // mask the byte to prevent sign-extension hurting us
-        if (hashType < SigHash.ALL.value || hashType > SigHash.SINGLE.value)
-            return false;
-
-        //                   "wrong type"                  "wrong length marker"
-        if ((signature[0] & 0xff) != 0x30 || (signature[1] & 0xff) != signature.length-3)
-            return false;
-
-        int lenR = signature[3] & 0xff;
-        if (5 + lenR >= signature.length || lenR == 0)
-            return false;
-        int lenS = signature[5+lenR] & 0xff;
-        if (lenR + lenS + 7 != signature.length || lenS == 0)
-            return false;
-
-        //    R value type mismatch          R value negative
-        if (signature[4-2] != 0x02 || (signature[4] & 0x80) == 0x80)
-            return false;
-        if (lenR > 1 && signature[4] == 0x00 && (signature[4+1] & 0x80) != 0x80)
-            return false; // R value excessively padded
-
-        //       S value type mismatch                    S value negative
-        if (signature[6 + lenR - 2] != 0x02 || (signature[6 + lenR] & 0x80) == 0x80)
-            return false;
-        if (lenS > 1 && signature[6 + lenR] == 0x00 && (signature[6 + lenR + 1] & 0x80) != 0x80)
-            return false; // S value excessively padded
-
-        return true;
+        return new TransactionSignature(val, val, type);
     }
 
     public boolean anyoneCanPay() {
@@ -118,18 +77,51 @@ public class TransactionSignature extends ECKey.ECDSASignature {
      * components into a structure, and then we append a byte to the end for the sighash flags.
      */
     public byte[] encodeToBitcoin() {
-        try {
-            ByteArrayOutputStream bos = derByteStream();
-            bos.write(sighashFlags);
-            return bos.toByteArray();
-        } catch (IOException e) {
-            throw new RuntimeException(e);  // Cannot happen.
+        if(ecdsaSignature != null) {
+            try {
+                ByteArrayOutputStream bos = ecdsaSignature.derByteStream();
+                bos.write(sighashFlags);
+                return bos.toByteArray();
+            } catch (IOException e) {
+                throw new RuntimeException(e);  // Cannot happen.
+            }
+        } else if(schnorrSignature != null) {
+            SigHash sigHash = getSigHash();
+            ByteBuffer buffer = ByteBuffer.allocate(sigHash == SigHash.ALL ? 64 : 65);
+            buffer.put(schnorrSignature.encode());
+            if(sigHash != SigHash.ALL) {
+                buffer.put(sighashFlags);
+            }
+            return buffer.array();
         }
+
+        throw new IllegalStateException("TransactionSignature has no values");
     }
 
-    @Override
-    public ECKey.ECDSASignature toCanonicalised() {
-        return new TransactionSignature(super.toCanonicalised(), getSigHash());
+    public static TransactionSignature decodeFromBitcoin(byte[] bytes, boolean requireCanonicalEncoding) throws SignatureDecodeException {
+        if(bytes.length == 64 || bytes.length == 65) {
+            return decodeFromBitcoin(Type.SCHNORR, bytes, requireCanonicalEncoding);
+        }
+
+        return decodeFromBitcoin(Type.ECDSA, bytes, requireCanonicalEncoding);
+    }
+
+    public static TransactionSignature decodeFromBitcoin(Type type, byte[] bytes, boolean requireCanonicalEncoding) throws SignatureDecodeException {
+        if(type == Type.ECDSA) {
+            return ECDSASignature.decodeFromBitcoin(bytes, requireCanonicalEncoding, false);
+        } else if(type == Type.SCHNORR) {
+            return SchnorrSignature.decodeFromBitcoin(bytes);
+        }
+
+        throw new IllegalStateException("Unknown TransactionSignature type " + type);
+    }
+
+    public boolean verify(byte[] data, ECKey pubKey) {
+        if(ecdsaSignature != null) {
+            return ecdsaSignature.verify(data, pubKey.getPubKey());
+        } else {
+            return schnorrSignature.verify(data, pubKey.getPubKeyXCoord());
+        }
     }
 
     @Override
@@ -140,39 +132,16 @@ public class TransactionSignature extends ECKey.ECDSASignature {
         if(o == null || getClass() != o.getClass()) {
             return false;
         }
-        if(!super.equals(o)) {
-            return false;
-        }
-        TransactionSignature signature = (TransactionSignature) o;
-        return sighashFlags == signature.sighashFlags;
+        TransactionSignature that = (TransactionSignature) o;
+        return sighashFlags == that.sighashFlags && Objects.equals(ecdsaSignature, that.ecdsaSignature) && Objects.equals(schnorrSignature, that.schnorrSignature);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(super.hashCode(), sighashFlags);
+        return Objects.hash(ecdsaSignature, schnorrSignature, sighashFlags);
     }
 
-    /**
-     * Returns a decoded signature.
-     *
-     * @param requireCanonicalEncoding if the encoding of the signature must
-     * be canonical.
-     * @param requireCanonicalSValue if the S-value must be canonical (below half
-     * the order of the curve).
-     * @throws SignatureDecodeException if the signature is unparseable in some way.
-     * @throws VerificationException if the signature is invalid.
-     */
-    public static TransactionSignature decodeFromBitcoin(byte[] bytes, boolean requireCanonicalEncoding,
-                                                         boolean requireCanonicalSValue) throws SignatureDecodeException, VerificationException {
-        // Bitcoin encoding is DER signature + sighash byte.
-        if (requireCanonicalEncoding && !isEncodingCanonical(bytes))
-            throw new VerificationException.NoncanonicalSignature();
-        ECKey.ECDSASignature sig = ECKey.ECDSASignature.decodeFromDER(bytes);
-        if (requireCanonicalSValue && !sig.isCanonical())
-            throw new VerificationException("S-value is not canonical.");
-
-        // In Bitcoin, any value of the final byte is valid, but not necessarily canonical. See javadocs for
-        // isEncodingCanonical to learn more about this. So we must store the exact byte found.
-        return new TransactionSignature(sig.r, sig.s, bytes[bytes.length - 1]);
+    public enum Type {
+        ECDSA, SCHNORR
     }
 }
