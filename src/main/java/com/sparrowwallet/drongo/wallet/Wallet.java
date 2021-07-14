@@ -795,7 +795,7 @@ public class Wallet extends Persistable {
 
         for(TransactionInput txInput : signingNodes.keySet()) {
             WalletNode walletNode = signingNodes.get(txInput);
-            Map<ECKey, Keystore> keystoreKeysForNode = getKeystores().stream().collect(Collectors.toMap(keystore -> keystore.getPubKey(walletNode), Function.identity(),
+            Map<ECKey, Keystore> keystoreKeysForNode = getKeystores().stream().collect(Collectors.toMap(keystore -> getScriptType().getOutputKey(keystore.getPubKey(walletNode)), Function.identity(),
                     (u, v) -> { throw new IllegalStateException("Duplicate keys from different keystores for node " + walletNode.getDerivationPath()); },
                     LinkedHashMap::new));
 
@@ -806,7 +806,15 @@ public class Wallet extends Persistable {
                 TransactionOutput spentTxo = blockTransaction.getTransaction().getOutputs().get((int)txInput.getOutpoint().getIndex());
 
                 Script signingScript = getSigningScript(txInput, spentTxo);
-                Sha256Hash hash = txInput.hasWitness() ? transaction.hashForWitnessSignature(txInput.getIndex(), signingScript, spentTxo.getValue(), SigHash.ALL) : transaction.hashForLegacySignature(txInput.getIndex(), signingScript, SigHash.ALL);
+                Sha256Hash hash;
+                if(getScriptType() == P2TR) {
+                    List<TransactionOutput> spentOutputs = transaction.getInputs().stream().map(input -> transactions.get(input.getOutpoint().getHash()).getTransaction().getOutputs().get((int)input.getOutpoint().getIndex())).collect(Collectors.toList());
+                    hash = transaction.hashForTaprootSignature(spentOutputs, txInput.getIndex(), !P2TR.isScriptType(signingScript), signingScript, SigHash.ALL_TAPROOT, null);
+                } else if(txInput.hasWitness()) {
+                    hash = transaction.hashForWitnessSignature(txInput.getIndex(), signingScript, spentTxo.getValue(), SigHash.ALL);
+                } else {
+                    hash = transaction.hashForLegacySignature(txInput.getIndex(), signingScript, SigHash.ALL);
+                }
 
                 for(ECKey sigPublicKey : keystoreKeysForNode.keySet()) {
                     for(TransactionSignature signature : txInput.hasWitness() ? txInput.getWitness().getSignatures() : txInput.getScriptSig().getSignatures()) {
@@ -887,12 +895,12 @@ public class Wallet extends Persistable {
 
         for(PSBTInput psbtInput : signingNodes.keySet()) {
             WalletNode walletNode = signingNodes.get(psbtInput);
-            Map<ECKey, Keystore> keystoreKeysForNode = getKeystores().stream().collect(Collectors.toMap(keystore -> keystore.getPubKey(walletNode), Function.identity(),
+            Map<ECKey, Keystore> keystoreKeysForNode = getKeystores().stream().collect(Collectors.toMap(keystore -> getScriptType().getOutputKey(keystore.getPubKey(walletNode)), Function.identity(),
                     (u, v) -> { throw new IllegalStateException("Duplicate keys from different keystores for node " + walletNode.getDerivationPath()); },
                     LinkedHashMap::new));
 
             Map<ECKey, TransactionSignature> keySignatureMap;
-            if(psbt.isFinalized()) {
+            if(psbt.isFinalized() || psbtInput.isTaproot()) {
                 keySignatureMap = psbtInput.getSigningKeys(keystoreKeysForNode.keySet());
             } else {
                 keySignatureMap = psbtInput.getPartialSignatures();
@@ -916,7 +924,7 @@ public class Wallet extends Persistable {
         for(Keystore keystore : getKeystores()) {
             if(keystore.hasPrivateKey()) {
                 for(Map.Entry<PSBTInput, WalletNode> signingEntry : signingNodes.entrySet()) {
-                    ECKey privKey = keystore.getKey(signingEntry.getValue());
+                    ECKey privKey = getScriptType().getOutputKey(keystore.getKey(signingEntry.getValue()));
                     PSBTInput psbtInput = signingEntry.getKey();
 
                     if(!psbtInput.isSigned()) {
@@ -954,13 +962,15 @@ public class Wallet extends Persistable {
                 }
             };
 
-            if(psbtInput.getPartialSignatures().size() >= threshold && signingNode != null) {
+            //TODO: Handle taproot scriptpath spending
+            int signaturesAvailable = psbtInput.isTaproot() ? (psbtInput.getTapKeyPathSignature() != null ? 1 : 0) : psbtInput.getPartialSignatures().size();
+            if(signaturesAvailable >= threshold && signingNode != null) {
                 Transaction transaction = new Transaction();
 
                 TransactionInput finalizedTxInput;
                 if(getPolicyType().equals(PolicyType.SINGLE)) {
                     ECKey pubKey = getPubKey(signingNode);
-                    TransactionSignature transactionSignature = psbtInput.getPartialSignature(pubKey);
+                    TransactionSignature transactionSignature = psbtInput.isTaproot() ? psbtInput.getTapKeyPathSignature() : psbtInput.getPartialSignature(pubKey);
                     if(transactionSignature == null) {
                         throw new IllegalArgumentException("Pubkey of partial signature does not match wallet pubkey");
                     }

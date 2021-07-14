@@ -11,6 +11,7 @@ import org.slf4j.LoggerFactory;
 import java.math.BigInteger;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
+import java.util.Objects;
 
 /**
  * Groups the two components that make up a Schnorr signature
@@ -76,5 +77,22 @@ public class SchnorrSignature {
         }
 
         return false;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if(this == o) {
+            return true;
+        }
+        if(o == null || getClass() != o.getClass()) {
+            return false;
+        }
+        SchnorrSignature that = (SchnorrSignature) o;
+        return r.equals(that.r) && s.equals(that.s);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(r, s);
     }
 }

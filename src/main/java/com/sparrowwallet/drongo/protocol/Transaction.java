@@ -31,6 +31,8 @@ public class Transaction extends ChildMessage {
     //Default min feerate, defined in sats/vByte
     public static final double DEFAULT_MIN_RELAY_FEE = 1d;
 
+    public static final byte LEAF_VERSION_TAPSCRIPT = (byte)0xc0;
+
     private long version;
     private long locktime;
     private boolean segwit;
@@ -608,5 +610,124 @@ public class Transaction extends ChildMessage {
         }
 
         return Sha256Hash.twiceOf(bos.toByteArray());
+    }
+
+    /**
+     * <p>Calculates a signature hash, that is, a hash of a simplified form of the transaction. How exactly the transaction
+     * is simplified is specified by the type and anyoneCanPay parameters.</p>
+     *
+     * (See BIP341: https://github.com/bitcoin/bips/blob/master/bip-0341.mediawiki)</p>
+     *
+     * @param spentUtxos   the ordered list of spent UTXOs corresponding to the inputs of this transaction
+     * @param inputIndex   input the signature is being calculated for. Tx signatures are always relative to an input.
+     * @param scriptPath   whether we are signing for the keypath or the scriptpath
+     * @param script       if signing for the scriptpath, the script to sign
+     * @param sigHash      should usually be SigHash.ALL
+     * @param annex        annex data
+     */
+    public synchronized Sha256Hash hashForTaprootSignature(List<TransactionOutput> spentUtxos, int inputIndex, boolean scriptPath, Script script, SigHash sigHash, byte[] annex) {
+        return hashForTaprootSignature(spentUtxos, inputIndex, scriptPath, script, sigHash.value, annex);
+    }
+
+    public synchronized Sha256Hash hashForTaprootSignature(List<TransactionOutput> spentUtxos, int inputIndex, boolean scriptPath, Script script, byte sigHashType, byte[] annex) {
+        if(spentUtxos.size() != getInputs().size()) {
+            throw new IllegalArgumentException("Provided spent UTXOs length does not equal the number of transaction inputs");
+        }
+        if(inputIndex >= getInputs().size()) {
+            throw new IllegalArgumentException("Input index is greater than the number of transaction inputs");
+        }
+
+        ByteArrayOutputStream bos = new UnsafeByteArrayOutputStream(length == UNKNOWN_LENGTH ? 256 : length + 4);
+        try {
+            byte outType = sigHashType == 0x00 ? SigHash.ALL.value : (byte)(sigHashType & 0x03);
+            boolean anyoneCanPay = (sigHashType & SigHash.ANYONECANPAY.value) == SigHash.ANYONECANPAY.value;
+
+            bos.write(0x00);
+            bos.write(sigHashType);
+            uint32ToByteStreamLE(this.version, bos);
+            uint32ToByteStreamLE(this.locktime, bos);
+
+            if(!anyoneCanPay) {
+                ByteArrayOutputStream outpoints = new ByteArrayOutputStream();
+                ByteArrayOutputStream outputValues = new ByteArrayOutputStream();
+                ByteArrayOutputStream outputScriptPubKeys = new ByteArrayOutputStream();
+                ByteArrayOutputStream inputSequences = new ByteArrayOutputStream();
+                for(int i = 0; i < getInputs().size(); i++) {
+                    TransactionInput input = getInputs().get(i);
+                    input.getOutpoint().bitcoinSerializeToStream(outpoints);
+                    Utils.uint64ToByteStreamLE(BigInteger.valueOf(spentUtxos.get(i).getValue()), outputValues);
+                    byteArraySerialize(spentUtxos.get(i).getScriptBytes(), outputScriptPubKeys);
+                    Utils.uint32ToByteStreamLE(input.getSequenceNumber(), inputSequences);
+                }
+                bos.write(Sha256Hash.hash(outpoints.toByteArray()));
+                bos.write(Sha256Hash.hash(outputValues.toByteArray()));
+                bos.write(Sha256Hash.hash(outputScriptPubKeys.toByteArray()));
+                bos.write(Sha256Hash.hash(inputSequences.toByteArray()));
+            }
+
+            if(outType == SigHash.ALL.value) {
+                ByteArrayOutputStream outputs = new ByteArrayOutputStream();
+                for(TransactionOutput output : getOutputs()) {
+                    output.bitcoinSerializeToStream(outputs);
+                }
+                bos.write(Sha256Hash.hash(outputs.toByteArray()));
+            }
+
+            byte spendType = 0x00;
+            if(annex != null) {
+                spendType |= 0x01;
+            }
+            if(scriptPath) {
+                spendType |= 0x02;
+            }
+            bos.write(spendType);
+
+            if(anyoneCanPay) {
+                getInputs().get(inputIndex).getOutpoint().bitcoinSerializeToStream(bos);
+                Utils.uint32ToByteStreamLE(spentUtxos.get(inputIndex).getValue(), bos);
+                byteArraySerialize(spentUtxos.get(inputIndex).getScriptBytes(), bos);
+                Utils.uint32ToByteStreamLE(getInputs().get(inputIndex).getSequenceNumber(), bos);
+            } else {
+                Utils.uint32ToByteStreamLE(inputIndex, bos);
+            }
+
+            if((spendType & 0x01) != 0) {
+                ByteArrayOutputStream annexStream = new ByteArrayOutputStream();
+                byteArraySerialize(annex, annexStream);
+                bos.write(Sha256Hash.hash(annexStream.toByteArray()));
+            }
+
+            if(outType == SigHash.SINGLE.value) {
+                if(inputIndex < getOutputs().size()) {
+                    bos.write(Sha256Hash.hash(getOutputs().get(inputIndex).bitcoinSerialize()));
+                } else {
+                    bos.write(Sha256Hash.ZERO_HASH.getBytes());
+                }
+            }
+
+            if(scriptPath) {
+                ByteArrayOutputStream leafStream = new ByteArrayOutputStream();
+                leafStream.write(LEAF_VERSION_TAPSCRIPT);
+                byteArraySerialize(script.getProgram(), leafStream);
+                bos.write(Utils.taggedHash("TapLeaf", leafStream.toByteArray()));
+                bos.write(0x00);
+                Utils.uint32ToByteStreamLE(-1, bos);
+            }
+
+            byte[] msgBytes = bos.toByteArray();
+            long requiredLength = 175 - (anyoneCanPay ? 49 : 0) - (outType != SigHash.ALL.value && outType != SigHash.SINGLE.value ? 32 : 0) + (annex != null ? 32 : 0) + (scriptPath ? 37 : 0);
+            if(msgBytes.length != requiredLength) {
+                throw new IllegalStateException("Invalid message length, was " + msgBytes.length + " not " + requiredLength);
+            }
+
+            return Sha256Hash.wrap(Utils.taggedHash("TapSighash", msgBytes));
+        } catch (IOException e) {
+            throw new RuntimeException(e);  // Cannot happen.
+        }
+    }
+
+    private void byteArraySerialize(byte[] bytes, OutputStream outputStream) throws IOException {
+        outputStream.write(new VarInt(bytes.length).encode());
+        outputStream.write(bytes);
     }
 }

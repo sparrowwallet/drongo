@@ -52,7 +52,7 @@ public class PSBT {
         this.transaction = transaction;
 
         for(int i = 0; i < transaction.getInputs().size(); i++) {
-            psbtInputs.add(new PSBTInput(transaction, i));
+            psbtInputs.add(new PSBTInput(this, transaction, i));
         }
 
         for(int i = 0; i < transaction.getOutputs().size(); i++) {
@@ -111,12 +111,18 @@ public class PSBT {
             }
 
             Map<ECKey, KeyDerivation> derivedPublicKeys = new LinkedHashMap<>();
+            ECKey tapInternalKey = null;
             for(Keystore keystore : wallet.getKeystores()) {
                 WalletNode walletNode = utxoEntry.getValue();
-                derivedPublicKeys.put(keystore.getPubKey(walletNode), keystore.getKeyDerivation().extend(walletNode.getDerivation()));
+                derivedPublicKeys.put(wallet.getScriptType().getOutputKey(keystore.getPubKey(walletNode)), keystore.getKeyDerivation().extend(walletNode.getDerivation()));
+
+                //TODO: Implement Musig for multisig wallets
+                if(wallet.getScriptType() == ScriptType.P2TR) {
+                    tapInternalKey = keystore.getPubKey(walletNode);
+                }
             }
 
-            PSBTInput psbtInput = new PSBTInput(wallet.getScriptType(), transaction, inputIndex, utxo, utxoIndex, redeemScript, witnessScript, derivedPublicKeys, Collections.emptyMap(), alwaysIncludeWitnessUtxo);
+            PSBTInput psbtInput = new PSBTInput(this, wallet.getScriptType(), transaction, inputIndex, utxo, utxoIndex, redeemScript, witnessScript, derivedPublicKeys, Collections.emptyMap(), tapInternalKey, alwaysIncludeWitnessUtxo);
             psbtInputs.add(psbtInput);
         }
 
@@ -327,7 +333,7 @@ public class PSBT {
             }
 
             int inputIndex = this.psbtInputs.size();
-            PSBTInput input = new PSBTInput(inputEntries, transaction, inputIndex);
+            PSBTInput input = new PSBTInput(this, inputEntries, transaction, inputIndex);
 
             if(verifySignatures) {
                 boolean verified = input.verifySignatures();
@@ -400,7 +406,7 @@ public class PSBT {
 
     public boolean hasSignatures() {
         for(PSBTInput psbtInput : getPsbtInputs()) {
-            if(!psbtInput.getPartialSignatures().isEmpty() || psbtInput.getFinalScriptSig() != null || psbtInput.getFinalScriptWitness() != null) {
+            if(!psbtInput.getPartialSignatures().isEmpty() || psbtInput.getTapKeyPathSignature() != null || psbtInput.getFinalScriptSig() != null || psbtInput.getFinalScriptWitness() != null) {
                 return true;
             }
         }

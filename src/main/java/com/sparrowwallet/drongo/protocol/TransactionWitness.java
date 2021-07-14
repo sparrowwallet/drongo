@@ -14,6 +14,12 @@ import java.util.List;
 public class TransactionWitness extends ChildMessage {
     private List<byte[]> pushes;
 
+    public TransactionWitness(Transaction transaction, TransactionSignature signature) {
+        setParent(transaction);
+        this.pushes = new ArrayList<>();
+        pushes.add(signature.encodeToBitcoin());
+    }
+
     public TransactionWitness(Transaction transaction, ECKey pubKey, TransactionSignature signature) {
         setParent(transaction);
         this.pushes = new ArrayList<>();

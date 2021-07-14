@@ -4,6 +4,7 @@ import com.sparrowwallet.drongo.Utils;
 import com.sparrowwallet.drongo.address.Address;
 import com.sparrowwallet.drongo.address.InvalidAddressException;
 import com.sparrowwallet.drongo.crypto.ECKey;
+import com.sparrowwallet.drongo.crypto.SchnorrSignature;
 import org.junit.Assert;
 import org.junit.Test;
 
@@ -478,5 +479,28 @@ public class TransactionTest {
         String constructedHex = Utils.bytesToHex(baos.toByteArray());
 
         Assert.assertEquals(spendingHex, constructedHex);
+    }
+
+    @Test
+    public void signBip340() {
+        ECKey privKey = ECKey.fromPrivate(Utils.hexToBytes("0000000000000000000000000000000000000000000000000000000000000003"));
+        Assert.assertEquals("F9308A019258C31049344F85F89D5229B531C845836F99B08601F113BCE036F9", Utils.bytesToHex(privKey.getPubKeyXCoord()).toUpperCase());
+        SchnorrSignature sig = privKey.signSchnorr(Sha256Hash.ZERO_HASH);
+        Assert.assertEquals("E907831F80848D1069A5371B402410364BDF1C5F8307B0084C55F1CE2DCA821525F66A4A85EA8B71E482A74F382D2CE5EBEEE8FDB2172F477DF4900D310536C0", Utils.bytesToHex(sig.encode()).toUpperCase());
+    }
+
+    @Test
+    public void signTaprootKeypath() {
+        Transaction tx = new Transaction(Utils.hexToBytes("02000000000101786ed355f998b98f8ef8ef2acf461577325cf170a9133d48a17aba957eb97ff00000000000ffffffff0100e1f50500000000220020693a94699e6e41ab302fd623a9bf5a5b2d6606cbfb35c550d1cb4300451356a102473044022004cc317c20eb9e372cb0e640f51eb2b8311616125321b11dbaa5671db5a3ca2a02207ae3d2771b565be98ae56e21045b9629c94b6ca8f4e3932260e54d4f0e2016b30121032da1692a41a61ad14f3795b31d33431abf8d6ee161b997d004c26a37bc20083500000000"));
+        Transaction spendingTx = new Transaction(Utils.hexToBytes("01000000011af4dca4a6bc6da092edca5390355891da9bbe76d2be1c04d067ec9c3a3d22b10000000000000000000180f0fa0200000000160014a3bcb5f272025cc66dc42e7518a5846bd60a9c9600000000"));
+
+        Sha256Hash hash = spendingTx.hashForTaprootSignature(tx.getOutputs(), 0, false, null, SigHash.ALL_TAPROOT, null);
+        ECKey privateKey = ECKey.fromPrivate(Utils.hexToBytes("d9bc817b92916a24b87d25dc48ef466b4fcd6c89cf90afbc17cba40eb8b91330"));
+        SchnorrSignature sig = privateKey.signSchnorr(hash);
+
+        Assert.assertEquals("7b04f59bc8f5c2c33c9b8acbf94743de74cc25a6052b52ff61a516f7c5ca19cc68345ba99b354f22bfaf5c04de395b9223f3bf0a5c351fc1cc68c224f4e5b202", Utils.bytesToHex(sig.encode()));
+
+        ECKey pubKey = ECKey.fromPublicOnly(privateKey);
+        Assert.assertTrue(pubKey.verify(hash, new TransactionSignature(sig, SigHash.ALL_TAPROOT)));
     }
 }

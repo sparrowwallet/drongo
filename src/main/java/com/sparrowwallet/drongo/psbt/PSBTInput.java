@@ -4,12 +4,14 @@ import com.sparrowwallet.drongo.KeyDerivation;
 import com.sparrowwallet.drongo.Utils;
 import com.sparrowwallet.drongo.crypto.ECDSASignature;
 import com.sparrowwallet.drongo.crypto.ECKey;
+import com.sparrowwallet.drongo.crypto.SchnorrSignature;
 import com.sparrowwallet.drongo.protocol.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.nio.charset.StandardCharsets;
 import java.util.*;
+import java.util.stream.Collectors;
 
 import static com.sparrowwallet.drongo.protocol.ScriptType.*;
 import static com.sparrowwallet.drongo.psbt.PSBTEntry.*;
@@ -26,7 +28,10 @@ public class PSBTInput {
     public static final byte PSBT_IN_FINAL_SCRIPTWITNESS = 0x08;
     public static final byte PSBT_IN_POR_COMMITMENT = 0x09;
     public static final byte PSBT_IN_PROPRIETARY = (byte)0xfc;
+    public static final byte PSBT_IN_TAP_KEY_SIG = 0x13;
+    public static final byte PSBT_IN_TAP_INTERNAL_KEY = 0x17;
 
+    private final PSBT psbt;
     private Transaction nonWitnessUtxo;
     private TransactionOutput witnessUtxo;
     private final Map<ECKey, TransactionSignature> partialSignatures = new LinkedHashMap<>();
@@ -38,20 +43,22 @@ public class PSBTInput {
     private TransactionWitness finalScriptWitness;
     private String porCommitment;
     private final Map<String, String> proprietary = new LinkedHashMap<>();
+    private TransactionSignature tapKeyPathSignature;
+    private ECKey tapInternalKey;
 
     private final Transaction transaction;
     private final int index;
 
     private static final Logger log = LoggerFactory.getLogger(PSBTInput.class);
 
-    PSBTInput(Transaction transaction, int index) {
+    PSBTInput(PSBT psbt, Transaction transaction, int index) {
+        this.psbt = psbt;
         this.transaction = transaction;
         this.index = index;
     }
 
-    PSBTInput(ScriptType scriptType, Transaction transaction, int index, Transaction utxo, int utxoIndex, Script redeemScript, Script witnessScript, Map<ECKey, KeyDerivation> derivedPublicKeys, Map<String, String> proprietary, boolean alwaysAddNonWitnessTx) {
-        this(transaction, index);
-        sigHash = SigHash.ALL;
+    PSBTInput(PSBT psbt, ScriptType scriptType, Transaction transaction, int index, Transaction utxo, int utxoIndex, Script redeemScript, Script witnessScript, Map<ECKey, KeyDerivation> derivedPublicKeys, Map<String, String> proprietary, ECKey tapInternalKey, boolean alwaysAddNonWitnessTx) {
+        this(psbt, transaction, index);
 
         if(Arrays.asList(ScriptType.WITNESS_TYPES).contains(scriptType)) {
             this.witnessUtxo = utxo.getOutputs().get(utxoIndex);
@@ -69,9 +76,14 @@ public class PSBTInput {
 
         this.derivedPublicKeys.putAll(derivedPublicKeys);
         this.proprietary.putAll(proprietary);
+
+        this.tapInternalKey = tapInternalKey;
+
+        this.sigHash = getDefaultSigHash();
     }
 
-    PSBTInput(List<PSBTEntry> inputEntries, Transaction transaction, int index) throws PSBTParseException {
+    PSBTInput(PSBT psbt, List<PSBTEntry> inputEntries, Transaction transaction, int index) throws PSBTParseException {
+        this.psbt = psbt;
         for(PSBTEntry entry : inputEntries) {
             switch(entry.getKeyType()) {
                 case PSBT_IN_NON_WITNESS_UTXO:
@@ -100,7 +112,7 @@ public class PSBTInput {
                 case PSBT_IN_WITNESS_UTXO:
                     entry.checkOneByteKey();
                     TransactionOutput witnessTxOutput = new TransactionOutput(null, entry.getData(), 0);
-                    if(!P2SH.isScriptType(witnessTxOutput.getScript()) && !P2WPKH.isScriptType(witnessTxOutput.getScript()) && !P2WSH.isScriptType(witnessTxOutput.getScript())) {
+                    if(!P2SH.isScriptType(witnessTxOutput.getScript()) && !P2WPKH.isScriptType(witnessTxOutput.getScript()) && !P2WSH.isScriptType(witnessTxOutput.getScript()) && !P2TR.isScriptType(witnessTxOutput.getScript())) {
                         throw new PSBTParseException("Witness UTXO provided for non-witness or unknown input");
                     }
                     this.witnessUtxo = witnessTxOutput;
@@ -197,6 +209,14 @@ public class PSBTInput {
                     this.proprietary.put(Utils.bytesToHex(entry.getKeyData()), Utils.bytesToHex(entry.getData()));
                     log.debug("Found proprietary input " + Utils.bytesToHex(entry.getKeyData()) + ": " + Utils.bytesToHex(entry.getData()));
                     break;
+                case PSBT_IN_TAP_KEY_SIG:
+                    this.tapKeyPathSignature = TransactionSignature.decodeFromBitcoin(TransactionSignature.Type.SCHNORR, entry.getData(), true);
+                    log.debug("Found input taproot key path signature " + Utils.bytesToHex(entry.getData()));
+                    break;
+                case PSBT_IN_TAP_INTERNAL_KEY:
+                    this.tapInternalKey = ECKey.fromPublicOnly(entry.getData());
+                    log.debug("Found input taproot internal key " + Utils.bytesToHex(entry.getData()));
+                    break;
                 default:
                     log.warn("PSBT input not recognized key type: " + entry.getKeyType());
             }
@@ -210,7 +230,8 @@ public class PSBTInput {
         List<PSBTEntry> entries = new ArrayList<>();
 
         if(nonWitnessUtxo != null) {
-            entries.add(populateEntry(PSBT_IN_NON_WITNESS_UTXO, null, nonWitnessUtxo.bitcoinSerialize()));
+            //Serialize all nonWitnessUtxo fields without witness data (pre-Segwit serialization) to reduce PSBT size
+            entries.add(populateEntry(PSBT_IN_NON_WITNESS_UTXO, null, nonWitnessUtxo.bitcoinSerialize(false)));
         }
 
         if(witnessUtxo != null) {
@@ -255,6 +276,14 @@ public class PSBTInput {
             entries.add(populateEntry(PSBT_IN_PROPRIETARY, Utils.hexToBytes(entry.getKey()), Utils.hexToBytes(entry.getValue())));
         }
 
+        if(tapKeyPathSignature != null) {
+            entries.add(populateEntry(PSBT_IN_TAP_KEY_SIG, null, tapKeyPathSignature.encodeToBitcoin()));
+        }
+
+        if(tapInternalKey != null) {
+            entries.add(populateEntry(PSBT_IN_TAP_INTERNAL_KEY, null, tapInternalKey.getPubKeyXCoord()));
+        }
+
         return entries;
     }
 
@@ -288,6 +317,14 @@ public class PSBTInput {
         }
 
         proprietary.putAll(psbtInput.proprietary);
+
+        if(psbtInput.tapKeyPathSignature != null) {
+            tapKeyPathSignature = psbtInput.tapKeyPathSignature;
+        }
+
+        if(psbtInput.tapInternalKey != null) {
+            tapInternalKey = psbtInput.tapInternalKey;
+        }
     }
 
     public Transaction getNonWitnessUtxo() {
@@ -384,8 +421,30 @@ public class PSBTInput {
         return proprietary;
     }
 
+    public TransactionSignature getTapKeyPathSignature() {
+        return tapKeyPathSignature;
+    }
+
+    public void setTapKeyPathSignature(TransactionSignature tapKeyPathSignature) {
+        this.tapKeyPathSignature = tapKeyPathSignature;
+    }
+
+    public ECKey getTapInternalKey() {
+        return tapInternalKey;
+    }
+
+    public void setTapInternalKey(ECKey tapInternalKey) {
+        this.tapInternalKey = tapInternalKey;
+    }
+
+    public boolean isTaproot() {
+        return getScriptType() == P2TR;
+    }
+
     public boolean isSigned() {
-        if(!getPartialSignatures().isEmpty()) {
+        if(getTapKeyPathSignature() != null) {
+            return true;
+        } else if(!getPartialSignatures().isEmpty()) {
             try {
                 //All partial sigs are already verified
                 int reqSigs = getSigningScript().getNumRequiredSignatures();
@@ -404,29 +463,46 @@ public class PSBTInput {
             return getFinalScriptWitness().getSignatures();
         } else if(getFinalScriptSig() != null) {
             return getFinalScriptSig().getSignatures();
+        } else if(getTapKeyPathSignature() != null) {
+            return List.of(getTapKeyPathSignature());
         } else {
             return getPartialSignatures().values();
         }
     }
 
+    private SigHash getDefaultSigHash() {
+        if(isTaproot()) {
+            return SigHash.ALL_TAPROOT;
+        }
+
+        return SigHash.ALL;
+    }
+
     public boolean sign(ECKey privKey) {
         SigHash localSigHash = getSigHash();
         if(localSigHash == null) {
-            //Assume SigHash.ALL
-            localSigHash = SigHash.ALL;
+            localSigHash = getDefaultSigHash();
         }
 
         if(getNonWitnessUtxo() != null || getWitnessUtxo() != null) {
             Script signingScript = getSigningScript();
             if(signingScript != null) {
                 Sha256Hash hash = getHashForSignature(signingScript, localSigHash);
-                ECDSASignature ecdsaSignature = privKey.signEcdsa(hash);
-                TransactionSignature transactionSignature = new TransactionSignature(ecdsaSignature, localSigHash);
 
-                ECKey pubKey = ECKey.fromPublicOnly(privKey);
-                getPartialSignatures().put(pubKey, transactionSignature);
+                if(isTaproot()) {
+                    SchnorrSignature schnorrSignature = privKey.signSchnorr(hash);
+                    tapKeyPathSignature = new TransactionSignature(schnorrSignature, localSigHash);
 
-                return true;
+                    return true;
+                } else {
+                    ECDSASignature ecdsaSignature = privKey.signEcdsa(hash);
+                    TransactionSignature transactionSignature = new TransactionSignature(ecdsaSignature, localSigHash);
+
+                    ECKey pubKey = ECKey.fromPublicOnly(privKey);
+                    getPartialSignatures().put(pubKey, transactionSignature);
+
+                    return true;
+                }
             }
         }
 
@@ -436,8 +512,7 @@ public class PSBTInput {
     boolean verifySignatures() throws PSBTSignatureException {
         SigHash localSigHash = getSigHash();
         if(localSigHash == null) {
-            //Assume SigHash.ALL
-            localSigHash = SigHash.ALL;
+            localSigHash = getDefaultSigHash();
         }
 
         if(getNonWitnessUtxo() != null || getWitnessUtxo() != null) {
@@ -445,10 +520,17 @@ public class PSBTInput {
             if(signingScript != null) {
                 Sha256Hash hash = getHashForSignature(signingScript, localSigHash);
 
-                for(ECKey sigPublicKey : getPartialSignatures().keySet()) {
-                    TransactionSignature signature = getPartialSignature(sigPublicKey);
-                    if(!sigPublicKey.verify(hash, signature)) {
-                        throw new PSBTSignatureException("Partial signature does not verify against provided public key");
+                if(isTaproot() && tapKeyPathSignature != null) {
+                    ECKey outputKey = ScriptType.P2TR.getPublicKeyFromScript(getUtxo().getScript());
+                    if(!outputKey.verify(hash, tapKeyPathSignature)) {
+                        throw new PSBTSignatureException("Tweaked internal key does not verify against provided taproot keypath signature");
+                    }
+                } else {
+                    for(ECKey sigPublicKey : getPartialSignatures().keySet()) {
+                        TransactionSignature signature = getPartialSignature(sigPublicKey);
+                        if(!sigPublicKey.verify(hash, signature)) {
+                            throw new PSBTSignatureException("Partial signature does not verify against provided public key");
+                        }
                     }
                 }
 
@@ -467,7 +549,7 @@ public class PSBTInput {
 
         Map<ECKey, TransactionSignature> signingKeys = new LinkedHashMap<>();
         if(signingScript != null) {
-            Sha256Hash hash = getHashForSignature(signingScript, getSigHash() == null ? SigHash.ALL : getSigHash());
+            Sha256Hash hash = getHashForSignature(signingScript, getSigHash() == null ? getDefaultSigHash() : getSigHash());
 
             for(ECKey sigPublicKey : availableKeys) {
                 for(TransactionSignature signature : signatures) {
@@ -531,6 +613,11 @@ public class PSBTInput {
             }
         }
 
+        if(P2TR.isScriptType(signingScript)) {
+            //For now, only support keypath spends and just return the ScriptPubKey
+            //In future return the script from PSBT_IN_TAP_LEAF_SCRIPT
+        }
+
         return signingScript;
     }
 
@@ -554,13 +641,17 @@ public class PSBTInput {
         witnessScript = null;
         porCommitment = null;
         proprietary.clear();
+        tapKeyPathSignature = null;
     }
 
     private Sha256Hash getHashForSignature(Script connectedScript, SigHash localSigHash) {
         Sha256Hash hash;
 
         ScriptType scriptType = getScriptType();
-        if(Arrays.asList(WITNESS_TYPES).contains(scriptType)) {
+        if(scriptType == ScriptType.P2TR) {
+            List<TransactionOutput> spentUtxos = psbt.getPsbtInputs().stream().map(PSBTInput::getUtxo).collect(Collectors.toList());
+            hash = transaction.hashForTaprootSignature(spentUtxos, index, !P2TR.isScriptType(connectedScript), connectedScript, localSigHash, null);
+        } else if(Arrays.asList(WITNESS_TYPES).contains(scriptType)) {
             long prevValue = getUtxo().getValue();
             hash = transaction.hashForWitnessSignature(index, connectedScript, prevValue, localSigHash);
         } else {

@@ -24,7 +24,7 @@ public class TransactionSignature {
 
     /** Constructs a signature with the given components of the given type and SIGHASH_ALL. */
     public TransactionSignature(BigInteger r, BigInteger s, Type type) {
-        this(r, s, type, SigHash.ALL.value);
+        this(r, s, type, type == Type.ECDSA ? SigHash.ALL.value : SigHash.ALL_TAPROOT.value);
     }
 
     /** Constructs a transaction signature based on the ECDSA signature. */
@@ -59,7 +59,7 @@ public class TransactionSignature {
         return (sighashFlags & SigHash.ANYONECANPAY.value) != 0;
     }
 
-    public SigHash getSigHash() {
+    private SigHash getSigHash() {
         boolean anyoneCanPay = anyoneCanPay();
         final int mode = sighashFlags & 0x1f;
         if (mode == SigHash.NONE.value) {
@@ -86,7 +86,7 @@ public class TransactionSignature {
                 throw new RuntimeException(e);  // Cannot happen.
             }
         } else if(schnorrSignature != null) {
-            SigHash sigHash = getSigHash();
+            SigHash sigHash = getSigHash();  //Note this will return Sighash.ALL for Sighash.ALL_TAPROOT as well
             ByteBuffer buffer = ByteBuffer.allocate(sigHash == SigHash.ALL ? 64 : 65);
             buffer.put(schnorrSignature.encode());
             if(sigHash != SigHash.ALL) {

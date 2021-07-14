@@ -26,7 +26,6 @@ import org.slf4j.LoggerFactory;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.math.BigInteger;
-import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.security.SecureRandom;
 import java.security.SignatureException;
@@ -369,7 +368,7 @@ public class ECKey {
         }
 
         try {
-            byte[] sigBytes = NativeSecp256k1.schnorrSign(input.getBytes(), priv.toByteArray(), null);
+            byte[] sigBytes = NativeSecp256k1.schnorrSign(input.getBytes(), Utils.bigIntegerToBytes(priv, 32), new byte[32]);
             return SchnorrSignature.decode(sigBytes);
         } catch(NativeSecp256k1Util.AssertFailException e) {
             log.error("Error signing schnorr", e);
@@ -393,13 +392,28 @@ public class ECKey {
     }
 
     public ECKey getTweakedOutputKey() {
-        ECPoint internalKey = liftX(getPubKeyXCoord());
-        byte[] taggedHash = taggedHash("TapTweak", internalKey.getXCoord().getEncoded());
-        ECPoint outputKey = internalKey.add(ECKey.fromPrivate(taggedHash).getPubKeyPoint());
+        TaprootPubKey taprootPubKey = liftX(getPubKeyXCoord());
+        ECPoint internalKey = taprootPubKey.ecPoint;
+        byte[] taggedHash = Utils.taggedHash("TapTweak", internalKey.getXCoord().getEncoded());
+        ECKey tweakValue = ECKey.fromPrivate(taggedHash);
+        ECPoint outputKey = internalKey.add(tweakValue.getPubKeyPoint());
+
+        if(hasPrivKey()) {
+            BigInteger taprootPriv = priv;
+            BigInteger tweakedPrivKey = taprootPriv.add(tweakValue.getPrivKey()).mod(CURVE_PARAMS.getCurve().getOrder());
+            //TODO: Improve on this hack. How do we know whether to negate the private key before tweaking it?
+            if(!ECKey.fromPrivate(tweakedPrivKey).getPubKeyPoint().equals(outputKey)) {
+                taprootPriv = CURVE_PARAMS.getCurve().getOrder().subtract(priv);
+                tweakedPrivKey = taprootPriv.add(tweakValue.getPrivKey()).mod(CURVE_PARAMS.getCurve().getOrder());
+            }
+
+            return new ECKey(tweakedPrivKey, outputKey, true);
+        }
+
         return ECKey.fromPublicOnly(outputKey, true);
     }
 
-    private static ECPoint liftX(byte[] bytes) {
+    private static TaprootPubKey liftX(byte[] bytes) {
         SecP256K1Curve secP256K1Curve = (SecP256K1Curve)CURVE_PARAMS.getCurve();
         BigInteger x = new BigInteger(1, bytes);
         BigInteger p = secP256K1Curve.getQ();
@@ -413,17 +427,17 @@ public class ECKey {
             throw new IllegalStateException("Calculated invalid y_sq when solving for y co-ordinate");
         }
 
-        return secP256K1Curve.createPoint(x, y.and(BigInteger.ONE).equals(BigInteger.ZERO) ? y : p.subtract(y));
+        return y.and(BigInteger.ONE).equals(BigInteger.ZERO) ? new TaprootPubKey(secP256K1Curve.createPoint(x, y), false) : new TaprootPubKey(secP256K1Curve.createPoint(x, p.subtract(y)), true);
     }
 
-    private static byte[] taggedHash(String tag, byte[] msg) {
-        byte[] hash = Sha256Hash.hash(tag.getBytes(StandardCharsets.UTF_8));
-        ByteBuffer buffer = ByteBuffer.allocate(hash.length + hash.length + msg.length);
-        buffer.put(hash);
-        buffer.put(hash);
-        buffer.put(msg);
+    private static class TaprootPubKey {
+        public final ECPoint ecPoint;
+        public final boolean negated;
 
-        return Sha256Hash.hash(buffer.array());
+        public TaprootPubKey(ECPoint ecPoint, boolean negated) {
+            this.ecPoint = ecPoint;
+            this.negated = negated;
+        }
     }
 
     /**

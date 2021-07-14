@@ -1017,13 +1017,18 @@ public enum ScriptType {
     },
     P2TR("P2TR", "Taproot (P2TR)", "m/86'/0'/0'") {
         @Override
+        public ECKey getOutputKey(ECKey derivedKey) {
+            return derivedKey.getTweakedOutputKey();
+        }
+
+        @Override
         public Address getAddress(byte[] pubKey) {
             return new P2TRAddress(pubKey);
         }
 
         @Override
         public Address getAddress(ECKey derivedKey) {
-            return getAddress(derivedKey.getTweakedOutputKey().getPubKeyXCoord());
+            return getAddress(getOutputKey(derivedKey).getPubKeyXCoord());
         }
 
         @Override
@@ -1042,7 +1047,7 @@ public enum ScriptType {
 
         @Override
         public Script getOutputScript(ECKey derivedKey) {
-            return getOutputScript(derivedKey.getTweakedOutputKey().getPubKeyXCoord());
+            return getOutputScript(getOutputKey(derivedKey).getPubKeyXCoord());
         }
 
         @Override
@@ -1105,7 +1110,9 @@ public enum ScriptType {
 
         @Override
         public TransactionInput addSpendingInput(Transaction transaction, TransactionOutput prevOutput, ECKey pubKey, TransactionSignature signature) {
-            throw new UnsupportedOperationException("Constructing Taproot inputs is not yet supported");
+            Script scriptSig = getScriptSig(prevOutput.getScript(), pubKey, signature);
+            TransactionWitness witness = new TransactionWitness(transaction, signature);
+            return transaction.addInput(prevOutput.getHash(), prevOutput.getIndex(), scriptSig, witness);
         }
 
         @Override
@@ -1184,6 +1191,10 @@ public enum ScriptType {
 
     public boolean isAllowed(PolicyType policyType) {
         return getAllowedPolicyTypes().contains(policyType);
+    }
+
+    public ECKey getOutputKey(ECKey derivedKey) {
+        return derivedKey;
     }
 
     public abstract Address getAddress(byte[] bytes);

@@ -12,6 +12,8 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.math.BigInteger;
+import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
 import java.util.*;
 
 public class Utils {
@@ -287,6 +289,16 @@ public class Utils {
         byte[] out = new byte[64];
         hmacSha512.doFinal(out, 0);
         return out;
+    }
+
+    public static byte[] taggedHash(String tag, byte[] msg) {
+        byte[] hash = Sha256Hash.hash(tag.getBytes(StandardCharsets.UTF_8));
+        ByteBuffer buffer = ByteBuffer.allocate(hash.length + hash.length + msg.length);
+        buffer.put(hash);
+        buffer.put(hash);
+        buffer.put(msg);
+
+        return Sha256Hash.hash(buffer.array());
     }
 
     public static class LexicographicByteArrayComparator implements Comparator<byte[]> {
