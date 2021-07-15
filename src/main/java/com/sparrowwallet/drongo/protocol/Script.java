@@ -200,7 +200,8 @@ public class Script {
     }
 
     public int getNumRequiredSignatures() throws NonStandardScriptException {
-        if(P2PK.isScriptType(this) || P2PKH.isScriptType(this) || P2WPKH.isScriptType(this)) {
+        //TODO: Handle P2TR script path spends
+        if(P2PK.isScriptType(this) || P2PKH.isScriptType(this) || P2WPKH.isScriptType(this) || P2TR.isScriptType(this)) {
             return 1;
         }
 
