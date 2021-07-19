@@ -8,6 +8,8 @@ import com.sparrowwallet.drongo.crypto.ChildNumber;
 import com.sparrowwallet.drongo.crypto.ECKey;
 import com.sparrowwallet.drongo.policy.PolicyType;
 
+import java.time.LocalDate;
+import java.time.Month;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -1132,9 +1134,12 @@ public enum ScriptType {
 
         @Override
         public List<PolicyType> getAllowedPolicyTypes() {
-            return Network.get() == Network.REGTEST || Network.get() == Network.SIGNET ? List.of(SINGLE) : Collections.emptyList();
+            return (Network.get() == Network.MAINNET && LocalDate.now().isAfter(TAPROOT_MAINNET_ACTIVATION_DATE)) || Network.get() == Network.TESTNET || Network.get() == Network.REGTEST || Network.get() == Network.SIGNET ? List.of(SINGLE) : Collections.emptyList();
         }
     };
+
+    //To avoid relying on a network-dependent block height >= 709632 check, use a approximate activation date. This can be removed once Taproot has activated on mainnet.
+    private static final LocalDate TAPROOT_MAINNET_ACTIVATION_DATE = LocalDate.of(2021, Month.NOVEMBER, 22);
 
     private final String name;
     private final String description;
