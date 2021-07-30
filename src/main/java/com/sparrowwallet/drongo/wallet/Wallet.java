@@ -61,6 +61,22 @@ public class Wallet extends Persistable {
         return name;
     }
 
+    public String getFullName() {
+        if(isMasterWallet()) {
+            return name;
+        }
+
+        return getMasterWallet().getName() + "-" + name;
+    }
+
+    public String getMasterName() {
+        if(isMasterWallet()) {
+            return name;
+        }
+
+        return getMasterWallet().getName();
+    }
+
     public void setName(String name) {
         this.name = name;
     }
@@ -1233,6 +1249,6 @@ public class Wallet extends Persistable {
 
     @Override
     public String toString() {
-        return getName();
+        return getFullName();
     }
 }
