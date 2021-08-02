@@ -438,7 +438,7 @@ public class PSBTInput {
     }
 
     public boolean isTaproot() {
-        return getScriptType() == P2TR;
+        return getUtxo() != null && getScriptType() == P2TR;
     }
 
     public boolean isSigned() {
