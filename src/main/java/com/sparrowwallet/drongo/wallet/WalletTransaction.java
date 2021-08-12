@@ -98,8 +98,20 @@ public class WalletTransaction {
     }
 
     public boolean isConsolidationSend(Payment payment) {
-        if(payment.getAddress() != null && getWallet() != null) {
-            return getWallet().isWalletOutputScript(payment.getAddress().getOutputScript());
+        return isWalletSend(getWallet(), payment);
+    }
+
+    public boolean isPremixSend(Payment payment) {
+        return isWalletSend(getWallet().getChildWallet(StandardAccount.WHIRLPOOL_PREMIX), payment);
+    }
+
+    public boolean isBadbankSend(Payment payment) {
+        return isWalletSend(getWallet().getChildWallet(StandardAccount.WHIRLPOOL_BADBANK), payment);
+    }
+
+    public boolean isWalletSend(Wallet wallet, Payment payment) {
+        if(payment.getAddress() != null && wallet != null) {
+            return wallet.isWalletOutputScript(payment.getAddress().getOutputScript());
         }
 
         return false;

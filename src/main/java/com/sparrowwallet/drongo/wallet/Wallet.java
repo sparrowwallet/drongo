@@ -1,9 +1,11 @@
 package com.sparrowwallet.drongo.wallet;
 
 import com.sparrowwallet.drongo.BitcoinUnit;
+import com.sparrowwallet.drongo.KeyDerivation;
 import com.sparrowwallet.drongo.KeyPurpose;
 import com.sparrowwallet.drongo.Network;
 import com.sparrowwallet.drongo.address.Address;
+import com.sparrowwallet.drongo.crypto.ChildNumber;
 import com.sparrowwallet.drongo.crypto.ECKey;
 import com.sparrowwallet.drongo.crypto.Key;
 import com.sparrowwallet.drongo.policy.Policy;
@@ -75,6 +77,92 @@ public class Wallet extends Persistable {
         }
 
         return getMasterWallet().getName();
+    }
+
+    public Wallet addChildWallet(StandardAccount standardAccount) {
+        Wallet childWallet = this.copy();
+
+        if(!isMasterWallet()) {
+            throw new IllegalStateException("Cannot add child wallet to existing child wallet");
+        }
+
+        if(!childWallet.containsPrivateKeys()) {
+            throw new IllegalStateException("Cannot derive child wallet xpub without private keys");
+        }
+
+        if(childWallet.isEncrypted()) {
+            throw new IllegalStateException("Cannot derive child wallet xpub from encrypted wallet");
+        }
+
+        childWallet.setId(null);
+        childWallet.setName(standardAccount.getName());
+        childWallet.purposeNodes.clear();
+        childWallet.transactions.clear();
+        childWallet.storedBlockHeight = null;
+        childWallet.gapLimit = null;
+        childWallet.birthDate = null;
+
+        for(Keystore keystore : childWallet.getKeystores()) {
+            KeyDerivation keyDerivation = keystore.getKeyDerivation();
+            List<ChildNumber> childDerivation = new ArrayList<>(keyDerivation.getDerivation().subList(0, keyDerivation.getDerivation().size() - 1));
+            childDerivation.add(standardAccount.getChildNumber());
+
+            try {
+                Keystore derivedKeystore = Keystore.fromSeed(keystore.getSeed(), childDerivation);
+                keystore.setKeyDerivation(derivedKeystore.getKeyDerivation());
+                keystore.setExtendedPublicKey(derivedKeystore.getExtendedPublicKey());
+                keystore.getSeed().setPassphrase(keystore.getSeed().getPassphrase());
+            } catch(Exception e) {
+                throw new IllegalStateException("Cannot derive keystore for " + standardAccount + " account", e);
+            }
+        }
+
+        childWallet.setMasterWallet(this);
+        getChildWallets().add(childWallet);
+        return childWallet;
+    }
+
+    public Wallet getChildWallet(StandardAccount account) {
+        for(Wallet childWallet : getChildWallets()) {
+            for(Keystore keystore : childWallet.getKeystores()) {
+                if(keystore.getKeyDerivation().getDerivation().get(keystore.getKeyDerivation().getDerivation().size() - 1).equals(account.getChildNumber())) {
+                    return childWallet;
+                }
+            }
+        }
+
+        return null;
+    }
+
+    public StandardAccount getStandardAccountType() {
+        int accountIndex = getAccountIndex();
+        return Arrays.stream(StandardAccount.values()).filter(standardAccount -> standardAccount.getChildNumber().num() == accountIndex).findFirst().orElse(null);
+    }
+
+    public int getAccountIndex() {
+        int index = -1;
+
+        for(Keystore keystore : getKeystores()) {
+            int keystoreAccount = getScriptType().getAccount(keystore.getKeyDerivation().getDerivationPath());
+            if(keystoreAccount != -1 && (index == -1 || keystoreAccount == index)) {
+                index = keystoreAccount;
+            }
+        }
+
+        return index;
+    }
+
+    public boolean isWhirlpoolMasterWallet() {
+        if(!isMasterWallet()) {
+            return false;
+        }
+
+        Set<StandardAccount> whirlpoolAccounts = new HashSet<>(Set.of(StandardAccount.WHIRLPOOL_PREMIX, StandardAccount.WHIRLPOOL_POSTMIX, StandardAccount.WHIRLPOOL_BADBANK));
+        for(Wallet childWallet : getChildWallets()) {
+            whirlpoolAccounts.remove(childWallet.getStandardAccountType());
+        }
+
+        return whirlpoolAccounts.isEmpty();
     }
 
     public void setName(String name) {

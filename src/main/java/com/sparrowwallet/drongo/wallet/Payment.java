@@ -7,6 +7,7 @@ public class Payment {
     private String label;
     private long amount;
     private boolean sendMax;
+    private Type type = Type.DEFAULT;
 
     public Payment(Address address, String label, long amount, boolean sendMax) {
         this.address = address;
@@ -45,5 +46,17 @@ public class Payment {
 
     public void setSendMax(boolean sendMax) {
         this.sendMax = sendMax;
+    }
+
+    public Type getType() {
+        return type;
+    }
+
+    public void setType(Type type) {
+        this.type = type;
+    }
+
+    public enum Type {
+        DEFAULT, WHIRLPOOL_FEE;
     }
 }
