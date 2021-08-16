@@ -143,9 +143,11 @@ public class Wallet extends Persistable {
         int index = -1;
 
         for(Keystore keystore : getKeystores()) {
-            int keystoreAccount = getScriptType().getAccount(keystore.getKeyDerivation().getDerivationPath());
-            if(keystoreAccount != -1 && (index == -1 || keystoreAccount == index)) {
-                index = keystoreAccount;
+            if(keystore.getKeyDerivation() != null) {
+                int keystoreAccount = getScriptType().getAccount(keystore.getKeyDerivation().getDerivationPath());
+                if(keystoreAccount != -1 && (index == -1 || keystoreAccount == index)) {
+                    index = keystoreAccount;
+                }
             }
         }
 
