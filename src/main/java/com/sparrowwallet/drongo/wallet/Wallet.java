@@ -14,6 +14,7 @@ import com.sparrowwallet.drongo.protocol.*;
 import com.sparrowwallet.drongo.psbt.PSBT;
 import com.sparrowwallet.drongo.psbt.PSBTInput;
 
+import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -35,6 +36,7 @@ public class Wallet extends Persistable {
     private List<Keystore> keystores = new ArrayList<>();
     private final TreeSet<WalletNode> purposeNodes = new TreeSet<>();
     private final Map<Sha256Hash, BlockTransaction> transactions = new HashMap<>();
+    private final Map<Sha256Hash, UtxoMixData> utxoMixes = new HashMap<>();
     private Integer storedBlockHeight;
     private Integer gapLimit;
     private Date birthDate;
@@ -167,6 +169,10 @@ public class Wallet extends Persistable {
         return whirlpoolAccounts.isEmpty();
     }
 
+    public boolean isWhirlpoolMixWallet() {
+        return !isMasterWallet() && StandardAccount.WHIRLPOOL_MIX_ACCOUNTS.contains(getStandardAccountType());
+    }
+
     public void setName(String name) {
         this.name = name;
     }
@@ -222,6 +228,14 @@ public class Wallet extends Persistable {
         if(!transactions.isEmpty()) {
             birthDate = transactions.values().stream().map(BlockTransactionHash::getDate).filter(Objects::nonNull).min(Date::compareTo).orElse(birthDate);
         }
+    }
+
+    public UtxoMixData getUtxoMixData(BlockTransactionHashIndex utxo) {
+        return utxoMixes.get(Sha256Hash.of(utxo.toString().getBytes(StandardCharsets.UTF_8)));
+    }
+
+    public Map<Sha256Hash, UtxoMixData> getUtxoMixes() {
+        return utxoMixes;
     }
 
     public Integer getStoredBlockHeight() {

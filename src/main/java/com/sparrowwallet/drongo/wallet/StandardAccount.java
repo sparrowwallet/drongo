@@ -20,6 +20,7 @@ public enum StandardAccount {
     WHIRLPOOL_BADBANK("Badbank", new ChildNumber(2147483644, true));
 
     public static final List<StandardAccount> WHIRLPOOL_ACCOUNTS = List.of(WHIRLPOOL_PREMIX, WHIRLPOOL_POSTMIX, WHIRLPOOL_BADBANK);
+    public static final List<StandardAccount> WHIRLPOOL_MIX_ACCOUNTS = List.of(WHIRLPOOL_PREMIX, WHIRLPOOL_POSTMIX);
 
     StandardAccount(String name, ChildNumber childNumber) {
         this.name = name;

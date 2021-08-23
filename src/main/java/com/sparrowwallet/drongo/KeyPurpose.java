@@ -2,8 +2,12 @@ package com.sparrowwallet.drongo;
 
 import com.sparrowwallet.drongo.crypto.ChildNumber;
 
+import java.util.List;
+
 public enum KeyPurpose {
     RECEIVE(ChildNumber.ZERO), CHANGE(ChildNumber.ONE);
+
+    public static final List<KeyPurpose> DEFAULT_PURPOSES = List.of(RECEIVE, CHANGE);
 
     private final ChildNumber pathIndex;
 

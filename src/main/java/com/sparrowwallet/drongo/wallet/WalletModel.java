@@ -44,7 +44,7 @@ public enum WalletModel {
     }
 
     public boolean alwaysIncludeNonWitnessUtxo() {
-        if(this == COLDCARD || this == COBO_VAULT || this == PASSPORT) {
+        if(this == COLDCARD || this == COBO_VAULT || this == PASSPORT || this == KEYSTONE) {
             return false;
         }
 
