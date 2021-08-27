@@ -132,8 +132,8 @@ public class PSBT {
                 Address address = txOutput.getScript().getToAddresses()[0];
                 if(walletTransaction.getPayments().stream().anyMatch(payment -> payment.getAddress().equals(address))) {
                     outputNodes.add(wallet.getWalletAddresses().getOrDefault(address, null));
-                } else if(address.equals(wallet.getAddress(walletTransaction.getChangeNode()))) {
-                    outputNodes.add(walletTransaction.getChangeNode());
+                } else if(walletTransaction.getChangeMap().keySet().stream().anyMatch(changeNode -> wallet.getAddress(changeNode).equals(address))) {
+                    outputNodes.add(wallet.getWalletAddresses().getOrDefault(address, null));
                 }
             } catch(NonStandardScriptException e) {
                 //Should never happen

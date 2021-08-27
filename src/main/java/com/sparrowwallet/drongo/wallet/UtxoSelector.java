@@ -1,7 +1,8 @@
 package com.sparrowwallet.drongo.wallet;
 
 import java.util.Collection;
+import java.util.List;
 
 public interface UtxoSelector {
-    Collection<BlockTransactionHashIndex> select(long targetValue, Collection<OutputGroup> candidates);
+    List<Collection<BlockTransactionHashIndex>> selectSets(long targetValue, Collection<OutputGroup> candidates);
 }

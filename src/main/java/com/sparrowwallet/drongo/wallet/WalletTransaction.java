@@ -5,6 +5,7 @@ import com.sparrowwallet.drongo.protocol.Transaction;
 import com.sparrowwallet.drongo.psbt.PSBT;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
@@ -18,22 +19,20 @@ public class WalletTransaction {
     private final List<UtxoSelector> utxoSelectors;
     private final Map<BlockTransactionHashIndex, WalletNode> selectedUtxos;
     private final List<Payment> payments;
-    private final WalletNode changeNode;
-    private final long changeAmount;
+    private final Map<WalletNode, Long> changeMap;
     private final long fee;
 
     public WalletTransaction(Wallet wallet, Transaction transaction, List<UtxoSelector> utxoSelectors, Map<BlockTransactionHashIndex, WalletNode> selectedUtxos, List<Payment> payments, long fee) {
-        this(wallet, transaction, utxoSelectors, selectedUtxos, payments, null, 0L, fee);
+        this(wallet, transaction, utxoSelectors, selectedUtxos, payments, Collections.emptyMap(), fee);
     }
 
-    public WalletTransaction(Wallet wallet, Transaction transaction, List<UtxoSelector> utxoSelectors, Map<BlockTransactionHashIndex, WalletNode> selectedUtxos, List<Payment> payments, WalletNode changeNode, long changeAmount, long fee) {
+    public WalletTransaction(Wallet wallet, Transaction transaction, List<UtxoSelector> utxoSelectors, Map<BlockTransactionHashIndex, WalletNode> selectedUtxos, List<Payment> payments, Map<WalletNode, Long> changeMap, long fee) {
         this.wallet = wallet;
         this.transaction = transaction;
         this.utxoSelectors = utxoSelectors;
         this.selectedUtxos = selectedUtxos;
         this.payments = payments;
-        this.changeNode = changeNode;
-        this.changeAmount = changeAmount;
+        this.changeMap = changeMap;
         this.fee = fee;
     }
 
@@ -61,16 +60,12 @@ public class WalletTransaction {
         return payments;
     }
 
-    public WalletNode getChangeNode() {
-        return changeNode;
+    public Map<WalletNode, Long> getChangeMap() {
+        return changeMap;
     }
 
-    public Address getChangeAddress() {
-        return getWallet().getAddress(getChangeNode());
-    }
-
-    public long getChangeAmount() {
-        return changeAmount;
+    public Address getChangeAddress(WalletNode changeNode) {
+        return getWallet().getAddress(changeNode);
     }
 
     public long getFee() {

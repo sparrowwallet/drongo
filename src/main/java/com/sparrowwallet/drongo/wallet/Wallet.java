@@ -622,7 +622,7 @@ public class Wallet extends Persistable {
         return getFee(changeOutput, feeRate, longTermFeeRate);
     }
 
-    public WalletTransaction createWalletTransaction(List<UtxoSelector> utxoSelectors, List<UtxoFilter> utxoFilters, List<Payment> payments, List<WalletNode> excludedChangeNodes, double feeRate, double longTermFeeRate, Long fee, Integer currentBlockHeight, boolean groupByAddress, boolean includeMempoolOutputs, boolean includeSpentMempoolOutputs) throws InsufficientFundsException {
+    public WalletTransaction createWalletTransaction(List<UtxoSelector> utxoSelectors, List<UtxoFilter> utxoFilters, List<Payment> payments, Set<WalletNode> excludedChangeNodes, double feeRate, double longTermFeeRate, Long fee, Integer currentBlockHeight, boolean groupByAddress, boolean includeMempoolOutputs, boolean includeSpentMempoolOutputs) throws InsufficientFundsException {
         boolean sendMax = payments.stream().anyMatch(Payment::isSendMax);
         long totalPaymentAmount = payments.stream().map(Payment::getAmount).mapToLong(v -> v).sum();
         long totalUtxoValue = getWalletUtxos().keySet().stream().mapToLong(BlockTransactionHashIndex::getValue).sum();
@@ -644,8 +644,13 @@ public class Wallet extends Persistable {
         }
 
         while(true) {
-            Map<BlockTransactionHashIndex, WalletNode> selectedUtxos = selectInputs(utxoSelectors, utxoFilters, valueRequiredAmt, feeRate, longTermFeeRate, groupByAddress, includeMempoolOutputs, includeSpentMempoolOutputs, sendMax);
+            List<Map<BlockTransactionHashIndex, WalletNode>> selectedUtxoSets = selectInputSets(utxoSelectors, utxoFilters, valueRequiredAmt, feeRate, longTermFeeRate, groupByAddress, includeMempoolOutputs, includeSpentMempoolOutputs, sendMax);
+            Map<BlockTransactionHashIndex, WalletNode> selectedUtxos = new HashMap<>();
+            selectedUtxoSets.forEach(selectedUtxos::putAll);
             long totalSelectedAmt = selectedUtxos.keySet().stream().mapToLong(BlockTransactionHashIndex::getValue).sum();
+            int numSets = selectedUtxoSets.size();
+            List<Payment> txPayments = new ArrayList<>(payments);
+            Set<WalletNode> txExcludedChangeNodes = new HashSet<>(excludedChangeNodes);
 
             Transaction transaction = new Transaction();
             transaction.setVersion(2);
@@ -663,8 +668,16 @@ public class Wallet extends Persistable {
                 txInput.setSequenceNumber(TransactionInput.SEQUENCE_RBF_ENABLED);
             }
 
+            for(int i = 1; i < numSets; i+=2) {
+                WalletNode mixNode = getFreshNode(KeyPurpose.CHANGE);
+                txExcludedChangeNodes.add(mixNode);
+                Payment fakeMixPayment = new Payment(getAddress(mixNode), ".." + mixNode + " (Fake Mix)", totalPaymentAmount, false);
+                fakeMixPayment.setType(Payment.Type.FAKE_MIX);
+                txPayments.add(fakeMixPayment);
+            }
+
             //Add recipient outputs
-            for(Payment payment : payments) {
+            for(Payment payment : txPayments) {
                 transaction.addOutput(payment.getAmount(), payment.getAddress());
             }
 
@@ -689,7 +702,7 @@ public class Wallet extends Persistable {
             }
 
             //Calculate what is left over from selected utxos after paying recipient
-            long differenceAmt = totalSelectedAmt - totalPaymentAmount;
+            long differenceAmt = totalSelectedAmt - totalPaymentAmount * numSets;
 
             //If insufficient fee, increase value required from inputs to include the fee and try again
             if(differenceAmt < noChangeFeeRequiredAmt) {
@@ -703,36 +716,61 @@ public class Wallet extends Persistable {
             }
 
             //Determine if a change output is required by checking if its value is greater than its dust threshold
-            long changeAmt = differenceAmt - noChangeFeeRequiredAmt;
+            List<Long> setChangeAmts = getSetChangeAmounts(selectedUtxoSets, totalPaymentAmount, noChangeFeeRequiredAmt);
             double noChangeFeeRate = (fee == null ? feeRate : noChangeFeeRequiredAmt / transaction.getVirtualSize());
             long costOfChangeAmt = getCostOfChange(noChangeFeeRate, longTermFeeRate);
-            if(changeAmt > costOfChangeAmt) {
+            if(setChangeAmts.stream().allMatch(amt -> amt > costOfChangeAmt)) {
                 //Change output is required, determine new fee once change output has been added
                 WalletNode changeNode = getFreshNode(KeyPurpose.CHANGE);
-                while(excludedChangeNodes.contains(changeNode)) {
+                while(txExcludedChangeNodes.contains(changeNode)) {
                     changeNode = getFreshNode(KeyPurpose.CHANGE, changeNode);
                 }
-                TransactionOutput changeOutput = new TransactionOutput(transaction, changeAmt, getOutputScript(changeNode));
-                double changeVSize = noChangeVSize + changeOutput.getLength();
+                TransactionOutput changeOutput = new TransactionOutput(transaction, setChangeAmts.iterator().next(), getOutputScript(changeNode));
+                double changeVSize = noChangeVSize + changeOutput.getLength() * numSets;
                 long changeFeeRequiredAmt = (fee == null ? (long)Math.floor(feeRate * changeVSize) : fee);
                 changeFeeRequiredAmt = (fee == null && feeRate == Transaction.DEFAULT_MIN_RELAY_FEE ? changeFeeRequiredAmt + 1 : changeFeeRequiredAmt);
-
-                //Recalculate the change amount with the new fee
-                changeAmt = differenceAmt - changeFeeRequiredAmt;
-                if(changeAmt < costOfChangeAmt) {
-                    //The new fee has meant that the change output is now dust. We pay too high a fee without change, but change is dust when added. Increase value required from inputs and try again
-                    valueRequiredAmt = totalSelectedAmt + 1;
-                    continue;
+                while(changeFeeRequiredAmt % numSets > 0) {
+                    changeFeeRequiredAmt++;
                 }
 
-                //Add change output
-                transaction.addOutput(changeAmt, getOutputScript(changeNode));
+                //Add change output(s)
+                Map<WalletNode, Long> changeMap = new LinkedHashMap<>();
+                setChangeAmts = getSetChangeAmounts(selectedUtxoSets, totalPaymentAmount, changeFeeRequiredAmt);
+                for(Long setChangeAmt : setChangeAmts) {
+                    transaction.addOutput(setChangeAmt, getOutputScript(changeNode));
+                    changeMap.put(changeNode, setChangeAmt);
+                    changeNode = getFreshNode(KeyPurpose.CHANGE, changeNode);
+                }
 
-                return new WalletTransaction(this, transaction, utxoSelectors, selectedUtxos, payments, changeNode, changeAmt, changeFeeRequiredAmt);
+                if(setChangeAmts.stream().anyMatch(amt -> amt < costOfChangeAmt)) {
+                    //The new fee has meant that one of the change outputs is now dust. We pay too high a fee without change, but change is dust when added.
+                    if(numSets > 1) {
+                        //Maximize privacy. Pay a higher fee to keep multiple output sets.
+                        return new WalletTransaction(this, transaction, utxoSelectors, selectedUtxos, txPayments, differenceAmt);
+                    } else {
+                        //Maxmize efficiency. Increase value required from inputs and try again.
+                        valueRequiredAmt = totalSelectedAmt + 1;
+                        continue;
+                    }
+                }
+
+                return new WalletTransaction(this, transaction, utxoSelectors, selectedUtxos, txPayments, changeMap, changeFeeRequiredAmt);
             }
 
-            return new WalletTransaction(this, transaction, utxoSelectors, selectedUtxos, payments, differenceAmt);
+            return new WalletTransaction(this, transaction, utxoSelectors, selectedUtxos, txPayments, differenceAmt);
         }
+    }
+
+    private List<Long> getSetChangeAmounts(List<Map<BlockTransactionHashIndex, WalletNode>> selectedUtxoSets, long totalPaymentAmount, long feeRequiredAmt) {
+        List<Long> changeAmts = new ArrayList<>();
+        int numSets = selectedUtxoSets.size();
+        for(Map<BlockTransactionHashIndex, WalletNode> selectedUtxoSet : selectedUtxoSets) {
+            long setAmt = selectedUtxoSet.keySet().stream().mapToLong(BlockTransactionHashIndex::getValue).sum();
+            long setChangeAmt = setAmt - (totalPaymentAmount + feeRequiredAmt / numSets);
+            changeAmts.add(setChangeAmt);
+        }
+
+        return changeAmts;
     }
 
     public TransactionInput addDummySpendingInput(Transaction transaction, WalletNode walletNode, TransactionOutput prevTxOut) {
@@ -752,7 +790,7 @@ public class Wallet extends Persistable {
         }
     }
 
-    private Map<BlockTransactionHashIndex, WalletNode> selectInputs(List<UtxoSelector> utxoSelectors, List<UtxoFilter> utxoFilters, Long targetValue, double feeRate, double longTermFeeRate, boolean groupByAddress, boolean includeMempoolOutputs, boolean includeSpentMempoolOutputs, boolean sendMax) throws InsufficientFundsException {
+    private List<Map<BlockTransactionHashIndex, WalletNode>> selectInputSets(List<UtxoSelector> utxoSelectors, List<UtxoFilter> utxoFilters, Long targetValue, double feeRate, double longTermFeeRate, boolean groupByAddress, boolean includeMempoolOutputs, boolean includeSpentMempoolOutputs, boolean sendMax) throws InsufficientFundsException {
         List<OutputGroup> utxoPool = getGroupedUtxos(utxoFilters, feeRate, longTermFeeRate, groupByAddress, includeSpentMempoolOutputs);
 
         List<OutputGroup.Filter> filters = new ArrayList<>();
@@ -770,12 +808,19 @@ public class Wallet extends Persistable {
             List<OutputGroup> filteredPool = utxoPool.stream().filter(filter::isEligible).collect(Collectors.toList());
 
             for(UtxoSelector utxoSelector : utxoSelectors) {
-                Collection<BlockTransactionHashIndex> selectedInputs = utxoSelector.select(targetValue, filteredPool);
-                long total = selectedInputs.stream().mapToLong(BlockTransactionHashIndex::getValue).sum();
-                if(total > targetValue) {
-                    Map<BlockTransactionHashIndex, WalletNode> utxos = getWalletUtxos(includeSpentMempoolOutputs);
-                    utxos.keySet().retainAll(selectedInputs);
-                    return utxos;
+                List<Collection<BlockTransactionHashIndex>> selectedInputSets = utxoSelector.selectSets(targetValue, filteredPool);
+                List<Map<BlockTransactionHashIndex, WalletNode>> selectedInputSetsList = new ArrayList<>();
+                long total = 0;
+                Map<BlockTransactionHashIndex, WalletNode> utxos = getWalletUtxos(includeSpentMempoolOutputs);
+                for(Collection<BlockTransactionHashIndex> selectedInputs : selectedInputSets) {
+                    total += selectedInputs.stream().mapToLong(BlockTransactionHashIndex::getValue).sum();
+                    Map<BlockTransactionHashIndex, WalletNode> selectedInputsMap = new HashMap<>(utxos);
+                    selectedInputsMap.keySet().retainAll(selectedInputs);
+                    selectedInputSetsList.add(selectedInputsMap);
+                }
+
+                if(total > targetValue * selectedInputSetsList.size()) {
+                    return selectedInputSetsList;
                 }
             }
         }

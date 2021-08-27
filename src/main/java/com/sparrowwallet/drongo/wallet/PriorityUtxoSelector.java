@@ -4,7 +4,7 @@ import java.math.BigInteger;
 import java.util.*;
 import java.util.stream.Collectors;
 
-public class PriorityUtxoSelector implements UtxoSelector {
+public class PriorityUtxoSelector extends SingleSetUtxoSelector {
     private final int currentBlockHeight;
 
     public PriorityUtxoSelector(int currentBlockHeight) {

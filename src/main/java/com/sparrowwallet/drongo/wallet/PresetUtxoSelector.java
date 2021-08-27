@@ -5,7 +5,7 @@ import java.util.Collection;
 import java.util.List;
 import java.util.stream.Collectors;
 
-public class PresetUtxoSelector implements UtxoSelector {
+public class PresetUtxoSelector extends SingleSetUtxoSelector {
     private final Collection<BlockTransactionHashIndex> presetUtxos;
 
     public PresetUtxoSelector(Collection<BlockTransactionHashIndex> presetUtxos) {

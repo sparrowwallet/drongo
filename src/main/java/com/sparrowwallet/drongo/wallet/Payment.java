@@ -57,6 +57,6 @@ public class Payment {
     }
 
     public enum Type {
-        DEFAULT, WHIRLPOOL_FEE;
+        DEFAULT, WHIRLPOOL_FEE, FAKE_MIX;
     }
 }
