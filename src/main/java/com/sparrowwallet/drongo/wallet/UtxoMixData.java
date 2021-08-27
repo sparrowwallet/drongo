@@ -1,30 +1,24 @@
 package com.sparrowwallet.drongo.wallet;
 
 public class UtxoMixData extends Persistable {
-    private final String poolId;
     private final int mixesDone;
-    private final Long forwarding;
+    private final Long expired;
 
-    public UtxoMixData(String poolId, int mixesDone, Long forwarding) {
-        this.poolId = poolId;
+    public UtxoMixData(int mixesDone, Long expired) {
         this.mixesDone = mixesDone;
-        this.forwarding = forwarding;
-    }
-
-    public String getPoolId() {
-        return poolId;
+        this.expired = expired;
     }
 
     public int getMixesDone() {
         return mixesDone;
     }
 
-    public Long getForwarding() {
-        return forwarding;
+    public Long getExpired() {
+        return expired;
     }
 
     @Override
     public String toString() {
-        return "{poolId:" + poolId + ", mixesDone:" + mixesDone + ", forwarding:" + forwarding + "}";
+        return "{mixesDone:" + mixesDone + ", expired: " + expired + "}";
     }
 }
