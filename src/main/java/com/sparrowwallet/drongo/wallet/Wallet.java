@@ -231,7 +231,11 @@ public class Wallet extends Persistable {
     }
 
     public UtxoMixData getUtxoMixData(BlockTransactionHashIndex utxo) {
-        return utxoMixes.get(Sha256Hash.of(utxo.toString().getBytes(StandardCharsets.UTF_8)));
+        return getUtxoMixData(Sha256Hash.of(utxo.toString().getBytes(StandardCharsets.UTF_8)));
+    }
+
+    public UtxoMixData getUtxoMixData(Sha256Hash utxoKey) {
+        return utxoMixes.get(utxoKey);
     }
 
     public Map<Sha256Hash, UtxoMixData> getUtxoMixes() {
