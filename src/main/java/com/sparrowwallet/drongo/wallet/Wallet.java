@@ -36,6 +36,7 @@ public class Wallet extends Persistable {
     private List<Keystore> keystores = new ArrayList<>();
     private final TreeSet<WalletNode> purposeNodes = new TreeSet<>();
     private final Map<Sha256Hash, BlockTransaction> transactions = new HashMap<>();
+    private MixConfig mixConfig;
     private final Map<Sha256Hash, UtxoMixData> utxoMixes = new HashMap<>();
     private Integer storedBlockHeight;
     private Integer gapLimit;
@@ -228,6 +229,22 @@ public class Wallet extends Persistable {
         if(!transactions.isEmpty()) {
             birthDate = transactions.values().stream().map(BlockTransactionHash::getDate).filter(Objects::nonNull).min(Date::compareTo).orElse(birthDate);
         }
+    }
+
+    public MixConfig getMixConfig() {
+        return mixConfig;
+    }
+
+    public MixConfig getOrCreateMixConfig() {
+        if(mixConfig == null) {
+            mixConfig = new MixConfig();
+        }
+
+        return mixConfig;
+    }
+
+    public void setMixConfig(MixConfig mixConfig) {
+        this.mixConfig = mixConfig;
     }
 
     public UtxoMixData getUtxoMixData(BlockTransactionHashIndex utxo) {
@@ -1338,6 +1355,10 @@ public class Wallet extends Persistable {
         }
         for(Sha256Hash hash : transactions.keySet()) {
             copy.transactions.put(hash, transactions.get(hash));
+        }
+        copy.setMixConfig(mixConfig == null ? null : mixConfig.copy());
+        for(Sha256Hash hash : utxoMixes.keySet()) {
+            copy.utxoMixes.put(hash, utxoMixes.get(hash));
         }
         copy.setStoredBlockHeight(getStoredBlockHeight());
         copy.gapLimit = gapLimit;
