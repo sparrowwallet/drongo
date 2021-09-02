@@ -8,16 +8,20 @@ public class MixConfig extends Persistable {
     private File mixToWalletFile;
     private String mixToWalletName;
     private Integer minMixes;
+    private int receiveIndex;
+    private int changeIndex;
 
     public MixConfig() {
     }
 
-    public MixConfig(String scode, Boolean mixOnStartup, File mixToWalletFile, String mixToWalletName, Integer minMixes) {
+    public MixConfig(String scode, Boolean mixOnStartup, File mixToWalletFile, String mixToWalletName, Integer minMixes, int receiveIndex, int changeIndex) {
         this.scode = scode;
         this.mixOnStartup = mixOnStartup;
         this.mixToWalletFile = mixToWalletFile;
         this.mixToWalletName = mixToWalletName;
         this.minMixes = minMixes;
+        this.receiveIndex = receiveIndex;
+        this.changeIndex = changeIndex;
     }
 
     public String getScode() {
@@ -60,7 +64,23 @@ public class MixConfig extends Persistable {
         this.minMixes = minMixes;
     }
 
+    public int getReceiveIndex() {
+        return receiveIndex;
+    }
+
+    public void setReceiveIndex(int receiveIndex) {
+        this.receiveIndex = receiveIndex;
+    }
+
+    public int getChangeIndex() {
+        return changeIndex;
+    }
+
+    public void setChangeIndex(int changeIndex) {
+        this.changeIndex = changeIndex;
+    }
+
     public MixConfig copy() {
-        return new MixConfig(scode, mixOnStartup, mixToWalletFile, mixToWalletName, minMixes);
+        return new MixConfig(scode, mixOnStartup, mixToWalletFile, mixToWalletName, minMixes, receiveIndex, changeIndex);
     }
 }
