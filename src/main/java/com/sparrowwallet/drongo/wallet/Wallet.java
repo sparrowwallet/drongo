@@ -235,7 +235,11 @@ public class Wallet extends Persistable {
         return mixConfig;
     }
 
-    public MixConfig getOrCreateMixConfig() {
+    public MixConfig getMasterMixConfig() {
+        if(!isMasterWallet()) {
+            return getMasterWallet().getMasterMixConfig();
+        }
+
         if(mixConfig == null) {
             mixConfig = new MixConfig();
         }
