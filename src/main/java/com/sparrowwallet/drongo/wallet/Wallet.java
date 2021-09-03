@@ -105,9 +105,13 @@ public class Wallet extends Persistable {
         childWallet.gapLimit = null;
         childWallet.birthDate = null;
 
+        if(standardAccount.getRequiredScriptType() != null) {
+            childWallet.setScriptType(standardAccount.getRequiredScriptType());
+        }
+
         for(Keystore keystore : childWallet.getKeystores()) {
-            KeyDerivation keyDerivation = keystore.getKeyDerivation();
-            List<ChildNumber> childDerivation = new ArrayList<>(keyDerivation.getDerivation().subList(0, keyDerivation.getDerivation().size() - 1));
+            List<ChildNumber> derivation = standardAccount.getRequiredScriptType() != null ? standardAccount.getRequiredScriptType().getDefaultDerivation() : keystore.getKeyDerivation().getDerivation();
+            List<ChildNumber> childDerivation = new ArrayList<>(derivation.subList(0, derivation.size() - 1));
             childDerivation.add(standardAccount.getChildNumber());
 
             try {

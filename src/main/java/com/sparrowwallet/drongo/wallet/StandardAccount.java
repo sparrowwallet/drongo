@@ -1,6 +1,7 @@
 package com.sparrowwallet.drongo.wallet;
 
 import com.sparrowwallet.drongo.crypto.ChildNumber;
+import com.sparrowwallet.drongo.protocol.ScriptType;
 
 import java.util.List;
 
@@ -15,9 +16,9 @@ public enum StandardAccount {
     ACCOUNT_7("Account #7", new ChildNumber(7, true)),
     ACCOUNT_8("Account #8", new ChildNumber(8, true)),
     ACCOUNT_9("Account #9", new ChildNumber(9, true)),
-    WHIRLPOOL_PREMIX("Premix", new ChildNumber(2147483645, true)),
-    WHIRLPOOL_POSTMIX("Postmix", new ChildNumber(2147483646, true)),
-    WHIRLPOOL_BADBANK("Badbank", new ChildNumber(2147483644, true));
+    WHIRLPOOL_PREMIX("Premix", new ChildNumber(2147483645, true), ScriptType.P2WPKH),
+    WHIRLPOOL_POSTMIX("Postmix", new ChildNumber(2147483646, true), ScriptType.P2WPKH),
+    WHIRLPOOL_BADBANK("Badbank", new ChildNumber(2147483644, true), ScriptType.P2WPKH);
 
     public static final List<StandardAccount> WHIRLPOOL_ACCOUNTS = List.of(WHIRLPOOL_PREMIX, WHIRLPOOL_POSTMIX, WHIRLPOOL_BADBANK);
     public static final List<StandardAccount> WHIRLPOOL_MIX_ACCOUNTS = List.of(WHIRLPOOL_PREMIX, WHIRLPOOL_POSTMIX);
@@ -25,10 +26,18 @@ public enum StandardAccount {
     StandardAccount(String name, ChildNumber childNumber) {
         this.name = name;
         this.childNumber = childNumber;
+        this.requiredScriptType = null;
+    }
+
+    StandardAccount(String name, ChildNumber childNumber, ScriptType requiredScriptType) {
+        this.name = name;
+        this.childNumber = childNumber;
+        this.requiredScriptType = requiredScriptType;
     }
 
     private final String name;
     private final ChildNumber childNumber;
+    private final ScriptType requiredScriptType;
 
     public String getName() {
         return name;
@@ -40,6 +49,10 @@ public enum StandardAccount {
 
     public int getAccountNumber() {
         return childNumber.num();
+    }
+
+    public ScriptType getRequiredScriptType() {
+        return requiredScriptType;
     }
 
     @Override
