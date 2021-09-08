@@ -174,6 +174,10 @@ public class Wallet extends Persistable {
         return whirlpoolAccounts.isEmpty();
     }
 
+    public boolean isWhirlpoolChildWallet() {
+        return !isMasterWallet() && StandardAccount.WHIRLPOOL_ACCOUNTS.contains(getStandardAccountType());
+    }
+
     public boolean isWhirlpoolMixWallet() {
         return !isMasterWallet() && StandardAccount.WHIRLPOOL_MIX_ACCOUNTS.contains(getStandardAccountType());
     }
