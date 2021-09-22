@@ -701,6 +701,10 @@ public class Wallet extends Persistable {
                 txInput.setSequenceNumber(TransactionInput.SEQUENCE_RBF_ENABLED);
             }
 
+            if(getScriptType() == P2TR && currentBlockHeight != null) {
+                applySequenceAntiFeeSniping(transaction, selectedUtxos, currentBlockHeight);
+            }
+
             for(int i = 1; i < numSets; i+=2) {
                 WalletNode mixNode = getFreshNode(KeyPurpose.CHANGE);
                 txExcludedChangeNodes.add(mixNode);
@@ -791,6 +795,27 @@ public class Wallet extends Persistable {
             }
 
             return new WalletTransaction(this, transaction, utxoSelectors, selectedUtxos, txPayments, differenceAmt);
+        }
+    }
+
+    private void applySequenceAntiFeeSniping(Transaction transaction, Map<BlockTransactionHashIndex, WalletNode> selectedUtxos, int currentBlockHeight) {
+        Random random = new Random();
+        boolean locktime = random.nextInt(2) == 0 || getScriptType() != P2TR || selectedUtxos.keySet().stream().anyMatch(utxo -> utxo.getConfirmations(currentBlockHeight) > 65535);
+
+        if(locktime) {
+            transaction.setLocktime(currentBlockHeight);
+            if(random.nextInt(10) == 0) {
+                transaction.setLocktime(Math.max(0, currentBlockHeight - random.nextInt(100)));
+            }
+        } else {
+            transaction.setLocktime(0);
+            int inputIndex = random.nextInt(transaction.getInputs().size());
+            TransactionInput txInput = transaction.getInputs().get(inputIndex);
+            BlockTransactionHashIndex utxo = selectedUtxos.keySet().stream().filter(ref -> ref.getHash().equals(txInput.getOutpoint().getHash()) && ref.getIndex() == txInput.getOutpoint().getIndex()).findFirst().orElseThrow();
+            txInput.setSequenceNumber(utxo.getConfirmations(currentBlockHeight));
+            if(random.nextInt(10) == 0) {
+                txInput.setSequenceNumber(Math.max(0, txInput.getSequenceNumber() - random.nextInt(100)));
+            }
         }
     }
 
