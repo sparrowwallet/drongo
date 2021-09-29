@@ -16,9 +16,9 @@ public enum StandardAccount {
     ACCOUNT_7("Account #7", new ChildNumber(7, true)),
     ACCOUNT_8("Account #8", new ChildNumber(8, true)),
     ACCOUNT_9("Account #9", new ChildNumber(9, true)),
-    WHIRLPOOL_PREMIX("Premix", new ChildNumber(2147483645, true), ScriptType.P2WPKH),
-    WHIRLPOOL_POSTMIX("Postmix", new ChildNumber(2147483646, true), ScriptType.P2WPKH),
-    WHIRLPOOL_BADBANK("Badbank", new ChildNumber(2147483644, true), ScriptType.P2WPKH);
+    WHIRLPOOL_PREMIX("Premix", new ChildNumber(2147483645, true), ScriptType.P2WPKH, null),
+    WHIRLPOOL_POSTMIX("Postmix", new ChildNumber(2147483646, true), ScriptType.P2WPKH, Wallet.DEFAULT_LOOKAHEAD * 2),
+    WHIRLPOOL_BADBANK("Badbank", new ChildNumber(2147483644, true), ScriptType.P2WPKH, null);
 
     public static final List<StandardAccount> WHIRLPOOL_ACCOUNTS = List.of(WHIRLPOOL_PREMIX, WHIRLPOOL_POSTMIX, WHIRLPOOL_BADBANK);
     public static final List<StandardAccount> WHIRLPOOL_MIX_ACCOUNTS = List.of(WHIRLPOOL_PREMIX, WHIRLPOOL_POSTMIX);
@@ -27,17 +27,20 @@ public enum StandardAccount {
         this.name = name;
         this.childNumber = childNumber;
         this.requiredScriptType = null;
+        this.minimumGapLimit = null;
     }
 
-    StandardAccount(String name, ChildNumber childNumber, ScriptType requiredScriptType) {
+    StandardAccount(String name, ChildNumber childNumber, ScriptType requiredScriptType, Integer minimumGapLimit) {
         this.name = name;
         this.childNumber = childNumber;
         this.requiredScriptType = requiredScriptType;
+        this.minimumGapLimit = minimumGapLimit;
     }
 
     private final String name;
     private final ChildNumber childNumber;
     private final ScriptType requiredScriptType;
+    private final Integer minimumGapLimit;
 
     public String getName() {
         return name;
@@ -53,6 +56,10 @@ public enum StandardAccount {
 
     public ScriptType getRequiredScriptType() {
         return requiredScriptType;
+    }
+
+    public Integer getMinimumGapLimit() {
+        return minimumGapLimit;
     }
 
     @Override

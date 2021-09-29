@@ -22,7 +22,7 @@ import java.util.stream.Collectors;
 import static com.sparrowwallet.drongo.protocol.ScriptType.*;
 import static com.sparrowwallet.drongo.protocol.Transaction.WITNESS_SCALE_FACTOR;
 
-public class Wallet extends Persistable {
+public class Wallet extends Persistable implements Comparable<Wallet> {
     public static final int DEFAULT_LOOKAHEAD = 20;
     public static final String ALLOW_DERIVATIONS_MATCHING_OTHER_SCRIPT_TYPES_PROPERTY = "com.sparrowwallet.allowDerivationsMatchingOtherScriptTypes";
 
@@ -89,11 +89,7 @@ public class Wallet extends Persistable {
             throw new IllegalStateException("Cannot add child wallet to existing child wallet");
         }
 
-        if(!childWallet.containsPrivateKeys()) {
-            throw new IllegalStateException("Cannot derive child wallet xpub without private keys");
-        }
-
-        if(childWallet.isEncrypted()) {
+        if(childWallet.containsPrivateKeys() && childWallet.isEncrypted()) {
             throw new IllegalStateException("Cannot derive child wallet xpub from encrypted wallet");
         }
 
@@ -102,7 +98,7 @@ public class Wallet extends Persistable {
         childWallet.purposeNodes.clear();
         childWallet.transactions.clear();
         childWallet.storedBlockHeight = null;
-        childWallet.gapLimit = null;
+        childWallet.gapLimit = standardAccount.getMinimumGapLimit();
         childWallet.birthDate = null;
 
         if(standardAccount.getRequiredScriptType() != null) {
@@ -111,16 +107,25 @@ public class Wallet extends Persistable {
 
         for(Keystore keystore : childWallet.getKeystores()) {
             List<ChildNumber> derivation = standardAccount.getRequiredScriptType() != null ? standardAccount.getRequiredScriptType().getDefaultDerivation() : keystore.getKeyDerivation().getDerivation();
-            List<ChildNumber> childDerivation = new ArrayList<>(derivation.subList(0, derivation.size() - 1));
-            childDerivation.add(standardAccount.getChildNumber());
+            List<ChildNumber> childDerivation;
+            if(childWallet.getScriptType().getAccount(KeyDerivation.writePath(derivation)) > -1) {
+                childDerivation = childWallet.getScriptType().getDefaultDerivation(standardAccount.getChildNumber().num());
+            } else {
+                childDerivation = derivation.isEmpty() ? new ArrayList<>() : new ArrayList<>(derivation.subList(0, derivation.size() - 1));
+                childDerivation.add(standardAccount.getChildNumber());
+            }
 
-            try {
-                Keystore derivedKeystore = Keystore.fromSeed(keystore.getSeed(), childDerivation);
-                keystore.setKeyDerivation(derivedKeystore.getKeyDerivation());
-                keystore.setExtendedPublicKey(derivedKeystore.getExtendedPublicKey());
-                keystore.getSeed().setPassphrase(keystore.getSeed().getPassphrase());
-            } catch(Exception e) {
-                throw new IllegalStateException("Cannot derive keystore for " + standardAccount + " account", e);
+            if(keystore.hasPrivateKey()) {
+                try {
+                    Keystore derivedKeystore = keystore.hasSeed() ? Keystore.fromSeed(keystore.getSeed(), childDerivation) : Keystore.fromMasterPrivateExtendedKey(keystore.getMasterPrivateExtendedKey(), childDerivation);
+                    keystore.setKeyDerivation(derivedKeystore.getKeyDerivation());
+                    keystore.setExtendedPublicKey(derivedKeystore.getExtendedPublicKey());
+                } catch(Exception e) {
+                    throw new IllegalStateException("Cannot derive keystore for " + standardAccount + " account", e);
+                }
+            } else {
+                keystore.setKeyDerivation(new KeyDerivation(null, KeyDerivation.writePath(childDerivation)));
+                keystore.setExtendedPublicKey(null);
             }
         }
 
@@ -154,6 +159,11 @@ public class Wallet extends Persistable {
                 int keystoreAccount = getScriptType().getAccount(keystore.getKeyDerivation().getDerivationPath());
                 if(keystoreAccount != -1 && (index == -1 || keystoreAccount == index)) {
                     index = keystoreAccount;
+                } else if(!keystore.getKeyDerivation().getDerivation().isEmpty()) {
+                    keystoreAccount = keystore.getKeyDerivation().getDerivation().get(keystore.getKeyDerivation().getDerivation().size() - 1).num();
+                    if(index == -1 || keystoreAccount == index) {
+                        index = keystoreAccount;
+                    }
                 }
             }
         }
@@ -175,7 +185,7 @@ public class Wallet extends Persistable {
     }
 
     public boolean isWhirlpoolChildWallet() {
-        return !isMasterWallet() && StandardAccount.WHIRLPOOL_ACCOUNTS.contains(getStandardAccountType());
+        return !isMasterWallet() && getStandardAccountType() != null && StandardAccount.WHIRLPOOL_ACCOUNTS.contains(getStandardAccountType());
     }
 
     public boolean isWhirlpoolMixWallet() {
@@ -1456,6 +1466,15 @@ public class Wallet extends Persistable {
         for(Keystore keystore : keystores) {
             keystore.clearPrivate();
         }
+    }
+
+    @Override
+    public int compareTo(Wallet other) {
+        if(getStandardAccountType() != null && other.getStandardAccountType() != null) {
+            return getStandardAccountType().ordinal() - other.getStandardAccountType().ordinal();
+        }
+
+        return getAccountIndex() - other.getAccountIndex();
     }
 
     @Override
