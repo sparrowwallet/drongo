@@ -17,7 +17,7 @@ public enum StandardAccount {
     ACCOUNT_8("Account #8", new ChildNumber(8, true)),
     ACCOUNT_9("Account #9", new ChildNumber(9, true)),
     WHIRLPOOL_PREMIX("Premix", new ChildNumber(2147483645, true), ScriptType.P2WPKH, null),
-    WHIRLPOOL_POSTMIX("Postmix", new ChildNumber(2147483646, true), ScriptType.P2WPKH, Wallet.DEFAULT_LOOKAHEAD * 2),
+    WHIRLPOOL_POSTMIX("Postmix", new ChildNumber(2147483646, true), ScriptType.P2WPKH, Wallet.DEFAULT_LOOKAHEAD * 3),
     WHIRLPOOL_BADBANK("Badbank", new ChildNumber(2147483644, true), ScriptType.P2WPKH, null);
 
     public static final List<StandardAccount> WHIRLPOOL_ACCOUNTS = List.of(WHIRLPOOL_PREMIX, WHIRLPOOL_POSTMIX, WHIRLPOOL_BADBANK);
