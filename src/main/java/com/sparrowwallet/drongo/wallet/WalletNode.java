@@ -130,11 +130,16 @@ public class WalletNode extends Persistable implements Comparable<WalletNode> {
         return value;
     }
 
-    public synchronized void fillToIndex(int index) {
+    public synchronized Set<WalletNode> fillToIndex(int index) {
+        Set<WalletNode> newNodes = new TreeSet<>();
         for(int i = 0; i <= index; i++) {
             WalletNode node = new WalletNode(getKeyPurpose(), i);
-            children.add(node);
+            if(children.add(node)) {
+                newNodes.add(node);
+            }
         }
+
+        return newNodes;
     }
 
     /**
@@ -244,5 +249,70 @@ public class WalletNode extends Persistable implements Comparable<WalletNode> {
         }
 
         return changed;
+    }
+
+    public static String nodeRangesToString(Set<WalletNode> nodes) {
+        return nodeRangesToString(nodes.stream().map(WalletNode::getDerivationPath).collect(Collectors.toList()));
+    }
+
+    public static String nodeRangesToString(Collection<String> nodeDerivations) {
+        List<String> sortedDerivations = new ArrayList<>(nodeDerivations);
+
+        if(nodeDerivations.isEmpty()) {
+            return "[]";
+        }
+
+        List<List<String>> contiguous = splitToContiguous(sortedDerivations);
+
+        String abbrev = "[";
+        for(Iterator<List<String>> iter = contiguous.iterator(); iter.hasNext(); ) {
+            List<String> range = iter.next();
+            abbrev += range.get(0);
+            if(range.size() > 1) {
+                abbrev += "-" + range.get(range.size() - 1);
+            }
+            if(iter.hasNext()) {
+                abbrev += ", ";
+            }
+        }
+        abbrev += "]";
+
+        return abbrev;
+    }
+
+    private static List<List<String>> splitToContiguous(List<String> input) {
+        List<List<String>> result = new ArrayList<>();
+        int prev = 0;
+
+        int keyPurpose = getKeyPurpose(input.get(0));
+        int index = getIndex(input.get(0));
+
+        for (int cur = 0; cur < input.size(); cur++) {
+            if(getKeyPurpose(input.get(cur)) != keyPurpose || getIndex(input.get(cur)) != index) {
+                result.add(input.subList(prev, cur));
+                prev = cur;
+            }
+            index = getIndex(input.get(cur)) + 1;
+            keyPurpose = getKeyPurpose(input.get(cur));
+        }
+        result.add(input.subList(prev, input.size()));
+
+        return result;
+    }
+
+    private static int getKeyPurpose(String path) {
+        List<ChildNumber> childNumbers = KeyDerivation.parsePath(path);
+        if(childNumbers.isEmpty()) {
+            return -1;
+        }
+        return childNumbers.get(0).num();
+    }
+
+    private static int getIndex(String path) {
+        List<ChildNumber> childNumbers = KeyDerivation.parsePath(path);
+        if(childNumbers.isEmpty()) {
+            return -1;
+        }
+        return childNumbers.get(childNumbers.size() - 1).num();
     }
 }
