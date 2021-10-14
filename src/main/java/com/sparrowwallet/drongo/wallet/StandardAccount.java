@@ -20,6 +20,7 @@ public enum StandardAccount {
     WHIRLPOOL_POSTMIX("Postmix", new ChildNumber(2147483646, true), ScriptType.P2WPKH, Wallet.DEFAULT_LOOKAHEAD * 2),
     WHIRLPOOL_BADBANK("Badbank", new ChildNumber(2147483644, true), ScriptType.P2WPKH, null);
 
+    public static final List<StandardAccount> MIXABLE_ACCOUNTS = List.of(ACCOUNT_0, WHIRLPOOL_BADBANK);
     public static final List<StandardAccount> WHIRLPOOL_ACCOUNTS = List.of(WHIRLPOOL_PREMIX, WHIRLPOOL_POSTMIX, WHIRLPOOL_BADBANK);
     public static final List<StandardAccount> WHIRLPOOL_MIX_ACCOUNTS = List.of(WHIRLPOOL_PREMIX, WHIRLPOOL_POSTMIX);
 
