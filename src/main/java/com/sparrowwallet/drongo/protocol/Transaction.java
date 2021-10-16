@@ -23,6 +23,7 @@ public class Transaction extends ChildMessage {
     public static final long MAX_BLOCK_LOCKTIME = 500000000L;
     public static final int WITNESS_SCALE_FACTOR = 4;
     public static final int DEFAULT_SEGWIT_FLAG = 1;
+    public static final int COINBASE_MATURITY_THRESHOLD = 100;
 
     //Min feerate for defining dust, defined in sats/vByte
     //From: https://github.com/bitcoin/bitcoin/blob/0.19/src/policy/policy.h#L50
