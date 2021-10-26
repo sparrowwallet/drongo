@@ -165,6 +165,14 @@ public class Script {
         throw new ProtocolException("Script not a standard form that contains a single hash");
     }
 
+    public Address getToAddress() {
+        try {
+            return getToAddresses()[0];
+        } catch(Exception e) {
+            return null;
+        }
+    }
+
     /**
      * Gets the destination address from this script, if it's in the required form.
      */

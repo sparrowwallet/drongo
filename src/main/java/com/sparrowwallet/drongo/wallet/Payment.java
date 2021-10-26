@@ -7,13 +7,18 @@ public class Payment {
     private String label;
     private long amount;
     private boolean sendMax;
-    private Type type = Type.DEFAULT;
+    private Type type;
 
     public Payment(Address address, String label, long amount, boolean sendMax) {
+        this(address, label, amount, sendMax, Type.DEFAULT);
+    }
+
+    public Payment(Address address, String label, long amount, boolean sendMax, Type type) {
         this.address = address;
         this.label = label;
         this.amount = amount;
         this.sendMax = sendMax;
+        this.type = type;
     }
 
     public Address getAddress() {

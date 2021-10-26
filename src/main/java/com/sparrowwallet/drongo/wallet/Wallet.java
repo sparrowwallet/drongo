@@ -518,6 +518,10 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
         return getWalletTxos().keySet().stream().anyMatch(ref -> ref.getHash().equals(txInput.getOutpoint().getHash()) && ref.getIndex() == txInput.getOutpoint().getIndex());
     }
 
+    public boolean isWalletTxo(TransactionOutput txOutput) {
+        return getWalletTxos().keySet().stream().anyMatch(ref -> ref.getHash().equals(txOutput.getHash()) && ref.getIndex() == txOutput.getIndex());
+    }
+
     public boolean isWalletTxo(BlockTransactionHashIndex txo) {
         return getWalletTxos().containsKey(txo);
     }
@@ -771,7 +775,7 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
             List<Long> setChangeAmts = getSetChangeAmounts(selectedUtxoSets, totalPaymentAmount, noChangeFeeRequiredAmt);
             double noChangeFeeRate = (fee == null ? feeRate : noChangeFeeRequiredAmt / transaction.getVirtualSize());
             long costOfChangeAmt = getCostOfChange(noChangeFeeRate, longTermFeeRate);
-            if(setChangeAmts.stream().allMatch(amt -> amt > costOfChangeAmt)) {
+            if(setChangeAmts.stream().allMatch(amt -> amt > costOfChangeAmt) || (numSets > 1 && differenceAmt / transaction.getVirtualSize() > noChangeFeeRate * 2)) {
                 //Change output is required, determine new fee once change output has been added
                 WalletNode changeNode = getFreshNode(KeyPurpose.CHANGE);
                 while(txExcludedChangeNodes.contains(changeNode)) {
@@ -796,7 +800,7 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
 
                 if(setChangeAmts.stream().anyMatch(amt -> amt < costOfChangeAmt)) {
                     //The new fee has meant that one of the change outputs is now dust. We pay too high a fee without change, but change is dust when added.
-                    if(numSets > 1) {
+                    if(numSets > 1 && differenceAmt / transaction.getVirtualSize() < noChangeFeeRate * 2) {
                         //Maximize privacy. Pay a higher fee to keep multiple output sets.
                         return new WalletTransaction(this, transaction, utxoSelectors, selectedUtxos, txPayments, differenceAmt);
                     } else {

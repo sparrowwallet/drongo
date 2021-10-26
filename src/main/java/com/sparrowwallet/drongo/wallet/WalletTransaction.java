@@ -1,6 +1,7 @@
 package com.sparrowwallet.drongo.wallet;
 
 import com.sparrowwallet.drongo.address.Address;
+import com.sparrowwallet.drongo.protocol.Sha256Hash;
 import com.sparrowwallet.drongo.protocol.Transaction;
 import com.sparrowwallet.drongo.psbt.PSBT;
 
@@ -21,12 +22,17 @@ public class WalletTransaction {
     private final List<Payment> payments;
     private final Map<WalletNode, Long> changeMap;
     private final long fee;
+    private final Map<Sha256Hash, BlockTransaction> inputTransactions;
 
     public WalletTransaction(Wallet wallet, Transaction transaction, List<UtxoSelector> utxoSelectors, Map<BlockTransactionHashIndex, WalletNode> selectedUtxos, List<Payment> payments, long fee) {
         this(wallet, transaction, utxoSelectors, selectedUtxos, payments, Collections.emptyMap(), fee);
     }
 
     public WalletTransaction(Wallet wallet, Transaction transaction, List<UtxoSelector> utxoSelectors, Map<BlockTransactionHashIndex, WalletNode> selectedUtxos, List<Payment> payments, Map<WalletNode, Long> changeMap, long fee) {
+        this(wallet, transaction, utxoSelectors, selectedUtxos, payments, changeMap, fee, Collections.emptyMap());
+    }
+
+    public WalletTransaction(Wallet wallet, Transaction transaction, List<UtxoSelector> utxoSelectors, Map<BlockTransactionHashIndex, WalletNode> selectedUtxos, List<Payment> payments, Map<WalletNode, Long> changeMap, long fee, Map<Sha256Hash, BlockTransaction> inputTransactions) {
         this.wallet = wallet;
         this.transaction = transaction;
         this.utxoSelectors = utxoSelectors;
@@ -34,6 +40,7 @@ public class WalletTransaction {
         this.payments = payments;
         this.changeMap = changeMap;
         this.fee = fee;
+        this.inputTransactions = inputTransactions;
     }
 
     public PSBT createPSBT() {
@@ -80,12 +87,16 @@ public class WalletTransaction {
         return selectedUtxos.keySet().stream().mapToLong(BlockTransactionHashIndex::getValue).sum();
     }
 
+    public Map<Sha256Hash, BlockTransaction> getInputTransactions() {
+        return inputTransactions;
+    }
+
     /**
      * Fee percentage matches the Coldcard implementation of total fee as a percentage of total value out
      * @return the fee percentage
      */
     public double getFeePercentage() {
-        return (double)getFee() / (getTotal() - getFee());
+        return getFee() == 0 ? 0 : (double)getFee() / (getTotal() - getFee());
     }
 
     public boolean isCoinControlUsed() {
@@ -97,11 +108,19 @@ public class WalletTransaction {
     }
 
     public boolean isPremixSend(Payment payment) {
-        return isWalletSend(getWallet().getChildWallet(StandardAccount.WHIRLPOOL_PREMIX), payment);
+        return isWalletSend(StandardAccount.WHIRLPOOL_PREMIX, payment);
     }
 
     public boolean isBadbankSend(Payment payment) {
-        return isWalletSend(getWallet().getChildWallet(StandardAccount.WHIRLPOOL_BADBANK), payment);
+        return isWalletSend(StandardAccount.WHIRLPOOL_BADBANK, payment);
+    }
+
+    private boolean isWalletSend(StandardAccount childAccount, Payment payment) {
+        if(getWallet() != null) {
+            return isWalletSend(getWallet().getChildWallet(childAccount), payment);
+        }
+
+        return false;
     }
 
     public boolean isWalletSend(Wallet wallet, Payment payment) {
