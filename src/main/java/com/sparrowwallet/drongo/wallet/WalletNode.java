@@ -158,7 +158,7 @@ public class WalletNode extends Persistable implements Comparable<WalletNode> {
 
     @Override
     public String toString() {
-        return derivationPath;
+        return derivationPath.replace("m", "..");
     }
 
     @Override

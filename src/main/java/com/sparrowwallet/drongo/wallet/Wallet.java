@@ -1038,7 +1038,7 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
         for(TransactionInput txInput : signingNodes.keySet()) {
             WalletNode walletNode = signingNodes.get(txInput);
             Map<ECKey, Keystore> keystoreKeysForNode = getKeystores().stream().collect(Collectors.toMap(keystore -> getScriptType().getOutputKey(keystore.getPubKey(walletNode)), Function.identity(),
-                    (u, v) -> { throw new IllegalStateException("Duplicate keys from different keystores for node " + walletNode.getDerivationPath()); },
+                    (u, v) -> { throw new IllegalStateException("Duplicate keys from different keystores for node " + walletNode); },
                     LinkedHashMap::new));
 
             Map<ECKey, TransactionSignature> keySignatureMap = new LinkedHashMap<>();
@@ -1138,7 +1138,7 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
         for(PSBTInput psbtInput : signingNodes.keySet()) {
             WalletNode walletNode = signingNodes.get(psbtInput);
             Map<ECKey, Keystore> keystoreKeysForNode = getKeystores().stream().collect(Collectors.toMap(keystore -> getScriptType().getOutputKey(keystore.getPubKey(walletNode)), Function.identity(),
-                    (u, v) -> { throw new IllegalStateException("Duplicate keys from different keystores for node " + walletNode.getDerivationPath()); },
+                    (u, v) -> { throw new IllegalStateException("Duplicate keys from different keystores for node " + walletNode); },
                     LinkedHashMap::new));
 
             Map<ECKey, TransactionSignature> keySignatureMap;
