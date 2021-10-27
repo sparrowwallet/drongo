@@ -27,6 +27,7 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
     public static final String ALLOW_DERIVATIONS_MATCHING_OTHER_SCRIPT_TYPES_PROPERTY = "com.sparrowwallet.allowDerivationsMatchingOtherScriptTypes";
 
     private String name;
+    private String label;
     private Wallet masterWallet;
     private List<Wallet> childWallets = new ArrayList<>();
     private Network network = Network.get();
@@ -194,6 +195,14 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
 
     public void setName(String name) {
         this.name = name;
+    }
+
+    public String getLabel() {
+        return label;
+    }
+
+    public void setLabel(String label) {
+        this.label = label;
     }
 
     public Network getNetwork() {

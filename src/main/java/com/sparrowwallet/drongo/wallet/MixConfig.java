@@ -5,6 +5,7 @@ import java.io.File;
 public class MixConfig extends Persistable {
     private String scode;
     private Boolean mixOnStartup;
+    private String indexRange;
     private File mixToWalletFile;
     private String mixToWalletName;
     private Integer minMixes;
@@ -14,9 +15,10 @@ public class MixConfig extends Persistable {
     public MixConfig() {
     }
 
-    public MixConfig(String scode, Boolean mixOnStartup, File mixToWalletFile, String mixToWalletName, Integer minMixes, int receiveIndex, int changeIndex) {
+    public MixConfig(String scode, Boolean mixOnStartup, String indexRange, File mixToWalletFile, String mixToWalletName, Integer minMixes, int receiveIndex, int changeIndex) {
         this.scode = scode;
         this.mixOnStartup = mixOnStartup;
+        this.indexRange = indexRange;
         this.mixToWalletFile = mixToWalletFile;
         this.mixToWalletName = mixToWalletName;
         this.minMixes = minMixes;
@@ -38,6 +40,14 @@ public class MixConfig extends Persistable {
 
     public void setMixOnStartup(Boolean mixOnStartup) {
         this.mixOnStartup = mixOnStartup;
+    }
+
+    public String getIndexRange() {
+        return indexRange;
+    }
+
+    public void setIndexRange(String indexRange) {
+        this.indexRange = indexRange;
     }
 
     public File getMixToWalletFile() {
@@ -81,6 +91,6 @@ public class MixConfig extends Persistable {
     }
 
     public MixConfig copy() {
-        return new MixConfig(scode, mixOnStartup, mixToWalletFile, mixToWalletName, minMixes, receiveIndex, changeIndex);
+        return new MixConfig(scode, mixOnStartup, indexRange, mixToWalletFile, mixToWalletName, minMixes, receiveIndex, changeIndex);
     }
 }
