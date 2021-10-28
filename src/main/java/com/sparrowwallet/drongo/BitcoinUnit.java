@@ -17,7 +17,7 @@ public enum BitcoinUnit {
     BTC("BTC") {
         @Override
         public long getSatsValue(double unitValue) {
-            return (long)(unitValue * Transaction.SATOSHIS_PER_BITCOIN);
+            return Math.round(unitValue * Transaction.SATOSHIS_PER_BITCOIN);
         }
 
         @Override
