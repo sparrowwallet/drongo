@@ -69,18 +69,27 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
 
     public String getFullName() {
         if(isMasterWallet()) {
-            return name;
+            return childWallets.isEmpty() ? name : name + "-" + (label != null && !label.isEmpty() ? label : getAutomaticName());
         }
 
-        return getMasterWallet().getName() + "-" + name;
+        return getMasterWallet().getName() + "-" + getDisplayName(this);
     }
 
     public String getFullDisplayName() {
         if(isMasterWallet()) {
-            return name;
+            return childWallets.isEmpty() ? name : name + " - " + (label != null && !label.isEmpty() ? label : getAutomaticName());
         }
 
-        return getMasterWallet().getName() + " - " + name;
+        return getMasterWallet().getName() + " - " + getDisplayName(this);
+    }
+
+    private String getDisplayName(Wallet wallet) {
+        return wallet.label != null && !wallet.label.isEmpty() ? wallet.label : wallet.name;
+    }
+
+    public String getAutomaticName() {
+        int account = getAccountIndex();
+        return (account < 0 || account > 9) ? getName() : (!isWhirlpoolMasterWallet() || account > 1 ? "Account #" + account : "Deposit");
     }
 
     public String getMasterName() {
