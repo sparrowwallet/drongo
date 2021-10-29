@@ -75,6 +75,14 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
         return getMasterWallet().getName() + "-" + name;
     }
 
+    public String getFullDisplayName() {
+        if(isMasterWallet()) {
+            return name;
+        }
+
+        return getMasterWallet().getName() + " - " + name;
+    }
+
     public String getMasterName() {
         if(isMasterWallet()) {
             return name;
