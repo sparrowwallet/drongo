@@ -5,10 +5,7 @@ import com.sparrowwallet.drongo.protocol.Sha256Hash;
 import com.sparrowwallet.drongo.protocol.Transaction;
 import com.sparrowwallet.drongo.psbt.PSBT;
 
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 /**
  * WalletTransaction contains a draft transaction along with associated metadata. The draft transaction has empty signatures but is otherwise complete.
@@ -18,25 +15,25 @@ public class WalletTransaction {
     private final Wallet wallet;
     private final Transaction transaction;
     private final List<UtxoSelector> utxoSelectors;
-    private final Map<BlockTransactionHashIndex, WalletNode> selectedUtxos;
+    private final List<Map<BlockTransactionHashIndex, WalletNode>> selectedUtxoSets;
     private final List<Payment> payments;
     private final Map<WalletNode, Long> changeMap;
     private final long fee;
     private final Map<Sha256Hash, BlockTransaction> inputTransactions;
 
-    public WalletTransaction(Wallet wallet, Transaction transaction, List<UtxoSelector> utxoSelectors, Map<BlockTransactionHashIndex, WalletNode> selectedUtxos, List<Payment> payments, long fee) {
-        this(wallet, transaction, utxoSelectors, selectedUtxos, payments, Collections.emptyMap(), fee);
+    public WalletTransaction(Wallet wallet, Transaction transaction, List<UtxoSelector> utxoSelectors, List<Map<BlockTransactionHashIndex, WalletNode>> selectedUtxoSets, List<Payment> payments, long fee) {
+        this(wallet, transaction, utxoSelectors, selectedUtxoSets, payments, Collections.emptyMap(), fee);
     }
 
-    public WalletTransaction(Wallet wallet, Transaction transaction, List<UtxoSelector> utxoSelectors, Map<BlockTransactionHashIndex, WalletNode> selectedUtxos, List<Payment> payments, Map<WalletNode, Long> changeMap, long fee) {
-        this(wallet, transaction, utxoSelectors, selectedUtxos, payments, changeMap, fee, Collections.emptyMap());
+    public WalletTransaction(Wallet wallet, Transaction transaction, List<UtxoSelector> utxoSelectors, List<Map<BlockTransactionHashIndex, WalletNode>> selectedUtxoSets, List<Payment> payments, Map<WalletNode, Long> changeMap, long fee) {
+        this(wallet, transaction, utxoSelectors, selectedUtxoSets, payments, changeMap, fee, Collections.emptyMap());
     }
 
-    public WalletTransaction(Wallet wallet, Transaction transaction, List<UtxoSelector> utxoSelectors, Map<BlockTransactionHashIndex, WalletNode> selectedUtxos, List<Payment> payments, Map<WalletNode, Long> changeMap, long fee, Map<Sha256Hash, BlockTransaction> inputTransactions) {
+    public WalletTransaction(Wallet wallet, Transaction transaction, List<UtxoSelector> utxoSelectors, List<Map<BlockTransactionHashIndex, WalletNode>> selectedUtxoSets, List<Payment> payments, Map<WalletNode, Long> changeMap, long fee, Map<Sha256Hash, BlockTransaction> inputTransactions) {
         this.wallet = wallet;
         this.transaction = transaction;
         this.utxoSelectors = utxoSelectors;
-        this.selectedUtxos = selectedUtxos;
+        this.selectedUtxoSets = selectedUtxoSets;
         this.payments = payments;
         this.changeMap = changeMap;
         this.fee = fee;
@@ -60,7 +57,17 @@ public class WalletTransaction {
     }
 
     public Map<BlockTransactionHashIndex, WalletNode> getSelectedUtxos() {
+        if(selectedUtxoSets.size() == 1) {
+            return selectedUtxoSets.get(0);
+        }
+
+        Map<BlockTransactionHashIndex, WalletNode> selectedUtxos = new LinkedHashMap<>();
+        selectedUtxoSets.forEach(selectedUtxos::putAll);
         return selectedUtxos;
+    }
+
+    public List<Map<BlockTransactionHashIndex, WalletNode>> getSelectedUtxoSets() {
+        return selectedUtxoSets;
     }
 
     public List<Payment> getPayments() {
@@ -84,7 +91,7 @@ public class WalletTransaction {
     }
 
     public long getTotal() {
-        return selectedUtxos.keySet().stream().mapToLong(BlockTransactionHashIndex::getValue).sum();
+        return getSelectedUtxos().keySet().stream().mapToLong(BlockTransactionHashIndex::getValue).sum();
     }
 
     public Map<Sha256Hash, BlockTransaction> getInputTransactions() {

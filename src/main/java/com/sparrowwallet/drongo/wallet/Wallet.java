@@ -828,7 +828,7 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
                     //The new fee has meant that one of the change outputs is now dust. We pay too high a fee without change, but change is dust when added.
                     if(numSets > 1 && differenceAmt / transaction.getVirtualSize() < noChangeFeeRate * 2) {
                         //Maximize privacy. Pay a higher fee to keep multiple output sets.
-                        return new WalletTransaction(this, transaction, utxoSelectors, selectedUtxos, txPayments, differenceAmt);
+                        return new WalletTransaction(this, transaction, utxoSelectors, selectedUtxoSets, txPayments, differenceAmt);
                     } else {
                         //Maxmize efficiency. Increase value required from inputs and try again.
                         valueRequiredAmt = totalSelectedAmt + 1;
@@ -836,10 +836,10 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
                     }
                 }
 
-                return new WalletTransaction(this, transaction, utxoSelectors, selectedUtxos, txPayments, changeMap, changeFeeRequiredAmt);
+                return new WalletTransaction(this, transaction, utxoSelectors, selectedUtxoSets, txPayments, changeMap, changeFeeRequiredAmt);
             }
 
-            return new WalletTransaction(this, transaction, utxoSelectors, selectedUtxos, txPayments, differenceAmt);
+            return new WalletTransaction(this, transaction, utxoSelectors, selectedUtxoSets, txPayments, differenceAmt);
         }
     }
 
