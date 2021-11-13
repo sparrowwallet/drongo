@@ -22,10 +22,11 @@ public class OutputDescriptor {
     private static final String INPUT_CHARSET = "0123456789()[],'/*abcdefgh@:$%{}IJKLMNOPQRSTUVWXYZ&+-.;<=>?!^_|~ijklmnopqrstuvwxyzABCDEFGH`#\"\\ ";
     private static final String CHECKSUM_CHARSET = "qpzry9x8gf2tvdw0s3jn54khce6mua7l";
 
-    private static final Pattern XPUB_PATTERN = Pattern.compile("(\\[[^\\]]+\\])?(.pub[^/\\,)]{100,112})(/[/\\d*'hH]+)?");
+    private static final Pattern XPUB_PATTERN = Pattern.compile("(\\[[^\\]]+\\])?(.pub[^/\\,)]{100,112})(/[/\\d*'hH<>;]+)?");
     private static final Pattern PUBKEY_PATTERN = Pattern.compile("(\\[[^\\]]+\\])?(0[23][0-9a-fA-F]{32})");
     private static final Pattern MULTI_PATTERN = Pattern.compile("multi\\(([\\d+])");
     private static final Pattern KEY_ORIGIN_PATTERN = Pattern.compile("\\[([A-Fa-f0-9]{8})([/\\d'hH]+)\\]");
+    private static final Pattern MULTIPATH_PATTERN = Pattern.compile("<([\\d*'hH;]+)>");
     private static final Pattern CHECKSUM_PATTERN = Pattern.compile("#([" + CHECKSUM_CHARSET + "]{8})$");
 
     private final ScriptType scriptType;
@@ -258,12 +259,25 @@ public class OutputDescriptor {
     }
 
     public static OutputDescriptor getOutputDescriptor(Wallet wallet, KeyPurpose keyPurpose, Integer index) {
+        return getOutputDescriptor(wallet, keyPurpose == null ? null : List.of(keyPurpose), index);
+    }
+
+    public static OutputDescriptor getOutputDescriptor(Wallet wallet, List<KeyPurpose> keyPurposes, Integer index) {
         Map<ExtendedKey, KeyDerivation> extendedKeyDerivationMap = new LinkedHashMap<>();
         Map<ExtendedKey, String> extendedKeyChildDerivationMap = new LinkedHashMap<>();
         for(Keystore keystore : wallet.getKeystores()) {
             extendedKeyDerivationMap.put(keystore.getExtendedPublicKey(), keystore.getKeyDerivation());
-            if(keyPurpose != null) {
-                extendedKeyChildDerivationMap.put(keystore.getExtendedPublicKey(), keyPurpose.getPathIndex().num() + "/" + (index == null ? "*" : index));
+            if(keyPurposes != null) {
+                String chain;
+                if(keyPurposes.size() == 1) {
+                    chain = Integer.toString(keyPurposes.get(0).getPathIndex().num());
+                } else {
+                    StringJoiner joiner = new StringJoiner(";");
+                    keyPurposes.forEach(keyPurpose -> joiner.add(Integer.toString(keyPurpose.getPathIndex().num())));
+                    chain = "<" + joiner + ">";
+                }
+
+                extendedKeyChildDerivationMap.put(keystore.getExtendedPublicKey(), chain + "/" + (index == null ? "*" : index));
             }
         }
 
@@ -395,7 +409,7 @@ public class OutputDescriptor {
     private static BigInteger polyMod(BigInteger c, int val)
     {
         byte c0 = c.shiftRight(35).byteValue();
-        c = c.and(new BigInteger("7ffffffff", 16)).shiftLeft(5).or(BigInteger.valueOf(val));
+        c = c.and(new BigInteger("7ffffffff", 16)).shiftLeft(5).xor(BigInteger.valueOf(val));
 
         if((c0 & 1) > 0) {
             c = c.xor(new BigInteger("f5dee51989", 16));
@@ -461,16 +475,31 @@ public class OutputDescriptor {
 
         Utils.LexicographicByteArrayComparator lexicographicByteArrayComparator = new Utils.LexicographicByteArrayComparator();
         sortedKeys.sort((o1, o2) -> {
-            List<ChildNumber> derivation1 = KeyDerivation.parsePath(mapChildrenDerivations.get(o1));
+            List<ChildNumber> derivation1 = getDerivations(mapChildrenDerivations.get(o1)).get(0);
             derivation1.add(0, o1.getKeyChildNumber());
             ECKey key1 = o1.getKey(derivation1);
-            List<ChildNumber> derivation2 = KeyDerivation.parsePath(mapChildrenDerivations.get(o2));
+            List<ChildNumber> derivation2 = getDerivations(mapChildrenDerivations.get(o2)).get(0);
             derivation2.add(0, o2.getKeyChildNumber());
             ECKey key2 = o2.getKey(derivation2);
             return lexicographicByteArrayComparator.compare(key1.getPubKey(), key2.getPubKey());
         });
 
         return sortedKeys;
+    }
+
+    private List<List<ChildNumber>> getDerivations(String childDerivation) {
+        Matcher matcher = MULTIPATH_PATTERN.matcher(childDerivation);
+        if(matcher.find()) {
+            String multipath = matcher.group(1);
+            String[] paths = multipath.split(";");
+            List<List<ChildNumber>> derivations = new ArrayList<>();
+            for(String path : paths) {
+                derivations.add(KeyDerivation.parsePath(childDerivation.replace(matcher.group(), path)));
+            }
+            return derivations;
+        } else {
+            return List.of(KeyDerivation.parsePath(childDerivation));
+        }
     }
 
     private String toString(ExtendedKey pubKey, boolean addKeyOrigin) {
@@ -482,7 +511,7 @@ public class OutputDescriptor {
                 keyBuilder.append(keyDerivation.getMasterFingerprint());
                 keyBuilder.append("/");
             }
-            keyBuilder.append(keyDerivation.getDerivationPath().replaceFirst("^m?/", ""));
+            keyBuilder.append(keyDerivation.getDerivationPath().replaceFirst("^m?/", "").replace('\'', 'h'));
             keyBuilder.append("]");
         }
 

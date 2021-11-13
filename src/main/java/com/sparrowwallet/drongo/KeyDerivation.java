@@ -68,13 +68,17 @@ public class KeyDerivation {
     }
 
     public static String writePath(List<ChildNumber> pathList) {
-        String path = "m";
-        for (ChildNumber child: pathList) {
-            path += "/";
-            path += child.toString();
+        return writePath(pathList, true);
+    }
+
+    public static String writePath(List<ChildNumber> pathList, boolean useApostrophes) {
+        StringBuilder path = new StringBuilder("m");
+        for(ChildNumber child: pathList) {
+            path.append("/");
+            path.append(child.toString(useApostrophes));
         }
 
-        return path;
+        return path.toString();
     }
 
     public static boolean isValid(String derivationPath) {
