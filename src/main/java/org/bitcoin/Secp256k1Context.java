@@ -45,7 +45,7 @@ public class Secp256k1Context {
 
             return true;
         } catch(IOException e) {
-            log.debug("Error loading libsecp256k1 library", e);
+            log.error("Error loading libsecp256k1 library", e);
         }
 
         return false;

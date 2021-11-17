@@ -1134,13 +1134,9 @@ public enum ScriptType {
 
         @Override
         public List<PolicyType> getAllowedPolicyTypes() {
-            return (Network.get() == Network.MAINNET && LocalDate.now().isAfter(TAPROOT_MAINNET_ACTIVATION_DATE) || (System.getProperty(Network.BLOCK_HEIGHT_PROPERTY) != null && Integer.parseInt(System.getProperty(Network.BLOCK_HEIGHT_PROPERTY)) >= 709632))
-                    || Network.get() == Network.TESTNET || Network.get() == Network.REGTEST || Network.get() == Network.SIGNET ? List.of(SINGLE) : Collections.emptyList();
+            return List.of(SINGLE);
         }
     };
-
-    //To avoid relying solely on a network-dependent block height >= 709632 check, use a approximate activation date. This can be removed once Taproot has activated on mainnet.
-    private static final LocalDate TAPROOT_MAINNET_ACTIVATION_DATE = LocalDate.of(2021, Month.NOVEMBER, 17);
 
     private final String name;
     private final String description;
