@@ -257,14 +257,6 @@ public class PSBT {
             if(transaction == null) {
                 throw new PSBTParseException("Missing transaction");
             }
-
-            if(currentState == STATE_INPUTS) {
-                throw new PSBTParseException("Missing inputs");
-            }
-
-            if(currentState == STATE_OUTPUTS) {
-                throw new PSBTParseException("Missing outputs");
-            }
         }
 
         if(log.isDebugEnabled()) {

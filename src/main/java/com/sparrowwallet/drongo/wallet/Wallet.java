@@ -164,6 +164,14 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
         return null;
     }
 
+    public List<Wallet> getAllWallets() {
+        List<Wallet> allWallets = new ArrayList<>();
+        Wallet masterWallet = isMasterWallet() ? this : getMasterWallet();
+        allWallets.add(masterWallet);
+        allWallets.addAll(masterWallet.getChildWallets());
+        return allWallets;
+    }
+
     public StandardAccount getStandardAccountType() {
         int accountIndex = getAccountIndex();
         return Arrays.stream(StandardAccount.values()).filter(standardAccount -> standardAccount.getChildNumber().num() == accountIndex).findFirst().orElse(null);
