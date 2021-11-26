@@ -509,6 +509,13 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
         }
     }
 
+    public Map<WalletNode, Set<BlockTransactionHashIndex>> getWalletNodes() {
+        Map<WalletNode, Set<BlockTransactionHashIndex>> walletNodes = new LinkedHashMap<>();
+        getNode(KeyPurpose.RECEIVE).getChildren().forEach(childNode -> walletNodes.put(childNode, childNode.getTransactionOutputs()));
+        getNode(KeyPurpose.CHANGE).getChildren().forEach(childNode -> walletNodes.put(childNode, childNode.getTransactionOutputs()));
+        return walletNodes;
+    }
+
     public boolean isWalletAddress(Address address) {
         return getWalletAddresses().containsKey(address);
     }
