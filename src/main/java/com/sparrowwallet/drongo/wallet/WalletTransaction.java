@@ -110,6 +110,10 @@ public class WalletTransaction {
         return !utxoSelectors.isEmpty() && utxoSelectors.get(0) instanceof PresetUtxoSelector;
     }
 
+    public boolean isTwoPersonCoinjoin() {
+        return !utxoSelectors.isEmpty() && utxoSelectors.get(0) instanceof StonewallUtxoSelector;
+    }
+
     public boolean isConsolidationSend(Payment payment) {
         return isWalletSend(getWallet(), payment);
     }
