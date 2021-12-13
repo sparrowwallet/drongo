@@ -733,7 +733,7 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
 
         while(true) {
             List<Map<BlockTransactionHashIndex, WalletNode>> selectedUtxoSets = selectInputSets(utxoSelectors, utxoFilters, valueRequiredAmt, feeRate, longTermFeeRate, groupByAddress, includeMempoolOutputs, includeSpentMempoolOutputs, sendMax);
-            Map<BlockTransactionHashIndex, WalletNode> selectedUtxos = new HashMap<>();
+            Map<BlockTransactionHashIndex, WalletNode> selectedUtxos = new LinkedHashMap<>();
             selectedUtxoSets.forEach(selectedUtxos::putAll);
             long totalSelectedAmt = selectedUtxos.keySet().stream().mapToLong(BlockTransactionHashIndex::getValue).sum();
             int numSets = selectedUtxoSets.size();
