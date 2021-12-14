@@ -132,6 +132,10 @@ public class OutputDescriptor {
         return extendedPublicKeys.size() > 1;
     }
 
+    public boolean isCosigner() {
+        return !isMultisig() && scriptType.isAllowed(PolicyType.MULTI);
+    }
+
     public ExtendedKey getSingletonExtendedPublicKey() {
         if(isMultisig()) {
             throw new IllegalStateException("Output descriptor contains multiple public keys but singleton requested");
@@ -233,7 +237,7 @@ public class OutputDescriptor {
 
     public Wallet toWallet() {
         Wallet wallet = new Wallet();
-        wallet.setPolicyType(isMultisig() ? PolicyType.MULTI : PolicyType.SINGLE);
+        wallet.setPolicyType(isMultisig() || isCosigner() ? PolicyType.MULTI : PolicyType.SINGLE);
         wallet.setScriptType(scriptType);
 
         for(Map.Entry<ExtendedKey,KeyDerivation> extKeyEntry : extendedPublicKeys.entrySet()) {
@@ -469,7 +473,7 @@ public class OutputDescriptor {
 
     private List<ExtendedKey> sortExtendedPubKeys(Collection<ExtendedKey> keys) {
         List<ExtendedKey> sortedKeys = new ArrayList<>(keys);
-        if(mapChildrenDerivations == null || mapChildrenDerivations.isEmpty()) {
+        if(mapChildrenDerivations == null || mapChildrenDerivations.isEmpty() || mapChildrenDerivations.containsKey(null)) {
             return sortedKeys;
         }
 
