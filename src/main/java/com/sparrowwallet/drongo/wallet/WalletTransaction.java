@@ -91,7 +91,11 @@ public class WalletTransaction {
     }
 
     public long getTotal() {
-        return getSelectedUtxos().keySet().stream().mapToLong(BlockTransactionHashIndex::getValue).sum();
+        return inputAmountsValid() ? getSelectedUtxos().keySet().stream().mapToLong(BlockTransactionHashIndex::getValue).sum() : 0;
+    }
+
+    private boolean inputAmountsValid() {
+        return getSelectedUtxos().keySet().stream().allMatch(ref -> ref.getValue() > 0);
     }
 
     public Map<Sha256Hash, BlockTransaction> getInputTransactions() {
@@ -103,7 +107,7 @@ public class WalletTransaction {
      * @return the fee percentage
      */
     public double getFeePercentage() {
-        return getFee() == 0 ? 0 : (double)getFee() / (getTotal() - getFee());
+        return getFee() <= 0 || getTotal() <= 0 ? 0 : (double)getFee() / (getTotal() - getFee());
     }
 
     public boolean isCoinControlUsed() {
