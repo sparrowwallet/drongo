@@ -1,7 +1,7 @@
 package com.sparrowwallet.drongo.wallet;
 
 public enum WalletModel {
-    SEED, SPARROW, BITCOIN_CORE, ELECTRUM, TREZOR_1, TREZOR_T, COLDCARD, LEDGER_NANO_S, LEDGER_NANO_X, DIGITALBITBOX_01, KEEPKEY, SPECTER_DESKTOP, COBO_VAULT, BITBOX_02, SPECTER_DIY, PASSPORT, BLUE_WALLET, KEYSTONE, SEEDSIGNER, CARAVAN;
+    SEED, SPARROW, BITCOIN_CORE, ELECTRUM, TREZOR_1, TREZOR_T, COLDCARD, LEDGER_NANO_S, LEDGER_NANO_X, DIGITALBITBOX_01, KEEPKEY, SPECTER_DESKTOP, COBO_VAULT, BITBOX_02, SPECTER_DIY, PASSPORT, BLUE_WALLET, KEYSTONE, SEEDSIGNER, CARAVAN, SEED_TOOL;
 
     public static WalletModel getModel(String model) {
         return valueOf(model.toUpperCase());
@@ -40,11 +40,15 @@ public enum WalletModel {
             return "bluewallet";
         }
 
+        if(this == SEED_TOOL) {
+            return "seedtool";
+        }
+
         return this.toString().toLowerCase();
     }
 
     public boolean alwaysIncludeNonWitnessUtxo() {
-        if(this == COLDCARD || this == COBO_VAULT || this == PASSPORT || this == KEYSTONE) {
+        if(this == COLDCARD || this == COBO_VAULT || this == PASSPORT || this == KEYSTONE || this == SEED_TOOL) {
             return false;
         }
 
