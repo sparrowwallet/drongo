@@ -48,7 +48,7 @@ dependencies {
         exclude group: 'org.hamcrest', module: 'hamcrest-core'
         exclude group: 'junit', module: 'junit'
     }
-    implementation ('ch.qos.logback:logback-classic:1.2.3') {
+    implementation ('ch.qos.logback:logback-classic:1.2.8') {
         exclude group: 'org.hamcrest', module: 'hamcrest-core'
         exclude group: 'org.slf4j'
     }
@@ -90,12 +90,12 @@ shadowJar {
 }
 
 extraJavaModuleInfo {
-    module('logback-core-1.2.3.jar', 'logback.core', '1.2.3') {
+    module('logback-core-1.2.8.jar', 'logback.core', '1.2.8') {
         exports('ch.qos.logback.core')
         exports('ch.qos.logback.core.spi')
         requires('java.xml')
     }
-    module('logback-classic-1.2.3.jar', 'logback.classic', '1.2.3') {
+    module('logback-classic-1.2.8.jar', 'logback.classic', '1.2.8') {
         exports('ch.qos.logback.classic')
         exports('ch.qos.logback.classic.spi')
         requires('org.slf4j')
