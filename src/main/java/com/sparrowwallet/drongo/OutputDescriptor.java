@@ -254,6 +254,27 @@ public class OutputDescriptor {
         return wallet;
     }
 
+    public Wallet toKeystoreWallet(String masterFingerprint) {
+        Wallet wallet = new Wallet();
+        if(isMultisig()) {
+            throw new IllegalStateException("Multisig output descriptors are unsupported.");
+        }
+
+        ExtendedKey extendedKey = getSingletonExtendedPublicKey();
+        if(masterFingerprint == null) {
+            masterFingerprint = getKeyDerivation(extendedKey).getMasterFingerprint();
+        }
+
+        wallet.setScriptType(getScriptType());
+        Keystore keystore = new Keystore();
+        keystore.setKeyDerivation(new KeyDerivation(masterFingerprint, KeyDerivation.writePath(getKeyDerivation(extendedKey).getDerivation())));
+        keystore.setExtendedPublicKey(extendedKey);
+        wallet.getKeystores().add(keystore);
+        wallet.setDefaultPolicy(Policy.getPolicy(isCosigner() ? PolicyType.MULTI : PolicyType.SINGLE, wallet.getScriptType(), wallet.getKeystores(), 1));
+
+        return wallet;
+    }
+
     public static OutputDescriptor getOutputDescriptor(Wallet wallet) {
         return getOutputDescriptor(wallet, null);
     }

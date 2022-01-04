@@ -38,6 +38,10 @@ public enum Network {
         return name;
     }
 
+    public String toDisplayString() {
+        return name.substring(0, 1).toUpperCase() + name.substring(1);
+    }
+
     public int getP2PKHAddressHeader() {
         return p2pkhAddressHeader;
     }
