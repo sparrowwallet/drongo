@@ -26,8 +26,8 @@ if(os.macOsX) {
     osName = "osx"
 }
 
-sourceCompatibility = 11
-targetCompatibility = 11
+sourceCompatibility = 16
+targetCompatibility = 16
 
 repositories {
     mavenCentral()

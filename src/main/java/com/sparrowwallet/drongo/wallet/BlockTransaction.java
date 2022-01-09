@@ -1,12 +1,12 @@
 package com.sparrowwallet.drongo.wallet;
 
+import com.sparrowwallet.drongo.protocol.HashIndex;
 import com.sparrowwallet.drongo.protocol.Sha256Hash;
 import com.sparrowwallet.drongo.protocol.Transaction;
 
 import java.util.Collections;
 import java.util.Date;
 import java.util.List;
-import java.util.Objects;
 import java.util.stream.Collectors;
 
 public class BlockTransaction extends BlockTransactionHash implements Comparable<BlockTransaction> {
@@ -67,7 +67,7 @@ public class BlockTransaction extends BlockTransactionHash implements Comparable
         }
 
         return blockchainTransaction.getTransaction().getInputs().stream()
-                .map(txInput -> new HashIndex(txInput.getOutpoint().getHash(), (int)txInput.getOutpoint().getIndex()))
+                .map(txInput -> new HashIndex(txInput.getOutpoint().getHash(), txInput.getOutpoint().getIndex()))
                 .collect(Collectors.toList());
     }
 
@@ -79,29 +79,5 @@ public class BlockTransaction extends BlockTransactionHash implements Comparable
         return blockchainTransaction.getTransaction().getOutputs().stream()
                 .map(txOutput -> new HashIndex(blockchainTransaction.getHash(), txOutput.getIndex()))
                 .collect(Collectors.toList());
-    }
-
-    private static class HashIndex {
-        public Sha256Hash hash;
-        public int index;
-
-        public HashIndex(Sha256Hash hash, int index) {
-            this.hash = hash;
-            this.index = index;
-        }
-
-        @Override
-        public boolean equals(Object o) {
-            if (this == o) return true;
-            if (o == null || getClass() != o.getClass()) return false;
-            HashIndex hashIndex = (HashIndex) o;
-            return index == hashIndex.index &&
-                    hash.equals(hashIndex.hash);
-        }
-
-        @Override
-        public int hashCode() {
-            return Objects.hash(hash, index);
-        }
     }
 }
