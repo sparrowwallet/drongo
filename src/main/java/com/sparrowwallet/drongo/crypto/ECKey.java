@@ -327,6 +327,17 @@ public class ECKey {
     }
 
     /**
+     * Exports the private key in the form used by Bitcoin Core's "dumpprivkey" and "importprivkey" commands. Use
+     * the {@link DumpedPrivateKey#toString()} method to get the string.
+     *
+     * @return Private key bytes as a {@link DumpedPrivateKey}.
+     * @throws IllegalStateException if the private key is not available.
+     */
+    public DumpedPrivateKey getPrivateKeyEncoded() {
+        return new DumpedPrivateKey(getPrivKeyBytes(), isCompressed());
+    }
+
+    /**
      * Returns whether this key is using the compressed form or not. Compressed pubkeys are only 33 bytes, not 64.
      */
     public boolean isCompressed() {
