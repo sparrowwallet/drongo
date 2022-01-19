@@ -41,6 +41,7 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
     private final Map<Sha256Hash, UtxoMixData> utxoMixes = new HashMap<>();
     private Integer storedBlockHeight;
     private Integer gapLimit;
+    private Integer watchLast;
     private Date birthDate;
 
     public Wallet() {
@@ -337,6 +338,14 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
 
     public void setGapLimit(int gapLimit) {
         this.gapLimit = gapLimit;
+    }
+
+    public Integer getWatchLast() {
+        return watchLast;
+    }
+
+    public void setWatchLast(Integer watchLast) {
+        this.watchLast = watchLast;
     }
 
     public Date getBirthDate() {
@@ -1463,6 +1472,7 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
         }
         copy.setStoredBlockHeight(getStoredBlockHeight());
         copy.gapLimit = gapLimit;
+        copy.watchLast = watchLast;
         copy.birthDate = birthDate;
 
         return copy;

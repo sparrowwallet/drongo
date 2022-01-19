@@ -94,6 +94,10 @@ public class WalletNode extends Persistable implements Comparable<WalletNode> {
         this.children = children;
     }
 
+    public boolean isUsed() {
+        return !transactionOutputs.isEmpty();
+    }
+
     public Set<BlockTransactionHashIndex> getTransactionOutputs() {
         return transactionOutputs;
     }
