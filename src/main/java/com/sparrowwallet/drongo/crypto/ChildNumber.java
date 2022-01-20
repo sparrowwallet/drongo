@@ -50,7 +50,7 @@ public class ChildNumber {
     }
 
     public String toString(boolean useApostrophes) {
-        return String.format(Locale.US, "%d%s", num(), isHardened() ? (useApostrophes ? "'" : "h") : "");
+        return num() + (isHardened() ? (useApostrophes ? "'" : "h") : "");
     }
 
     public boolean equals(Object o) {

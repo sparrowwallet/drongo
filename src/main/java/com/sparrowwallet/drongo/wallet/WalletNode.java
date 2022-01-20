@@ -175,7 +175,7 @@ public class WalletNode extends Persistable implements Comparable<WalletNode> {
 
     @Override
     public int hashCode() {
-        return Objects.hash(derivationPath);
+        return derivationPath.hashCode();
     }
 
     @Override

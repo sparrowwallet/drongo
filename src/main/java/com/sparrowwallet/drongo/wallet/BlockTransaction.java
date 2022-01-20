@@ -1,17 +1,18 @@
 package com.sparrowwallet.drongo.wallet;
 
-import com.sparrowwallet.drongo.protocol.HashIndex;
-import com.sparrowwallet.drongo.protocol.Sha256Hash;
-import com.sparrowwallet.drongo.protocol.Transaction;
+import com.sparrowwallet.drongo.protocol.*;
 
 import java.util.Collections;
 import java.util.Date;
-import java.util.List;
-import java.util.stream.Collectors;
+import java.util.HashSet;
+import java.util.Set;
 
 public class BlockTransaction extends BlockTransactionHash implements Comparable<BlockTransaction> {
     private final Transaction transaction;
     private final Sha256Hash blockHash;
+
+    private final Set<HashIndex> spending = new HashSet<>();
+    private final Set<HashIndex> funding = new HashSet<>();
 
     public BlockTransaction(Sha256Hash hash, int height, Date date, Long fee, Transaction transaction) {
         this(hash, height, date, fee, transaction, null);
@@ -25,6 +26,15 @@ public class BlockTransaction extends BlockTransactionHash implements Comparable
         super(hash, height, date, fee, label);
         this.transaction = transaction;
         this.blockHash = blockHash;
+
+        if(transaction != null) {
+            for(TransactionInput txInput : transaction.getInputs()) {
+                spending.add(new HashIndex(txInput.getOutpoint().getHash(), txInput.getOutpoint().getIndex()));
+            }
+            for(TransactionOutput txOutput : transaction.getOutputs()) {
+                funding.add(new HashIndex(hash, txOutput.getIndex()));
+            }
+        }
     }
 
     public Transaction getTransaction() {
@@ -33,6 +43,14 @@ public class BlockTransaction extends BlockTransactionHash implements Comparable
 
     public Sha256Hash getBlockHash() {
         return blockHash;
+    }
+
+    public Set<HashIndex> getSpending() {
+        return Collections.unmodifiableSet(spending);
+    }
+
+    public Set<HashIndex> getFunding() {
+        return Collections.unmodifiableSet(funding);
     }
 
     @Override
@@ -50,34 +68,14 @@ public class BlockTransaction extends BlockTransactionHash implements Comparable
             return getComparisonHeight() - blkTx.getComparisonHeight();
         }
 
-        if(getReferencedOutpoints(this).removeAll(getOutputs(blkTx))) {
+        if(!Collections.disjoint(spending, blkTx.funding)) {
             return 1;
         }
 
-        if(getReferencedOutpoints(blkTx).removeAll(getOutputs(this))) {
+        if(!Collections.disjoint(blkTx.spending, funding)) {
             return -1;
         }
 
         return 0;
-    }
-
-    private static List<HashIndex> getReferencedOutpoints(BlockTransaction blockchainTransaction) {
-        if(blockchainTransaction.getTransaction() == null) {
-            return Collections.emptyList();
-        }
-
-        return blockchainTransaction.getTransaction().getInputs().stream()
-                .map(txInput -> new HashIndex(txInput.getOutpoint().getHash(), txInput.getOutpoint().getIndex()))
-                .collect(Collectors.toList());
-    }
-
-    private static List<HashIndex> getOutputs(BlockTransaction blockchainTransaction) {
-        if(blockchainTransaction.getTransaction() == null) {
-            return Collections.emptyList();
-        }
-
-        return blockchainTransaction.getTransaction().getOutputs().stream()
-                .map(txOutput -> new HashIndex(blockchainTransaction.getHash(), txOutput.getIndex()))
-                .collect(Collectors.toList());
     }
 }
