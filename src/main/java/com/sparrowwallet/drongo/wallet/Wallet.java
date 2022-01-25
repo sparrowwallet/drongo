@@ -1534,11 +1534,31 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
 
     @Override
     public int compareTo(Wallet other) {
-        if(getStandardAccountType() != null && other.getStandardAccountType() != null) {
-            return getStandardAccountType().ordinal() - other.getStandardAccountType().ordinal();
+        if(isMasterWallet() && !other.isMasterWallet()) {
+            return -1;
         }
 
-        return getAccountIndex() - other.getAccountIndex();
+        if(!isMasterWallet() && other.isMasterWallet()) {
+            return 1;
+        }
+
+        if(getStandardAccountType() != null && other.getStandardAccountType() != null) {
+            int standardAccountDiff = getStandardAccountType().ordinal() - other.getStandardAccountType().ordinal();
+            if(standardAccountDiff != 0) {
+                return standardAccountDiff;
+            }
+        }
+
+        int accountIndexDiff = getAccountIndex() - other.getAccountIndex();
+        if(accountIndexDiff != 0) {
+            return accountIndexDiff;
+        }
+
+        if(name != null && other.name != null) {
+            return name.compareTo(other.name);
+        }
+
+        return 0;
     }
 
     @Override
