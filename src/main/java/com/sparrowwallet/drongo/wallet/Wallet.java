@@ -73,7 +73,7 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
             return childWallets.isEmpty() ? name : name + "-" + (label != null && !label.isEmpty() ? label : getAutomaticName());
         }
 
-        return getMasterWallet().getName() + "-" + getDisplayName(this);
+        return getMasterWallet().getName() + "-" + getDisplayName();
     }
 
     public String getFullDisplayName() {
@@ -81,11 +81,11 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
             return childWallets.isEmpty() ? name : name + " - " + (label != null && !label.isEmpty() ? label : getAutomaticName());
         }
 
-        return getMasterWallet().getName() + " - " + getDisplayName(this);
+        return getMasterWallet().getName() + " - " + getDisplayName();
     }
 
-    private String getDisplayName(Wallet wallet) {
-        return wallet.label != null && !wallet.label.isEmpty() ? wallet.label : wallet.name;
+    public String getDisplayName() {
+        return label != null && !label.isEmpty() ? label : (isMasterWallet() ? getAutomaticName() : name);
     }
 
     public String getAutomaticName() {
