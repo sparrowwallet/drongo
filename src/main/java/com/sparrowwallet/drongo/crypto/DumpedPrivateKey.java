@@ -63,7 +63,7 @@ public class DumpedPrivateKey extends VersionedChecksummedBytes {
      * Returns an ECKey created from this encoded private key.
      */
     public ECKey getKey() {
-        return ECKey.fromPrivate(bytes);
+        return ECKey.fromPrivate(bytes, compressed);
     }
 
     @Override
