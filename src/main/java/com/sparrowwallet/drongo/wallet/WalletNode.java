@@ -106,10 +106,26 @@ public class WalletNode extends Persistable implements Comparable<WalletNode> {
         this.transactionOutputs = transactionOutputs;
     }
 
-    public synchronized void updateTransactionOutputs(Set<BlockTransactionHashIndex> updatedOutputs) {
+    public synchronized void updateTransactionOutputs(Wallet wallet, Set<BlockTransactionHashIndex> updatedOutputs) {
         for(BlockTransactionHashIndex txo : updatedOutputs) {
-            Optional<String> optionalLabel = transactionOutputs.stream().filter(oldTxo -> oldTxo.getHash().equals(txo.getHash()) && oldTxo.getIndex() == txo.getIndex()).map(BlockTransactionHash::getLabel).filter(Objects::nonNull).findFirst();
-            optionalLabel.ifPresent(txo::setLabel);
+            if(!transactionOutputs.isEmpty()) {
+                Optional<String> optionalLabel = transactionOutputs.stream().filter(oldTxo -> oldTxo.getHash().equals(txo.getHash()) && oldTxo.getIndex() == txo.getIndex()).map(BlockTransactionHash::getLabel).filter(Objects::nonNull).findFirst();
+                optionalLabel.ifPresent(txo::setLabel);
+            }
+
+            if(!wallet.getDetachedLabels().isEmpty()) {
+                String label = wallet.getDetachedLabels().remove(txo.getHash().toString() + "<" + txo.getIndex());
+                if(label != null && (txo.getLabel() == null || txo.getLabel().isEmpty())) {
+                    txo.setLabel(label);
+                }
+
+                if(txo.isSpent()) {
+                    String spentByLabel = wallet.getDetachedLabels().remove(txo.getSpentBy().getHash() + ">" + txo.getSpentBy().getIndex());
+                    if(spentByLabel != null && (txo.getSpentBy().getLabel() == null || txo.getSpentBy().getLabel().isEmpty())) {
+                        txo.getSpentBy().setLabel(spentByLabel);
+                    }
+                }
+            }
         }
 
         transactionOutputs.clear();
@@ -132,6 +148,20 @@ public class WalletNode extends Persistable implements Comparable<WalletNode> {
         }
 
         return value;
+    }
+
+    public Set<WalletNode> fillToIndex(Wallet wallet, int index) {
+        Set<WalletNode> newNodes = fillToIndex(index);
+        if(!wallet.getDetachedLabels().isEmpty()) {
+            for(WalletNode newNode : newNodes) {
+                String label = wallet.getDetachedLabels().remove(wallet.getAddress(newNode).toString());
+                if(label != null && (newNode.getLabel() == null || newNode.getLabel().isEmpty())) {
+                    newNode.setLabel(label);
+                }
+            }
+        }
+
+        return newNodes;
     }
 
     public synchronized Set<WalletNode> fillToIndex(int index) {

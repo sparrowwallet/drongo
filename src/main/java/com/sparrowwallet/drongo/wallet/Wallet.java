@@ -37,6 +37,7 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
     private List<Keystore> keystores = new ArrayList<>();
     private final TreeSet<WalletNode> purposeNodes = new TreeSet<>();
     private final Map<Sha256Hash, BlockTransaction> transactions = new HashMap<>();
+    private final Map<String, String> detachedLabels = new HashMap<>();
     private MixConfig mixConfig;
     private final Map<Sha256Hash, UtxoMixData> utxoMixes = new HashMap<>();
     private Integer storedBlockHeight;
@@ -116,6 +117,7 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
         childWallet.setName(standardAccount.getName());
         childWallet.purposeNodes.clear();
         childWallet.transactions.clear();
+        childWallet.detachedLabels.clear();
         childWallet.storedBlockHeight = null;
         childWallet.gapLimit = standardAccount.getMinimumGapLimit();
         childWallet.birthDate = null;
@@ -273,8 +275,17 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
 
     public synchronized void updateTransactions(Map<Sha256Hash, BlockTransaction> updatedTransactions) {
         for(BlockTransaction blockTx : updatedTransactions.values()) {
-            Optional<String> optionalLabel = transactions.values().stream().filter(oldBlTx -> oldBlTx.getHash().equals(blockTx.getHash())).map(BlockTransaction::getLabel).filter(Objects::nonNull).findFirst();
-            optionalLabel.ifPresent(blockTx::setLabel);
+            if(!transactions.isEmpty()) {
+                Optional<String> optionalLabel = transactions.values().stream().filter(oldBlTx -> oldBlTx.getHash().equals(blockTx.getHash())).map(BlockTransaction::getLabel).filter(Objects::nonNull).findFirst();
+                optionalLabel.ifPresent(blockTx::setLabel);
+            }
+
+            if(!detachedLabels.isEmpty()) {
+                String label = detachedLabels.remove(blockTx.getHashAsString());
+                if(label != null && (blockTx.getLabel() == null || blockTx.getLabel().isEmpty())) {
+                    blockTx.setLabel(label);
+                }
+            }
         }
 
         transactions.putAll(updatedTransactions);
@@ -282,6 +293,10 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
         if(!transactions.isEmpty()) {
             birthDate = transactions.values().stream().map(BlockTransactionHash::getDate).filter(Objects::nonNull).min(Date::compareTo).orElse(birthDate);
         }
+    }
+
+    public Map<String, String> getDetachedLabels() {
+        return detachedLabels;
     }
 
     public MixConfig getMixConfig() {
@@ -394,7 +409,7 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
             purposeNode = optionalPurposeNode.get();
         }
 
-        purposeNode.fillToIndex(getLookAheadIndex(purposeNode));
+        purposeNode.fillToIndex(this, getLookAheadIndex(purposeNode));
         return purposeNode;
     }
 
@@ -426,7 +441,7 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
         }
 
         if(index >= node.getChildren().size()) {
-            node.fillToIndex(index);
+            node.fillToIndex(this, index);
         }
 
         for(WalletNode childNode : node.getChildren()) {
@@ -1311,19 +1326,50 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
         return BitcoinUnit.SATOSHIS;
     }
 
-    public void clearNodes() {
+    public void clearNodes(Wallet previousWallet) {
+        detachedLabels.putAll(previousWallet.getDetachedLabels(true));
         purposeNodes.clear();
         transactions.clear();
         storedBlockHeight = 0;
     }
 
     public void clearHistory() {
+        detachedLabels.putAll(getDetachedLabels(false));
         for(WalletNode purposeNode : purposeNodes) {
             purposeNode.clearHistory();
         }
 
         transactions.clear();
         storedBlockHeight = 0;
+    }
+
+    private Map<String, String> getDetachedLabels(boolean includeAddresses) {
+        Map<String, String> labels = new HashMap<>();
+        for(BlockTransaction blockTransaction : transactions.values()) {
+            if(blockTransaction.getLabel() != null && !blockTransaction.getLabel().isEmpty()) {
+                labels.put(blockTransaction.getHashAsString(), blockTransaction.getLabel());
+            }
+        }
+
+        for(WalletNode purposeNode : purposeNodes) {
+            for(WalletNode addressNode : purposeNode.getChildren()) {
+                if(includeAddresses && addressNode.getLabel() != null && !addressNode.getLabel().isEmpty()) {
+                    labels.put(getAddress(addressNode).toString(), addressNode.getLabel());
+                }
+
+                for(BlockTransactionHashIndex output : addressNode.getTransactionOutputs()) {
+                    if(output.getLabel() != null && !output.getLabel().isEmpty()) {
+                        labels.put(output.getHash().toString() + "<" + output.getIndex(), output.getLabel());
+                    }
+
+                    if(output.isSpent() && output.getSpentBy().getLabel() != null && !output.getSpentBy().getLabel().isEmpty()) {
+                        labels.put(output.getSpentBy().getHash() + ">" + output.getSpentBy().getIndex(), output.getSpentBy().getLabel());
+                    }
+                }
+            }
+        }
+
+        return labels;
     }
 
     public boolean isValid() {
@@ -1465,6 +1511,9 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
         }
         for(Sha256Hash hash : transactions.keySet()) {
             copy.transactions.put(hash, transactions.get(hash));
+        }
+        for(String entry : detachedLabels.keySet()) {
+            copy.detachedLabels.put(entry, detachedLabels.get(entry));
         }
         copy.setMixConfig(mixConfig == null ? null : mixConfig.copy());
         for(Sha256Hash hash : utxoMixes.keySet()) {
