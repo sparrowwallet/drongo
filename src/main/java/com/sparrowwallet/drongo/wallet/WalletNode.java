@@ -152,7 +152,7 @@ public class WalletNode extends Persistable implements Comparable<WalletNode> {
 
     public Set<WalletNode> fillToIndex(Wallet wallet, int index) {
         Set<WalletNode> newNodes = fillToIndex(index);
-        if(!wallet.getDetachedLabels().isEmpty()) {
+        if(!wallet.getDetachedLabels().isEmpty() && wallet.isValid()) {
             for(WalletNode newNode : newNodes) {
                 String label = wallet.getDetachedLabels().remove(wallet.getAddress(newNode).toString());
                 if(label != null && (newNode.getLabel() == null || newNode.getLabel().isEmpty())) {
