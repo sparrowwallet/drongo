@@ -248,43 +248,6 @@ public class WalletNode extends Persistable implements Comparable<WalletNode> {
         return copy;
     }
 
-    public boolean copyLabels(WalletNode pastNode) {
-        if(pastNode == null) {
-            return false;
-        }
-
-        boolean changed = false;
-
-        if(label == null && pastNode.label != null) {
-            label = pastNode.label;
-            changed = true;
-        }
-
-        for(BlockTransactionHashIndex txo : getTransactionOutputs()) {
-            Optional<BlockTransactionHashIndex> optPastTxo = pastNode.getTransactionOutputs().stream().filter(pastTxo -> pastTxo.equals(txo)).findFirst();
-            if(optPastTxo.isPresent()) {
-                BlockTransactionHashIndex pastTxo = optPastTxo.get();
-                if(txo.getLabel() == null && pastTxo.getLabel() != null) {
-                    txo.setLabel(pastTxo.getLabel());
-                    changed = true;
-                }
-                if(txo.isSpent() && pastTxo.isSpent() && txo.getSpentBy().getLabel() == null && pastTxo.getSpentBy().getLabel() != null) {
-                    txo.getSpentBy().setLabel(pastTxo.getSpentBy().getLabel());
-                    changed = true;
-                }
-            }
-        }
-
-        for(WalletNode childNode : getChildren()) {
-            Optional<WalletNode> optPastChildNode = pastNode.getChildren().stream().filter(node -> node.equals(childNode)).findFirst();
-            if(optPastChildNode.isPresent()) {
-                changed |= childNode.copyLabels(optPastChildNode.get());
-            }
-        }
-
-        return changed;
-    }
-
     public static String nodeRangesToString(Set<WalletNode> nodes) {
         return nodeRangesToString(nodes.stream().map(WalletNode::getDerivationPath).collect(Collectors.toList()));
     }
