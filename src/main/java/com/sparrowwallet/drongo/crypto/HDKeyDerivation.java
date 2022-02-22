@@ -38,6 +38,10 @@ public class HDKeyDerivation {
         return new DeterministicKey(childNumberPath, chainCode, priv, null);
     }
 
+    public static DeterministicKey createMasterPubKeyFromBytes(byte[] pubKeyBytes, byte[] chainCode) {
+        return new DeterministicKey(List.of(), chainCode, new LazyECPoint(ECKey.CURVE.getCurve(), pubKeyBytes), null, null);
+    }
+
     public static DeterministicKey deriveChildKey(DeterministicKey parent, ChildNumber childNumber) throws HDDerivationException {
         if(parent.isPubKeyOnly()) {
             RawKeyBytes rawKey = deriveChildKeyBytesFromPublic(parent, childNumber);

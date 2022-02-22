@@ -500,16 +500,22 @@ public class OutputDescriptor {
 
         Utils.LexicographicByteArrayComparator lexicographicByteArrayComparator = new Utils.LexicographicByteArrayComparator();
         sortedKeys.sort((o1, o2) -> {
-            List<ChildNumber> derivation1 = getDerivations(mapChildrenDerivations.get(o1)).get(0);
-            derivation1.add(0, o1.getKeyChildNumber());
-            ECKey key1 = o1.getKey(derivation1);
-            List<ChildNumber> derivation2 = getDerivations(mapChildrenDerivations.get(o2)).get(0);
-            derivation2.add(0, o2.getKeyChildNumber());
-            ECKey key2 = o2.getKey(derivation2);
+            ECKey key1 = getChildKeyForExtendedPubKey(o1);
+            ECKey key2 = getChildKeyForExtendedPubKey(o2);
             return lexicographicByteArrayComparator.compare(key1.getPubKey(), key2.getPubKey());
         });
 
         return sortedKeys;
+    }
+
+    private ECKey getChildKeyForExtendedPubKey(ExtendedKey extendedKey) {
+        if(mapChildrenDerivations.get(extendedKey) == null) {
+            return extendedKey.getKey();
+        }
+
+        List<ChildNumber> derivation = getDerivations(mapChildrenDerivations.get(extendedKey)).get(0);
+        derivation.add(0, extendedKey.getKeyChildNumber());
+        return extendedKey.getKey(derivation);
     }
 
     private List<List<ChildNumber>> getDerivations(String childDerivation) {

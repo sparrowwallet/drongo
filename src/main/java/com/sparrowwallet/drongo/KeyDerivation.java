@@ -11,6 +11,10 @@ public class KeyDerivation {
     private final String derivationPath;
     private transient List<ChildNumber> derivation;
 
+    public KeyDerivation(String masterFingerprint, List<ChildNumber> derivation) {
+        this(masterFingerprint, writePath(derivation));
+    }
+
     public KeyDerivation(String masterFingerprint, String derivationPath) {
         this.masterFingerprint = masterFingerprint == null ? null : masterFingerprint.toLowerCase();
         this.derivationPath = derivationPath;
@@ -89,6 +93,10 @@ public class KeyDerivation {
         }
 
         return true;
+    }
+
+    public static List<ChildNumber> getBip47Derivation(int account) {
+        return List.of(new ChildNumber(47, true), new ChildNumber(Network.get() == Network.MAINNET ? 0 : 1, true), new ChildNumber(account, true));
     }
 
     public KeyDerivation copy() {

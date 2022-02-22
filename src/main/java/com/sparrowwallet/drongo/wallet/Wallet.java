@@ -1,11 +1,10 @@
 package com.sparrowwallet.drongo.wallet;
 
-import com.sparrowwallet.drongo.BitcoinUnit;
-import com.sparrowwallet.drongo.KeyDerivation;
-import com.sparrowwallet.drongo.KeyPurpose;
-import com.sparrowwallet.drongo.Network;
+import com.sparrowwallet.drongo.*;
 import com.sparrowwallet.drongo.address.Address;
+import com.sparrowwallet.drongo.bip47.PaymentCode;
 import com.sparrowwallet.drongo.crypto.ChildNumber;
+import com.sparrowwallet.drongo.crypto.DeterministicKey;
 import com.sparrowwallet.drongo.crypto.ECKey;
 import com.sparrowwallet.drongo.crypto.Key;
 import com.sparrowwallet.drongo.policy.Policy;
@@ -109,7 +108,7 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
             throw new IllegalStateException("Cannot add child wallet to existing child wallet");
         }
 
-        if(childWallet.containsPrivateKeys() && childWallet.isEncrypted()) {
+        if(childWallet.containsMasterPrivateKeys() && childWallet.isEncrypted()) {
             throw new IllegalStateException("Cannot derive child wallet xpub from encrypted wallet");
         }
 
@@ -136,7 +135,7 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
                 childDerivation.add(standardAccount.getChildNumber());
             }
 
-            if(keystore.hasPrivateKey()) {
+            if(keystore.hasMasterPrivateKey()) {
                 try {
                     Keystore derivedKeystore = keystore.hasSeed() ? Keystore.fromSeed(keystore.getSeed(), childDerivation) : Keystore.fromMasterPrivateExtendedKey(keystore.getMasterPrivateExtendedKey(), childDerivation);
                     keystore.setKeyDerivation(derivedKeystore.getKeyDerivation());
@@ -167,12 +166,135 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
         return null;
     }
 
+    public Wallet addChildWallet(PaymentCode externalPaymentCode, ScriptType childScriptType, BlockTransactionHashIndex notificationOutput, BlockTransaction notificationTransaction) {
+        Wallet bip47Wallet = addChildWallet(externalPaymentCode, childScriptType);
+        WalletNode notificationNode = bip47Wallet.getNode(KeyPurpose.NOTIFICATION);
+        notificationNode.getTransactionOutputs().add(notificationOutput);
+        bip47Wallet.updateTransactions(Map.of(notificationTransaction.getHash(), notificationTransaction));
+
+        return bip47Wallet;
+    }
+
+    public Wallet addChildWallet(PaymentCode externalPaymentCode, ScriptType childScriptType) {
+        if(policyType != PolicyType.SINGLE) {
+            throw new IllegalStateException("Cannot add payment code wallet to " + policyType.getName() + " wallet");
+        }
+
+        if(scriptType != P2PKH && scriptType != P2WPKH) {
+            throw new IllegalStateException("Cannot add payment code wallet to " + scriptType.getName() + " wallet");
+        }
+
+        Keystore masterKeystore = getKeystores().get(0);
+        if(masterKeystore.getBip47ExtendedPrivateKey() == null) {
+            throw new IllegalStateException("Cannot add payment code wallet, BIP47 extended private key not present");
+        }
+
+        Wallet childWallet = new Wallet(childScriptType + "-" + externalPaymentCode.toString());
+        childWallet.setPolicyType(PolicyType.SINGLE);
+        childWallet.setScriptType(childScriptType);
+        childWallet.setGapLimit(5);
+
+        Keystore keystore = new Keystore("BIP47");
+        keystore.setSource(KeystoreSource.SW_PAYMENT_CODE);
+        keystore.setWalletModel(WalletModel.SPARROW);
+        List<ChildNumber> derivation = KeyDerivation.getBip47Derivation(getAccountIndex());
+        keystore.setKeyDerivation(new KeyDerivation(masterKeystore.getKeyDerivation().getMasterFingerprint(), derivation));
+        keystore.setExternalPaymentCode(externalPaymentCode);
+        keystore.setBip47ExtendedPrivateKey(masterKeystore.getBip47ExtendedPrivateKey());
+        DeterministicKey pubKey = keystore.getBip47ExtendedPrivateKey().getKey().dropPrivateBytes().dropParent();
+        keystore.setExtendedPublicKey(new ExtendedKey(pubKey, keystore.getBip47ExtendedPrivateKey().getParentFingerprint(), derivation.get(derivation.size() - 1)));
+
+        childWallet.getKeystores().add(keystore);
+        childWallet.setDefaultPolicy(Policy.getPolicy(PolicyType.SINGLE, scriptType, childWallet.getKeystores(), 1));
+
+        childWallet.setMasterWallet(this);
+        getChildWallets().add(childWallet);
+        return childWallet;
+    }
+
+    public Wallet getChildWallet(PaymentCode externalPaymentCode, ScriptType childScriptType) {
+        for(Wallet childWallet : getChildWallets()) {
+            if(childWallet.getKeystores().size() == 1 && externalPaymentCode != null && childWallet.getScriptType() == childScriptType &&
+                    childWallet.getKeystores().get(0).getExternalPaymentCode() != null &&
+                    (externalPaymentCode.equals(childWallet.getKeystores().get(0).getExternalPaymentCode()) ||
+                            externalPaymentCode.getNotificationAddress().equals(childWallet.getKeystores().get(0).getExternalPaymentCode().getNotificationAddress()))) {
+                return childWallet;
+            }
+        }
+
+        return null;
+    }
+
     public List<Wallet> getAllWallets() {
         List<Wallet> allWallets = new ArrayList<>();
         Wallet masterWallet = isMasterWallet() ? this : getMasterWallet();
         allWallets.add(masterWallet);
         allWallets.addAll(masterWallet.getChildWallets());
         return allWallets;
+    }
+
+    public boolean hasPaymentCode() {
+        return getKeystores().size() == 1 && getKeystores().get(0).getBip47ExtendedPrivateKey() != null;
+    }
+
+    public PaymentCode getPaymentCode() {
+        if(hasPaymentCode()) {
+            return getKeystores().get(0).getPaymentCode();
+        }
+
+        return null;
+    }
+
+    public Wallet getNotificationWallet() {
+        if(isMasterWallet() && hasPaymentCode()) {
+            Wallet notificationWallet = new Wallet();
+            notificationWallet.setPolicyType(PolicyType.SINGLE);
+            notificationWallet.setScriptType(ScriptType.P2PKH);
+            notificationWallet.setGapLimit(0);
+
+            Keystore masterKeystore = getKeystores().get(0);
+
+            Keystore keystore = new Keystore();
+            keystore.setSource(KeystoreSource.SW_WATCH);
+            keystore.setWalletModel(WalletModel.SPARROW);
+            keystore.setKeyDerivation(new KeyDerivation(masterKeystore.getKeyDerivation().getMasterFingerprint(), KeyDerivation.getBip47Derivation(getAccountIndex())));
+            keystore.setExtendedPublicKey(masterKeystore.getBip47ExtendedPrivateKey());
+            keystore.setBip47ExtendedPrivateKey(masterKeystore.getBip47ExtendedPrivateKey());
+
+            notificationWallet.getKeystores().add(keystore);
+            notificationWallet.setDefaultPolicy(Policy.getPolicy(PolicyType.SINGLE, ScriptType.P2PKH, notificationWallet.getKeystores(), 1));
+
+            return notificationWallet;
+        }
+
+        return null;
+    }
+
+    public Map<BlockTransaction, WalletNode> getNotificationTransaction(PaymentCode externalPaymentCode) {
+        Address notificationAddress = externalPaymentCode.getNotificationAddress();
+        for(Map.Entry<BlockTransactionHashIndex, WalletNode> txoEntry : getWalletTxos().entrySet()) {
+            if(txoEntry.getKey().isSpent()) {
+                BlockTransaction blockTransaction = transactions.get(txoEntry.getKey().getSpentBy().getHash());
+                if(blockTransaction != null) {
+                    for(TransactionOutput txOutput : blockTransaction.getTransaction().getOutputs()) {
+                        if(notificationAddress.equals(txOutput.getScript().getToAddress())) {
+                            try {
+                                PaymentCode.getOpReturnData(blockTransaction.getTransaction());
+                                return Map.of(blockTransaction, txoEntry.getValue());
+                            } catch(Exception e) {
+                                //ignore
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        return Collections.emptyMap();
+    }
+
+    public boolean isBip47() {
+        return !isMasterWallet() && getKeystores().size() == 1 && getKeystores().get(0).getSource() == KeystoreSource.SW_PAYMENT_CODE;
     }
 
     public StandardAccount getStandardAccountType() {
@@ -454,10 +576,6 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
     }
 
     public ECKey getPubKey(WalletNode node) {
-        return getPubKey(node.getKeyPurpose(), node.getIndex());
-    }
-
-    public ECKey getPubKey(KeyPurpose keyPurpose, int index) {
         if(policyType == PolicyType.MULTI) {
             throw new IllegalStateException("Attempting to retrieve a single key for a multisig policy wallet");
         } else if(policyType == PolicyType.CUSTOM) {
@@ -465,33 +583,25 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
         }
 
         Keystore keystore = getKeystores().get(0);
-        return keystore.getPubKey(keyPurpose, index);
+        return keystore.getPubKey(node);
     }
 
     public List<ECKey> getPubKeys(WalletNode node) {
-        return getPubKeys(node.getKeyPurpose(), node.getIndex());
-    }
-
-    public List<ECKey> getPubKeys(KeyPurpose keyPurpose, int index) {
         if(policyType == PolicyType.SINGLE) {
             throw new IllegalStateException("Attempting to retrieve multiple keys for a singlesig policy wallet");
         } else if(policyType == PolicyType.CUSTOM) {
             throw new UnsupportedOperationException("Cannot determine public keys for a custom policy");
         }
 
-        return getKeystores().stream().map(keystore -> keystore.getPubKey(keyPurpose, index)).collect(Collectors.toList());
+        return getKeystores().stream().map(keystore -> keystore.getPubKey(node)).collect(Collectors.toList());
     }
 
     public Address getAddress(WalletNode node) {
-        return getAddress(node.getKeyPurpose(), node.getIndex());
-    }
-
-    public Address getAddress(KeyPurpose keyPurpose, int index) {
         if(policyType == PolicyType.SINGLE) {
-            ECKey pubKey = getPubKey(keyPurpose, index);
+            ECKey pubKey = getPubKey(node);
             return scriptType.getAddress(pubKey);
         } else if(policyType == PolicyType.MULTI) {
-            List<ECKey> pubKeys = getPubKeys(keyPurpose, index);
+            List<ECKey> pubKeys = getPubKeys(node);
             Script script = ScriptType.MULTISIG.getOutputScript(defaultPolicy.getNumSignaturesRequired(), pubKeys);
             return scriptType.getAddress(script);
         } else {
@@ -500,15 +610,11 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
     }
 
     public Script getOutputScript(WalletNode node) {
-        return getOutputScript(node.getKeyPurpose(), node.getIndex());
-    }
-
-    public Script getOutputScript(KeyPurpose keyPurpose, int index) {
         if(policyType == PolicyType.SINGLE) {
-            ECKey pubKey = getPubKey(keyPurpose, index);
+            ECKey pubKey = getPubKey(node);
             return scriptType.getOutputScript(pubKey);
         } else if(policyType == PolicyType.MULTI) {
-            List<ECKey> pubKeys = getPubKeys(keyPurpose, index);
+            List<ECKey> pubKeys = getPubKeys(node);
             Script script = ScriptType.MULTISIG.getOutputScript(defaultPolicy.getNumSignaturesRequired(), pubKeys);
             return scriptType.getOutputScript(script);
         } else {
@@ -517,15 +623,11 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
     }
 
     public String getOutputDescriptor(WalletNode node) {
-        return getOutputDescriptor(node.getKeyPurpose(), node.getIndex());
-    }
-
-    public String getOutputDescriptor(KeyPurpose keyPurpose, int index) {
         if(policyType == PolicyType.SINGLE) {
-            ECKey pubKey = getPubKey(keyPurpose, index);
+            ECKey pubKey = getPubKey(node);
             return scriptType.getOutputDescriptor(pubKey);
         } else if(policyType == PolicyType.MULTI) {
-            List<ECKey> pubKeys = getPubKeys(keyPurpose, index);
+            List<ECKey> pubKeys = getPubKeys(node);
             Script script = ScriptType.MULTISIG.getOutputScript(defaultPolicy.getNumSignaturesRequired(), pubKeys);
             return scriptType.getOutputDescriptor(script);
         } else {
@@ -533,10 +635,20 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
         }
     }
 
+    public List<KeyPurpose> getWalletKeyPurposes() {
+        return isBip47() ? List.of(KeyPurpose.RECEIVE) : KeyPurpose.DEFAULT_PURPOSES;
+    }
+
+    public KeyPurpose getChangeKeyPurpose() {
+        return isBip47() ? KeyPurpose.RECEIVE : KeyPurpose.CHANGE;
+    }
+
     public Map<WalletNode, Set<BlockTransactionHashIndex>> getWalletNodes() {
         Map<WalletNode, Set<BlockTransactionHashIndex>> walletNodes = new LinkedHashMap<>();
-        getNode(KeyPurpose.RECEIVE).getChildren().forEach(childNode -> walletNodes.put(childNode, childNode.getTransactionOutputs()));
-        getNode(KeyPurpose.CHANGE).getChildren().forEach(childNode -> walletNodes.put(childNode, childNode.getTransactionOutputs()));
+        for(KeyPurpose keyPurpose : KeyPurpose.DEFAULT_PURPOSES) {
+            getNode(keyPurpose).getChildren().forEach(childNode -> walletNodes.put(childNode, childNode.getTransactionOutputs()));
+        }
+
         return walletNodes;
     }
 
@@ -546,8 +658,10 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
 
     public Map<Address, WalletNode> getWalletAddresses() {
         Map<Address, WalletNode> walletAddresses = new LinkedHashMap<>();
-        getWalletAddresses(walletAddresses, getNode(KeyPurpose.RECEIVE));
-        getWalletAddresses(walletAddresses, getNode(KeyPurpose.CHANGE));
+        for(KeyPurpose keyPurpose : getWalletKeyPurposes()) {
+            getWalletAddresses(walletAddresses, getNode(keyPurpose));
+        }
+
         return walletAddresses;
     }
 
@@ -562,10 +676,18 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
     }
 
     public Map<Script, WalletNode> getWalletOutputScripts() {
-        return getWalletOutputScripts(KeyPurpose.RECEIVE, KeyPurpose.CHANGE);
+        return getWalletOutputScripts(getWalletKeyPurposes());
     }
 
-    public Map<Script, WalletNode> getWalletOutputScripts(KeyPurpose... keyPurposes) {
+    public Map<Script, WalletNode> getWalletOutputScripts(KeyPurpose keyPurpose) {
+        if(!getWalletKeyPurposes().contains(keyPurpose)) {
+            return Collections.emptyMap();
+        }
+
+        return getWalletOutputScripts(List.of(keyPurpose));
+    }
+
+    private Map<Script, WalletNode> getWalletOutputScripts(List<KeyPurpose> keyPurposes) {
         Map<Script, WalletNode> walletOutputScripts = new LinkedHashMap<>();
         for(KeyPurpose keyPurpose : keyPurposes) {
             getWalletOutputScripts(walletOutputScripts, getNode(keyPurpose));
@@ -593,8 +715,10 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
 
     public Map<BlockTransactionHashIndex, WalletNode> getWalletTxos() {
         Map<BlockTransactionHashIndex, WalletNode> walletTxos = new TreeMap<>();
-        getWalletTxos(walletTxos, getNode(KeyPurpose.RECEIVE));
-        getWalletTxos(walletTxos, getNode(KeyPurpose.CHANGE));
+        for(KeyPurpose keyPurpose : getWalletKeyPurposes()) {
+            getWalletTxos(walletTxos, getNode(keyPurpose));
+        }
+
         return walletTxos;
     }
 
@@ -612,8 +736,10 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
 
     public Map<BlockTransactionHashIndex, WalletNode> getWalletUtxos(boolean includeSpentMempoolOutputs) {
         Map<BlockTransactionHashIndex, WalletNode> walletUtxos = new TreeMap<>();
-        getWalletUtxos(walletUtxos, getNode(KeyPurpose.RECEIVE), includeSpentMempoolOutputs);
-        getWalletUtxos(walletUtxos, getNode(KeyPurpose.CHANGE), includeSpentMempoolOutputs);
+        for(KeyPurpose keyPurpose : getWalletKeyPurposes()) {
+            getWalletUtxos(walletUtxos, getNode(keyPurpose), includeSpentMempoolOutputs);
+        }
+
         return walletUtxos;
     }
 
@@ -785,7 +911,7 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
             }
 
             for(int i = 1; i < numSets; i+=2) {
-                WalletNode mixNode = getFreshNode(KeyPurpose.CHANGE);
+                WalletNode mixNode = getFreshNode(getChangeKeyPurpose());
                 txExcludedChangeNodes.add(mixNode);
                 Payment fakeMixPayment = new Payment(getAddress(mixNode), ".." + mixNode + " (Fake Mix)", totalPaymentAmount, false);
                 fakeMixPayment.setType(Payment.Type.FAKE_MIX);
@@ -842,9 +968,9 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
             long costOfChangeAmt = getCostOfChange(noChangeFeeRate, longTermFeeRate);
             if(setChangeAmts.stream().allMatch(amt -> amt > costOfChangeAmt) || (numSets > 1 && differenceAmt / transaction.getVirtualSize() > noChangeFeeRate * 2)) {
                 //Change output is required, determine new fee once change output has been added
-                WalletNode changeNode = getFreshNode(KeyPurpose.CHANGE);
+                WalletNode changeNode = getFreshNode(getChangeKeyPurpose());
                 while(txExcludedChangeNodes.contains(changeNode)) {
-                    changeNode = getFreshNode(KeyPurpose.CHANGE, changeNode);
+                    changeNode = getFreshNode(getChangeKeyPurpose(), changeNode);
                 }
                 TransactionOutput changeOutput = new TransactionOutput(transaction, setChangeAmts.iterator().next(), getOutputScript(changeNode));
                 double changeVSize = noChangeVSize + changeOutput.getLength() * numSets;
@@ -860,7 +986,7 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
                 for(Long setChangeAmt : setChangeAmts) {
                     transaction.addOutput(setChangeAmt, getOutputScript(changeNode));
                     changeMap.put(changeNode, setChangeAmt);
-                    changeNode = getFreshNode(KeyPurpose.CHANGE, changeNode);
+                    changeNode = getFreshNode(getChangeKeyPurpose(), changeNode);
                 }
 
                 if(setChangeAmts.stream().anyMatch(amt -> amt < costOfChangeAmt)) {
@@ -958,7 +1084,9 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
                     total += selectedInputs.stream().mapToLong(BlockTransactionHashIndex::getValue).sum();
                     Map<BlockTransactionHashIndex, WalletNode> selectedInputsMap = new LinkedHashMap<>();
                     List<BlockTransactionHashIndex> shuffledInputs = new ArrayList<>(selectedInputs);
-                    Collections.shuffle(shuffledInputs);
+                    if(utxoSelector.shuffleInputs()) {
+                        Collections.shuffle(shuffledInputs);
+                    }
                     for(BlockTransactionHashIndex shuffledInput : shuffledInputs) {
                         selectedInputsMap.put(shuffledInput, utxos.get(shuffledInput));
                     }
@@ -976,8 +1104,10 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
 
     private List<OutputGroup> getGroupedUtxos(List<UtxoFilter> utxoFilters, double feeRate, double longTermFeeRate, boolean groupByAddress, boolean includeSpentMempoolOutputs) {
         List<OutputGroup> outputGroups = new ArrayList<>();
-        getGroupedUtxos(outputGroups, getNode(KeyPurpose.RECEIVE), utxoFilters, feeRate, longTermFeeRate, groupByAddress, includeSpentMempoolOutputs);
-        getGroupedUtxos(outputGroups, getNode(KeyPurpose.CHANGE), utxoFilters, feeRate, longTermFeeRate, groupByAddress, includeSpentMempoolOutputs);
+        for(KeyPurpose keyPurpose : getWalletKeyPurposes()) {
+            getGroupedUtxos(outputGroups, getNode(keyPurpose), utxoFilters, feeRate, longTermFeeRate, groupByAddress, includeSpentMempoolOutputs);
+        }
+
         return outputGroups;
     }
 
@@ -1527,9 +1657,9 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
         return copy;
     }
 
-    public boolean containsPrivateKeys() {
+    public boolean containsMasterPrivateKeys() {
         for(Keystore keystore : keystores) {
-            if(keystore.hasPrivateKey()) {
+            if(keystore.hasMasterPrivateKey()) {
                 return true;
             }
         }

@@ -47,7 +47,7 @@ public class OutputDescriptorTest {
     @Test
     public void masterP2PKH() {
         OutputDescriptor descriptor = OutputDescriptor.getOutputDescriptor("pkh([d34db33f/44'/0'/0']xpub6ERApfZwUNrhLCkDtcHTcxd75RbzS1ed54G1LkBUHQVHQKqhMkhgbmJbZRkrgZw4koxb5JaHWkY4ALHY2grBGRjaDMzQLcgJvLJuZZvRcEL/1/*)");
-        Assert.assertEquals("pkh([d34db33f/44'/0'/0']xpub6ERApfZwUNrhLCkDtcHTcxd75RbzS1ed54G1LkBUHQVHQKqhMkhgbmJbZRkrgZw4koxb5JaHWkY4ALHY2grBGRjaDMzQLcgJvLJuZZvRcEL/1/*)", descriptor.toString());
+        Assert.assertEquals("pkh([d34db33f/44h/0h/0h]xpub6ERApfZwUNrhLCkDtcHTcxd75RbzS1ed54G1LkBUHQVHQKqhMkhgbmJbZRkrgZw4koxb5JaHWkY4ALHY2grBGRjaDMzQLcgJvLJuZZvRcEL/1/*)", descriptor.toString());
         ExtendedKey extendedPublicKey = descriptor.getSingletonExtendedPublicKey();
         KeyDerivation derivation = descriptor.getKeyDerivation(extendedPublicKey);
         Assert.assertEquals("d34db33f", derivation.getMasterFingerprint());
@@ -58,7 +58,7 @@ public class OutputDescriptorTest {
     @Test
     public void singleP2SH_P2WPKH() {
         OutputDescriptor descriptor = OutputDescriptor.getOutputDescriptor("sh(wpkh([f09a3b29/49h/0h/0h]xpub6CjUWYtkq9KT1zkM5NPMxoJTCMm8JSFw7JPyMG6YLBzv5AsCTkASnsVyJhqL1aaqF5XSsFinHK3FDi8RoeEWcTG3DQA2TjqrZ6HJtatYbsU/0/*))");
-        Assert.assertEquals("sh(wpkh([f09a3b29/49'/0'/0']xpub6CjUWYtkq9KT1zkM5NPMxoJTCMm8JSFw7JPyMG6YLBzv5AsCTkASnsVyJhqL1aaqF5XSsFinHK3FDi8RoeEWcTG3DQA2TjqrZ6HJtatYbsU/0/*))", descriptor.toString());
+        Assert.assertEquals("sh(wpkh([f09a3b29/49h/0h/0h]xpub6CjUWYtkq9KT1zkM5NPMxoJTCMm8JSFw7JPyMG6YLBzv5AsCTkASnsVyJhqL1aaqF5XSsFinHK3FDi8RoeEWcTG3DQA2TjqrZ6HJtatYbsU/0/*))", descriptor.toString());
         ExtendedKey extendedPublicKey = descriptor.getSingletonExtendedPublicKey();
         KeyDerivation derivation = descriptor.getKeyDerivation(extendedPublicKey);
         Assert.assertEquals("f09a3b29", derivation.getMasterFingerprint());
@@ -95,7 +95,7 @@ public class OutputDescriptorTest {
     @Test
     public void testChecksum() {
         OutputDescriptor descriptor = OutputDescriptor.getOutputDescriptor("sh(multi(2,[00000000/111'/222]xpub6ERApfZwUNrhLCkDtcHTcxd75RbzS1ed54G1LkBUHQVHQKqhMkhgbmJbZRkrgZw4koxb5JaHWkY4ALHY2grBGRjaDMzQLcgJvLJuZZvRcEL,xpub68NZiKmJWnxxS6aaHmn81bvJeTESw724CRDs6HbuccFQN9Ku14VQrADWgqbhhTHBaohPX4CjNLf9fq9MYo6oDaPPLPxSb7gwQN3ih19Zm4Y/0))#tjg09x5t");
-        Assert.assertEquals("sh(sortedmulti(2,[00000000/111'/222]xpub6ERApfZwUNrhLCkDtcHTcxd75RbzS1ed54G1LkBUHQVHQKqhMkhgbmJbZRkrgZw4koxb5JaHWkY4ALHY2grBGRjaDMzQLcgJvLJuZZvRcEL,xpub68NZiKmJWnxxS6aaHmn81bvJeTESw724CRDs6HbuccFQN9Ku14VQrADWgqbhhTHBaohPX4CjNLf9fq9MYo6oDaPPLPxSb7gwQN3ih19Zm4Y/0))#s66h0xn6", descriptor.toString(true));
+        Assert.assertEquals("sh(sortedmulti(2,[00000000/111h/222]xpub6ERApfZwUNrhLCkDtcHTcxd75RbzS1ed54G1LkBUHQVHQKqhMkhgbmJbZRkrgZw4koxb5JaHWkY4ALHY2grBGRjaDMzQLcgJvLJuZZvRcEL,xpub68NZiKmJWnxxS6aaHmn81bvJeTESw724CRDs6HbuccFQN9Ku14VQrADWgqbhhTHBaohPX4CjNLf9fq9MYo6oDaPPLPxSb7gwQN3ih19Zm4Y/0))#vqfgjk5v", descriptor.toString(true));
     }
 
     @Test(expected = IllegalArgumentException.class)

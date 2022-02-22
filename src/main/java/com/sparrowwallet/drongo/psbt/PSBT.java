@@ -136,8 +136,8 @@ public class PSBT {
                     outputNodes.add(wallet.getWalletAddresses().getOrDefault(address, null));
                 }
             } catch(NonStandardScriptException e) {
-                //Should never happen
-                throw new IllegalArgumentException(e);
+                //Ignore, likely OP_RETURN output
+                outputNodes.add(null);
             }
         }
 
