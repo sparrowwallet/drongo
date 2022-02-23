@@ -112,7 +112,9 @@ public class PaymentCode {
             TransactionInput txInput = getDesignatedInput(transaction);
             ECKey pubKey = getDesignatedPubKey(txInput);
 
-            ECKey notificationPrivKey = keystore.getBip47ExtendedPrivateKey().getKey(List.of(ChildNumber.ZERO_HARDENED, new ChildNumber(0)));
+            List<ChildNumber> derivation = keystore.getKeyDerivation().getDerivation();
+            ChildNumber derivationStart = derivation.isEmpty() ? ChildNumber.ZERO_HARDENED : derivation.get(derivation.size() - 1);
+            ECKey notificationPrivKey = keystore.getBip47ExtendedPrivateKey().getKey(List.of(derivationStart, new ChildNumber(0)));
             SecretPoint secretPoint = new SecretPoint(notificationPrivKey.getPrivKeyBytes(), pubKey.getPubKey());
             byte[] blindingMask = getMask(secretPoint.ECDHSecretAsBytes(), txInput.getOutpoint().bitcoinSerialize());
             byte[] blindedPaymentCode = getOpReturnData(transaction);
