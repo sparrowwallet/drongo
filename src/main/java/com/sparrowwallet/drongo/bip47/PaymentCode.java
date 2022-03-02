@@ -361,6 +361,10 @@ public class PaymentCode {
         return new PaymentCode(strPaymentCode, pubkey, chain);
     }
 
+    public String toAbbreviatedString() {
+        return strPaymentCode.substring(0, 8) + "..." + strPaymentCode.substring(strPaymentCode.length() - 3);
+    }
+
     @Override
     public boolean equals(Object o) {
         if(this == o) {

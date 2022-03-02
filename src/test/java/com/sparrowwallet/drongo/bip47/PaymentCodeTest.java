@@ -126,15 +126,15 @@ public class PaymentCodeTest {
         Assert.assertEquals("1JDdmqFLhpzcUwPeinhJbUPw4Co3aWLyzW", paymentCodeAlice.getNotificationAddress().toString());
 
         WalletNode sendNode0 = aliceBip47Wallet.getFreshNode(KeyPurpose.SEND);
-        Address address0 = aliceBip47Wallet.getAddress(sendNode0);
+        Address address0 = sendNode0.getAddress();
         Assert.assertEquals("141fi7TY3h936vRUKh1qfUZr8rSBuYbVBK", address0.toString());
 
         WalletNode sendNode1 = aliceBip47Wallet.getFreshNode(KeyPurpose.SEND, sendNode0);
-        Address address1 = aliceBip47Wallet.getAddress(sendNode1);
+        Address address1 = sendNode1.getAddress();
         Assert.assertEquals("12u3Uued2fuko2nY4SoSFGCoGLCBUGPkk6", address1.toString());
 
         WalletNode sendNode2 = aliceBip47Wallet.getFreshNode(KeyPurpose.SEND, sendNode1);
-        Address address2 = aliceBip47Wallet.getAddress(sendNode2);
+        Address address2 = sendNode2.getAddress();
         Assert.assertEquals("1FsBVhT5dQutGwaPePTYMe5qvYqqjxyftc", address2.toString());
 
         DeterministicSeed bobSeed = new DeterministicSeed("reward upper indicate eight swift arch injury crystal super wrestle already dentist", "", 0, DeterministicSeed.Type.BIP39);
@@ -149,15 +149,15 @@ public class PaymentCodeTest {
         Assert.assertEquals("1ChvUUvht2hUQufHBXF8NgLhW8SwE2ecGV", paymentCodeBob.getNotificationAddress().toString());
 
         WalletNode receiveNode0 = bobBip47Wallet.getFreshNode(KeyPurpose.RECEIVE);
-        Address receiveAddress0 = bobBip47Wallet.getAddress(receiveNode0);
+        Address receiveAddress0 = receiveNode0.getAddress();
         Assert.assertEquals("141fi7TY3h936vRUKh1qfUZr8rSBuYbVBK", receiveAddress0.toString());
 
         WalletNode receiveNode1 = bobBip47Wallet.getFreshNode(KeyPurpose.RECEIVE, receiveNode0);
-        Address receiveAddress1 = bobBip47Wallet.getAddress(receiveNode1);
+        Address receiveAddress1 = receiveNode1.getAddress();
         Assert.assertEquals("12u3Uued2fuko2nY4SoSFGCoGLCBUGPkk6", receiveAddress1.toString());
 
         WalletNode receiveNode2 = bobBip47Wallet.getFreshNode(KeyPurpose.RECEIVE, receiveNode1);
-        Address receiveAddress2 = bobBip47Wallet.getAddress(receiveNode2);
+        Address receiveAddress2 = receiveNode2.getAddress();
         Assert.assertEquals("1FsBVhT5dQutGwaPePTYMe5qvYqqjxyftc", receiveAddress2.toString());
 
         ECKey privKey0 = bobWallet.getKeystores().get(0).getKey(receiveNode0);

@@ -22,7 +22,7 @@ public class ECKeyTest {
         wallet.setDefaultPolicy(Policy.getPolicy(PolicyType.SINGLE, ScriptType.P2PKH, wallet.getKeystores(), 1));
 
         WalletNode firstReceive = wallet.getNode(KeyPurpose.RECEIVE).getChildren().iterator().next();
-        Address address = wallet.getAddress(firstReceive);
+        Address address = firstReceive.getAddress();
         Assert.assertEquals("14JmU9a7SzieZNEtBnsZo688rt3mGrw6hr", address.toString());
         ECKey privKey = keystore.getKey(firstReceive);
 

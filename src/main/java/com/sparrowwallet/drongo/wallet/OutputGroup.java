@@ -1,5 +1,7 @@
 package com.sparrowwallet.drongo.wallet;
 
+import com.sparrowwallet.drongo.protocol.ScriptType;
+
 import java.util.ArrayList;
 import java.util.List;
 
@@ -7,6 +9,7 @@ import static com.sparrowwallet.drongo.protocol.Transaction.WITNESS_SCALE_FACTOR
 
 public class OutputGroup {
     private final List<BlockTransactionHashIndex> utxos = new ArrayList<>();
+    private final ScriptType scriptType;
     private final int walletBlockHeight;
     private final long inputWeightUnits;
     private final double feeRate;
@@ -18,7 +21,8 @@ public class OutputGroup {
     private int depth = Integer.MAX_VALUE;
     private boolean allInputsFromWallet = true;
 
-    public OutputGroup(int walletBlockHeight, long inputWeightUnits, double feeRate, double longTermFeeRate) {
+    public OutputGroup(ScriptType scriptType, int walletBlockHeight, long inputWeightUnits, double feeRate, double longTermFeeRate) {
+        this.scriptType = scriptType;
         this.walletBlockHeight = walletBlockHeight;
         this.inputWeightUnits = inputWeightUnits;
         this.feeRate = feeRate;
@@ -46,6 +50,10 @@ public class OutputGroup {
 
     public List<BlockTransactionHashIndex> getUtxos() {
         return utxos;
+    }
+
+    public ScriptType getScriptType() {
+        return scriptType;
     }
 
     public long getValue() {

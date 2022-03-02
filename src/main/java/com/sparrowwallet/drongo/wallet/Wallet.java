@@ -117,6 +117,7 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
         childWallet.purposeNodes.clear();
         childWallet.transactions.clear();
         childWallet.detachedLabels.clear();
+        childWallet.childWallets.clear();
         childWallet.storedBlockHeight = null;
         childWallet.gapLimit = standardAccount.getMinimumGapLimit();
         childWallet.birthDate = null;
@@ -156,9 +157,11 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
 
     public Wallet getChildWallet(StandardAccount account) {
         for(Wallet childWallet : getChildWallets()) {
-            for(Keystore keystore : childWallet.getKeystores()) {
-                if(keystore.getKeyDerivation().getDerivation().get(keystore.getKeyDerivation().getDerivation().size() - 1).equals(account.getChildNumber())) {
-                    return childWallet;
+            if(!childWallet.isNested()) {
+                for(Keystore keystore : childWallet.getKeystores()) {
+                    if(keystore.getKeyDerivation().getDerivation().get(keystore.getKeyDerivation().getDerivation().size() - 1).equals(account.getChildNumber())) {
+                        return childWallet;
+                    }
                 }
             }
         }
@@ -229,7 +232,12 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
         List<Wallet> allWallets = new ArrayList<>();
         Wallet masterWallet = isMasterWallet() ? this : getMasterWallet();
         allWallets.add(masterWallet);
-        allWallets.addAll(masterWallet.getChildWallets());
+        for(Wallet childWallet : getChildWallets()) {
+            if(!childWallet.isNested()) {
+                allWallets.add(childWallet);
+            }
+        }
+
         return allWallets;
     }
 
@@ -274,7 +282,7 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
         Address notificationAddress = externalPaymentCode.getNotificationAddress();
         for(Map.Entry<BlockTransactionHashIndex, WalletNode> txoEntry : getWalletTxos().entrySet()) {
             if(txoEntry.getKey().isSpent()) {
-                BlockTransaction blockTransaction = transactions.get(txoEntry.getKey().getSpentBy().getHash());
+                BlockTransaction blockTransaction = getWalletTransaction(txoEntry.getKey().getSpentBy().getHash());
                 if(blockTransaction != null) {
                     for(TransactionOutput txOutput : blockTransaction.getTransaction().getOutputs()) {
                         if(notificationAddress.equals(txOutput.getScript().getToAddress())) {
@@ -291,6 +299,10 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
         }
 
         return Collections.emptyMap();
+    }
+
+    public boolean isNested() {
+        return isBip47();
     }
 
     public boolean isBip47() {
@@ -329,7 +341,9 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
 
         Set<StandardAccount> whirlpoolAccounts = new HashSet<>(Set.of(StandardAccount.WHIRLPOOL_PREMIX, StandardAccount.WHIRLPOOL_POSTMIX, StandardAccount.WHIRLPOOL_BADBANK));
         for(Wallet childWallet : getChildWallets()) {
-            whirlpoolAccounts.remove(childWallet.getStandardAccountType());
+            if(!childWallet.isNested()) {
+                whirlpoolAccounts.remove(childWallet.getStandardAccountType());
+            }
         }
 
         return whirlpoolAccounts.isEmpty();
@@ -525,7 +539,7 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
         WalletNode purposeNode;
         Optional<WalletNode> optionalPurposeNode = purposeNodes.stream().filter(node -> node.getKeyPurpose().equals(keyPurpose)).findFirst();
         if(optionalPurposeNode.isEmpty()) {
-            purposeNode = new WalletNode(keyPurpose);
+            purposeNode = new WalletNode(this, keyPurpose);
             purposeNodes.add(purposeNode);
         } else {
             purposeNode = optionalPurposeNode.get();
@@ -598,10 +612,10 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
 
     public Address getAddress(WalletNode node) {
         if(policyType == PolicyType.SINGLE) {
-            ECKey pubKey = getPubKey(node);
+            ECKey pubKey = node.getPubKey();
             return scriptType.getAddress(pubKey);
         } else if(policyType == PolicyType.MULTI) {
-            List<ECKey> pubKeys = getPubKeys(node);
+            List<ECKey> pubKeys = node.getPubKeys();
             Script script = ScriptType.MULTISIG.getOutputScript(defaultPolicy.getNumSignaturesRequired(), pubKeys);
             return scriptType.getAddress(script);
         } else {
@@ -611,10 +625,10 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
 
     public Script getOutputScript(WalletNode node) {
         if(policyType == PolicyType.SINGLE) {
-            ECKey pubKey = getPubKey(node);
+            ECKey pubKey = node.getPubKey();
             return scriptType.getOutputScript(pubKey);
         } else if(policyType == PolicyType.MULTI) {
-            List<ECKey> pubKeys = getPubKeys(node);
+            List<ECKey> pubKeys = node.getPubKeys();
             Script script = ScriptType.MULTISIG.getOutputScript(defaultPolicy.getNumSignaturesRequired(), pubKeys);
             return scriptType.getOutputScript(script);
         } else {
@@ -624,10 +638,10 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
 
     public String getOutputDescriptor(WalletNode node) {
         if(policyType == PolicyType.SINGLE) {
-            ECKey pubKey = getPubKey(node);
+            ECKey pubKey = node.getPubKey();
             return scriptType.getOutputDescriptor(pubKey);
         } else if(policyType == PolicyType.MULTI) {
-            List<ECKey> pubKeys = getPubKeys(node);
+            List<ECKey> pubKeys = node.getPubKeys();
             Script script = ScriptType.MULTISIG.getOutputScript(defaultPolicy.getNumSignaturesRequired(), pubKeys);
             return scriptType.getOutputDescriptor(script);
         } else {
@@ -662,12 +676,20 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
             getWalletAddresses(walletAddresses, getNode(keyPurpose));
         }
 
+        for(Wallet childWallet : getChildWallets()) {
+            if(childWallet.isNested()) {
+                for(KeyPurpose keyPurpose : childWallet.getWalletKeyPurposes()) {
+                    getWalletAddresses(walletAddresses, childWallet.getNode(keyPurpose));
+                }
+            }
+        }
+
         return walletAddresses;
     }
 
     private void getWalletAddresses(Map<Address, WalletNode> walletAddresses, WalletNode purposeNode) {
         for(WalletNode addressNode : purposeNode.getChildren()) {
-            walletAddresses.put(getAddress(addressNode), addressNode);
+            walletAddresses.put(addressNode.getAddress(), addressNode);
         }
     }
 
@@ -692,12 +714,23 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
         for(KeyPurpose keyPurpose : keyPurposes) {
             getWalletOutputScripts(walletOutputScripts, getNode(keyPurpose));
         }
+
+        for(Wallet childWallet : getChildWallets()) {
+            if(childWallet.isNested()) {
+                for(KeyPurpose keyPurpose : childWallet.getWalletKeyPurposes()) {
+                    if(keyPurposes.contains(keyPurpose)) {
+                        getWalletOutputScripts(walletOutputScripts, childWallet.getNode(keyPurpose));
+                    }
+                }
+            }
+        }
+
         return walletOutputScripts;
     }
 
     private void getWalletOutputScripts(Map<Script, WalletNode> walletOutputScripts, WalletNode purposeNode) {
         for(WalletNode addressNode : purposeNode.getChildren()) {
-            walletOutputScripts.put(getOutputScript(addressNode), addressNode);
+            walletOutputScripts.put(addressNode.getOutputScript(), addressNode);
         }
     }
 
@@ -717,6 +750,14 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
         Map<BlockTransactionHashIndex, WalletNode> walletTxos = new TreeMap<>();
         for(KeyPurpose keyPurpose : getWalletKeyPurposes()) {
             getWalletTxos(walletTxos, getNode(keyPurpose));
+        }
+
+        for(Wallet childWallet : getChildWallets()) {
+            if(childWallet.isNested()) {
+                for(KeyPurpose keyPurpose : childWallet.getWalletKeyPurposes()) {
+                    getWalletTxos(walletTxos, childWallet.getNode(keyPurpose));
+                }
+            }
         }
 
         return walletTxos;
@@ -740,6 +781,14 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
             getWalletUtxos(walletUtxos, getNode(keyPurpose), includeSpentMempoolOutputs);
         }
 
+        for(Wallet childWallet : getChildWallets()) {
+            if(childWallet.isNested()) {
+                for(KeyPurpose keyPurpose : childWallet.getWalletKeyPurposes()) {
+                    getWalletUtxos(walletUtxos, childWallet.getNode(keyPurpose), includeSpentMempoolOutputs);
+                }
+            }
+        }
+
         return walletUtxos;
     }
 
@@ -749,6 +798,51 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
                 walletUtxos.put(utxo, addressNode);
             }
         }
+    }
+
+    public boolean hasTransactions() {
+        if(!transactions.isEmpty()) {
+            return true;
+        }
+
+        for(Wallet childWallet : getChildWallets()) {
+            if(childWallet.isNested()) {
+                if(!childWallet.transactions.isEmpty()) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    public BlockTransaction getWalletTransaction(Sha256Hash txid) {
+        BlockTransaction blockTransaction = transactions.get(txid);
+        if(blockTransaction != null) {
+            return blockTransaction;
+        }
+
+        for(Wallet childWallet : getChildWallets()) {
+            if(childWallet.isNested()) {
+                blockTransaction = childWallet.transactions.get(txid);
+                if(blockTransaction != null) {
+                    return blockTransaction;
+                }
+            }
+        }
+
+        return null;
+    }
+
+    public Map<Sha256Hash, BlockTransaction> getWalletTransactions() {
+        Map<Sha256Hash, BlockTransaction> allTransactions = new HashMap<>(transactions);
+        for(Wallet childWallet : getChildWallets()) {
+            if(childWallet.isNested()) {
+                allTransactions.putAll(childWallet.transactions);
+            }
+        }
+
+        return allTransactions;
     }
 
     /**
@@ -828,15 +922,15 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
         WalletNode receiveNode = getFreshNode(KeyPurpose.RECEIVE);
 
         Transaction transaction = new Transaction();
-        TransactionOutput prevTxOut = transaction.addOutput(1L, getAddress(receiveNode));
+        TransactionOutput prevTxOut = transaction.addOutput(1L, receiveNode.getAddress());
 
         TransactionInput txInput = null;
         if(getPolicyType().equals(PolicyType.SINGLE)) {
-            ECKey pubKey = getPubKey(receiveNode);
+            ECKey pubKey = receiveNode.getPubKey();
             TransactionSignature signature = TransactionSignature.dummy(getScriptType().getSignatureType());
             txInput = getScriptType().addSpendingInput(transaction, prevTxOut, pubKey, signature);
         } else if(getPolicyType().equals(PolicyType.MULTI)) {
-            List<ECKey> pubKeys = getPubKeys(receiveNode);
+            List<ECKey> pubKeys = receiveNode.getPubKeys();
             int threshold = getDefaultPolicy().getNumSignaturesRequired();
             Map<ECKey, TransactionSignature> pubKeySignatures = new TreeMap<>(new ECKey.LexicographicECKeyComparator());
             for(int i = 0; i < pubKeys.size(); i++) {
@@ -856,7 +950,7 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
 
     public long getCostOfChange(double feeRate, double longTermFeeRate) {
         WalletNode changeNode = getFreshNode(KeyPurpose.CHANGE);
-        TransactionOutput changeOutput = new TransactionOutput(new Transaction(), 1L, getOutputScript(changeNode));
+        TransactionOutput changeOutput = new TransactionOutput(new Transaction(), 1L, changeNode.getOutputScript());
         return getFee(changeOutput, feeRate, longTermFeeRate);
     }
 
@@ -898,7 +992,7 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
 
             //Add inputs
             for(Map.Entry<BlockTransactionHashIndex, WalletNode> selectedUtxo : selectedUtxos.entrySet()) {
-                Transaction prevTx = getTransactions().get(selectedUtxo.getKey().getHash()).getTransaction();
+                Transaction prevTx = getWalletTransaction(selectedUtxo.getKey().getHash()).getTransaction();
                 TransactionOutput prevTxOut = prevTx.getOutputs().get((int)selectedUtxo.getKey().getIndex());
                 TransactionInput txInput = addDummySpendingInput(transaction, selectedUtxo.getValue(), prevTxOut);
 
@@ -913,7 +1007,7 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
             for(int i = 1; i < numSets; i+=2) {
                 WalletNode mixNode = getFreshNode(getChangeKeyPurpose());
                 txExcludedChangeNodes.add(mixNode);
-                Payment fakeMixPayment = new Payment(getAddress(mixNode), ".." + mixNode + " (Fake Mix)", totalPaymentAmount, false);
+                Payment fakeMixPayment = new Payment(mixNode.getAddress(), ".." + mixNode + " (Fake Mix)", totalPaymentAmount, false);
                 fakeMixPayment.setType(Payment.Type.FAKE_MIX);
                 txPayments.add(fakeMixPayment);
             }
@@ -972,7 +1066,7 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
                 while(txExcludedChangeNodes.contains(changeNode)) {
                     changeNode = getFreshNode(getChangeKeyPurpose(), changeNode);
                 }
-                TransactionOutput changeOutput = new TransactionOutput(transaction, setChangeAmts.iterator().next(), getOutputScript(changeNode));
+                TransactionOutput changeOutput = new TransactionOutput(transaction, setChangeAmts.iterator().next(), changeNode.getOutputScript());
                 double changeVSize = noChangeVSize + changeOutput.getLength() * numSets;
                 long changeFeeRequiredAmt = (fee == null ? (long)Math.floor(feeRate * changeVSize) : fee);
                 changeFeeRequiredAmt = (fee == null && feeRate == Transaction.DEFAULT_MIN_RELAY_FEE ? changeFeeRequiredAmt + 1 : changeFeeRequiredAmt);
@@ -984,7 +1078,7 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
                 Map<WalletNode, Long> changeMap = new LinkedHashMap<>();
                 setChangeAmts = getSetChangeAmounts(selectedUtxoSets, totalPaymentAmount, changeFeeRequiredAmt);
                 for(Long setChangeAmt : setChangeAmts) {
-                    transaction.addOutput(setChangeAmt, getOutputScript(changeNode));
+                    transaction.addOutput(setChangeAmt, changeNode.getOutputScript());
                     changeMap.put(changeNode, setChangeAmt);
                     changeNode = getFreshNode(getChangeKeyPurpose(), changeNode);
                 }
@@ -1041,20 +1135,21 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
         return changeAmts;
     }
 
-    public TransactionInput addDummySpendingInput(Transaction transaction, WalletNode walletNode, TransactionOutput prevTxOut) {
-        if(getPolicyType().equals(PolicyType.SINGLE)) {
-            ECKey pubKey = getPubKey(walletNode);
-            return getScriptType().addSpendingInput(transaction, prevTxOut, pubKey, TransactionSignature.dummy(getScriptType().getSignatureType()));
-        } else if(getPolicyType().equals(PolicyType.MULTI)) {
-            List<ECKey> pubKeys = getPubKeys(walletNode);
-            int threshold = getDefaultPolicy().getNumSignaturesRequired();
+    public static TransactionInput addDummySpendingInput(Transaction transaction, WalletNode walletNode, TransactionOutput prevTxOut) {
+        Wallet signingWallet = walletNode.getWallet();
+        if(signingWallet.getPolicyType().equals(PolicyType.SINGLE)) {
+            ECKey pubKey = walletNode.getPubKey();
+            return signingWallet.getScriptType().addSpendingInput(transaction, prevTxOut, pubKey, TransactionSignature.dummy(signingWallet.getScriptType().getSignatureType()));
+        } else if(signingWallet.getPolicyType().equals(PolicyType.MULTI)) {
+            List<ECKey> pubKeys = walletNode.getPubKeys();
+            int threshold = signingWallet.getDefaultPolicy().getNumSignaturesRequired();
             Map<ECKey, TransactionSignature> pubKeySignatures = new TreeMap<>(new ECKey.LexicographicECKeyComparator());
             for(int i = 0; i < pubKeys.size(); i++) {
-                pubKeySignatures.put(pubKeys.get(i), i < threshold ? TransactionSignature.dummy(getScriptType().getSignatureType()) : null);
+                pubKeySignatures.put(pubKeys.get(i), i < threshold ? TransactionSignature.dummy(signingWallet.getScriptType().getSignatureType()) : null);
             }
-            return getScriptType().addMultisigSpendingInput(transaction, prevTxOut, threshold, pubKeySignatures);
+            return signingWallet.getScriptType().addMultisigSpendingInput(transaction, prevTxOut, threshold, pubKeySignatures);
         } else {
-            throw new UnsupportedOperationException("Cannot create transaction for policy type " + getPolicyType());
+            throw new UnsupportedOperationException("Cannot create transaction for policy type " + signingWallet.getPolicyType());
         }
     }
 
@@ -1104,14 +1199,23 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
 
     private List<OutputGroup> getGroupedUtxos(List<UtxoFilter> utxoFilters, double feeRate, double longTermFeeRate, boolean groupByAddress, boolean includeSpentMempoolOutputs) {
         List<OutputGroup> outputGroups = new ArrayList<>();
+        Map<Sha256Hash, BlockTransaction> walletTransactions = getWalletTransactions();
         for(KeyPurpose keyPurpose : getWalletKeyPurposes()) {
-            getGroupedUtxos(outputGroups, getNode(keyPurpose), utxoFilters, feeRate, longTermFeeRate, groupByAddress, includeSpentMempoolOutputs);
+            getGroupedUtxos(outputGroups, getNode(keyPurpose), utxoFilters, walletTransactions, feeRate, longTermFeeRate, groupByAddress, includeSpentMempoolOutputs);
+        }
+
+        for(Wallet childWallet : getChildWallets()) {
+            if(childWallet.isNested()) {
+                for(KeyPurpose keyPurpose : childWallet.getWalletKeyPurposes()) {
+                    childWallet.getGroupedUtxos(outputGroups, childWallet.getNode(keyPurpose), utxoFilters, walletTransactions, feeRate, longTermFeeRate, groupByAddress, includeSpentMempoolOutputs);
+                }
+            }
         }
 
         return outputGroups;
     }
 
-    private void getGroupedUtxos(List<OutputGroup> outputGroups, WalletNode purposeNode, List<UtxoFilter> utxoFilters, double feeRate, double longTermFeeRate, boolean groupByAddress, boolean includeSpentMempoolOutputs) {
+    private void getGroupedUtxos(List<OutputGroup> outputGroups, WalletNode purposeNode, List<UtxoFilter> utxoFilters, Map<Sha256Hash, BlockTransaction> walletTransactions, double feeRate, double longTermFeeRate, boolean groupByAddress, boolean includeSpentMempoolOutputs) {
         for(WalletNode addressNode : purposeNode.getChildren()) {
             OutputGroup outputGroup = null;
             for(BlockTransactionHashIndex utxo : addressNode.getUnspentTransactionOutputs(includeSpentMempoolOutputs)) {
@@ -1121,11 +1225,11 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
                 }
 
                 if(outputGroup == null || !groupByAddress) {
-                    outputGroup = new OutputGroup(getStoredBlockHeight(), getInputWeightUnits(), feeRate, longTermFeeRate);
+                    outputGroup = new OutputGroup(addressNode.getWallet().getScriptType(), getStoredBlockHeight(), getInputWeightUnits(), feeRate, longTermFeeRate);
                     outputGroups.add(outputGroup);
                 }
 
-                outputGroup.add(utxo, allInputsFromWallet(utxo.getHash()));
+                outputGroup.add(utxo, allInputsFromWallet(walletTransactions, utxo.getHash()));
             }
         }
     }
@@ -1137,7 +1241,12 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
      * @return Whether the transaction was created entirely from inputs that reference outputs that belong to this wallet
      */
     public boolean allInputsFromWallet(Sha256Hash txId) {
-        BlockTransaction utxoBlkTx = getTransactions().get(txId);
+        Map<Sha256Hash, BlockTransaction> allTransactions = getWalletTransactions();
+        return allInputsFromWallet(allTransactions, txId);
+    }
+
+    private boolean allInputsFromWallet(Map<Sha256Hash, BlockTransaction> walletTransactions, Sha256Hash txId) {
+        BlockTransaction utxoBlkTx = walletTransactions.get(txId);
         if(utxoBlkTx == null) {
             //Provided txId was not a wallet transaction
             return false;
@@ -1145,7 +1254,7 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
 
         for(int i = 0; i < utxoBlkTx.getTransaction().getInputs().size(); i++) {
             TransactionInput utxoTxInput = utxoBlkTx.getTransaction().getInputs().get(i);
-            BlockTransaction prevBlkTx = getTransactions().get(utxoTxInput.getOutpoint().getHash());
+            BlockTransaction prevBlkTx = walletTransactions.get(utxoTxInput.getOutpoint().getHash());
             if(prevBlkTx == null) {
                 return false;
             }
@@ -1171,13 +1280,13 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
      */
     public long getMaxSpendable(List<Address> paymentAddresses, double feeRate) {
         long maxInputValue = 0;
-        int inputWeightUnits = getInputWeightUnits();
-        long minInputValue = (long)Math.ceil(feeRate * inputWeightUnits / WITNESS_SCALE_FACTOR);
 
         Transaction transaction = new Transaction();
         for(Map.Entry<BlockTransactionHashIndex, WalletNode> utxo : getWalletUtxos().entrySet()) {
+            int inputWeightUnits = utxo.getValue().getWallet().getInputWeightUnits();
+            long minInputValue = (long)Math.ceil(feeRate * inputWeightUnits / WITNESS_SCALE_FACTOR);
             if(utxo.getKey().getValue() > minInputValue) {
-                Transaction prevTx = getTransactions().get(utxo.getKey().getHash()).getTransaction();
+                Transaction prevTx = getWalletTransaction(utxo.getKey().getHash()).getTransaction();
                 TransactionOutput prevTxOut = prevTx.getOutputs().get((int)utxo.getKey().getIndex());
                 addDummySpendingInput(transaction, utxo.getValue(), prevTxOut);
                 maxInputValue += utxo.getKey().getValue();
@@ -1207,7 +1316,7 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
         Map<Script, WalletNode> walletOutputScripts = getWalletOutputScripts();
 
         for(TransactionInput txInput : transaction.getInputs()) {
-            BlockTransaction blockTransaction = transactions.get(txInput.getOutpoint().getHash());
+            BlockTransaction blockTransaction = getWalletTransaction(txInput.getOutpoint().getHash());
             if(blockTransaction != null && blockTransaction.getTransaction().getOutputs().size() > txInput.getOutpoint().getIndex()) {
                 TransactionOutput utxo = blockTransaction.getTransaction().getOutputs().get((int)txInput.getOutpoint().getIndex());
 
@@ -1236,20 +1345,22 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
 
         for(TransactionInput txInput : signingNodes.keySet()) {
             WalletNode walletNode = signingNodes.get(txInput);
-            Map<ECKey, Keystore> keystoreKeysForNode = getKeystores().stream().collect(Collectors.toMap(keystore -> getScriptType().getOutputKey(keystore.getPubKey(walletNode)), Function.identity(),
+            Wallet signingWallet = walletNode.getWallet();
+            Map<ECKey, Keystore> keystoreKeysForNode = signingWallet.getKeystores().stream()
+                    .collect(Collectors.toMap(keystore -> signingWallet.getScriptType().getOutputKey(keystore.getPubKey(walletNode)), Function.identity(),
                     (u, v) -> { throw new IllegalStateException("Duplicate keys from different keystores for node " + walletNode); },
                     LinkedHashMap::new));
 
             Map<ECKey, TransactionSignature> keySignatureMap = new LinkedHashMap<>();
 
-            BlockTransaction blockTransaction = transactions.get(txInput.getOutpoint().getHash());
+            BlockTransaction blockTransaction = signingWallet.transactions.get(txInput.getOutpoint().getHash());
             if(blockTransaction != null && blockTransaction.getTransaction().getOutputs().size() > txInput.getOutpoint().getIndex()) {
                 TransactionOutput spentTxo = blockTransaction.getTransaction().getOutputs().get((int)txInput.getOutpoint().getIndex());
 
                 Script signingScript = getSigningScript(txInput, spentTxo);
                 Sha256Hash hash;
-                if(getScriptType() == P2TR) {
-                    List<TransactionOutput> spentOutputs = transaction.getInputs().stream().map(input -> transactions.get(input.getOutpoint().getHash()).getTransaction().getOutputs().get((int)input.getOutpoint().getIndex())).collect(Collectors.toList());
+                if(signingWallet.getScriptType() == P2TR) {
+                    List<TransactionOutput> spentOutputs = transaction.getInputs().stream().map(input -> signingWallet.transactions.get(input.getOutpoint().getHash()).getTransaction().getOutputs().get((int)input.getOutpoint().getIndex())).collect(Collectors.toList());
                     hash = transaction.hashForTaprootSignature(spentOutputs, txInput.getIndex(), !P2TR.isScriptType(signingScript), signingScript, SigHash.ALL_TAPROOT, null);
                 } else if(txInput.hasWitness()) {
                     hash = transaction.hashForWitnessSignature(txInput.getIndex(), signingScript, spentTxo.getValue(), SigHash.ALL);
@@ -1336,7 +1447,9 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
 
         for(PSBTInput psbtInput : signingNodes.keySet()) {
             WalletNode walletNode = signingNodes.get(psbtInput);
-            Map<ECKey, Keystore> keystoreKeysForNode = getKeystores().stream().collect(Collectors.toMap(keystore -> getScriptType().getOutputKey(keystore.getPubKey(walletNode)), Function.identity(),
+            Wallet signingWallet = walletNode.getWallet();
+            Map<ECKey, Keystore> keystoreKeysForNode = signingWallet.getKeystores().stream()
+                    .collect(Collectors.toMap(keystore -> signingWallet.getScriptType().getOutputKey(keystore.getPubKey(walletNode)), Function.identity(),
                     (u, v) -> { throw new IllegalStateException("Duplicate keys from different keystores for node " + walletNode); },
                     LinkedHashMap::new));
 
@@ -1362,10 +1475,11 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
 
     public void sign(PSBT psbt) throws MnemonicException {
         Map<PSBTInput, WalletNode> signingNodes = getSigningNodes(psbt);
-        for(Keystore keystore : getKeystores()) {
-            if(keystore.hasPrivateKey()) {
-                for(Map.Entry<PSBTInput, WalletNode> signingEntry : signingNodes.entrySet()) {
-                    ECKey privKey = getScriptType().getOutputKey(keystore.getKey(signingEntry.getValue()));
+        for(Map.Entry<PSBTInput, WalletNode> signingEntry : signingNodes.entrySet()) {
+            Wallet signingWallet = signingEntry.getValue().getWallet();
+            for(Keystore keystore : signingWallet.getKeystores()) {
+                if(keystore.hasPrivateKey()) {
+                    ECKey privKey = signingWallet.getScriptType().getOutputKey(keystore.getKey(signingEntry.getValue()));
                     PSBTInput psbtInput = signingEntry.getKey();
 
                     if(!psbtInput.isSigned()) {
@@ -1410,15 +1524,15 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
 
                 TransactionInput finalizedTxInput;
                 if(getPolicyType().equals(PolicyType.SINGLE)) {
-                    ECKey pubKey = getPubKey(signingNode);
+                    ECKey pubKey = signingNode.getPubKey();
                     TransactionSignature transactionSignature = psbtInput.isTaproot() ? psbtInput.getTapKeyPathSignature() : psbtInput.getPartialSignature(pubKey);
                     if(transactionSignature == null) {
                         throw new IllegalArgumentException("Pubkey of partial signature does not match wallet pubkey");
                     }
 
-                    finalizedTxInput = getScriptType().addSpendingInput(transaction, utxo, pubKey, transactionSignature);
+                    finalizedTxInput = signingNode.getWallet().getScriptType().addSpendingInput(transaction, utxo, pubKey, transactionSignature);
                 } else if(getPolicyType().equals(PolicyType.MULTI)) {
-                    List<ECKey> pubKeys = getPubKeys(signingNode);
+                    List<ECKey> pubKeys = signingNode.getPubKeys();
 
                     Map<ECKey, TransactionSignature> pubKeySignatures = new TreeMap<>(new ECKey.LexicographicECKeyComparator());
                     for(ECKey pubKey : pubKeys) {
@@ -1430,7 +1544,7 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
                         throw new IllegalArgumentException("Pubkeys of partial signatures do not match wallet pubkeys");
                     }
 
-                    finalizedTxInput = getScriptType().addMultisigSpendingInput(transaction, utxo, threshold, pubKeySignatures);
+                    finalizedTxInput = signingNode.getWallet().getScriptType().addMultisigSpendingInput(transaction, utxo, threshold, pubKeySignatures);
                 } else {
                     throw new UnsupportedOperationException("Cannot finalise PSBT for policy type " + getPolicyType());
                 }
@@ -1471,6 +1585,12 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
 
         transactions.clear();
         storedBlockHeight = 0;
+
+        for(Wallet childWallet : getChildWallets()) {
+            if(childWallet.isNested()) {
+                childWallet.clearHistory();
+            }
+        }
     }
 
     private Map<String, String> getDetachedLabels(boolean includeAddresses) {
@@ -1484,7 +1604,7 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
         for(WalletNode purposeNode : purposeNodes) {
             for(WalletNode addressNode : purposeNode.getChildren()) {
                 if(includeAddresses && addressNode.getLabel() != null && !addressNode.getLabel().isEmpty()) {
-                    labels.put(getAddress(addressNode).toString(), addressNode.getLabel());
+                    labels.put(addressNode.getAddress().toString(), addressNode.getLabel());
                 }
 
                 for(BlockTransactionHashIndex output : addressNode.getTransactionOutputs()) {
@@ -1637,7 +1757,7 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
             copy.getKeystores().add(keystore.copy());
         }
         for(WalletNode node : purposeNodes) {
-            copy.purposeNodes.add(node.copy());
+            copy.purposeNodes.add(node.copy(copy));
         }
         for(Sha256Hash hash : transactions.keySet()) {
             copy.transactions.put(hash, transactions.get(hash));
@@ -1684,6 +1804,12 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
             }
         }
 
+        for(Wallet childWallet : getChildWallets()) {
+            if(childWallet.isNested() && childWallet.isEncrypted()) {
+                return true;
+            }
+        }
+
         return false;
     }
 
@@ -1691,11 +1817,23 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
         for(Keystore keystore : keystores) {
             keystore.encrypt(key);
         }
+
+        for(Wallet childWallet : getChildWallets()) {
+            if(childWallet.isNested()) {
+                childWallet.encrypt(key);
+            }
+        }
     }
 
     public void decrypt(CharSequence password) {
         for(Keystore keystore : keystores) {
             keystore.decrypt(password);
+        }
+
+        for(Wallet childWallet : getChildWallets()) {
+            if(childWallet.isNested()) {
+                childWallet.decrypt(password);
+            }
         }
     }
 
@@ -1703,11 +1841,23 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
         for(Keystore keystore : keystores) {
             keystore.decrypt(key);
         }
+
+        for(Wallet childWallet : getChildWallets()) {
+            if(childWallet.isNested()) {
+                childWallet.decrypt(key);
+            }
+        }
     }
 
     public void clearPrivate() {
         for(Keystore keystore : keystores) {
             keystore.clearPrivate();
+        }
+
+        for(Wallet childWallet : getChildWallets()) {
+            if(childWallet.isNested()) {
+                childWallet.clearPrivate();
+            }
         }
     }
 

@@ -79,7 +79,7 @@ public class WalletTransaction {
     }
 
     public Address getChangeAddress(WalletNode changeNode) {
-        return getWallet().getAddress(changeNode);
+        return changeNode.getAddress();
     }
 
     public long getFee() {

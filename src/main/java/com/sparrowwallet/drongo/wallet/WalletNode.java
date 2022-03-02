@@ -2,7 +2,10 @@ package com.sparrowwallet.drongo.wallet;
 
 import com.sparrowwallet.drongo.KeyDerivation;
 import com.sparrowwallet.drongo.KeyPurpose;
+import com.sparrowwallet.drongo.address.Address;
 import com.sparrowwallet.drongo.crypto.ChildNumber;
+import com.sparrowwallet.drongo.crypto.ECKey;
+import com.sparrowwallet.drongo.protocol.Script;
 
 import java.util.*;
 import java.util.stream.Collectors;
@@ -13,27 +16,51 @@ public class WalletNode extends Persistable implements Comparable<WalletNode> {
     private TreeSet<WalletNode> children = new TreeSet<>();
     private TreeSet<BlockTransactionHashIndex> transactionOutputs = new TreeSet<>();
 
+    private transient Wallet wallet;
     private transient KeyPurpose keyPurpose;
     private transient int index = -1;
     private transient List<ChildNumber> derivation;
 
+    //Cache pubkeys for BIP47 wallets to avoid time-consuming ECDH calculations
+    private transient ECKey cachedPubKey;
+
+    //Note use of this constructor must be followed by setting the wallet field
     public WalletNode(String derivationPath) {
         this.derivationPath = derivationPath;
         parseDerivation();
     }
 
-    public WalletNode(KeyPurpose keyPurpose) {
+    public WalletNode(Wallet wallet, String derivationPath) {
+        this.wallet = wallet;
+        this.derivationPath = derivationPath;
+        parseDerivation();
+    }
+
+    public WalletNode(Wallet wallet, KeyPurpose keyPurpose) {
+        this.wallet = wallet;
         this.derivation = List.of(keyPurpose.getPathIndex());
         this.derivationPath = KeyDerivation.writePath(derivation);
         this.keyPurpose = keyPurpose;
         this.index = keyPurpose.getPathIndex().num();
     }
 
-    public WalletNode(KeyPurpose keyPurpose, int index) {
+    public WalletNode(Wallet wallet, KeyPurpose keyPurpose, int index) {
+        this.wallet = wallet;
         this.derivation = List.of(keyPurpose.getPathIndex(), new ChildNumber(index));
         this.derivationPath = KeyDerivation.writePath(derivation);
         this.keyPurpose = keyPurpose;
         this.index = index;
+    }
+
+    public Wallet getWallet() {
+        return wallet;
+    }
+
+    public void setWallet(Wallet wallet) {
+        this.wallet = wallet;
+        for(WalletNode childNode : getChildren()) {
+            childNode.setWallet(wallet);
+        }
     }
 
     public String getDerivationPath() {
@@ -154,7 +181,7 @@ public class WalletNode extends Persistable implements Comparable<WalletNode> {
         Set<WalletNode> newNodes = fillToIndex(index);
         if(!wallet.getDetachedLabels().isEmpty() && wallet.isValid()) {
             for(WalletNode newNode : newNodes) {
-                String label = wallet.getDetachedLabels().remove(wallet.getAddress(newNode).toString());
+                String label = wallet.getDetachedLabels().remove(newNode.getAddress().toString());
                 if(label != null && (newNode.getLabel() == null || newNode.getLabel().isEmpty())) {
                     newNode.setLabel(label);
                 }
@@ -167,7 +194,7 @@ public class WalletNode extends Persistable implements Comparable<WalletNode> {
     public synchronized Set<WalletNode> fillToIndex(int index) {
         Set<WalletNode> newNodes = new TreeSet<>();
         for(int i = 0; i <= index; i++) {
-            WalletNode node = new WalletNode(getKeyPurpose(), i);
+            WalletNode node = new WalletNode(wallet, getKeyPurpose(), i);
             if(children.add(node)) {
                 newNodes.add(node);
             }
@@ -190,6 +217,35 @@ public class WalletNode extends Persistable implements Comparable<WalletNode> {
         return highestNode == null ? null : highestNode.index;
     }
 
+    public ECKey getPubKey() {
+        if(cachedPubKey != null) {
+            return cachedPubKey;
+        }
+
+        if(wallet.isBip47()) {
+            cachedPubKey = wallet.getPubKey(this);
+            return cachedPubKey;
+        }
+
+        return wallet.getPubKey(this);
+    }
+
+    public List<ECKey> getPubKeys() {
+        return wallet.getPubKeys(this);
+    }
+
+    public Address getAddress() {
+        return wallet.getAddress(this);
+    }
+
+    public Script getOutputScript() {
+        return wallet.getOutputScript(this);
+    }
+
+    public String getOutputDescriptor() {
+        return wallet.getOutputDescriptor(this);
+    }
+
     @Override
     public String toString() {
         return derivationPath.replace("m", "..");
@@ -200,12 +256,12 @@ public class WalletNode extends Persistable implements Comparable<WalletNode> {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
         WalletNode node = (WalletNode) o;
-        return derivationPath.equals(node.derivationPath);
+        return Objects.equals(wallet, node.wallet) && derivationPath.equals(node.derivationPath);
     }
 
     @Override
     public int hashCode() {
-        return derivationPath.hashCode();
+        return Objects.hash(wallet, derivationPath);
     }
 
     @Override
@@ -232,13 +288,13 @@ public class WalletNode extends Persistable implements Comparable<WalletNode> {
         }
     }
 
-    public WalletNode copy() {
-        WalletNode copy = new WalletNode(derivationPath);
+    public WalletNode copy(Wallet walletCopy) {
+        WalletNode copy = new WalletNode(walletCopy, derivationPath);
         copy.setId(getId());
         copy.setLabel(label);
 
         for(WalletNode child : getChildren()) {
-            copy.children.add(child.copy());
+            copy.children.add(child.copy(walletCopy));
         }
 
         for(BlockTransactionHashIndex txo : getTransactionOutputs()) {

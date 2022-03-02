@@ -102,11 +102,7 @@ public class PSBTInput {
                         log.debug(" Transaction input references txid: " + input.getOutpoint().getHash() + " vout " + input.getOutpoint().getIndex() + " with script " + input.getScriptSig());
                     }
                     for(TransactionOutput output: nonWitnessTx.getOutputs()) {
-                        try {
-                            log.debug(" Transaction output value: " + output.getValue() + " to addresses " + Arrays.asList(output.getScript().getToAddresses()) + " with script hex " + Utils.bytesToHex(output.getScript().getProgram()) + " to script " + output.getScript());
-                        } catch(NonStandardScriptException e) {
-                            log.error("Unknown script type", e);
-                        }
+                        log.debug(" Transaction output value: " + output.getValue() + (output.getScript().getToAddress() != null ? " to address " + output.getScript().getToAddress() : "") + " with script hex " + Utils.bytesToHex(output.getScript().getProgram()) + " to script " + output.getScript());
                     }
                     break;
                 case PSBT_IN_WITNESS_UTXO:

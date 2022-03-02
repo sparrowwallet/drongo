@@ -1,15 +1,19 @@
 package com.sparrowwallet.drongo.wallet;
 
+import com.sparrowwallet.drongo.protocol.ScriptType;
+
 import java.util.*;
 import java.util.stream.Collectors;
 
 public class StonewallUtxoSelector implements UtxoSelector {
+    private final ScriptType preferredScriptType;
     private final long noInputsFee;
 
     //Use the same seed so the UTXO selection is deterministic
     private final Random random = new Random(42);
 
-    public StonewallUtxoSelector(long noInputsFee) {
+    public StonewallUtxoSelector(ScriptType preferredScriptType, long noInputsFee) {
+        this.preferredScriptType = preferredScriptType;
         this.noInputsFee = noInputsFee;
     }
 
@@ -17,6 +21,16 @@ public class StonewallUtxoSelector implements UtxoSelector {
     public List<Collection<BlockTransactionHashIndex>> selectSets(long targetValue, Collection<OutputGroup> candidates) {
         long actualTargetValue = targetValue + noInputsFee;
 
+        List<OutputGroup> preferredCandidates = candidates.stream().filter(outputGroup -> outputGroup.getScriptType().equals(preferredScriptType)).collect(Collectors.toList());
+        List<Collection<BlockTransactionHashIndex>> preferredSets = selectSets(targetValue, preferredCandidates, actualTargetValue);
+        if(!preferredSets.isEmpty()) {
+            return preferredSets;
+        }
+
+        return selectSets(targetValue, candidates, actualTargetValue);
+    }
+
+    private List<Collection<BlockTransactionHashIndex>> selectSets(long targetValue, Collection<OutputGroup> candidates, long actualTargetValue) {
         for(int i = 0; i < 10; i++) {
             List<OutputGroup> randomized = new ArrayList<>(candidates);
             Collections.shuffle(randomized, random);
