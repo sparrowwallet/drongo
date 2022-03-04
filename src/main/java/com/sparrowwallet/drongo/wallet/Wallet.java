@@ -114,6 +114,7 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
 
         childWallet.setId(null);
         childWallet.setName(standardAccount.getName());
+        childWallet.setLabel(null);
         childWallet.purposeNodes.clear();
         childWallet.transactions.clear();
         childWallet.detachedLabels.clear();
@@ -1744,6 +1745,7 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
     public Wallet copy() {
         Wallet copy = new Wallet(name);
         copy.setId(getId());
+        copy.setLabel(label);
         copy.setMasterWallet(masterWallet);
         for(Wallet childWallet : childWallets) {
             Wallet copyChildWallet = childWallet.copy();
