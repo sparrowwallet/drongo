@@ -170,8 +170,8 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
         return null;
     }
 
-    public Wallet addChildWallet(PaymentCode externalPaymentCode, ScriptType childScriptType, BlockTransactionHashIndex notificationOutput, BlockTransaction notificationTransaction) {
-        Wallet bip47Wallet = addChildWallet(externalPaymentCode, childScriptType);
+    public Wallet addChildWallet(PaymentCode externalPaymentCode, ScriptType childScriptType, BlockTransactionHashIndex notificationOutput, BlockTransaction notificationTransaction, String label) {
+        Wallet bip47Wallet = addChildWallet(externalPaymentCode, childScriptType, label);
         WalletNode notificationNode = bip47Wallet.getNode(KeyPurpose.NOTIFICATION);
         notificationNode.getTransactionOutputs().add(notificationOutput);
         bip47Wallet.updateTransactions(Map.of(notificationTransaction.getHash(), notificationTransaction));
@@ -179,7 +179,7 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
         return bip47Wallet;
     }
 
-    public Wallet addChildWallet(PaymentCode externalPaymentCode, ScriptType childScriptType) {
+    public Wallet addChildWallet(PaymentCode externalPaymentCode, ScriptType childScriptType, String label) {
         if(policyType != PolicyType.SINGLE) {
             throw new IllegalStateException("Cannot add payment code wallet to " + policyType.getName() + " wallet");
         }
@@ -194,6 +194,7 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
         }
 
         Wallet childWallet = new Wallet(childScriptType + "-" + externalPaymentCode.toString());
+        childWallet.setLabel(label);
         childWallet.setPolicyType(PolicyType.SINGLE);
         childWallet.setScriptType(childScriptType);
         childWallet.setGapLimit(5);
