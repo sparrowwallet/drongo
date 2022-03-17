@@ -179,11 +179,22 @@ public class WalletNode extends Persistable implements Comparable<WalletNode> {
 
     public Set<WalletNode> fillToIndex(Wallet wallet, int index) {
         Set<WalletNode> newNodes = fillToIndex(index);
-        if(!wallet.getDetachedLabels().isEmpty() && wallet.isValid()) {
-            for(WalletNode newNode : newNodes) {
-                String label = wallet.getDetachedLabels().remove(newNode.getAddress().toString());
-                if(label != null && (newNode.getLabel() == null || newNode.getLabel().isEmpty())) {
-                    newNode.setLabel(label);
+        if(wallet.isValid()) {
+            if(!wallet.getDetachedLabels().isEmpty()) {
+                for(WalletNode newNode : newNodes) {
+                    String label = wallet.getDetachedLabels().remove(newNode.getAddress().toString());
+                    if(label != null && (newNode.getLabel() == null || newNode.getLabel().isEmpty())) {
+                        newNode.setLabel(label);
+                    }
+                }
+            }
+
+            if(wallet.isBip47() && keyPurpose == KeyPurpose.RECEIVE && wallet.getLabel() != null && !newNodes.isEmpty()) {
+                String suffix = " " + wallet.getScriptType().getName();
+                for(WalletNode newNode : newNodes) {
+                    if((newNode.getLabel() == null || newNode.getLabel().isEmpty()) && wallet.getLabel().endsWith(suffix)) {
+                        newNode.setLabel("From " + wallet.getLabel().substring(0, wallet.getLabel().length() - suffix.length()));
+                    }
                 }
             }
         }
