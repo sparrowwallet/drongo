@@ -184,7 +184,7 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
             throw new IllegalStateException("Cannot add payment code wallet to " + policyType.getName() + " wallet");
         }
 
-        if(scriptType != P2PKH && scriptType != P2WPKH) {
+        if(scriptType != P2PKH && scriptType != P2SH_P2WPKH && scriptType != P2WPKH) {
             throw new IllegalStateException("Cannot add payment code wallet to " + scriptType.getName() + " wallet");
         }
 
@@ -244,7 +244,8 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
     }
 
     public boolean hasPaymentCode() {
-        return getKeystores().size() == 1 && getKeystores().get(0).getBip47ExtendedPrivateKey() != null;
+        return getKeystores().size() == 1 && getKeystores().get(0).getBip47ExtendedPrivateKey() != null && policyType == PolicyType.SINGLE
+                && (scriptType == P2PKH || scriptType == P2SH_P2WPKH || scriptType == P2WPKH);
     }
 
     public PaymentCode getPaymentCode() {
