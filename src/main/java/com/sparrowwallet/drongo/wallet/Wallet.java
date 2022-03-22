@@ -90,7 +90,7 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
 
     public String getAutomaticName() {
         int account = getAccountIndex();
-        return (account < 0 || account > 9) ? getName() : (!isWhirlpoolMasterWallet() || account > 1 ? "Account #" + account : "Deposit");
+        return (account < 1 || account > 9) ? "Deposit" : "Account #" + account;
     }
 
     public String getMasterName() {
