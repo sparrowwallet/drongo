@@ -330,15 +330,16 @@ public class PSBT {
 
             int inputIndex = this.psbtInputs.size();
             PSBTInput input = new PSBTInput(this, inputEntries, transaction, inputIndex);
+            this.psbtInputs.add(input);
+        }
 
-            if(verifySignatures) {
+        if(verifySignatures) {
+            for(PSBTInput input : psbtInputs) {
                 boolean verified = input.verifySignatures();
                 if(!verified && input.getPartialSignatures().size() > 0) {
                     throw new PSBTSignatureException("Unverifiable partial signatures provided");
                 }
             }
-
-            this.psbtInputs.add(input);
         }
     }
 

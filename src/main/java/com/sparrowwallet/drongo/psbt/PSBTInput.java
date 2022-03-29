@@ -29,6 +29,7 @@ public class PSBTInput {
     public static final byte PSBT_IN_POR_COMMITMENT = 0x09;
     public static final byte PSBT_IN_PROPRIETARY = (byte)0xfc;
     public static final byte PSBT_IN_TAP_KEY_SIG = 0x13;
+    public static final byte PSBT_IN_TAP_BIP32_DERIVATION = 0x16;
     public static final byte PSBT_IN_TAP_INTERNAL_KEY = 0x17;
 
     private final PSBT psbt;
@@ -44,6 +45,7 @@ public class PSBTInput {
     private String porCommitment;
     private final Map<String, String> proprietary = new LinkedHashMap<>();
     private TransactionSignature tapKeyPathSignature;
+    private Map<ECKey, Map<KeyDerivation, List<Sha256Hash>>> tapDerivedPublicKeys = new LinkedHashMap<>();
     private ECKey tapInternalKey;
 
     private final Transaction transaction;
@@ -78,6 +80,11 @@ public class PSBTInput {
         this.proprietary.putAll(proprietary);
 
         this.tapInternalKey = tapInternalKey;
+
+        if(tapInternalKey != null && !derivedPublicKeys.values().isEmpty()) {
+            KeyDerivation tapKeyDerivation = derivedPublicKeys.values().iterator().next();
+            tapDerivedPublicKeys.put(tapInternalKey, Map.of(tapKeyDerivation, Collections.emptyList()));
+        }
 
         this.sigHash = getDefaultSigHash();
     }
@@ -121,6 +128,10 @@ public class PSBTInput {
                 case PSBT_IN_PARTIAL_SIG:
                     entry.checkOneBytePlusPubKey();
                     ECKey sigPublicKey = ECKey.fromPublicOnly(entry.getKeyData());
+                    if(entry.getData().length == 64 || entry.getData().length == 65) {
+                        log.error("Schnorr signature provided as ECDSA partial signature, ignoring");
+                        break;
+                    }
                     //TODO: Verify signature
                     TransactionSignature signature = TransactionSignature.decodeFromBitcoin(TransactionSignature.Type.ECDSA, entry.getData(), true);
                     this.partialSignatures.put(sigPublicKey, signature);
@@ -206,10 +217,23 @@ public class PSBTInput {
                     log.debug("Found proprietary input " + Utils.bytesToHex(entry.getKeyData()) + ": " + Utils.bytesToHex(entry.getData()));
                     break;
                 case PSBT_IN_TAP_KEY_SIG:
+                    entry.checkOneByteKey();
                     this.tapKeyPathSignature = TransactionSignature.decodeFromBitcoin(TransactionSignature.Type.SCHNORR, entry.getData(), true);
                     log.debug("Found input taproot key path signature " + Utils.bytesToHex(entry.getData()));
                     break;
+                case PSBT_IN_TAP_BIP32_DERIVATION:
+                    entry.checkOneBytePlusXOnlyPubKey();
+                    ECKey tapPublicKey = ECKey.fromPublicOnly(entry.getKeyData());
+                    Map<KeyDerivation, List<Sha256Hash>> tapKeyDerivations = parseTaprootKeyDerivation(entry.getData());
+                    if(tapKeyDerivations.isEmpty()) {
+                        log.warn("PSBT provided an invalid taproot key derivation");
+                    } else {
+                        this.tapDerivedPublicKeys.put(tapPublicKey, tapKeyDerivations);
+                        log.debug("Found input taproot key derivation for key " + Utils.bytesToHex(entry.getKey()));
+                    }
+                    break;
                 case PSBT_IN_TAP_INTERNAL_KEY:
+                    entry.checkOneByteKey();
                     this.tapInternalKey = ECKey.fromPublicOnly(entry.getData());
                     log.debug("Found input taproot internal key " + Utils.bytesToHex(entry.getData()));
                     break;
@@ -276,6 +300,12 @@ public class PSBTInput {
             entries.add(populateEntry(PSBT_IN_TAP_KEY_SIG, null, tapKeyPathSignature.encodeToBitcoin()));
         }
 
+        for(Map.Entry<ECKey, Map<KeyDerivation, List<Sha256Hash>>> entry : tapDerivedPublicKeys.entrySet()) {
+            if(!entry.getValue().isEmpty()) {
+                entries.add(populateEntry(PSBT_IN_TAP_BIP32_DERIVATION, entry.getKey().getPubKeyXCoord(), serializeTaprootKeyDerivation(Collections.emptyList(), entry.getValue().keySet().iterator().next())));
+            }
+        }
+
         if(tapInternalKey != null) {
             entries.add(populateEntry(PSBT_IN_TAP_INTERNAL_KEY, null, tapInternalKey.getPubKeyXCoord()));
         }
@@ -317,6 +347,8 @@ public class PSBTInput {
         if(psbtInput.tapKeyPathSignature != null) {
             tapKeyPathSignature = psbtInput.tapKeyPathSignature;
         }
+
+        tapDerivedPublicKeys.putAll(psbtInput.tapDerivedPublicKeys);
 
         if(psbtInput.tapInternalKey != null) {
             tapInternalKey = psbtInput.tapInternalKey;
@@ -425,6 +457,14 @@ public class PSBTInput {
         this.tapKeyPathSignature = tapKeyPathSignature;
     }
 
+    public Map<ECKey, Map<KeyDerivation, List<Sha256Hash>>> getTapDerivedPublicKeys() {
+        return tapDerivedPublicKeys;
+    }
+
+    public void setTapDerivedPublicKeys(Map<ECKey, Map<KeyDerivation, List<Sha256Hash>>> tapDerivedPublicKeys) {
+        this.tapDerivedPublicKeys = tapDerivedPublicKeys;
+    }
+
     public ECKey getTapInternalKey() {
         return tapInternalKey;
     }
@@ -517,7 +557,7 @@ public class PSBTInput {
                 Sha256Hash hash = getHashForSignature(signingScript, localSigHash);
 
                 if(isTaproot() && tapKeyPathSignature != null) {
-                    ECKey outputKey = ScriptType.P2TR.getPublicKeyFromScript(getUtxo().getScript());
+                    ECKey outputKey = P2TR.getPublicKeyFromScript(getUtxo().getScript());
                     if(!outputKey.verify(hash, tapKeyPathSignature)) {
                         throw new PSBTSignatureException("Tweaked internal key does not verify against provided taproot keypath signature");
                     }
@@ -637,6 +677,7 @@ public class PSBTInput {
         witnessScript = null;
         porCommitment = null;
         proprietary.clear();
+        tapDerivedPublicKeys.clear();
         tapKeyPathSignature = null;
     }
 

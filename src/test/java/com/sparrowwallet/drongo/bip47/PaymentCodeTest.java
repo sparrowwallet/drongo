@@ -118,7 +118,7 @@ public class PaymentCodeTest {
 
         PaymentCode paymentCodeBob = new PaymentCode("PM8TJS2JxQ5ztXUpBBRnpTbcUXbUHy2T1abfrb3KkAAtMEGNbey4oumH7Hc578WgQJhPjBxteQ5GHHToTYHE3A1w6p7tU6KSoFmWBVbFGjKPisZDbP97");
 
-        Wallet aliceBip47Wallet = aliceWallet.addChildWallet(paymentCodeBob, ScriptType.P2PKH);
+        Wallet aliceBip47Wallet = aliceWallet.addChildWallet(paymentCodeBob, ScriptType.P2PKH, "Alice");
         PaymentCode paymentCodeAlice = aliceBip47Wallet.getKeystores().get(0).getPaymentCode();
 
         Assert.assertEquals(aliceWallet.getPaymentCode(), aliceBip47Wallet.getPaymentCode());
@@ -144,7 +144,7 @@ public class PaymentCodeTest {
         bobWallet.getKeystores().add(Keystore.fromSeed(bobSeed, bobWallet.getScriptType().getDefaultDerivation()));
         bobWallet.setDefaultPolicy(Policy.getPolicy(PolicyType.SINGLE, ScriptType.P2PKH, bobWallet.getKeystores(), 1));
 
-        Wallet bobBip47Wallet = bobWallet.addChildWallet(paymentCodeAlice, ScriptType.P2PKH);
+        Wallet bobBip47Wallet = bobWallet.addChildWallet(paymentCodeAlice, ScriptType.P2PKH, "Bob");
         Assert.assertEquals(paymentCodeBob.toString(), bobBip47Wallet.getKeystores().get(0).getPaymentCode().toString());
         Assert.assertEquals("1ChvUUvht2hUQufHBXF8NgLhW8SwE2ecGV", paymentCodeBob.getNotificationAddress().toString());
 
