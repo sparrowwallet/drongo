@@ -21,18 +21,31 @@ public class StonewallUtxoSelector implements UtxoSelector {
     public List<Collection<BlockTransactionHashIndex>> selectSets(long targetValue, Collection<OutputGroup> candidates) {
         long actualTargetValue = targetValue + noInputsFee;
 
-        List<OutputGroup> preferredCandidates = candidates.stream().filter(outputGroup -> outputGroup.getScriptType().equals(preferredScriptType)).collect(Collectors.toList());
+        List<OutputGroup> uniqueCandidates = new ArrayList<>();
+        for(OutputGroup candidate : candidates) {
+            OutputGroup existingTxGroup = getTransactionAlreadySelected(uniqueCandidates, candidate);
+            if(existingTxGroup != null) {
+                if(candidate.getValue() > existingTxGroup.getValue()) {
+                    uniqueCandidates.remove(existingTxGroup);
+                    uniqueCandidates.add(candidate);
+                }
+            } else {
+                uniqueCandidates.add(candidate);
+            }
+        }
+
+        List<OutputGroup> preferredCandidates = uniqueCandidates.stream().filter(outputGroup -> outputGroup.getScriptType().equals(preferredScriptType)).collect(Collectors.toList());
         List<Collection<BlockTransactionHashIndex>> preferredSets = selectSets(targetValue, preferredCandidates, actualTargetValue);
         if(!preferredSets.isEmpty()) {
             return preferredSets;
         }
 
-        return selectSets(targetValue, candidates, actualTargetValue);
+        return selectSets(targetValue, uniqueCandidates, actualTargetValue);
     }
 
-    private List<Collection<BlockTransactionHashIndex>> selectSets(long targetValue, Collection<OutputGroup> candidates, long actualTargetValue) {
-        for(int i = 0; i < 10; i++) {
-            List<OutputGroup> randomized = new ArrayList<>(candidates);
+    private List<Collection<BlockTransactionHashIndex>> selectSets(long targetValue, List<OutputGroup> uniqueCandidates, long actualTargetValue) {
+        for(int i = 0; i < 15; i++) {
+            List<OutputGroup> randomized = new ArrayList<>(uniqueCandidates);
             Collections.shuffle(randomized, random);
 
             List<OutputGroup> set1 = new ArrayList<>();
@@ -53,17 +66,7 @@ public class StonewallUtxoSelector implements UtxoSelector {
         long selectedValue = 0;
         while(selectedValue <= targetValue && !randomized.isEmpty()) {
             OutputGroup candidate = randomized.remove(0);
-
-            OutputGroup existingTxGroup = getTransactionAlreadySelected(selectedSet, candidate);
-            if(existingTxGroup != null) {
-                if(candidate.getValue() > existingTxGroup.getValue()) {
-                    selectedSet.remove(existingTxGroup);
-                    selectedSet.add(candidate);
-                }
-            } else {
-                selectedSet.add(candidate);
-            }
-
+            selectedSet.add(candidate);
             selectedValue = selectedSet.stream().mapToLong(OutputGroup::getEffectiveValue).sum();
         }
 
