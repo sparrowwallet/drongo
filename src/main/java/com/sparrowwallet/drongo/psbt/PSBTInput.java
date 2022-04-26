@@ -76,7 +76,10 @@ public class PSBTInput {
         this.redeemScript = redeemScript;
         this.witnessScript = witnessScript;
 
-        this.derivedPublicKeys.putAll(derivedPublicKeys);
+        if(scriptType != P2TR) {
+            this.derivedPublicKeys.putAll(derivedPublicKeys);
+        }
+
         this.proprietary.putAll(proprietary);
 
         this.tapInternalKey = tapInternalKey;
