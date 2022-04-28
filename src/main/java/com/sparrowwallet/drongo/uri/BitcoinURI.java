@@ -87,9 +87,7 @@ public class BitcoinURI {
      * @throws BitcoinURIParseException if the URI is not syntactically or semantically valid.
      */
     public BitcoinURI(String input) throws BitcoinURIParseException {
-        String scheme = BITCOIN_SCHEME;
-
-        // Attempt to form the URI (fail fast syntax checking to official standards).
+        // Attempt to parse the URI
         URI uri;
         try {
             uri = new URI(input);
@@ -100,22 +98,13 @@ public class BitcoinURI {
         // URI is formed as  bitcoin:<address>?<query parameters>
         // blockchain.info generates URIs of non-BIP compliant form bitcoin://address?....
 
-        // Remove the bitcoin scheme.
-        // (Note: getSchemeSpecificPart() is not used as it unescapes the label and parse then fails.
-        // For instance with : bitcoin:129mVqKUmJ9uwPxKJBnNdABbuaaNfho4Ha?amount=0.06&label=Tom%20%26%20Jerry
-        // the & (%26) in Tom and Jerry gets interpreted as a separator and the label then gets parsed
-        // as 'Tom ' instead of 'Tom & Jerry')
-        String blockchainInfoScheme = scheme + "://";
-        String correctScheme = scheme + ":";
-        String schemeSpecificPart;
-        final String inputLc = input.toLowerCase(Locale.US);
-        if(inputLc.startsWith(blockchainInfoScheme)) {
-            schemeSpecificPart = input.substring(blockchainInfoScheme.length());
-        } else if(inputLc.startsWith(correctScheme)) {
-            schemeSpecificPart = input.substring(correctScheme.length());
-        } else {
+        if (!BITCOIN_SCHEME.equalsIgnoreCase(uri.getScheme())) {
             throw new BitcoinURIParseException("Unsupported URI scheme: " + uri.getScheme());
         }
+
+        String schemeSpecificPart = uri.getRawSchemeSpecificPart().startsWith("//")
+                ? uri.getRawSchemeSpecificPart().substring(2)
+                : uri.getRawSchemeSpecificPart();
 
         // Split off the address from the rest of the query parameters.
         String[] addressSplitTokens = schemeSpecificPart.split("\\?", 2);
