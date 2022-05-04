@@ -148,10 +148,11 @@ public class PSBT {
         for(int outputIndex = 0; outputIndex < outputNodes.size(); outputIndex++) {
             WalletNode outputNode = outputNodes.get(outputIndex);
             if(outputNode == null) {
-                PSBTOutput externalRecipientOutput = new PSBTOutput(null, null, Collections.emptyMap(), Collections.emptyMap());
+                PSBTOutput externalRecipientOutput = new PSBTOutput(null, null, null, Collections.emptyMap(), Collections.emptyMap(), null);
                 psbtOutputs.add(externalRecipientOutput);
             } else {
                 TransactionOutput txOutput = transaction.getOutputs().get(outputIndex);
+                Wallet recipientWallet = outputNode.getWallet();
 
                 //Construct dummy transaction to spend the UTXO created by this wallet's txOutput
                 Transaction transaction = new Transaction();
@@ -168,11 +169,17 @@ public class PSBT {
                 }
 
                 Map<ECKey, KeyDerivation> derivedPublicKeys = new LinkedHashMap<>();
-                for(Keystore keystore : outputNode.getWallet().getKeystores()) {
-                    derivedPublicKeys.put(keystore.getPubKey(outputNode), keystore.getKeyDerivation().extend(outputNode.getDerivation()));
+                ECKey tapInternalKey = null;
+                for(Keystore keystore : recipientWallet.getKeystores()) {
+                    derivedPublicKeys.put(recipientWallet.getScriptType().getOutputKey(keystore.getPubKey(outputNode)), keystore.getKeyDerivation().extend(outputNode.getDerivation()));
+
+                    //TODO: Implement Musig for multisig wallets
+                    if(recipientWallet.getScriptType() == ScriptType.P2TR) {
+                        tapInternalKey = keystore.getPubKey(outputNode);
+                    }
                 }
 
-                PSBTOutput walletOutput = new PSBTOutput(redeemScript, witnessScript, derivedPublicKeys, Collections.emptyMap());
+                PSBTOutput walletOutput = new PSBTOutput(recipientWallet.getScriptType(), redeemScript, witnessScript, derivedPublicKeys, Collections.emptyMap(), tapInternalKey);
                 psbtOutputs.add(walletOutput);
             }
         }
@@ -476,7 +483,8 @@ public class PSBT {
         for(PSBTInput psbtInput : getPsbtInputs()) {
             List<PSBTEntry> inputEntries = psbtInput.getInputEntries();
             for(PSBTEntry entry : inputEntries) {
-                if(includeXpubs || entry.getKeyType() != PSBT_IN_BIP32_DERIVATION) {
+                if(includeXpubs || (entry.getKeyType() != PSBT_IN_BIP32_DERIVATION && entry.getKeyType() != PSBT_IN_PROPRIETARY
+                        && entry.getKeyType() != PSBT_IN_TAP_INTERNAL_KEY && entry.getKeyType() != PSBT_IN_TAP_BIP32_DERIVATION)) {
                     entry.serializeToStream(baos);
                 }
             }
@@ -486,7 +494,9 @@ public class PSBT {
         for(PSBTOutput psbtOutput : getPsbtOutputs()) {
             List<PSBTEntry> outputEntries = psbtOutput.getOutputEntries();
             for(PSBTEntry entry : outputEntries) {
-                if(includeXpubs || (entry.getKeyType() != PSBT_OUT_REDEEM_SCRIPT && entry.getKeyType() != PSBT_OUT_WITNESS_SCRIPT && entry.getKeyType() != PSBT_OUT_BIP32_DERIVATION && entry.getKeyType() != PSBT_OUT_PROPRIETARY)) {
+                if(includeXpubs || (entry.getKeyType() != PSBT_OUT_REDEEM_SCRIPT && entry.getKeyType() != PSBT_OUT_WITNESS_SCRIPT
+                        && entry.getKeyType() != PSBT_OUT_BIP32_DERIVATION && entry.getKeyType() != PSBT_OUT_PROPRIETARY
+                        && entry.getKeyType() != PSBT_OUT_TAP_INTERNAL_KEY && entry.getKeyType() != PSBT_OUT_TAP_BIP32_DERIVATION)) {
                     entry.serializeToStream(baos);
                 }
             }

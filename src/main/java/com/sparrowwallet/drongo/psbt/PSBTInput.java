@@ -229,10 +229,12 @@ public class PSBTInput {
                     ECKey tapPublicKey = ECKey.fromPublicOnly(entry.getKeyData());
                     Map<KeyDerivation, List<Sha256Hash>> tapKeyDerivations = parseTaprootKeyDerivation(entry.getData());
                     if(tapKeyDerivations.isEmpty()) {
-                        log.warn("PSBT provided an invalid taproot key derivation");
+                        log.warn("PSBT provided an invalid input taproot key derivation");
                     } else {
                         this.tapDerivedPublicKeys.put(tapPublicKey, tapKeyDerivations);
-                        log.debug("Found input taproot key derivation for key " + Utils.bytesToHex(entry.getKey()));
+                        for(KeyDerivation tapKeyDerivation : tapKeyDerivations.keySet()) {
+                            log.debug("Found input taproot key derivation for key " + Utils.bytesToHex(entry.getKeyData()) + " with master fingerprint " + tapKeyDerivation.getMasterFingerprint() + " at path " + tapKeyDerivation.getDerivationPath());
+                        }
                     }
                     break;
                 case PSBT_IN_TAP_INTERNAL_KEY:

@@ -11,6 +11,9 @@ import org.junit.After;
 import org.junit.Assert;
 import org.junit.Test;
 
+import java.util.List;
+import java.util.Map;
+
 public class PSBTTest {
 
     @Test(expected = PSBTParseException.class)
@@ -377,6 +380,23 @@ public class PSBTTest {
         Assert.assertFalse(PSBT.isPSBT(s));
         Assert.assertFalse(PSBT.isPSBT(""));
         Assert.assertFalse(PSBT.isPSBT("x"));
+    }
+
+    @Test
+    public void testTaproot() throws PSBTParseException {
+        Network.set(Network.TESTNET);
+        String strSignedPsbt = "cHNidP8BAH0CAAAAAdPUSBYKaQKOqAMgU2IcGuM6z7JtbkLe69OmYZoa4UxYAAAAAADmdQAAAp4CAAAAAAAAFgAUg+/zyGWbtKbIJb8ZasbGYDtItZhgrgEAAAAAACJRIJMQKWeQsI/WiRS+lmeeyeJaKFVnlVoBtXeuGTO7XIbrAAAAAE8BBDWHzwM27GqkgAAAAO1YZge2AP67ozhdoF9wgg2hpJw1jbVEXLKfxRQUNGEIAlog/wK83w7jxD37prhWrPenLxjGAJzkJKrj6h0ZPK8WED/ZeB1WAACAAQAAgAAAAIAAAQCJAgAAAAGBuBuu5OIheS4SKtYJufScCJDTWWLopBoXtFWhPDuRWQEAAAAA/f///wKNsQEAAAAAACJRIAjXFSnHwcD+J/obgd9CxVneHsUyFKM9xU7NY5K3DgCxHwIAAAAAAAAiUSAhUe66hJMCB1esHqXtxRVJHmviQ4ZjzFIwDWDPk+1KY6VyIQABASuNsQEAAAAAACJRIAjXFSnHwcD+J/obgd9CxVneHsUyFKM9xU7NY5K3DgCxAQMEAAAAAAETQCG/ZGuefjDVqBhmgVEuV1HbdxoZKDDWWTvTUrq6MJreRzj22k/WcFni6yPn9PGZkptZSNx9waf8ouP28ogJz24hFnRZPMvN82XI+lnim7dRKwFgpHnqiDoMGnIoFoSQRX7bGQA/2XgdVgAAgAEAAIAAAACAAQAAAAIAAAABFyB0WTzLzfNlyPpZ4pu3USsBYKR56og6DBpyKBaEkEV+2wAAIQflpK6JYWolG3K2DU7FU3hlkwSdU/69bglhZxaprqSvyxkAP9l4HVYAAIABAACAAAAAgAEAAAADAAAAAQUg5aSuiWFqJRtytg1OxVN4ZZMEnVP+vW4JYWcWqa6kr8sA";
+        PSBT psbt = PSBT.fromString(strSignedPsbt);
+
+        Assert.assertEquals(0, psbt.getPsbtInputs().get(0).getDerivedPublicKeys().size());
+        Assert.assertEquals("74593ccbcdf365c8fa59e29bb7512b0160a479ea883a0c1a7228168490457edb", Utils.bytesToHex(psbt.getPsbtInputs().get(0).getTapDerivedPublicKeys().keySet().iterator().next().getPubKeyXCoord()));
+        Map<KeyDerivation, List<Sha256Hash>> tapInKeyDerivations = psbt.getPsbtInputs().get(0).getTapDerivedPublicKeys().values().iterator().next();
+        Assert.assertEquals("3fd9781d", tapInKeyDerivations.keySet().iterator().next().getMasterFingerprint());
+
+        Assert.assertEquals(0, psbt.getPsbtOutputs().get(0).getDerivedPublicKeys().size());
+        Assert.assertEquals("e5a4ae89616a251b72b60d4ec553786593049d53febd6e09616716a9aea4afcb", Utils.bytesToHex(psbt.getPsbtOutputs().get(1).getTapDerivedPublicKeys().keySet().iterator().next().getPubKeyXCoord()));
+        Map<KeyDerivation, List<Sha256Hash>> tapOutKeyDerivations = psbt.getPsbtOutputs().get(1).getTapDerivedPublicKeys().values().iterator().next();
+        Assert.assertEquals("3fd9781d", tapOutKeyDerivations.keySet().iterator().next().getMasterFingerprint());
     }
 
     @After

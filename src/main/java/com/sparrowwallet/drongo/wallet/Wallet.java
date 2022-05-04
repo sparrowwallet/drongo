@@ -12,6 +12,7 @@ import com.sparrowwallet.drongo.policy.PolicyType;
 import com.sparrowwallet.drongo.protocol.*;
 import com.sparrowwallet.drongo.psbt.PSBT;
 import com.sparrowwallet.drongo.psbt.PSBTInput;
+import com.sparrowwallet.drongo.psbt.PSBTOutput;
 
 import java.nio.charset.StandardCharsets;
 import java.util.*;
@@ -1557,6 +1558,8 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
                 psbtInput.clearNonFinalFields();
             }
         }
+
+        psbt.getPsbtOutputs().forEach(PSBTOutput::clearNonFinalFields);
     }
 
     public BitcoinUnit getAutoUnit() {
