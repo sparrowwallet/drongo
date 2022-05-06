@@ -35,7 +35,10 @@ public class Secp256k1Context {
     private static boolean loadLibrary() {
         try {
             String osName = System.getProperty("os.name");
-            if(osName.startsWith("Mac")) {
+            String osArch = System.getProperty("os.arch");
+            if(osName.startsWith("Mac") && osArch.equals("aarch64")) {
+                NativeUtils.loadLibraryFromJar("/native/osx/aarch64/libsecp256k1.dylib");
+            } else if(osName.startsWith("Mac")) {
                 NativeUtils.loadLibraryFromJar("/native/osx/x64/libsecp256k1.dylib");
             } else if(osName.startsWith("Windows")) {
                 NativeUtils.loadLibraryFromJar("/native/windows/x64/libsecp256k1-0.dll");

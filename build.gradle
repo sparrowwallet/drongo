@@ -44,10 +44,12 @@ dependencies {
     implementation ('org.bouncycastle:bcprov-jdk15on:1.64') {
         exclude group: 'org.hamcrest', module: 'hamcrest-core'
     }
-    implementation ('de.mkammerer:argon2-jvm:2.7') {
+    implementation ('de.mkammerer:argon2-jvm:2.11') {
         exclude group: 'org.hamcrest', module: 'hamcrest-core'
         exclude group: 'junit', module: 'junit'
+        exclude group: 'net.java.dev.jna', module: 'jna'
     }
+    implementation ('net.java.dev.jna:jna:5.8.0')
     implementation ('ch.qos.logback:logback-classic:1.2.8') {
         exclude group: 'org.hamcrest', module: 'hamcrest-core'
         exclude group: 'org.slf4j'
