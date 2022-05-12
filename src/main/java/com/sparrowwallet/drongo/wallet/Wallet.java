@@ -967,7 +967,7 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
             throw new IllegalArgumentException("Use an input fee rate of 1 sat/vB when using a defined fee amount so UTXO selectors overestimate effective value");
         }
 
-        long maxSpendableAmt = getMaxSpendable(payments.stream().map(Payment::getAddress).collect(Collectors.toList()), feeRate);
+        long maxSpendableAmt = getMaxSpendable(payments.stream().map(Payment::getAddress).collect(Collectors.toList()), feeRate, includeSpentMempoolOutputs);
         if(maxSpendableAmt < 0) {
             throw new InsufficientFundsException("Not enough combined value in all available UTXOs to send a transaction to the provided addresses at this fee rate");
         }
@@ -1282,11 +1282,11 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
      * @param feeRate the fee rate in sats/vB
      * @return the maximum spendable amount (can be negative if the fee is higher than the combined UTXO value)
      */
-    public long getMaxSpendable(List<Address> paymentAddresses, double feeRate) {
+    public long getMaxSpendable(List<Address> paymentAddresses, double feeRate, boolean includeSpentMempoolOutputs) {
         long maxInputValue = 0;
 
         Transaction transaction = new Transaction();
-        for(Map.Entry<BlockTransactionHashIndex, WalletNode> utxo : getWalletUtxos().entrySet()) {
+        for(Map.Entry<BlockTransactionHashIndex, WalletNode> utxo : getWalletUtxos(includeSpentMempoolOutputs).entrySet()) {
             int inputWeightUnits = utxo.getValue().getWallet().getInputWeightUnits();
             long minInputValue = (long)Math.ceil(feeRate * inputWeightUnits / WITNESS_SCALE_FACTOR);
             if(utxo.getKey().getValue() > minInputValue) {
