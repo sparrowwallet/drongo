@@ -138,6 +138,8 @@ public class WalletNode extends Persistable implements Comparable<WalletNode> {
             if(!transactionOutputs.isEmpty()) {
                 Optional<String> optionalLabel = transactionOutputs.stream().filter(oldTxo -> oldTxo.getHash().equals(txo.getHash()) && oldTxo.getIndex() == txo.getIndex()).map(BlockTransactionHash::getLabel).filter(Objects::nonNull).findFirst();
                 optionalLabel.ifPresent(txo::setLabel);
+                Optional<Status> optionalStatus = transactionOutputs.stream().filter(oldTxo -> oldTxo.getHash().equals(txo.getHash()) && oldTxo.getIndex() == txo.getIndex()).map(BlockTransactionHashIndex::getStatus).filter(Objects::nonNull).findFirst();
+                optionalStatus.ifPresent(txo::setStatus);
             }
 
             if(!wallet.getDetachedLabels().isEmpty()) {
