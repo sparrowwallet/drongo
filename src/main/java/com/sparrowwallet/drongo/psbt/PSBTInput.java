@@ -82,11 +82,11 @@ public class PSBTInput {
 
         this.proprietary.putAll(proprietary);
 
-        this.tapInternalKey = tapInternalKey;
+        this.tapInternalKey = tapInternalKey == null ? null : ECKey.fromPublicOnly(tapInternalKey.getPubKeyXCoord());
 
         if(tapInternalKey != null && !derivedPublicKeys.values().isEmpty()) {
             KeyDerivation tapKeyDerivation = derivedPublicKeys.values().iterator().next();
-            tapDerivedPublicKeys.put(tapInternalKey, Map.of(tapKeyDerivation, Collections.emptyList()));
+            tapDerivedPublicKeys.put(this.tapInternalKey, Map.of(tapKeyDerivation, Collections.emptyList()));
         }
 
         this.sigHash = getDefaultSigHash();
