@@ -1365,7 +1365,7 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
                 Sha256Hash hash;
                 if(signingWallet.getScriptType() == P2TR) {
                     List<TransactionOutput> spentOutputs = transaction.getInputs().stream().map(input -> signingWallet.transactions.get(input.getOutpoint().getHash()).getTransaction().getOutputs().get((int)input.getOutpoint().getIndex())).collect(Collectors.toList());
-                    hash = transaction.hashForTaprootSignature(spentOutputs, txInput.getIndex(), !P2TR.isScriptType(signingScript), signingScript, SigHash.ALL_TAPROOT, null);
+                    hash = transaction.hashForTaprootSignature(spentOutputs, txInput.getIndex(), !P2TR.isScriptType(signingScript), signingScript, SigHash.DEFAULT, null);
                 } else if(txInput.hasWitness()) {
                     hash = transaction.hashForWitnessSignature(txInput.getIndex(), signingScript, spentTxo.getValue(), SigHash.ALL);
                 } else {

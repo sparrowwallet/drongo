@@ -513,7 +513,7 @@ public class PSBTInput {
 
     private SigHash getDefaultSigHash() {
         if(isTaproot()) {
-            return SigHash.ALL_TAPROOT;
+            return SigHash.DEFAULT;
         }
 
         return SigHash.ALL;
