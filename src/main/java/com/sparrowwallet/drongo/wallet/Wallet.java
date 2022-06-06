@@ -288,8 +288,10 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
             if(txoEntry.getKey().isSpent()) {
                 BlockTransaction blockTransaction = getWalletTransaction(txoEntry.getKey().getSpentBy().getHash());
                 if(blockTransaction != null) {
+                    TransactionInput txInput0 = blockTransaction.getTransaction().getInputs().get(0);
                     for(TransactionOutput txOutput : blockTransaction.getTransaction().getOutputs()) {
-                        if(notificationAddress.equals(txOutput.getScript().getToAddress())) {
+                        if(notificationAddress.equals(txOutput.getScript().getToAddress())
+                                && txoEntry.getValue().getTransactionOutputs().stream().anyMatch(ref -> ref.getHash().equals(txInput0.getOutpoint().getHash()) && ref.getIndex() == txInput0.getOutpoint().getIndex())) {
                             try {
                                 PaymentCode.getOpReturnData(blockTransaction.getTransaction());
                                 return Map.of(blockTransaction, txoEntry.getValue());
