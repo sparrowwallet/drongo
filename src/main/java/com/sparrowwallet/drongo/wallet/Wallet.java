@@ -1206,14 +1206,15 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
     private List<OutputGroup> getGroupedUtxos(List<UtxoFilter> utxoFilters, double feeRate, double longTermFeeRate, boolean groupByAddress, boolean includeSpentMempoolOutputs) {
         List<OutputGroup> outputGroups = new ArrayList<>();
         Map<Sha256Hash, BlockTransaction> walletTransactions = getWalletTransactions();
+        Map<BlockTransactionHashIndex, WalletNode> walletTxos = getWalletTxos();
         for(KeyPurpose keyPurpose : getWalletKeyPurposes()) {
-            getGroupedUtxos(outputGroups, getNode(keyPurpose), utxoFilters, walletTransactions, feeRate, longTermFeeRate, groupByAddress, includeSpentMempoolOutputs);
+            getGroupedUtxos(outputGroups, getNode(keyPurpose), utxoFilters, walletTransactions, walletTxos, feeRate, longTermFeeRate, groupByAddress, includeSpentMempoolOutputs);
         }
 
         for(Wallet childWallet : getChildWallets()) {
             if(childWallet.isNested()) {
                 for(KeyPurpose keyPurpose : childWallet.getWalletKeyPurposes()) {
-                    childWallet.getGroupedUtxos(outputGroups, childWallet.getNode(keyPurpose), utxoFilters, walletTransactions, feeRate, longTermFeeRate, groupByAddress, includeSpentMempoolOutputs);
+                    childWallet.getGroupedUtxos(outputGroups, childWallet.getNode(keyPurpose), utxoFilters, walletTransactions, walletTxos, feeRate, longTermFeeRate, groupByAddress, includeSpentMempoolOutputs);
                 }
             }
         }
@@ -1221,7 +1222,8 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
         return outputGroups;
     }
 
-    private void getGroupedUtxos(List<OutputGroup> outputGroups, WalletNode purposeNode, List<UtxoFilter> utxoFilters, Map<Sha256Hash, BlockTransaction> walletTransactions, double feeRate, double longTermFeeRate, boolean groupByAddress, boolean includeSpentMempoolOutputs) {
+    private void getGroupedUtxos(List<OutputGroup> outputGroups, WalletNode purposeNode, List<UtxoFilter> utxoFilters, Map<Sha256Hash, BlockTransaction> walletTransactions, Map<BlockTransactionHashIndex, WalletNode> walletTxos, double feeRate, double longTermFeeRate, boolean groupByAddress, boolean includeSpentMempoolOutputs) {
+        int inputWeightUnits = getInputWeightUnits();
         for(WalletNode addressNode : purposeNode.getChildren()) {
             OutputGroup outputGroup = null;
             for(BlockTransactionHashIndex utxo : addressNode.getUnspentTransactionOutputs(includeSpentMempoolOutputs)) {
@@ -1231,11 +1233,11 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
                 }
 
                 if(outputGroup == null || !groupByAddress) {
-                    outputGroup = new OutputGroup(addressNode.getWallet().getScriptType(), getStoredBlockHeight(), getInputWeightUnits(), feeRate, longTermFeeRate);
+                    outputGroup = new OutputGroup(addressNode.getWallet().getScriptType(), getStoredBlockHeight(), inputWeightUnits, feeRate, longTermFeeRate);
                     outputGroups.add(outputGroup);
                 }
 
-                outputGroup.add(utxo, allInputsFromWallet(walletTransactions, utxo.getHash()));
+                outputGroup.add(utxo, allInputsFromWallet(walletTransactions, walletTxos, utxo.getHash()));
             }
         }
     }
@@ -1248,10 +1250,11 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
      */
     public boolean allInputsFromWallet(Sha256Hash txId) {
         Map<Sha256Hash, BlockTransaction> allTransactions = getWalletTransactions();
-        return allInputsFromWallet(allTransactions, txId);
+        Map<BlockTransactionHashIndex, WalletNode> allTxos = getWalletTxos();
+        return allInputsFromWallet(allTransactions, allTxos, txId);
     }
 
-    private boolean allInputsFromWallet(Map<Sha256Hash, BlockTransaction> walletTransactions, Sha256Hash txId) {
+    private boolean allInputsFromWallet(Map<Sha256Hash, BlockTransaction> walletTransactions, Map<BlockTransactionHashIndex, WalletNode> walletTxos, Sha256Hash txId) {
         BlockTransaction utxoBlkTx = walletTransactions.get(txId);
         if(utxoBlkTx == null) {
             //Provided txId was not a wallet transaction
@@ -1269,7 +1272,7 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
             TransactionOutput prevTxOut = prevBlkTx.getTransaction().getOutputs().get(index);
             BlockTransactionHashIndex spendingTXI = new BlockTransactionHashIndex(utxoBlkTx.getHash(), utxoBlkTx.getHeight(), utxoBlkTx.getDate(), utxoBlkTx.getFee(), i, prevTxOut.getValue());
             BlockTransactionHashIndex spentTXO = new BlockTransactionHashIndex(prevBlkTx.getHash(), prevBlkTx.getHeight(), prevBlkTx.getDate(), prevBlkTx.getFee(), index, prevTxOut.getValue(), spendingTXI);
-            if(!isWalletTxo(spentTXO)) {
+            if(!walletTxos.containsKey(spentTXO)) {
                 return false;
             }
         }
@@ -1287,9 +1290,10 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
     public long getMaxSpendable(List<Address> paymentAddresses, double feeRate, boolean includeSpentMempoolOutputs) {
         long maxInputValue = 0;
 
+        Map<Wallet, Integer> cachedInputWeightUnits = new HashMap<>();
         Transaction transaction = new Transaction();
         for(Map.Entry<BlockTransactionHashIndex, WalletNode> utxo : getWalletUtxos(includeSpentMempoolOutputs).entrySet()) {
-            int inputWeightUnits = utxo.getValue().getWallet().getInputWeightUnits();
+            int inputWeightUnits = cachedInputWeightUnits.computeIfAbsent(utxo.getValue().getWallet(), Wallet::getInputWeightUnits);
             long minInputValue = (long)Math.ceil(feeRate * inputWeightUnits / WITNESS_SCALE_FACTOR);
             if(utxo.getKey().getValue() > minInputValue) {
                 Transaction prevTx = getWalletTransaction(utxo.getKey().getHash()).getTransaction();
