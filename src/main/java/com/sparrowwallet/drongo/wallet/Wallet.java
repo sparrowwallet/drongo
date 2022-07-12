@@ -924,8 +924,8 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
      * @return the number of weight units (WU)
      */
     public int getInputWeightUnits() {
-        //Estimate assuming an input spending from a fresh receive node - it does not matter this node has no real utxos
-        WalletNode receiveNode = getFreshNode(KeyPurpose.RECEIVE);
+        //Estimate assuming an input spending from the parent receive node - it does not matter this node has no real utxos
+        WalletNode receiveNode = new WalletNode(this, KeyPurpose.RECEIVE);
 
         Transaction transaction = new Transaction();
         TransactionOutput prevTxOut = transaction.addOutput(1L, receiveNode.getAddress());

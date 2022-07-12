@@ -275,6 +275,16 @@ public class ECKey {
      * use {@code new BigInteger(1, bytes);}
      */
     public static ECPoint publicPointFromPrivate(BigInteger privKey) {
+        if(Secp256k1Context.isEnabled()) {
+            try {
+                byte[] pubKeyBytes = NativeSecp256k1.computePubkey(Utils.bigIntegerToBytes(privKey, 32), false);
+                LazyECPoint lazyECPoint = new LazyECPoint(CURVE.getCurve(), pubKeyBytes);
+                return lazyECPoint.get();
+            } catch(NativeSecp256k1Util.AssertFailException e) {
+                log.error("Error computing public key from private", e);
+            }
+        }
+
         /*
          * TODO: FixedPointCombMultiplier currently doesn't support scalars longer than the group order,
          * but that could change in future versions.
