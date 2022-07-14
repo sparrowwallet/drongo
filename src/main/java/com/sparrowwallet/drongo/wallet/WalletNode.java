@@ -325,7 +325,7 @@ public class WalletNode extends Persistable implements Comparable<WalletNode> {
         copy.setId(getId());
         copy.setLabel(label);
 
-        for(WalletNode child : new ArrayList<>(getChildren())) {
+        for(WalletNode child : getChildren()) {
             copy.children.add(child.copy(walletCopy));
         }
 
