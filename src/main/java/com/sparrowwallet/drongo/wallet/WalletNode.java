@@ -166,8 +166,13 @@ public class WalletNode extends Persistable implements Comparable<WalletNode> {
     }
 
     public Set<BlockTransactionHashIndex> getUnspentTransactionOutputs(boolean includeSpentMempoolOutputs) {
+        if(transactionOutputs.isEmpty()) {
+            return Collections.emptySet();
+        }
+
         Set<BlockTransactionHashIndex> unspentTXOs = new TreeSet<>(transactionOutputs);
-        return unspentTXOs.stream().filter(txo -> !txo.isSpent() || (includeSpentMempoolOutputs && txo.getSpentBy().getHeight() <= 0)).collect(Collectors.toCollection(HashSet::new));
+        unspentTXOs.removeIf(txo -> txo.isSpent() && (!includeSpentMempoolOutputs || txo.getSpentBy().getHeight() > 0));
+        return unspentTXOs;
     }
 
     public long getUnspentValue() {
