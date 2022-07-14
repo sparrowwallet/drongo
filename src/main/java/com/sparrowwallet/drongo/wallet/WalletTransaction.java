@@ -1,6 +1,7 @@
 package com.sparrowwallet.drongo.wallet;
 
 import com.sparrowwallet.drongo.address.Address;
+import com.sparrowwallet.drongo.protocol.Script;
 import com.sparrowwallet.drongo.protocol.Sha256Hash;
 import com.sparrowwallet.drongo.protocol.Transaction;
 import com.sparrowwallet.drongo.psbt.PSBT;
@@ -20,6 +21,8 @@ public class WalletTransaction {
     private final Map<WalletNode, Long> changeMap;
     private final long fee;
     private final Map<Sha256Hash, BlockTransaction> inputTransactions;
+
+    private Map<Wallet, Map<Address, WalletNode>> addressNodeMap = new HashMap<>();
 
     public WalletTransaction(Wallet wallet, Transaction transaction, List<UtxoSelector> utxoSelectors, List<Map<BlockTransactionHashIndex, WalletNode>> selectedUtxoSets, List<Payment> payments, long fee) {
         this(wallet, transaction, utxoSelectors, selectedUtxoSets, payments, Collections.emptyMap(), fee);
@@ -139,24 +142,37 @@ public class WalletTransaction {
     }
 
     public boolean isWalletSend(Wallet wallet, Payment payment) {
-        if(payment.getAddress() != null && wallet != null) {
-            return wallet.isWalletOutputScript(payment.getAddress().getOutputScript());
+        if(wallet == null) {
+            return false;
         }
 
-        return false;
+        return getAddressNodeMap(wallet).get(payment.getAddress()) != null;
     }
 
-    public List<WalletNode> getConsolidationSendNodes() {
-        List<WalletNode> walletNodes = new ArrayList<>();
+    public void updateAddressNodeMap(Map<Wallet, Map<Address, WalletNode>> addressNodeMap, Wallet wallet) {
+        this.addressNodeMap = addressNodeMap;
+        getAddressNodeMap(wallet);
+    }
+
+    public Map<Address, WalletNode> getAddressNodeMap(Wallet wallet) {
+        Map<Script, WalletNode> walletOutputScripts = null;
+
+        Map<Address, WalletNode> walletAddressNodeMap = addressNodeMap.computeIfAbsent(wallet, w -> new LinkedHashMap<>());
         for(Payment payment : payments) {
-            if(payment.getAddress() != null && getWallet() != null) {
-                WalletNode walletNode = getWallet().getWalletOutputScripts().get(payment.getAddress().getOutputScript());
-                if(walletNode != null) {
-                    walletNodes.add(walletNode);
+            if(walletAddressNodeMap.containsKey(payment.getAddress())) {
+                continue;
+            }
+
+            if(payment.getAddress() != null && wallet != null) {
+                if(walletOutputScripts == null) {
+                    walletOutputScripts = wallet.getWalletOutputScripts();
                 }
+
+                WalletNode walletNode = walletOutputScripts.get(payment.getAddress().getOutputScript());
+                walletAddressNodeMap.put(payment.getAddress(), walletNode);
             }
         }
 
-        return walletNodes;
+        return walletAddressNodeMap;
     }
 }
