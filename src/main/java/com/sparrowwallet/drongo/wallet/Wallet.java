@@ -740,17 +740,6 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
         }
     }
 
-    public void derivePublicKeys() {
-        for(KeyPurpose keyPurpose : KeyPurpose.DEFAULT_PURPOSES) {
-            WalletNode purposeNode = getNode(keyPurpose);
-            for(WalletNode addressNode : purposeNode.getChildren()) {
-                for(Keystore keystore : getKeystores()) {
-                    keystore.getPubKey(addressNode);
-                }
-            }
-        }
-    }
-
     public boolean isWalletTxo(TransactionInput txInput) {
         return getWalletTxos().keySet().stream().anyMatch(ref -> ref.getHash().equals(txInput.getOutpoint().getHash()) && ref.getIndex() == txInput.getOutpoint().getIndex());
     }
