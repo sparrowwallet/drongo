@@ -205,6 +205,20 @@ public class WalletNode extends Persistable implements Comparable<WalletNode> {
     }
 
     public synchronized Set<WalletNode> fillToIndex(int index) {
+        //Optimization to check if child nodes already monotonically increment to the desired index
+        int indexCheck = 0;
+        for(WalletNode childNode : getChildren()) {
+            if(childNode.index == indexCheck) {
+                indexCheck++;
+            } else {
+                break;
+            }
+
+            if(childNode.index == index) {
+                return Collections.emptySet();
+            }
+        }
+
         Set<WalletNode> newNodes = new TreeSet<>();
         for(int i = 0; i <= index; i++) {
             WalletNode node = new WalletNode(wallet, getKeyPurpose(), i);
