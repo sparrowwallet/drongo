@@ -134,10 +134,10 @@ public class PSBT {
         for(TransactionOutput txOutput : transaction.getOutputs()) {
             try {
                 Address address = txOutput.getScript().getToAddresses()[0];
-                if(walletTransaction.getPayments().stream().anyMatch(payment -> payment.getAddress().equals(address))) {
-                    outputNodes.add(wallet.getWalletAddresses().getOrDefault(address, null));
+                if(walletTransaction.getAddressNodeMap().containsKey(address)) {
+                    outputNodes.add(walletTransaction.getAddressNodeMap().get(address));
                 } else if(walletTransaction.getChangeMap().keySet().stream().anyMatch(changeNode -> changeNode.getAddress().equals(address))) {
-                    outputNodes.add(wallet.getWalletAddresses().getOrDefault(address, null));
+                    outputNodes.add(walletTransaction.getChangeMap().keySet().stream().filter(changeNode -> changeNode.getAddress().equals(address)).findFirst().orElse(null));
                 }
             } catch(NonStandardScriptException e) {
                 //Ignore, likely OP_RETURN output

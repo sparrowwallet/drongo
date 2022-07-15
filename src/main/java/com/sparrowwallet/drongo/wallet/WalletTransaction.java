@@ -154,8 +154,12 @@ public class WalletTransaction {
         getAddressNodeMap(wallet);
     }
 
+    public Map<Address, WalletNode> getAddressNodeMap() {
+        return getAddressNodeMap(getWallet());
+    }
+
     public Map<Address, WalletNode> getAddressNodeMap(Wallet wallet) {
-        Map<Script, WalletNode> walletOutputScripts = null;
+        Map<Address, WalletNode> walletAddresses = null;
 
         Map<Address, WalletNode> walletAddressNodeMap = addressNodeMap.computeIfAbsent(wallet, w -> new LinkedHashMap<>());
         for(Payment payment : payments) {
@@ -164,11 +168,11 @@ public class WalletTransaction {
             }
 
             if(payment.getAddress() != null && wallet != null) {
-                if(walletOutputScripts == null) {
-                    walletOutputScripts = wallet.getWalletOutputScripts();
+                if(walletAddresses == null) {
+                    walletAddresses = wallet.getWalletAddresses();
                 }
 
-                WalletNode walletNode = walletOutputScripts.get(payment.getAddress().getOutputScript());
+                WalletNode walletNode = walletAddresses.get(payment.getAddress());
                 walletAddressNodeMap.put(payment.getAddress(), walletNode);
             }
         }

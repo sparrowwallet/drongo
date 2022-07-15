@@ -98,7 +98,7 @@ public class AddressTest {
             Address address = (i % 2 == 0 ? new P2PKHAddress(values) : new P2WPKHAddress(values));
             String strAddress = address.toString();
             Address checkAddress = Address.fromString(strAddress);
-            Assert.assertArrayEquals(values, checkAddress.getHash());
+            Assert.assertArrayEquals(values, checkAddress.getData());
         }
 
         byte[] values32 = new byte[32];
@@ -107,7 +107,7 @@ public class AddressTest {
             Address address = new P2WSHAddress(values32);
             String strAddress = address.toString();
             Address checkAddress = Address.fromString(strAddress);
-            Assert.assertArrayEquals(values32, checkAddress.getHash());
+            Assert.assertArrayEquals(values32, checkAddress.getData());
         }
     }
 

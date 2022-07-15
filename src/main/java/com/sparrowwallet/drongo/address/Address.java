@@ -9,14 +9,14 @@ import com.sparrowwallet.drongo.protocol.ScriptType;
 import java.util.Arrays;
 
 public abstract class Address {
-    protected final byte[] hash;
+    protected final byte[] data;
 
-    public Address(byte[] hash) {
-        this.hash = hash;
+    public Address(byte[] data) {
+        this.data = data;
     }
 
-    public byte[] getHash() {
-        return hash;
+    public byte[] getData() {
+        return data;
     }
 
     public String getAddress() {
@@ -24,7 +24,7 @@ public abstract class Address {
     }
 
     public String getAddress(Network network) {
-        return Base58.encodeChecked(getVersion(network), hash);
+        return Base58.encodeChecked(getVersion(network), data);
     }
 
     public String toString() {
@@ -50,16 +50,15 @@ public abstract class Address {
     public abstract String getOutputScriptDataType();
 
     public boolean equals(Object obj) {
-        if(!(obj instanceof Address)) {
+        if(!(obj instanceof Address address)) {
             return false;
         }
 
-        Address address = (Address)obj;
-        return address.getAddress().equals(this.getAddress());
+        return Arrays.equals(data, address.data) && getVersion(Network.get()) == address.getVersion(Network.get());
     }
 
     public int hashCode() {
-        return getAddress().hashCode();
+        return Arrays.hashCode(data) + getVersion(Network.get());
     }
 
     public static Address fromString(String address) throws InvalidAddressException {

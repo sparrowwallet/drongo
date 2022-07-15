@@ -275,6 +275,10 @@ public class ECKey {
      * use {@code new BigInteger(1, bytes);}
      */
     public static ECPoint publicPointFromPrivate(BigInteger privKey) {
+        if (privKey.bitLength() > CURVE.getN().bitLength()) {
+            privKey = privKey.mod(CURVE.getN());
+        }
+
         if(Secp256k1Context.isEnabled()) {
             try {
                 byte[] pubKeyBytes = NativeSecp256k1.computePubkey(Utils.bigIntegerToBytes(privKey, 32), false);
@@ -285,13 +289,6 @@ public class ECKey {
             }
         }
 
-        /*
-         * TODO: FixedPointCombMultiplier currently doesn't support scalars longer than the group order,
-         * but that could change in future versions.
-         */
-        if (privKey.bitLength() > CURVE.getN().bitLength()) {
-            privKey = privKey.mod(CURVE.getN());
-        }
         return new FixedPointCombMultiplier().multiply(CURVE.getG(), privKey);
     }
 
