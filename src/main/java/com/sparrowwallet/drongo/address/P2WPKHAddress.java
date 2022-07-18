@@ -26,16 +26,6 @@ public class P2WPKHAddress extends Address {
     }
 
     @Override
-    public Script getOutputScript() {
-        return getScriptType().getOutputScript(data);
-    }
-
-    @Override
-    public byte[] getOutputScriptData() {
-        return data;
-    }
-
-    @Override
     public String getOutputScriptDataType() {
         return "Witness Public Key Hash";
     }

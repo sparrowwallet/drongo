@@ -13,6 +13,7 @@ import java.util.stream.Collectors;
 public class WalletNode extends Persistable implements Comparable<WalletNode> {
     private final String derivationPath;
     private String label;
+    private Address address;
     private TreeSet<WalletNode> children = new TreeSet<>();
     private TreeSet<BlockTransactionHashIndex> transactionOutputs = new TreeSet<>();
 
@@ -267,11 +268,28 @@ public class WalletNode extends Persistable implements Comparable<WalletNode> {
     }
 
     public Address getAddress() {
+        if(address != null) {
+            return address;
+        }
+
+        if(wallet.getKeystores().stream().noneMatch(Keystore::needsPassphrase)) {
+            address = wallet.getAddress(this);
+            return address;
+        }
+
         return wallet.getAddress(this);
     }
 
+    public byte[] getAddressData() {
+        return address == null ? null : address.getData();
+    }
+
+    public void setAddress(Address address) {
+        this.address = address;
+    }
+
     public Script getOutputScript() {
-        return wallet.getOutputScript(this);
+        return getAddress().getOutputScript();
     }
 
     public String getOutputDescriptor() {
@@ -324,6 +342,7 @@ public class WalletNode extends Persistable implements Comparable<WalletNode> {
         WalletNode copy = new WalletNode(walletCopy, derivationPath);
         copy.setId(getId());
         copy.setLabel(label);
+        copy.setAddress(address);
 
         for(WalletNode child : getChildren()) {
             copy.children.add(child.copy(walletCopy));

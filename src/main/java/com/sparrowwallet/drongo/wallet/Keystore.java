@@ -31,7 +31,10 @@ public class Keystore extends Persistable {
     private DeterministicSeed seed;
 
     //For BIP47 keystores - not persisted but must be unencrypted to generate keys
-    private ExtendedKey bip47ExtendedPrivateKey;
+    private transient ExtendedKey bip47ExtendedPrivateKey;
+
+    //Avoid performing repeated expensive seed derivation checks
+    private transient boolean extendedPublicKeyChecked;
 
     public Keystore() {
         this(DEFAULT_LABEL);
@@ -83,6 +86,7 @@ public class Keystore extends Persistable {
 
     public void setExtendedPublicKey(ExtendedKey extendedPublicKey) {
         this.extendedPublicKey = extendedPublicKey;
+        this.extendedPublicKeyChecked = false;
     }
 
     public PaymentCode getExternalPaymentCode() {
@@ -123,6 +127,14 @@ public class Keystore extends Persistable {
 
     public boolean hasPrivateKey() {
         return hasMasterPrivateKey() || (source == KeystoreSource.SW_PAYMENT_CODE && bip47ExtendedPrivateKey != null);
+    }
+
+    public boolean needsPassphrase() {
+        if(seed != null) {
+            return seed.needsPassphrase();
+        }
+
+        return false;
     }
 
     public PaymentCode getPaymentCode() {
@@ -278,7 +290,7 @@ public class Keystore extends Persistable {
                 throw new InvalidKeystoreException("Source of " + source + " but no seed or master private key is present");
             }
 
-            if((seed != null && !seed.isEncrypted()) || (masterPrivateExtendedKey != null && !masterPrivateExtendedKey.isEncrypted())) {
+            if(!extendedPublicKeyChecked && ((seed != null && !seed.isEncrypted()) || (masterPrivateExtendedKey != null && !masterPrivateExtendedKey.isEncrypted()))) {
                 try {
                     List<ChildNumber> derivation = getKeyDerivation().getDerivation();
                     DeterministicKey derivedKey = getExtendedMasterPrivateKey().getKey(derivation);
@@ -287,6 +299,7 @@ public class Keystore extends Persistable {
                     if(!xpub.equals(getExtendedPublicKey())) {
                         throw new InvalidKeystoreException("Specified extended public key does not match public key derived from seed");
                     }
+                    extendedPublicKeyChecked = true;
                 } catch(MnemonicException e) {
                     throw new InvalidKeystoreException("Invalid mnemonic specified for seed", e);
                 }

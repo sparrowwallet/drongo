@@ -24,15 +24,6 @@ public class P2PKAddress extends Address {
         return ScriptType.P2PK;
     }
 
-    public Script getOutputScript() {
-        return getScriptType().getOutputScript(data);
-    }
-
-    @Override
-    public byte[] getOutputScriptData() {
-        return data;
-    }
-
     @Override
     public String getOutputScriptDataType() {
         return "Public Key";

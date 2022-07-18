@@ -43,9 +43,13 @@ public abstract class Address {
 
     public abstract ScriptType getScriptType();
 
-    public abstract Script getOutputScript();
+    public Script getOutputScript() {
+        return getScriptType().getOutputScript(data);
+    }
 
-    public abstract byte[] getOutputScriptData();
+    public byte[] getOutputScriptData() {
+        return data;
+    }
 
     public abstract String getOutputScriptDataType();
 
