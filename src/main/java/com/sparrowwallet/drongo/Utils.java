@@ -121,6 +121,13 @@ public class Utils {
         }
     }
 
+    public static byte[] concat(byte[] a, byte[] b) {
+        byte[] c = new byte[a.length + b.length];
+        System.arraycopy(a, 0, c, 0, a.length);
+        System.arraycopy(b, 0, c, a.length, b.length);
+        return c;
+    }
+
     /** Parse 4 bytes from the byte array (starting at the offset) as unsigned 32-bit integer in little endian format. */
     public static long readUint32(byte[] bytes, int offset) {
         return (bytes[offset] & 0xffl) |
