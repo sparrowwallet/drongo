@@ -53,6 +53,15 @@ public class BlockTransaction extends BlockTransactionHash implements Comparable
         return Collections.unmodifiableSet(funding);
     }
 
+    public Double getFeeRate() {
+        if(getFee() != null && transaction != null) {
+            double vSize = transaction.getVirtualSize();
+            return getFee() / vSize;
+        }
+
+        return null;
+    }
+
     @Override
     public int compareTo(BlockTransaction blkTx) {
         int blockOrder = compareBlockOrder(blkTx);
