@@ -1163,10 +1163,13 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
         List<OutputGroup> utxoPool = getGroupedUtxos(utxoFilters, feeRate, longTermFeeRate, groupByAddress, includeSpentMempoolOutputs);
 
         List<OutputGroup.Filter> filters = new ArrayList<>();
-        filters.add(new OutputGroup.Filter(1, 6));
-        filters.add(new OutputGroup.Filter(1, 1));
+        filters.add(new OutputGroup.Filter(1, 6, false));
+        filters.add(new OutputGroup.Filter(1, 1, false));
         if(includeMempoolOutputs) {
-            filters.add(new OutputGroup.Filter(0, 0));
+            filters.add(new OutputGroup.Filter(0, 0, false));
+            filters.add(new OutputGroup.Filter(0, 0, true));
+        } else {
+            filters.add(new OutputGroup.Filter(1, 1, true));
         }
 
         if(sendMax) {
@@ -1237,7 +1240,7 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
                     outputGroups.add(outputGroup);
                 }
 
-                outputGroup.add(utxo, allInputsFromWallet(walletTransactions, walletTxos, utxo.getHash()));
+                outputGroup.add(utxo, allInputsFromWallet(walletTransactions, walletTxos, utxo.getHash()), isNotificationChange(walletTransactions, utxo.getHash()));
             }
         }
     }
@@ -1278,6 +1281,18 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
         }
 
         return true;
+    }
+
+    private boolean isNotificationChange(Map<Sha256Hash, BlockTransaction> walletTransactions, Sha256Hash txId) {
+        BlockTransaction utxoBlkTx = walletTransactions.get(txId);
+        try {
+            PaymentCode.getOpReturnData(utxoBlkTx.getTransaction());
+            return true;
+        } catch(IllegalArgumentException e) {
+            //ignore, not a notification tx
+        }
+
+        return false;
     }
 
     /**

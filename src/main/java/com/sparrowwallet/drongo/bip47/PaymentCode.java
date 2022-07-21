@@ -174,6 +174,10 @@ public class PaymentCode {
         if(scriptChunks.get(1).getData() != null && scriptChunks.get(1).getData().length != 80) {
             return null;
         }
+        byte[] data = scriptChunks.get(1).getData();
+        if(data[0] != 0x01 || (data[2] != 0x02 && data[2] != 0x03)) {
+            return null;
+        }
         return scriptChunks;
     }
 
