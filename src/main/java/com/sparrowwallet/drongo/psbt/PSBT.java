@@ -341,12 +341,7 @@ public class PSBT {
         }
 
         if(verifySignatures) {
-            for(PSBTInput input : psbtInputs) {
-                boolean verified = input.verifySignatures();
-                if(!verified && input.getPartialSignatures().size() > 0) {
-                    throw new PSBTSignatureException("Unverifiable partial signatures provided");
-                }
-            }
+            verifySignatures(psbtInputs);
         }
     }
 
@@ -382,7 +377,7 @@ public class PSBT {
             if(utxo != null) {
                 fee += utxo.getValue();
             } else {
-                log.error("Cannot determine fee - not enough information provided on inputs");
+                log.warn("Cannot determine fee - inputs are missing UTXO data");
                 return null;
             }
         }
@@ -396,14 +391,17 @@ public class PSBT {
     }
 
     public void verifySignatures() throws PSBTSignatureException {
-        for(PSBTInput input : getPsbtInputs()) {
-            boolean verified = input.verifySignatures();
-            if(!verified) {
-                if(input.getPartialSignatures().size() > 0) {
-                    throw new PSBTSignatureException("Unverifiable partial signatures provided");
-                }
+        verifySignatures(getPsbtInputs());
+    }
 
-                throw new PSBTSignatureException("No UTXO data provided");
+    private void verifySignatures(List<PSBTInput> psbtInputs) throws PSBTSignatureException {
+        for(PSBTInput input : psbtInputs) {
+            boolean verified = input.verifySignatures();
+            if(!verified && input.getPartialSignatures().size() > 0) {
+                throw new PSBTSignatureException("Unverifiable partial signatures provided");
+            }
+            if(!verified && input.isTaproot() && input.getTapKeyPathSignature() != null) {
+                throw new PSBTSignatureException("Unverifiable taproot keypath signature provided");
             }
         }
     }
