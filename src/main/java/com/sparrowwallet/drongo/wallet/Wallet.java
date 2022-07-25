@@ -1710,6 +1710,10 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
                 throw new InvalidWalletException("Keystore " + keystore.getLabel() + " derivation of " + keystore.getKeyDerivation().getDerivationPath() + " in " + scriptType.getName() + " wallet matches another default script type.");
             }
         }
+
+        if(containsDuplicateExtendedKeys()) {
+            throw new InvalidWalletException("Wallet keystores have duplicate extended public keys");
+        }
     }
 
     public boolean derivationMatchesAnotherScriptType(String derivationPath) {
@@ -1730,6 +1734,14 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
         }
 
         return !keystores.stream().map(Keystore::getLabel).allMatch(new HashSet<>()::add);
+    }
+
+    public boolean containsDuplicateExtendedKeys() {
+        if(keystores.size() <= 1) {
+            return false;
+        }
+
+        return !keystores.stream().map(Keystore::getExtendedPublicKey).allMatch(new HashSet<>()::add);
     }
 
     public void makeLabelsUnique(Keystore newKeystore) {
