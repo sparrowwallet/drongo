@@ -1288,7 +1288,7 @@ public enum ScriptType {
         scriptTypes.sort((o1, o2) -> o2.getDescriptor().length() - o1.getDescriptor().length());
 
         for(ScriptType scriptType : scriptTypes) {
-            if(descriptor.toLowerCase().startsWith(scriptType.getDescriptor())) {
+            if(descriptor.toLowerCase(Locale.ROOT).startsWith(scriptType.getDescriptor())) {
                 return scriptType;
             }
         }

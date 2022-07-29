@@ -5,6 +5,7 @@ import com.sparrowwallet.drongo.crypto.ChildNumber;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Locale;
 
 public class KeyDerivation {
     private final String masterFingerprint;
@@ -16,7 +17,7 @@ public class KeyDerivation {
     }
 
     public KeyDerivation(String masterFingerprint, String derivationPath) {
-        this.masterFingerprint = masterFingerprint == null ? null : masterFingerprint.toLowerCase();
+        this.masterFingerprint = masterFingerprint == null ? null : masterFingerprint.toLowerCase(Locale.ROOT);
         this.derivationPath = derivationPath;
         this.derivation = parsePath(derivationPath);
     }

@@ -7,6 +7,7 @@ import com.sparrowwallet.drongo.protocol.Script;
 import com.sparrowwallet.drongo.protocol.ScriptType;
 
 import java.util.Arrays;
+import java.util.Locale;
 
 public abstract class Address {
     protected final byte[] data;
@@ -106,7 +107,7 @@ public abstract class Address {
                 }
             }
 
-            if(address.toLowerCase().startsWith(network.getBech32AddressHRP())) {
+            if(address.toLowerCase(Locale.ROOT).startsWith(network.getBech32AddressHRP())) {
                 try {
                     Bech32.Bech32Data data = Bech32.decode(address);
                     if(data.hrp.equals(network.getBech32AddressHRP())) {

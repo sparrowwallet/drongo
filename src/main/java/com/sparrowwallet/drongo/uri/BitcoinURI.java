@@ -154,7 +154,7 @@ public class BitcoinURI {
             if(sepIndex == 0) {
                 throw new BitcoinURIParseException("Malformed Bitcoin URI - empty name '" + nameValuePairToken + "'");
             }
-            final String nameToken = nameValuePairToken.substring(0, sepIndex).toLowerCase(Locale.ENGLISH);
+            final String nameToken = nameValuePairToken.substring(0, sepIndex).toLowerCase(Locale.ROOT);
             final String valueToken = nameValuePairToken.substring(sepIndex + 1);
 
             // Parse the amount.

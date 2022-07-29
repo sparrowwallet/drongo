@@ -1,5 +1,7 @@
 package com.sparrowwallet.drongo;
 
+import java.util.Locale;
+
 public enum Network {
     MAINNET("mainnet", 0, "1", 5, "3", "bc", ExtendedKey.Header.xprv, ExtendedKey.Header.xpub, 128, 8332),
     TESTNET("testnet", 111, "mn", 196, "2", "tb", ExtendedKey.Header.tprv, ExtendedKey.Header.tpub, 239, 18332),
@@ -39,7 +41,7 @@ public enum Network {
     }
 
     public String toDisplayString() {
-        return name.substring(0, 1).toUpperCase() + name.substring(1);
+        return name.substring(0, 1).toUpperCase(Locale.ROOT) + name.substring(1);
     }
 
     public int getP2PKHAddressHeader() {

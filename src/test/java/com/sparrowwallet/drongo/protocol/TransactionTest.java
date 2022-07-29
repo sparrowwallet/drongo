@@ -10,6 +10,7 @@ import org.junit.Test;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.util.Locale;
 import java.util.Map;
 import java.util.TreeMap;
 
@@ -484,9 +485,9 @@ public class TransactionTest {
     @Test
     public void signBip340() {
         ECKey privKey = ECKey.fromPrivate(Utils.hexToBytes("0000000000000000000000000000000000000000000000000000000000000003"));
-        Assert.assertEquals("F9308A019258C31049344F85F89D5229B531C845836F99B08601F113BCE036F9", Utils.bytesToHex(privKey.getPubKeyXCoord()).toUpperCase());
+        Assert.assertEquals("F9308A019258C31049344F85F89D5229B531C845836F99B08601F113BCE036F9", Utils.bytesToHex(privKey.getPubKeyXCoord()).toUpperCase(Locale.ROOT));
         SchnorrSignature sig = privKey.signSchnorr(Sha256Hash.ZERO_HASH);
-        Assert.assertEquals("E907831F80848D1069A5371B402410364BDF1C5F8307B0084C55F1CE2DCA821525F66A4A85EA8B71E482A74F382D2CE5EBEEE8FDB2172F477DF4900D310536C0", Utils.bytesToHex(sig.encode()).toUpperCase());
+        Assert.assertEquals("E907831F80848D1069A5371B402410364BDF1C5F8307B0084C55F1CE2DCA821525F66A4A85EA8B71E482A74F382D2CE5EBEEE8FDB2172F477DF4900D310536C0", Utils.bytesToHex(sig.encode()).toUpperCase(Locale.ROOT));
     }
 
     @Test
