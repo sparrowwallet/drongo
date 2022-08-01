@@ -272,7 +272,8 @@ public class WalletNode extends Persistable implements Comparable<WalletNode> {
             return address;
         }
 
-        if(wallet.getKeystores().stream().noneMatch(Keystore::needsPassphrase)) {
+        Wallet masterWallet = wallet.isMasterWallet() ? wallet : wallet.getMasterWallet();
+        if(masterWallet.getKeystores().stream().noneMatch(Keystore::needsPassphrase)) {
             address = wallet.getAddress(this);
             return address;
         }
