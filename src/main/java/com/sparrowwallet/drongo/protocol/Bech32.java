@@ -150,10 +150,14 @@ public class Bech32 {
 
     /** Decode a Bech32 string. */
     public static Bech32Data decode(final String str) {
+        return decode(str, 90);
+    }
+
+    public static Bech32Data decode(final String str, int limit) {
         boolean lower = false, upper = false;
         if (str.length() < 8)
             throw new ProtocolException("Input too short: " + str.length());
-        if (str.length() > 90)
+        if (str.length() > limit)
             throw new ProtocolException("Input too long: " + str.length());
         for (int i = 0; i < str.length(); ++i) {
             char c = str.charAt(i);

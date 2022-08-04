@@ -38,6 +38,9 @@ public class PaymentCode {
     private final byte[] pubkey;
     private final byte[] chain;
 
+    public static final List<ScriptType> SEGWIT_SCRIPT_TYPES = List.of(ScriptType.P2PKH, ScriptType.P2SH_P2WPKH, ScriptType.P2WPKH);
+    public static final List<ScriptType> V1_SCRIPT_TYPES = List.of(ScriptType.P2PKH);
+
     private PaymentCode(String strPaymentCode, byte[] pubkey, byte[] chain) {
         this.strPaymentCode = strPaymentCode;
         this.pubkey = pubkey;
