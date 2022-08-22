@@ -64,6 +64,9 @@ public class FinalizingPSBTWallet extends Wallet {
             }
         }
 
+        setGapLimit(0);
+        purposeNode.setChildren(new TreeSet<>());
+
         setPolicyType(numSignatures == 1 ? PolicyType.SINGLE : PolicyType.MULTI);
     }
 
