@@ -351,6 +351,25 @@ public class ECKey {
         return pub.isCompressed();
     }
 
+    public TransactionSignature sign(Sha256Hash input, SigHash sigHash, TransactionSignature.Type type) {
+        TransactionSignature transactionSignature;
+
+        if(type == TransactionSignature.Type.SCHNORR) {
+            SchnorrSignature schnorrSignature = signSchnorr(input);
+            transactionSignature = new TransactionSignature(schnorrSignature, sigHash);
+        } else {
+            ECDSASignature ecdsaSignature = signEcdsa(input);
+            transactionSignature = new TransactionSignature(ecdsaSignature, sigHash);
+        }
+
+        //Verify transaction signature immediately after signing as recommended in BIP340
+        if(!transactionSignature.verify(input.getBytes(), this)) {
+            throw new IllegalStateException("Generated signature failed verification");
+        }
+
+        return transactionSignature;
+    }
+
     /**
      * Signs the given hash and returns the R and S components as an ECDSASignature.
      */

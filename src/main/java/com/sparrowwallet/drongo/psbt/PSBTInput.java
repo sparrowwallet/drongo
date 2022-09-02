@@ -2,9 +2,7 @@ package com.sparrowwallet.drongo.psbt;
 
 import com.sparrowwallet.drongo.KeyDerivation;
 import com.sparrowwallet.drongo.Utils;
-import com.sparrowwallet.drongo.crypto.ECDSASignature;
 import com.sparrowwallet.drongo.crypto.ECKey;
-import com.sparrowwallet.drongo.crypto.SchnorrSignature;
 import com.sparrowwallet.drongo.protocol.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -14,6 +12,7 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 import static com.sparrowwallet.drongo.protocol.ScriptType.*;
+import static com.sparrowwallet.drongo.protocol.TransactionSignature.Type.*;
 import static com.sparrowwallet.drongo.psbt.PSBTEntry.*;
 
 public class PSBTInput {
@@ -136,7 +135,7 @@ public class PSBTInput {
                         break;
                     }
                     //TODO: Verify signature
-                    TransactionSignature signature = TransactionSignature.decodeFromBitcoin(TransactionSignature.Type.ECDSA, entry.getData(), true);
+                    TransactionSignature signature = TransactionSignature.decodeFromBitcoin(ECDSA, entry.getData(), true);
                     this.partialSignatures.put(sigPublicKey, signature);
                     log.debug("Found input partial signature with public key " + sigPublicKey + " signature " + Utils.bytesToHex(entry.getData()));
                     break;
@@ -221,7 +220,7 @@ public class PSBTInput {
                     break;
                 case PSBT_IN_TAP_KEY_SIG:
                     entry.checkOneByteKey();
-                    this.tapKeyPathSignature = TransactionSignature.decodeFromBitcoin(TransactionSignature.Type.SCHNORR, entry.getData(), true);
+                    this.tapKeyPathSignature = TransactionSignature.decodeFromBitcoin(SCHNORR, entry.getData(), true);
                     log.debug("Found input taproot key path signature " + Utils.bytesToHex(entry.getData()));
                     break;
                 case PSBT_IN_TAP_BIP32_DERIVATION:
@@ -529,21 +528,17 @@ public class PSBTInput {
             Script signingScript = getSigningScript();
             if(signingScript != null) {
                 Sha256Hash hash = getHashForSignature(signingScript, localSigHash);
+                TransactionSignature.Type type = isTaproot() ? SCHNORR : ECDSA;
+                TransactionSignature transactionSignature = privKey.sign(hash, localSigHash, type);
 
-                if(isTaproot()) {
-                    SchnorrSignature schnorrSignature = privKey.signSchnorr(hash);
-                    tapKeyPathSignature = new TransactionSignature(schnorrSignature, localSigHash);
-
-                    return true;
+                if(type == SCHNORR) {
+                    tapKeyPathSignature = transactionSignature;
                 } else {
-                    ECDSASignature ecdsaSignature = privKey.signEcdsa(hash);
-                    TransactionSignature transactionSignature = new TransactionSignature(ecdsaSignature, localSigHash);
-
                     ECKey pubKey = ECKey.fromPublicOnly(privKey);
                     getPartialSignatures().put(pubKey, transactionSignature);
-
-                    return true;
                 }
+
+                return true;
             }
         }
 
