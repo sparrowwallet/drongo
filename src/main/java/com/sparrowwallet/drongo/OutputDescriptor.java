@@ -401,7 +401,7 @@ public class OutputDescriptor {
             int pos = INPUT_CHARSET.indexOf(ch);
 
             if(pos < 0) {
-                return "";
+                continue;
             }
 
             c = polyMod(c, pos & 31); // Emit a symbol for the position inside the group, for every character.
