@@ -42,6 +42,8 @@ public class Secp256k1Context {
                 NativeUtils.loadLibraryFromJar("/native/osx/x64/libsecp256k1.dylib");
             } else if(osName.startsWith("Windows")) {
                 NativeUtils.loadLibraryFromJar("/native/windows/x64/libsecp256k1-0.dll");
+            } else if(osArch.equals("aarch64")) {
+                NativeUtils.loadLibraryFromJar("/native/linux/aarch64/libsecp256k1.so");
             } else {
                 NativeUtils.loadLibraryFromJar("/native/linux/x64/libsecp256k1.so");
             }
