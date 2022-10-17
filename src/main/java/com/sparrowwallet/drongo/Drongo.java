@@ -83,6 +83,11 @@ public class Drongo {
         root.setLevel(ch.qos.logback.classic.Level.toLevel(level.toString()));
     }
 
+    public static void removeRootLogAppender(String appenderName) {
+        ch.qos.logback.classic.Logger root = (ch.qos.logback.classic.Logger)LoggerFactory.getLogger(org.slf4j.Logger.ROOT_LOGGER_NAME);
+        root.detachAppender(appenderName);
+    }
+
     public static Provider getProvider() {
         return new BouncyCastleProvider();
     }
