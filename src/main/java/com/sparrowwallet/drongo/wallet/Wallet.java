@@ -38,6 +38,7 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
     private final TreeSet<WalletNode> purposeNodes = new TreeSet<>();
     private final Map<Sha256Hash, BlockTransaction> transactions = new HashMap<>();
     private final Map<String, String> detachedLabels = new HashMap<>();
+    private WalletConfig walletConfig;
     private MixConfig mixConfig;
     private final Map<Sha256Hash, UtxoMixData> utxoMixes = new HashMap<>();
     private Integer storedBlockHeight;
@@ -439,6 +440,26 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
 
     public Map<String, String> getDetachedLabels() {
         return detachedLabels;
+    }
+
+    public WalletConfig getWalletConfig() {
+        return walletConfig;
+    }
+
+    public WalletConfig getMasterWalletConfig() {
+        if(!isMasterWallet()) {
+            return getMasterWallet().getMasterWalletConfig();
+        }
+
+        if(walletConfig == null) {
+            walletConfig = new WalletConfig();
+        }
+
+        return walletConfig;
+    }
+
+    public void setWalletConfig(WalletConfig walletConfig) {
+        this.walletConfig = walletConfig;
     }
 
     public MixConfig getMixConfig() {
@@ -1805,6 +1826,7 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
         for(String entry : detachedLabels.keySet()) {
             copy.detachedLabels.put(entry, detachedLabels.get(entry));
         }
+        copy.setWalletConfig(walletConfig == null ? null : walletConfig.copy());
         copy.setMixConfig(mixConfig == null ? null : mixConfig.copy());
         for(Sha256Hash hash : utxoMixes.keySet()) {
             copy.utxoMixes.put(hash, utxoMixes.get(hash));
