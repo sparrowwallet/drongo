@@ -275,6 +275,10 @@ public class OutputDescriptor {
         return wallet;
     }
 
+    public static String toDescriptorString(Address address) {
+        return "addr(" + address + ")";
+    }
+
     public static OutputDescriptor getOutputDescriptor(Wallet wallet) {
         return getOutputDescriptor(wallet, null);
     }
@@ -390,6 +394,17 @@ public class OutputDescriptor {
         }
 
         return new OutputDescriptor(scriptType, multisigThreshold, keyDerivationMap, keyChildDerivationMap);
+    }
+
+    public static String normalize(String descriptor) {
+        String normalized = descriptor.replaceAll("'", "h");
+
+        int checksumHash = normalized.lastIndexOf('#');
+        if(checksumHash > -1) {
+            normalized = normalized.substring(0, checksumHash);
+        }
+
+        return normalized + "#" + getChecksum(normalized);
     }
 
     private static String getChecksum(String descriptor) {
