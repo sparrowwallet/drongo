@@ -1802,12 +1802,16 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
     }
 
     public Wallet copy() {
+        return copy(true);
+    }
+
+    public Wallet copy(boolean includeHistory) {
         Wallet copy = new Wallet(name);
         copy.setId(getId());
         copy.setLabel(label);
         copy.setMasterWallet(masterWallet);
         for(Wallet childWallet : childWallets) {
-            Wallet copyChildWallet = childWallet.copy();
+            Wallet copyChildWallet = childWallet.copy(includeHistory);
             copyChildWallet.setMasterWallet(copy);
             copy.childWallets.add(copyChildWallet);
         }
@@ -1817,20 +1821,22 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
         for(Keystore keystore : keystores) {
             copy.getKeystores().add(keystore.copy());
         }
-        for(WalletNode node : purposeNodes) {
-            copy.purposeNodes.add(node.copy(copy));
-        }
-        for(Sha256Hash hash : transactions.keySet()) {
-            copy.transactions.put(hash, transactions.get(hash));
-        }
-        for(String entry : detachedLabels.keySet()) {
-            copy.detachedLabels.put(entry, detachedLabels.get(entry));
+        if(includeHistory) {
+            for(WalletNode node : purposeNodes) {
+                copy.purposeNodes.add(node.copy(copy));
+            }
+            for(Sha256Hash hash : transactions.keySet()) {
+                copy.transactions.put(hash, transactions.get(hash));
+            }
+            for(String entry : detachedLabels.keySet()) {
+                copy.detachedLabels.put(entry, detachedLabels.get(entry));
+            }
+            for(Sha256Hash hash : utxoMixes.keySet()) {
+                copy.utxoMixes.put(hash, utxoMixes.get(hash));
+            }
         }
         copy.setWalletConfig(walletConfig == null ? null : walletConfig.copy());
         copy.setMixConfig(mixConfig == null ? null : mixConfig.copy());
-        for(Sha256Hash hash : utxoMixes.keySet()) {
-            copy.utxoMixes.put(hash, utxoMixes.get(hash));
-        }
         copy.setStoredBlockHeight(getStoredBlockHeight());
         copy.gapLimit = gapLimit;
         copy.watchLast = watchLast;
