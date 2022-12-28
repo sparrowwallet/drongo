@@ -59,7 +59,6 @@ dependencies {
         exclude group: 'org.hamcrest', module: 'hamcrest-core'
     }
     testImplementation group: 'org.hamcrest', name: 'hamcrest-core', version: '2.2'
-    implementation 'de.sfuhrm:saphir-hash-core:3.0.10'
 }
 
 processResources {
@@ -116,8 +115,5 @@ extraJavaModuleInfo {
     module('jnacl-1.0.0.jar', 'eu.neilalexander.jnacl', '1.0.0')
     module('junit-4.12.jar', 'junit', '4.12') {
         exports('org.junit')
-    }
-    module('saphir-hash-core-3.0.10.jar', 'de.sfuhrm', '3.0.10') {
-        exports('de.sfuhrm')
     }
 }
