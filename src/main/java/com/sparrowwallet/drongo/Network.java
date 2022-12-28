@@ -5,7 +5,7 @@ import java.util.Locale;
 public enum Network {
     MAINNET("mainnet", 36, "F", 5, "3", "grs", ExtendedKey.Header.xprv, ExtendedKey.Header.xpub, 128, 1331),
     TESTNET("testnet", 111, "mn", 196, "2", "tgrs", ExtendedKey.Header.tprv, ExtendedKey.Header.tpub, 239, 17777),
-    REGTEST("regtest", 111, "mn", 239, "2", "grsrt", ExtendedKey.Header.tprv, ExtendedKey.Header.tpub, 239, 18888);
+    REGTEST("regtest", 111, "mn", 239, "2", "grsrt", ExtendedKey.Header.tprv, ExtendedKey.Header.tpub, 239, 18888),
     SIGNET("signet", 111, "mn", 196, "2", "tgrs", ExtendedKey.Header.tprv, ExtendedKey.Header.tpub, 239, 31331);
 
     public static final String BLOCK_HEIGHT_PROPERTY = "com.sparrowwallet.blockHeight";
