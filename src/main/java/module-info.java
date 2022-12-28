@@ -1,8 +1,9 @@
 open module com.sparrowwallet.drongo {
     requires org.bouncycastle.provider;
-    requires de.mkammerer.argon2;
-    requires slf4j.api;
+    requires de.mkammerer.argon2.nolibs;
+    requires org.slf4j;
     requires logback.core;
+    requires logback.classic;
     requires json.simple;
     requires jeromq;
     exports com.sparrowwallet.drongo;
@@ -13,4 +14,6 @@ open module com.sparrowwallet.drongo {
     exports com.sparrowwallet.drongo.wallet;
     exports com.sparrowwallet.drongo.policy;
     exports com.sparrowwallet.drongo.uri;
+    exports com.sparrowwallet.drongo.bip47;
+    exports org.bitcoin;
 }

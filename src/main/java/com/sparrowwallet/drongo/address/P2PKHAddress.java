@@ -20,16 +20,6 @@ public class P2PKHAddress extends Address {
     }
 
     @Override
-    public Script getOutputScript() {
-        return getScriptType().getOutputScript(hash);
-    }
-
-    @Override
-    public byte[] getOutputScriptData() {
-        return hash;
-    }
-
-    @Override
     public String getOutputScriptDataType() {
         return "Public Key Hash";
     }

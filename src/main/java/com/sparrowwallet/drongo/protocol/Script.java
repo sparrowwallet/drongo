@@ -136,6 +136,21 @@ public class Script {
     }
 
     /**
+     * <p>If the program somehow pays to a pubkey, returns the pubkey.</p>
+     *
+     * <p>Otherwise this method throws a ScriptException.</p>
+     */
+    public ECKey getPubKey() throws ProtocolException {
+        for(ScriptType scriptType : SINGLE_KEY_TYPES) {
+            if(scriptType.isScriptType(this)) {
+                return scriptType.getPublicKeyFromScript(this);
+            }
+        }
+
+        throw new ProtocolException("Script not a standard form that contains a single key");
+    }
+
+    /**
      * <p>If the program somehow pays to a hash, returns the hash.</p>
      *
      * <p>Otherwise this method throws a ScriptException.</p>
@@ -150,6 +165,14 @@ public class Script {
         throw new ProtocolException("Script not a standard form that contains a single hash");
     }
 
+    public Address getToAddress() {
+        try {
+            return getToAddresses()[0];
+        } catch(Exception e) {
+            return null;
+        }
+    }
+
     /**
      * Gets the destination address from this script, if it's in the required form.
      */
@@ -160,8 +183,15 @@ public class Script {
             }
         }
 
-        if(P2PK.isScriptType(this)) {
-            return new Address[] { P2PK.getAddress(P2PK.getPublicKeyFromScript(this).getPubKey()) };
+        //Special handling for taproot tweaked keys - we don't want to tweak them again
+        if(P2TR.isScriptType(this)) {
+            return new Address[] { new P2TRAddress(P2TR.getPublicKeyFromScript(this).getPubKeyXCoord()) };
+        }
+
+        for(ScriptType scriptType : SINGLE_KEY_TYPES) {
+            if(scriptType.isScriptType(this)) {
+                return new Address[] { scriptType.getAddress(scriptType.getPublicKeyFromScript(this)) };
+            }
         }
 
         if(MULTISIG.isScriptType(this)) {
@@ -178,7 +208,8 @@ public class Script {
     }
 
     public int getNumRequiredSignatures() throws NonStandardScriptException {
-        if(P2PK.isScriptType(this) || P2PKH.isScriptType(this) || P2WPKH.isScriptType(this)) {
+        //TODO: Handle P2TR script path spends
+        if(P2PK.isScriptType(this) || P2PKH.isScriptType(this) || P2WPKH.isScriptType(this) || P2TR.isScriptType(this)) {
             return 1;
         }
 

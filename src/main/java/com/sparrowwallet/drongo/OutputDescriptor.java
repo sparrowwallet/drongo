@@ -9,10 +9,7 @@ import com.sparrowwallet.drongo.policy.PolicyType;
 import com.sparrowwallet.drongo.protocol.ProtocolException;
 import com.sparrowwallet.drongo.protocol.Script;
 import com.sparrowwallet.drongo.protocol.ScriptType;
-import com.sparrowwallet.drongo.wallet.Keystore;
-import com.sparrowwallet.drongo.wallet.KeystoreSource;
-import com.sparrowwallet.drongo.wallet.Wallet;
-import com.sparrowwallet.drongo.wallet.WalletModel;
+import com.sparrowwallet.drongo.wallet.*;
 
 import java.math.BigInteger;
 import java.util.*;
@@ -25,10 +22,11 @@ public class OutputDescriptor {
     private static final String INPUT_CHARSET = "0123456789()[],'/*abcdefgh@:$%{}IJKLMNOPQRSTUVWXYZ&+-.;<=>?!^_|~ijklmnopqrstuvwxyzABCDEFGH`#\"\\ ";
     private static final String CHECKSUM_CHARSET = "qpzry9x8gf2tvdw0s3jn54khce6mua7l";
 
-    private static final Pattern XPUB_PATTERN = Pattern.compile("(\\[[^\\]]+\\])?(.pub[^/\\,)]{100,112})(/[/\\d*'hH]+)?");
+    private static final Pattern XPUB_PATTERN = Pattern.compile("(\\[[^\\]]+\\])?(.pub[^/\\,)]{100,112})(/[/\\d*'hH<>;]+)?");
     private static final Pattern PUBKEY_PATTERN = Pattern.compile("(\\[[^\\]]+\\])?(0[23][0-9a-fA-F]{32})");
     private static final Pattern MULTI_PATTERN = Pattern.compile("multi\\(([\\d+])");
     private static final Pattern KEY_ORIGIN_PATTERN = Pattern.compile("\\[([A-Fa-f0-9]{8})([/\\d'hH]+)\\]");
+    private static final Pattern MULTIPATH_PATTERN = Pattern.compile("<([\\d*'hH;]+)>");
     private static final Pattern CHECKSUM_PATTERN = Pattern.compile("#([" + CHECKSUM_CHARSET + "]{8})$");
 
     private final ScriptType scriptType;
@@ -134,6 +132,10 @@ public class OutputDescriptor {
         return extendedPublicKeys.size() > 1;
     }
 
+    public boolean isCosigner() {
+        return !isMultisig() && scriptType.isAllowed(PolicyType.MULTI);
+    }
+
     public ExtendedKey getSingletonExtendedPublicKey() {
         if(isMultisig()) {
             throw new IllegalStateException("Output descriptor contains multiple public keys but singleton requested");
@@ -235,7 +237,7 @@ public class OutputDescriptor {
 
     public Wallet toWallet() {
         Wallet wallet = new Wallet();
-        wallet.setPolicyType(isMultisig() ? PolicyType.MULTI : PolicyType.SINGLE);
+        wallet.setPolicyType(isMultisig() || isCosigner() ? PolicyType.MULTI : PolicyType.SINGLE);
         wallet.setScriptType(scriptType);
 
         for(Map.Entry<ExtendedKey,KeyDerivation> extKeyEntry : extendedPublicKeys.entrySet()) {
@@ -252,17 +254,59 @@ public class OutputDescriptor {
         return wallet;
     }
 
+    public Wallet toKeystoreWallet(String masterFingerprint) {
+        Wallet wallet = new Wallet();
+        if(isMultisig()) {
+            throw new IllegalStateException("Multisig output descriptors are unsupported.");
+        }
+
+        ExtendedKey extendedKey = getSingletonExtendedPublicKey();
+        if(masterFingerprint == null) {
+            masterFingerprint = getKeyDerivation(extendedKey).getMasterFingerprint();
+        }
+
+        wallet.setScriptType(getScriptType());
+        Keystore keystore = new Keystore();
+        keystore.setKeyDerivation(new KeyDerivation(masterFingerprint, KeyDerivation.writePath(getKeyDerivation(extendedKey).getDerivation())));
+        keystore.setExtendedPublicKey(extendedKey);
+        wallet.getKeystores().add(keystore);
+        wallet.setDefaultPolicy(Policy.getPolicy(isCosigner() ? PolicyType.MULTI : PolicyType.SINGLE, wallet.getScriptType(), wallet.getKeystores(), 1));
+
+        return wallet;
+    }
+
+    public static String toDescriptorString(Address address) {
+        return "addr(" + address + ")";
+    }
+
     public static OutputDescriptor getOutputDescriptor(Wallet wallet) {
         return getOutputDescriptor(wallet, null);
     }
 
     public static OutputDescriptor getOutputDescriptor(Wallet wallet, KeyPurpose keyPurpose) {
+        return getOutputDescriptor(wallet, keyPurpose, null);
+    }
+
+    public static OutputDescriptor getOutputDescriptor(Wallet wallet, KeyPurpose keyPurpose, Integer index) {
+        return getOutputDescriptor(wallet, keyPurpose == null ? null : List.of(keyPurpose), index);
+    }
+
+    public static OutputDescriptor getOutputDescriptor(Wallet wallet, List<KeyPurpose> keyPurposes, Integer index) {
         Map<ExtendedKey, KeyDerivation> extendedKeyDerivationMap = new LinkedHashMap<>();
         Map<ExtendedKey, String> extendedKeyChildDerivationMap = new LinkedHashMap<>();
         for(Keystore keystore : wallet.getKeystores()) {
             extendedKeyDerivationMap.put(keystore.getExtendedPublicKey(), keystore.getKeyDerivation());
-            if(keyPurpose != null) {
-                extendedKeyChildDerivationMap.put(keystore.getExtendedPublicKey(), keyPurpose.getPathIndex().num() + "/*");
+            if(keyPurposes != null) {
+                String chain;
+                if(keyPurposes.size() == 1) {
+                    chain = Integer.toString(keyPurposes.get(0).getPathIndex().num());
+                } else {
+                    StringJoiner joiner = new StringJoiner(";");
+                    keyPurposes.forEach(keyPurpose -> joiner.add(Integer.toString(keyPurpose.getPathIndex().num())));
+                    chain = "<" + joiner + ">";
+                }
+
+                extendedKeyChildDerivationMap.put(keystore.getExtendedPublicKey(), chain + "/" + (index == null ? "*" : index));
             }
         }
 
@@ -352,6 +396,17 @@ public class OutputDescriptor {
         return new OutputDescriptor(scriptType, multisigThreshold, keyDerivationMap, keyChildDerivationMap);
     }
 
+    public static String normalize(String descriptor) {
+        String normalized = descriptor.replaceAll("'", "h");
+
+        int checksumHash = normalized.lastIndexOf('#');
+        if(checksumHash > -1) {
+            normalized = normalized.substring(0, checksumHash);
+        }
+
+        return normalized + "#" + getChecksum(normalized);
+    }
+
     private static String getChecksum(String descriptor) {
         BigInteger c = BigInteger.valueOf(1);
         int cls = 0;
@@ -361,7 +416,7 @@ public class OutputDescriptor {
             int pos = INPUT_CHARSET.indexOf(ch);
 
             if(pos < 0) {
-                return "";
+                continue;
             }
 
             c = polyMod(c, pos & 31); // Emit a symbol for the position inside the group, for every character.
@@ -394,7 +449,7 @@ public class OutputDescriptor {
     private static BigInteger polyMod(BigInteger c, int val)
     {
         byte c0 = c.shiftRight(35).byteValue();
-        c = c.and(new BigInteger("7ffffffff", 16)).shiftLeft(5).or(BigInteger.valueOf(val));
+        c = c.and(new BigInteger("7ffffffff", 16)).shiftLeft(5).xor(BigInteger.valueOf(val));
 
         if((c0 & 1) > 0) {
             c = c.xor(new BigInteger("f5dee51989", 16));
@@ -431,7 +486,7 @@ public class OutputDescriptor {
             builder.append(ScriptType.MULTISIG.getDescriptor());
             StringJoiner joiner = new StringJoiner(",");
             joiner.add(Integer.toString(multisigThreshold));
-            for(ExtendedKey pubKey : extendedPublicKeys.keySet()) {
+            for(ExtendedKey pubKey : sortExtendedPubKeys(extendedPublicKeys.keySet())) {
                 String extKeyString = toString(pubKey, addKeyOrigin);
                 joiner.add(extKeyString);
             }
@@ -452,6 +507,47 @@ public class OutputDescriptor {
         return builder.toString();
     }
 
+    private List<ExtendedKey> sortExtendedPubKeys(Collection<ExtendedKey> keys) {
+        List<ExtendedKey> sortedKeys = new ArrayList<>(keys);
+        if(mapChildrenDerivations == null || mapChildrenDerivations.isEmpty() || mapChildrenDerivations.containsKey(null)) {
+            return sortedKeys;
+        }
+
+        Utils.LexicographicByteArrayComparator lexicographicByteArrayComparator = new Utils.LexicographicByteArrayComparator();
+        sortedKeys.sort((o1, o2) -> {
+            ECKey key1 = getChildKeyForExtendedPubKey(o1);
+            ECKey key2 = getChildKeyForExtendedPubKey(o2);
+            return lexicographicByteArrayComparator.compare(key1.getPubKey(), key2.getPubKey());
+        });
+
+        return sortedKeys;
+    }
+
+    private ECKey getChildKeyForExtendedPubKey(ExtendedKey extendedKey) {
+        if(mapChildrenDerivations.get(extendedKey) == null) {
+            return extendedKey.getKey();
+        }
+
+        List<ChildNumber> derivation = getDerivations(mapChildrenDerivations.get(extendedKey)).get(0);
+        derivation.add(0, extendedKey.getKeyChildNumber());
+        return extendedKey.getKey(derivation);
+    }
+
+    private List<List<ChildNumber>> getDerivations(String childDerivation) {
+        Matcher matcher = MULTIPATH_PATTERN.matcher(childDerivation);
+        if(matcher.find()) {
+            String multipath = matcher.group(1);
+            String[] paths = multipath.split(";");
+            List<List<ChildNumber>> derivations = new ArrayList<>();
+            for(String path : paths) {
+                derivations.add(KeyDerivation.parsePath(childDerivation.replace(matcher.group(), path)));
+            }
+            return derivations;
+        } else {
+            return List.of(KeyDerivation.parsePath(childDerivation));
+        }
+    }
+
     private String toString(ExtendedKey pubKey, boolean addKeyOrigin) {
         StringBuilder keyBuilder = new StringBuilder();
         KeyDerivation keyDerivation = extendedPublicKeys.get(pubKey);
@@ -461,7 +557,7 @@ public class OutputDescriptor {
                 keyBuilder.append(keyDerivation.getMasterFingerprint());
                 keyBuilder.append("/");
             }
-            keyBuilder.append(keyDerivation.getDerivationPath().replaceFirst("^m?/", ""));
+            keyBuilder.append(keyDerivation.getDerivationPath().replaceFirst("^m?/", "").replace('\'', 'h'));
             keyBuilder.append("]");
         }
 

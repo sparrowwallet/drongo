@@ -104,8 +104,10 @@ public class WalletTest {
         wallet.getKeystores().add(keystore);
         wallet.setDefaultPolicy(Policy.getPolicy(PolicyType.SINGLE, ScriptType.P2PKH, wallet.getKeystores(), 1));
 
-        Assert.assertEquals("12kTQjuWDp7Uu6PwY6CsS1KLTt3d1DBHZa", wallet.getAddress(KeyPurpose.RECEIVE, 0).toString());
-        Assert.assertEquals("1HbQwQCitHQxVtP39isXmUdHx7hQCZovrK", wallet.getAddress(KeyPurpose.RECEIVE, 1).toString());
+        WalletNode receive0 = new WalletNode(wallet, KeyPurpose.RECEIVE, 0);
+        Assert.assertEquals("12kTQjuWDp7Uu6PwY6CsS1KLTt3d1DBHZa", receive0.getAddress().toString());
+        WalletNode receive1 = new WalletNode(wallet, KeyPurpose.RECEIVE, 1);
+        Assert.assertEquals("1HbQwQCitHQxVtP39isXmUdHx7hQCZovrK", receive1.getAddress().toString());
     }
 
     @Test
@@ -119,8 +121,10 @@ public class WalletTest {
         wallet.getKeystores().add(keystore);
         wallet.setDefaultPolicy(Policy.getPolicy(PolicyType.SINGLE, ScriptType.P2SH_P2WPKH, wallet.getKeystores(), 1));
 
-        Assert.assertEquals("3NZLE4TntsjtcZ5MbrfxwtYo9meBVybVQj", wallet.getAddress(KeyPurpose.RECEIVE, 0).toString());
-        Assert.assertEquals("32YBBuRsp8XTeLx4T6BmD2L4nANGaNDkSg", wallet.getAddress(KeyPurpose.RECEIVE, 1).toString());
+        WalletNode receive0 = new WalletNode(wallet, KeyPurpose.RECEIVE, 0);
+        Assert.assertEquals("3NZLE4TntsjtcZ5MbrfxwtYo9meBVybVQj", receive0.getAddress().toString());
+        WalletNode receive1 = new WalletNode(wallet, KeyPurpose.RECEIVE, 1);
+        Assert.assertEquals("32YBBuRsp8XTeLx4T6BmD2L4nANGaNDkSg", receive1.getAddress().toString());
     }
 
     @Test
@@ -134,8 +138,10 @@ public class WalletTest {
         wallet.getKeystores().add(keystore);
         wallet.setDefaultPolicy(Policy.getPolicy(PolicyType.SINGLE, ScriptType.P2WPKH, wallet.getKeystores(), 1));
 
-        Assert.assertEquals("bc1quvxdut936uswuxwxrk6nvjmgwxh463r0fjwn55", wallet.getAddress(KeyPurpose.RECEIVE, 0).toString());
-        Assert.assertEquals("bc1q95j2862dz7mqpraw6qdjc70gumyu5z7adgq9x9", wallet.getAddress(KeyPurpose.RECEIVE, 1).toString());
+        WalletNode receive0 = new WalletNode(wallet, KeyPurpose.RECEIVE, 0);
+        Assert.assertEquals("bc1quvxdut936uswuxwxrk6nvjmgwxh463r0fjwn55", receive0.getAddress().toString());
+        WalletNode receive1 = new WalletNode(wallet, KeyPurpose.RECEIVE, 1);
+        Assert.assertEquals("bc1q95j2862dz7mqpraw6qdjc70gumyu5z7adgq9x9", receive1.getAddress().toString());
     }
 
     @Test
@@ -159,8 +165,10 @@ public class WalletTest {
         wallet.getKeystores().add(keystore2);
         wallet.setDefaultPolicy(Policy.getPolicy(PolicyType.MULTI, ScriptType.P2SH, wallet.getKeystores(), 2));
 
-        Assert.assertEquals("38kq6yz4VcYymTExQPY3gppbz38mtPLveK", wallet.getAddress(KeyPurpose.RECEIVE, 0).toString());
-        Assert.assertEquals("3EdKaNsnjBTBggWcSMRyVju6GbHWy68mAH", wallet.getAddress(KeyPurpose.CHANGE, 1).toString());
+        WalletNode receive0 = new WalletNode(wallet, KeyPurpose.RECEIVE, 0);
+        Assert.assertEquals("38kq6yz4VcYymTExQPY3gppbz38mtPLveK", receive0.getAddress().toString());
+        WalletNode receive1 = new WalletNode(wallet, KeyPurpose.CHANGE, 1);
+        Assert.assertEquals("3EdKaNsnjBTBggWcSMRyVju6GbHWy68mAH", receive1.getAddress().toString());
     }
 
     @Test
@@ -184,8 +192,10 @@ public class WalletTest {
         wallet.getKeystores().add(keystore2);
         wallet.setDefaultPolicy(Policy.getPolicy(PolicyType.MULTI, ScriptType.P2SH_P2WSH, wallet.getKeystores(), 2));
 
-        Assert.assertEquals("3Mw8xqAHh8g3eBvh7q1UEUmoexqdXDK9Tf", wallet.getAddress(KeyPurpose.RECEIVE, 0).toString());
-        Assert.assertEquals("35dFo1ivJ8jyHpyf42MWvnYf5LBU8Siren", wallet.getAddress(KeyPurpose.CHANGE, 1).toString());
+        WalletNode receive0 = new WalletNode(wallet, KeyPurpose.RECEIVE, 0);
+        Assert.assertEquals("3Mw8xqAHh8g3eBvh7q1UEUmoexqdXDK9Tf", receive0.getAddress().toString());
+        WalletNode receive1 = new WalletNode(wallet, KeyPurpose.CHANGE, 1);
+        Assert.assertEquals("35dFo1ivJ8jyHpyf42MWvnYf5LBU8Siren", receive1.getAddress().toString());
     }
 
     @Test
@@ -209,8 +219,10 @@ public class WalletTest {
         wallet.getKeystores().add(keystore2);
         wallet.setDefaultPolicy(Policy.getPolicy(PolicyType.MULTI, ScriptType.P2WSH, wallet.getKeystores(), 2));
 
-        Assert.assertEquals("bc1q20e4vm656h5lvmngz9ztz6hjzftvh39yzngqhuqzk8qzj7tqnzaqgclrwc", wallet.getAddress(KeyPurpose.RECEIVE, 0).toString());
-        Assert.assertEquals("bc1q2epdx7dplwaas2jucfrzmxm8350rqh68hs6vqreysku80ye44mfqla85f2", wallet.getAddress(KeyPurpose.CHANGE, 1).toString());
+        WalletNode receive0 = new WalletNode(wallet, KeyPurpose.RECEIVE, 0);
+        Assert.assertEquals("bc1q20e4vm656h5lvmngz9ztz6hjzftvh39yzngqhuqzk8qzj7tqnzaqgclrwc", receive0.getAddress().toString());
+        WalletNode receive1 = new WalletNode(wallet, KeyPurpose.CHANGE, 1);
+        Assert.assertEquals("bc1q2epdx7dplwaas2jucfrzmxm8350rqh68hs6vqreysku80ye44mfqla85f2", receive1.getAddress().toString());
     }
 
     @Test
@@ -227,6 +239,7 @@ public class WalletTest {
         List<ChildNumber> derivation = List.of(keystore.getExtendedPublicKey().getKeyChildNumber(), new ChildNumber(0));
         Assert.assertEquals("027ecc656f4b91b92881b6f07cf876cd2e42b20df7acc4df54fc3315fbb2d13e1c", Utils.bytesToHex(extendedKey.getKey(derivation).getPubKey()));
 
-        Assert.assertEquals("bc1qarzeu6ncapyvjzdeayjq8vnzp6uvcn4eaeuuqq", wallet.getAddress(KeyPurpose.RECEIVE, 0).toString());
+        WalletNode receive0 = new WalletNode(wallet, KeyPurpose.RECEIVE, 0);
+        Assert.assertEquals("bc1qarzeu6ncapyvjzdeayjq8vnzp6uvcn4eaeuuqq", receive0.getAddress().toString());
     }
 }

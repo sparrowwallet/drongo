@@ -12,9 +12,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.math.BigInteger;
-import java.nio.Buffer;
 import java.nio.ByteBuffer;
-import java.nio.CharBuffer;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
 
@@ -113,6 +111,21 @@ public class Utils {
         System.arraycopy(src, srcPos, dest, destPos, length);
         Arrays.fill(src, (byte)0);
         return dest;
+    }
+
+    public static void reverse(byte[] array) {
+        for (int i = 0; i < array.length / 2; i++) {
+            byte temp = array[i];
+            array[i] = array[array.length - i - 1];
+            array[array.length - i - 1] = temp;
+        }
+    }
+
+    public static byte[] concat(byte[] a, byte[] b) {
+        byte[] c = new byte[a.length + b.length];
+        System.arraycopy(a, 0, c, 0, a.length);
+        System.arraycopy(b, 0, c, a.length, b.length);
+        return c;
     }
 
     /** Parse 4 bytes from the byte array (starting at the offset) as unsigned 32-bit integer in little endian format. */
@@ -283,6 +296,16 @@ public class Utils {
         byte[] out = new byte[64];
         hmacSha512.doFinal(out, 0);
         return out;
+    }
+
+    public static byte[] taggedHash(String tag, byte[] msg) {
+        byte[] hash = Sha256Hash.hash(tag.getBytes(StandardCharsets.UTF_8));
+        ByteBuffer buffer = ByteBuffer.allocate(hash.length + hash.length + msg.length);
+        buffer.put(hash);
+        buffer.put(hash);
+        buffer.put(msg);
+
+        return Sha256Hash.hash(buffer.array());
     }
 
     public static class LexicographicByteArrayComparator implements Comparator<byte[]> {

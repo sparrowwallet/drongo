@@ -5,11 +5,18 @@ import java.util.Collection;
 import java.util.List;
 import java.util.stream.Collectors;
 
-public class PresetUtxoSelector implements UtxoSelector {
+public class PresetUtxoSelector extends SingleSetUtxoSelector {
     private final Collection<BlockTransactionHashIndex> presetUtxos;
+    private final boolean maintainOrder;
 
     public PresetUtxoSelector(Collection<BlockTransactionHashIndex> presetUtxos) {
         this.presetUtxos = presetUtxos;
+        this.maintainOrder = false;
+    }
+
+    public PresetUtxoSelector(Collection<BlockTransactionHashIndex> presetUtxos, boolean maintainOrder) {
+        this.presetUtxos = presetUtxos;
+        this.maintainOrder = maintainOrder;
     }
 
     @Override
@@ -26,10 +33,19 @@ public class PresetUtxoSelector implements UtxoSelector {
             }
         }
 
+        if(maintainOrder && utxos.containsAll(presetUtxos)) {
+            return presetUtxos;
+        }
+
         return utxos;
     }
 
     public Collection<BlockTransactionHashIndex> getPresetUtxos() {
         return presetUtxos;
+    }
+
+    @Override
+    public boolean shuffleInputs() {
+        return !maintainOrder;
     }
 }

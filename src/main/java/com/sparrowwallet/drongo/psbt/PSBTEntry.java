@@ -3,6 +3,8 @@ package com.sparrowwallet.drongo.psbt;
 import com.sparrowwallet.drongo.KeyDerivation;
 import com.sparrowwallet.drongo.Utils;
 import com.sparrowwallet.drongo.crypto.ChildNumber;
+import com.sparrowwallet.drongo.protocol.Sha256Hash;
+import com.sparrowwallet.drongo.protocol.VarInt;
 
 import java.io.ByteArrayOutputStream;
 import java.nio.ByteBuffer;
@@ -10,6 +12,7 @@ import java.nio.ByteOrder;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 
 public class PSBTEntry {
     private final byte[] key;
@@ -55,6 +58,25 @@ public class PSBTEntry {
         }
     }
 
+    public static Map<KeyDerivation, List<Sha256Hash>> parseTaprootKeyDerivation(byte[] data) throws PSBTParseException {
+        if(data.length < 1) {
+            throw new PSBTParseException("Invalid taproot key derivation: no bytes");
+        }
+        VarInt varInt = new VarInt(data, 0);
+        int offset = varInt.getOriginalSizeInBytes();
+
+        if(data.length < offset + (varInt.value * 32)) {
+            throw new PSBTParseException("Invalid taproot key derivation: not enough bytes for leaf hashes");
+        }
+        List<Sha256Hash> leafHashes = new ArrayList<>();
+        for(int i = 0; i < varInt.value; i++) {
+            leafHashes.add(Sha256Hash.wrap(Arrays.copyOfRange(data, offset + (i * 32), offset + (i * 32) + 32)));
+        }
+
+        KeyDerivation keyDerivation = parseKeyDerivation(Arrays.copyOfRange(data, offset + (leafHashes.size() * 32), data.length));
+        return Map.of(keyDerivation, leafHashes);
+    }
+
     public static KeyDerivation parseKeyDerivation(byte[] data) throws PSBTParseException {
         if(data.length < 4) {
             throw new PSBTParseException("Invalid master fingerprint specified: not enough bytes");
@@ -64,7 +86,7 @@ public class PSBTEntry {
             throw new PSBTParseException("Invalid master fingerprint specified: " + masterFingerprint);
         }
         if(data.length < 8) {
-            throw new PSBTParseException("Invalid key derivation specified: not enough bytes");
+            return new KeyDerivation(masterFingerprint, "m");
         }
         List<ChildNumber> bip32pathList = readBIP32Derivation(Arrays.copyOfRange(data, 4, data.length));
         String bip32path = KeyDerivation.writePath(bip32pathList);
@@ -83,12 +105,25 @@ public class PSBTEntry {
 
         do {
             bb.get(buf);
-            reverse(buf);
+            Utils.reverse(buf);
             ByteBuffer pbuf = ByteBuffer.wrap(buf);
             path.add(new ChildNumber(pbuf.getInt()));
         } while(bb.hasRemaining());
 
         return path;
+    }
+
+    public static byte[] serializeTaprootKeyDerivation(List<Sha256Hash> leafHashes, KeyDerivation keyDerivation) {
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+
+        VarInt hashesLen = new VarInt(leafHashes.size());
+        baos.writeBytes(hashesLen.encode());
+        for(Sha256Hash leafHash : leafHashes) {
+            baos.writeBytes(leafHash.getBytes());
+        }
+
+        baos.writeBytes(serializeKeyDerivation(keyDerivation));
+        return baos.toByteArray();
     }
 
     public static byte[] serializeKeyDerivation(KeyDerivation keyDerivation) {
@@ -202,14 +237,6 @@ public class PSBTEntry {
         return bb.array();
     }
 
-    private static void reverse(byte[] array) {
-        for (int i = 0; i < array.length / 2; i++) {
-            byte temp = array[i];
-            array[i] = array[array.length - i - 1];
-            array[array.length - i - 1] = temp;
-        }
-    }
-
     public void checkOneByteKey() throws PSBTParseException {
         if(this.getKey().length != 1) {
             throw new PSBTParseException("PSBT key type must be one byte");
@@ -218,13 +245,19 @@ public class PSBTEntry {
 
     public void checkOneBytePlusXpubKey() throws PSBTParseException {
         if(this.getKey().length != 79) {
-            throw new PSBTParseException("PSBT key type must be one byte");
+            throw new PSBTParseException("PSBT key type must be one byte plus xpub");
         }
     }
 
     public void checkOneBytePlusPubKey() throws PSBTParseException {
         if(this.getKey().length != 34) {
-            throw new PSBTParseException("PSBT key type must be one byte");
+            throw new PSBTParseException("PSBT key type must be one byte plus pub key");
+        }
+    }
+
+    public void checkOneBytePlusXOnlyPubKey() throws PSBTParseException {
+        if(this.getKey().length != 33) {
+            throw new PSBTParseException("PSBT key type must be one byte plus x only pub key");
         }
     }
 }

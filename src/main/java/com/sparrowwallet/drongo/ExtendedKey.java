@@ -206,7 +206,7 @@ public class ExtendedKey {
         }
 
         public static List<Header> getHeaders(Network network) {
-            return Arrays.stream(Header.values()).filter(header -> header.getNetwork() == network || (header.getNetwork() == Network.TESTNET && network == Network.REGTEST)).collect(Collectors.toList());
+            return Arrays.stream(Header.values()).filter(header -> header.getNetwork() == network || (header.getNetwork() == Network.TESTNET && network == Network.REGTEST) || (header.getNetwork() == Network.TESTNET && network == Network.SIGNET)).collect(Collectors.toList());
         }
 
         public static Header fromExtendedKey(String xkey) {

@@ -1,12 +1,15 @@
 package com.sparrowwallet.drongo;
 
 import com.sparrowwallet.drongo.rpc.BitcoinJSONRPCClient;
+import org.bouncycastle.jce.provider.BouncyCastleProvider;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.event.Level;
 import org.zeromq.SocketType;
 import org.zeromq.ZContext;
 import org.zeromq.ZMQ;
 
+import java.security.Provider;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
@@ -73,5 +76,19 @@ public class Drongo {
 
     public List<WatchWallet> getWallets() {
         return watchWallets;
+    }
+
+    public static void setRootLogLevel(Level level) {
+        ch.qos.logback.classic.Logger root = (ch.qos.logback.classic.Logger)LoggerFactory.getLogger(org.slf4j.Logger.ROOT_LOGGER_NAME);
+        root.setLevel(ch.qos.logback.classic.Level.toLevel(level.toString()));
+    }
+
+    public static void removeRootLogAppender(String appenderName) {
+        ch.qos.logback.classic.Logger root = (ch.qos.logback.classic.Logger)LoggerFactory.getLogger(org.slf4j.Logger.ROOT_LOGGER_NAME);
+        root.detachAppender(appenderName);
+    }
+
+    public static Provider getProvider() {
+        return new BouncyCastleProvider();
     }
 }

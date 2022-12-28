@@ -11,17 +11,14 @@ import org.junit.After;
 import org.junit.Assert;
 import org.junit.Test;
 
+import java.util.List;
+import java.util.Map;
+
 public class PSBTTest {
 
     @Test(expected = PSBTParseException.class)
     public void invalidNotPSBT() throws PSBTParseException {
         String psbt = "AgAAAAEmgXE3Ht/yhek3re6ks3t4AAwFZsuzrWRkFxPKQhcb9gAAAABqRzBEAiBwsiRRI+a/R01gxbUMBD1MaRpdJDXwmjSnZiqdwlF5CgIgATKcqdrPKAvfMHQOwDkEIkIsgctFg5RXrrdvwS7dlbMBIQJlfRGNM1e44PTCzUbbezn22cONmnCry5st5dyNv+TOMf7///8C09/1BQAAAAAZdqkU0MWZA8W6woaHYOkP1SGkZlqnZSCIrADh9QUAAAAAF6kUNUXm4zuDLEcFDyTT7rk8nAOUi8eHsy4TAA==";
-        PSBT.fromString(psbt);
-    }
-
-    @Test(expected = PSBTParseException.class)
-    public void missingOutputs() throws PSBTParseException {
-        String psbt = "cHNidP8BAHUCAAAAASaBcTce3/KF6Tet7qSze3gADAVmy7OtZGQXE8pCFxv2AAAAAAD+////AtPf9QUAAAAAGXapFNDFmQPFusKGh2DpD9UhpGZap2UgiKwA4fUFAAAAABepFDVF5uM7gyxHBQ8k0+65PJwDlIvHh7MuEwAAAQD9pQEBAAAAAAECiaPHHqtNIOA3G7ukzGmPopXJRjr6Ljl/hTPMti+VZ+UBAAAAFxYAFL4Y0VKpsBIDna89p95PUzSe7LmF/////4b4qkOnHf8USIk6UwpyN+9rRgi7st0tAXHmOuxqSJC0AQAAABcWABT+Pp7xp0XpdNkCxDVZQ6vLNL1TU/////8CAMLrCwAAAAAZdqkUhc/xCX/Z4Ai7NK9wnGIZeziXikiIrHL++E4sAAAAF6kUM5cluiHv1irHU6m80GfWx6ajnQWHAkcwRAIgJxK+IuAnDzlPVoMR3HyppolwuAJf3TskAinwf4pfOiQCIAGLONfc0xTnNMkna9b7QPZzMlvEuqFEyADS8vAtsnZcASED0uFWdJQbrUqZY3LLh+GFbTZSYG2YVi/jnF6efkE/IQUCSDBFAiEA0SuFLYXc2WHS9fSrZgZU327tzHlMDDPOXMMJ/7X85Y0CIGczio4OFyXBl/saiK9Z9R5E5CVbIBZ8hoQDHAXR8lkqASECI7cr7vCWXRC+B3jv7NYfysb3mk6haTkzgHNEZPhPKrMAAAAAAA==";
         PSBT.fromString(psbt);
     }
 
@@ -312,7 +309,8 @@ public class PSBTTest {
 
         String psbtStr4 = "cHNidP8BAHUCAAAAASaBcTce3/KF6Tet7qSze3gADAVmy7OtZGQXE8pCFxv2AAAAAAD+////AtPf9QUAAAAAGXapFNDFmQPFusKGh2DpD9UhpGZap2UgiKwA4fUFAAAAABepFDVF5uM7gyxHBQ8k0+65PJwDlIvHh7MuEwAAAQD9pQEBAAAAAAECiaPHHqtNIOA3G7ukzGmPopXJRjr6Ljl/hTPMti+VZ+UBAAAAFxYAFL4Y0VKpsBIDna89p95PUzSe7LmF/////4b4qkOnHf8USIk6UwpyN+9rRgi7st0tAXHmOuxqSJC0AQAAABcWABT+Pp7xp0XpdNkCxDVZQ6vLNL1TU/////8CAMLrCwAAAAAZdqkUhc/xCX/Z4Ai7NK9wnGIZeziXikiIrHL++E4sAAAAF6kUM5cluiHv1irHU6m80GfWx6ajnQWHAkcwRAIgJxK+IuAnDzlPVoMR3HyppolwuAJf3TskAinwf4pfOiQCIAGLONfc0xTnNMkna9b7QPZzMlvEuqFEyADS8vAtsnZcASED0uFWdJQbrUqZY3LLh+GFbTZSYG2YVi/jnF6efkE/IQUCSDBFAiEA0SuFLYXc2WHS9fSrZgZU327tzHlMDDPOXMMJ/7X85Y0CIGczio4OFyXBl/saiK9Z9R5E5CVbIBZ8hoQDHAXR8lkqASECI7cr7vCWXRC+B3jv7NYfysb3mk6haTkzgHNEZPhPKrMAAAAAAQMEAQAAAAAAAA==";
         PSBT psbt4 = PSBT.fromString(psbtStr4);
-        Assert.assertEquals(psbtStr4, psbt4.toBase64String());
+        String noWitnessDataPsbt = "cHNidP8BAHUCAAAAASaBcTce3/KF6Tet7qSze3gADAVmy7OtZGQXE8pCFxv2AAAAAAD+////AtPf9QUAAAAAGXapFNDFmQPFusKGh2DpD9UhpGZap2UgiKwA4fUFAAAAABepFDVF5uM7gyxHBQ8k0+65PJwDlIvHh7MuEwAAAQDMAQAAAAKJo8ceq00g4Dcbu6TMaY+ilclGOvouOX+FM8y2L5Vn5QEAAAAXFgAUvhjRUqmwEgOdrz2n3k9TNJ7suYX/////hviqQ6cd/xRIiTpTCnI372tGCLuy3S0BceY67GpIkLQBAAAAFxYAFP4+nvGnRel02QLENVlDq8s0vVNT/////wIAwusLAAAAABl2qRSFz/EJf9ngCLs0r3CcYhl7OJeKSIiscv74TiwAAAAXqRQzlyW6Ie/WKsdTqbzQZ9bHpqOdBYcAAAAAAQMEAQAAAAAAAA==";
+        Assert.assertEquals(noWitnessDataPsbt, psbt4.toBase64String());
     }
 
     @Test
@@ -374,6 +372,31 @@ public class PSBTTest {
         Transaction transaction = psbt.extractTransaction();
 
         Assert.assertEquals("0200000000010258e87a21b56daf0c23be8e7070456c336f7cbaa5c8757924f545887bb2abdd7500000000da00473044022074018ad4180097b873323c0015720b3684cc8123891048e7dbcd9b55ad679c99022073d369b740e3eb53dcefa33823c8070514ca55a7dd9544f157c167913261118c01483045022100f61038b308dc1da865a34852746f015772934208c6d24454393cd99bdf2217770220056e675a675a6d0a02b85b14e5e29074d8a25a9b5760bea2816f661910a006ea01475221029583bf39ae0a609747ad199addd634fa6108559d6c5cd39b4c2183f1ab96e07f2102dab61ff49a14db6a7d02b0cd1fbb78fc4b18312b5b4e54dae4dba2fbfef536d752aeffffffff838d0427d0ec650a68aa46bb0b098aea4422c071b2ca78352a077959d07cea1d01000000232200208c2353173743b595dfb4a07b72ba8e42e3797da74e87fe7d9d7497e3b2028903ffffffff0270aaf00800000000160014d85c2b71d0060b09c9886aeb815e50991dda124d00e1f5050000000016001400aea9a2e5f0f876a588df5546e8742d1d87008f000400473044022062eb7a556107a7c73f45ac4ab5a1dddf6f7075fb1275969a7f383efff784bcb202200c05dbb7470dbf2f08557dd356c7325c1ed30913e996cd3840945db12228da5f01473044022065f45ba5998b59a27ffe1a7bed016af1f1f90d54b3aa8f7450aa5f56a25103bd02207f724703ad1edb96680b284b56d4ffcb88f7fb759eabbe08aa30f29b851383d20147522103089dc10c7ac6db54f91329af617333db388cead0c231f723379d1b99030b02dc21023add904f3d6dcf59ddb906b0dee23529b7ffb9ed50e5e86151926860221f0e7352ae00000000", Utils.bytesToHex(transaction.bitcoinSerialize()));
+    }
+
+    @Test
+    public void isPSBT() {
+        String s = null;
+        Assert.assertFalse(PSBT.isPSBT(s));
+        Assert.assertFalse(PSBT.isPSBT(""));
+        Assert.assertFalse(PSBT.isPSBT("x"));
+    }
+
+    @Test
+    public void testTaproot() throws PSBTParseException {
+        Network.set(Network.TESTNET);
+        String strSignedPsbt = "cHNidP8BAH0CAAAAAdPUSBYKaQKOqAMgU2IcGuM6z7JtbkLe69OmYZoa4UxYAAAAAADmdQAAAp4CAAAAAAAAFgAUg+/zyGWbtKbIJb8ZasbGYDtItZhgrgEAAAAAACJRIJMQKWeQsI/WiRS+lmeeyeJaKFVnlVoBtXeuGTO7XIbrAAAAAE8BBDWHzwM27GqkgAAAAO1YZge2AP67ozhdoF9wgg2hpJw1jbVEXLKfxRQUNGEIAlog/wK83w7jxD37prhWrPenLxjGAJzkJKrj6h0ZPK8WED/ZeB1WAACAAQAAgAAAAIAAAQCJAgAAAAGBuBuu5OIheS4SKtYJufScCJDTWWLopBoXtFWhPDuRWQEAAAAA/f///wKNsQEAAAAAACJRIAjXFSnHwcD+J/obgd9CxVneHsUyFKM9xU7NY5K3DgCxHwIAAAAAAAAiUSAhUe66hJMCB1esHqXtxRVJHmviQ4ZjzFIwDWDPk+1KY6VyIQABASuNsQEAAAAAACJRIAjXFSnHwcD+J/obgd9CxVneHsUyFKM9xU7NY5K3DgCxAQMEAAAAAAETQCG/ZGuefjDVqBhmgVEuV1HbdxoZKDDWWTvTUrq6MJreRzj22k/WcFni6yPn9PGZkptZSNx9waf8ouP28ogJz24hFnRZPMvN82XI+lnim7dRKwFgpHnqiDoMGnIoFoSQRX7bGQA/2XgdVgAAgAEAAIAAAACAAQAAAAIAAAABFyB0WTzLzfNlyPpZ4pu3USsBYKR56og6DBpyKBaEkEV+2wAAIQflpK6JYWolG3K2DU7FU3hlkwSdU/69bglhZxaprqSvyxkAP9l4HVYAAIABAACAAAAAgAEAAAADAAAAAQUg5aSuiWFqJRtytg1OxVN4ZZMEnVP+vW4JYWcWqa6kr8sA";
+        PSBT psbt = PSBT.fromString(strSignedPsbt);
+
+        Assert.assertEquals(0, psbt.getPsbtInputs().get(0).getDerivedPublicKeys().size());
+        Assert.assertEquals("74593ccbcdf365c8fa59e29bb7512b0160a479ea883a0c1a7228168490457edb", Utils.bytesToHex(psbt.getPsbtInputs().get(0).getTapDerivedPublicKeys().keySet().iterator().next().getPubKeyXCoord()));
+        Map<KeyDerivation, List<Sha256Hash>> tapInKeyDerivations = psbt.getPsbtInputs().get(0).getTapDerivedPublicKeys().values().iterator().next();
+        Assert.assertEquals("3fd9781d", tapInKeyDerivations.keySet().iterator().next().getMasterFingerprint());
+
+        Assert.assertEquals(0, psbt.getPsbtOutputs().get(0).getDerivedPublicKeys().size());
+        Assert.assertEquals("e5a4ae89616a251b72b60d4ec553786593049d53febd6e09616716a9aea4afcb", Utils.bytesToHex(psbt.getPsbtOutputs().get(1).getTapDerivedPublicKeys().keySet().iterator().next().getPubKeyXCoord()));
+        Map<KeyDerivation, List<Sha256Hash>> tapOutKeyDerivations = psbt.getPsbtOutputs().get(1).getTapDerivedPublicKeys().values().iterator().next();
+        Assert.assertEquals("3fd9781d", tapOutKeyDerivations.keySet().iterator().next().getMasterFingerprint());
     }
 
     @After

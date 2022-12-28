@@ -7,16 +7,17 @@ import com.sparrowwallet.drongo.protocol.Script;
 import com.sparrowwallet.drongo.protocol.ScriptType;
 
 import java.util.Arrays;
+import java.util.Locale;
 
 public abstract class Address {
-    protected final byte[] hash;
+    protected final byte[] data;
 
-    public Address(byte[] hash) {
-        this.hash = hash;
+    public Address(byte[] data) {
+        this.data = data;
     }
 
-    public byte[] getHash() {
-        return hash;
+    public byte[] getData() {
+        return data;
     }
 
     public String getAddress() {
@@ -24,7 +25,7 @@ public abstract class Address {
     }
 
     public String getAddress(Network network) {
-        return Base58.encodeChecked(getVersion(network), hash);
+        return Base58.encodeChecked(getVersion(network), data);
     }
 
     public String toString() {
@@ -43,23 +44,26 @@ public abstract class Address {
 
     public abstract ScriptType getScriptType();
 
-    public abstract Script getOutputScript();
+    public Script getOutputScript() {
+        return getScriptType().getOutputScript(data);
+    }
 
-    public abstract byte[] getOutputScriptData();
+    public byte[] getOutputScriptData() {
+        return data;
+    }
 
     public abstract String getOutputScriptDataType();
 
     public boolean equals(Object obj) {
-        if(!(obj instanceof Address)) {
+        if(!(obj instanceof Address address)) {
             return false;
         }
 
-        Address address = (Address)obj;
-        return address.getAddress().equals(this.getAddress());
+        return Arrays.equals(data, address.data) && getVersion(Network.get()) == address.getVersion(Network.get());
     }
 
     public int hashCode() {
-        return getAddress().hashCode();
+        return Arrays.hashCode(data) + getVersion(Network.get());
     }
 
     public static Address fromString(String address) throws InvalidAddressException {
@@ -103,19 +107,33 @@ public abstract class Address {
                 }
             }
 
-            if(address.toLowerCase().startsWith(network.getBech32AddressHRP())) {
+            if(address.toLowerCase(Locale.ROOT).startsWith(network.getBech32AddressHRP())) {
                 try {
                     Bech32.Bech32Data data = Bech32.decode(address);
                     if(data.hrp.equals(network.getBech32AddressHRP())) {
                         int witnessVersion = data.data[0];
-                        if (witnessVersion == 0) {
+                        if(witnessVersion == 0) {
+                            if(data.encoding != Bech32.Encoding.BECH32) {
+                                throw new InvalidAddressException("Invalid address - witness version is 0 but encoding is " + data.encoding);
+                            }
+
                             byte[] convertedProgram = Arrays.copyOfRange(data.data, 1, data.data.length);
                             byte[] witnessProgram = Bech32.convertBits(convertedProgram, 0, convertedProgram.length, 5, 8, false);
-                            if (witnessProgram.length == 20) {
+                            if(witnessProgram.length == 20) {
                                 return new P2WPKHAddress(witnessProgram);
                             }
-                            if (witnessProgram.length == 32) {
+                            if(witnessProgram.length == 32) {
                                 return new P2WSHAddress(witnessProgram);
+                            }
+                        } else if(witnessVersion == 1) {
+                            if(data.encoding != Bech32.Encoding.BECH32M) {
+                                throw new InvalidAddressException("Invalid address - witness version is 1 but encoding is " + data.encoding);
+                            }
+
+                            byte[] convertedProgram = Arrays.copyOfRange(data.data, 1, data.data.length);
+                            byte[] witnessProgram = Bech32.convertBits(convertedProgram, 0, convertedProgram.length, 5, 8, false);
+                            if(witnessProgram.length == 32) {
+                                return new P2TRAddress(witnessProgram);
                             }
                         }
                     }

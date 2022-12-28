@@ -16,6 +16,9 @@ import java.nio.ByteBuffer;
 import java.util.*;
 
 import static com.sparrowwallet.drongo.psbt.PSBTEntry.*;
+import static com.sparrowwallet.drongo.psbt.PSBTInput.*;
+import static com.sparrowwallet.drongo.psbt.PSBTOutput.*;
+import static com.sparrowwallet.drongo.wallet.Wallet.addDummySpendingInput;
 
 public class PSBT {
     public static final byte PSBT_GLOBAL_UNSIGNED_TX = 0x00;
@@ -50,7 +53,7 @@ public class PSBT {
         this.transaction = transaction;
 
         for(int i = 0; i < transaction.getInputs().size(); i++) {
-            psbtInputs.add(new PSBTInput(transaction, i));
+            psbtInputs.add(new PSBTInput(this, transaction, i));
         }
 
         for(int i = 0; i < transaction.getOutputs().size(); i++) {
@@ -87,12 +90,16 @@ public class PSBT {
             this.version = version;
         }
 
-        boolean alwaysIncludeWitnessUtxo = wallet.getKeystores().stream().anyMatch(keystore -> keystore.getWalletModel().alwaysIncludeNonWitnessUtxo());
-
         int inputIndex = 0;
         for(Iterator<Map.Entry<BlockTransactionHashIndex, WalletNode>> iter = walletTransaction.getSelectedUtxos().entrySet().iterator(); iter.hasNext(); inputIndex++) {
             Map.Entry<BlockTransactionHashIndex, WalletNode> utxoEntry = iter.next();
-            Transaction utxo = wallet.getTransactions().get(utxoEntry.getKey().getHash()).getTransaction();
+
+            WalletNode walletNode = utxoEntry.getValue();
+            Wallet signingWallet = walletNode.getWallet();
+
+            boolean alwaysIncludeWitnessUtxo = signingWallet.getKeystores().stream().anyMatch(keystore -> keystore.getWalletModel().alwaysIncludeNonWitnessUtxo());
+
+            Transaction utxo = signingWallet.getTransactions().get(utxoEntry.getKey().getHash()).getTransaction();
             int utxoIndex = (int)utxoEntry.getKey().getIndex();
             TransactionOutput utxoOutput = utxo.getOutputs().get(utxoIndex);
 
@@ -109,12 +116,17 @@ public class PSBT {
             }
 
             Map<ECKey, KeyDerivation> derivedPublicKeys = new LinkedHashMap<>();
-            for(Keystore keystore : wallet.getKeystores()) {
-                WalletNode walletNode = utxoEntry.getValue();
-                derivedPublicKeys.put(keystore.getPubKey(walletNode), keystore.getKeyDerivation().extend(walletNode.getDerivation()));
+            ECKey tapInternalKey = null;
+            for(Keystore keystore : signingWallet.getKeystores()) {
+                derivedPublicKeys.put(signingWallet.getScriptType().getOutputKey(keystore.getPubKey(walletNode)), keystore.getKeyDerivation().extend(walletNode.getDerivation()));
+
+                //TODO: Implement Musig for multisig wallets
+                if(signingWallet.getScriptType() == ScriptType.P2TR) {
+                    tapInternalKey = keystore.getPubKey(walletNode);
+                }
             }
 
-            PSBTInput psbtInput = new PSBTInput(wallet.getScriptType(), transaction, inputIndex, utxo, utxoIndex, redeemScript, witnessScript, derivedPublicKeys, Collections.emptyMap(), alwaysIncludeWitnessUtxo);
+            PSBTInput psbtInput = new PSBTInput(this, signingWallet.getScriptType(), transaction, inputIndex, utxo, utxoIndex, redeemScript, witnessScript, derivedPublicKeys, Collections.emptyMap(), tapInternalKey, alwaysIncludeWitnessUtxo);
             psbtInputs.add(psbtInput);
         }
 
@@ -122,28 +134,29 @@ public class PSBT {
         for(TransactionOutput txOutput : transaction.getOutputs()) {
             try {
                 Address address = txOutput.getScript().getToAddresses()[0];
-                if(walletTransaction.getPayments().stream().anyMatch(payment -> payment.getAddress().equals(address))) {
-                    outputNodes.add(wallet.getWalletAddresses().getOrDefault(address, null));
-                } else if(address.equals(wallet.getAddress(walletTransaction.getChangeNode()))) {
-                    outputNodes.add(walletTransaction.getChangeNode());
+                if(walletTransaction.getAddressNodeMap().containsKey(address)) {
+                    outputNodes.add(walletTransaction.getAddressNodeMap().get(address));
+                } else if(walletTransaction.getChangeMap().keySet().stream().anyMatch(changeNode -> changeNode.getAddress().equals(address))) {
+                    outputNodes.add(walletTransaction.getChangeMap().keySet().stream().filter(changeNode -> changeNode.getAddress().equals(address)).findFirst().orElse(null));
                 }
             } catch(NonStandardScriptException e) {
-                //Should never happen
-                throw new IllegalArgumentException(e);
+                //Ignore, likely OP_RETURN output
+                outputNodes.add(null);
             }
         }
 
         for(int outputIndex = 0; outputIndex < outputNodes.size(); outputIndex++) {
             WalletNode outputNode = outputNodes.get(outputIndex);
             if(outputNode == null) {
-                PSBTOutput externalRecipientOutput = new PSBTOutput(null, null, Collections.emptyMap(), Collections.emptyMap());
+                PSBTOutput externalRecipientOutput = new PSBTOutput(null, null, null, Collections.emptyMap(), Collections.emptyMap(), null);
                 psbtOutputs.add(externalRecipientOutput);
             } else {
                 TransactionOutput txOutput = transaction.getOutputs().get(outputIndex);
+                Wallet recipientWallet = outputNode.getWallet();
 
                 //Construct dummy transaction to spend the UTXO created by this wallet's txOutput
                 Transaction transaction = new Transaction();
-                TransactionInput spendingInput = wallet.addDummySpendingInput(transaction, outputNode, txOutput);
+                TransactionInput spendingInput = addDummySpendingInput(transaction, outputNode, txOutput);
 
                 Script redeemScript = null;
                 if(ScriptType.P2SH.isScriptType(txOutput.getScript())) {
@@ -156,22 +169,32 @@ public class PSBT {
                 }
 
                 Map<ECKey, KeyDerivation> derivedPublicKeys = new LinkedHashMap<>();
-                for(Keystore keystore : wallet.getKeystores()) {
-                    derivedPublicKeys.put(keystore.getPubKey(outputNode), keystore.getKeyDerivation().extend(outputNode.getDerivation()));
+                ECKey tapInternalKey = null;
+                for(Keystore keystore : recipientWallet.getKeystores()) {
+                    derivedPublicKeys.put(recipientWallet.getScriptType().getOutputKey(keystore.getPubKey(outputNode)), keystore.getKeyDerivation().extend(outputNode.getDerivation()));
+
+                    //TODO: Implement Musig for multisig wallets
+                    if(recipientWallet.getScriptType() == ScriptType.P2TR) {
+                        tapInternalKey = keystore.getPubKey(outputNode);
+                    }
                 }
 
-                PSBTOutput walletOutput = new PSBTOutput(redeemScript, witnessScript, derivedPublicKeys, Collections.emptyMap());
+                PSBTOutput walletOutput = new PSBTOutput(recipientWallet.getScriptType(), redeemScript, witnessScript, derivedPublicKeys, Collections.emptyMap(), tapInternalKey);
                 psbtOutputs.add(walletOutput);
             }
         }
     }
 
     public PSBT(byte[] psbt) throws PSBTParseException {
-        this.psbtBytes = psbt;
-        parse();
+        this(psbt, true);
     }
 
-    private void parse() throws PSBTParseException {
+    public PSBT(byte[] psbt, boolean verifySignatures) throws PSBTParseException {
+        this.psbtBytes = psbt;
+        parse(verifySignatures);
+    }
+
+    private void parse(boolean verifySignatures) throws PSBTParseException {
         int seenInputs = 0;
         int seenOutputs = 0;
 
@@ -212,7 +235,7 @@ public class PSBT {
                         seenInputs++;
                         if (seenInputs == inputs) {
                             currentState = STATE_OUTPUTS;
-                            parseInputEntries(inputEntryLists);
+                            parseInputEntries(inputEntryLists, verifySignatures);
                         }
                         break;
                     case STATE_OUTPUTS:
@@ -244,14 +267,6 @@ public class PSBT {
         if(currentState != STATE_END) {
             if(transaction == null) {
                 throw new PSBTParseException("Missing transaction");
-            }
-
-            if(currentState == STATE_INPUTS) {
-                throw new PSBTParseException("Missing inputs");
-            }
-
-            if(currentState == STATE_OUTPUTS) {
-                throw new PSBTParseException("Missing outputs");
             }
         }
 
@@ -313,7 +328,7 @@ public class PSBT {
         }
     }
 
-    private void parseInputEntries(List<List<PSBTEntry>> inputEntryLists) throws PSBTParseException {
+    private void parseInputEntries(List<List<PSBTEntry>> inputEntryLists, boolean verifySignatures) throws PSBTParseException {
         for(List<PSBTEntry> inputEntries : inputEntryLists) {
             PSBTEntry duplicate = findDuplicateKey(inputEntries);
             if(duplicate != null) {
@@ -321,14 +336,12 @@ public class PSBT {
             }
 
             int inputIndex = this.psbtInputs.size();
-            PSBTInput input = new PSBTInput(inputEntries, transaction, inputIndex);
-
-            boolean verified = input.verifySignatures();
-            if(!verified && input.getPartialSignatures().size() > 0) {
-                throw new PSBTParseException("Unverifiable partial signatures provided");
-            }
-
+            PSBTInput input = new PSBTInput(this, inputEntries, transaction, inputIndex);
             this.psbtInputs.add(input);
+        }
+
+        if(verifySignatures) {
+            verifySignatures(psbtInputs);
         }
     }
 
@@ -364,7 +377,7 @@ public class PSBT {
             if(utxo != null) {
                 fee += utxo.getValue();
             } else {
-                log.error("Cannot determine fee - not enough information provided on inputs");
+                log.warn("Cannot determine fee - inputs are missing UTXO data");
                 return null;
             }
         }
@@ -377,9 +390,25 @@ public class PSBT {
         return fee;
     }
 
+    public void verifySignatures() throws PSBTSignatureException {
+        verifySignatures(getPsbtInputs());
+    }
+
+    private void verifySignatures(List<PSBTInput> psbtInputs) throws PSBTSignatureException {
+        for(PSBTInput input : psbtInputs) {
+            boolean verified = input.verifySignatures();
+            if(!verified && input.getPartialSignatures().size() > 0) {
+                throw new PSBTSignatureException("Unverifiable partial signatures provided");
+            }
+            if(!verified && input.isTaproot() && input.getTapKeyPathSignature() != null) {
+                throw new PSBTSignatureException("Unverifiable taproot keypath signature provided");
+            }
+        }
+    }
+
     public boolean hasSignatures() {
         for(PSBTInput psbtInput : getPsbtInputs()) {
-            if(!psbtInput.getPartialSignatures().isEmpty() || psbtInput.getFinalScriptSig() != null || psbtInput.getFinalScriptWitness() != null) {
+            if(!psbtInput.getPartialSignatures().isEmpty() || psbtInput.getTapKeyPathSignature() != null || psbtInput.getFinalScriptSig() != null || psbtInput.getFinalScriptWitness() != null) {
                 return true;
             }
         }
@@ -432,6 +461,10 @@ public class PSBT {
     }
 
     public byte[] serialize() {
+        return serialize(true);
+    }
+
+    public byte[] serialize(boolean includeXpubs) {
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
 
         baos.writeBytes(Utils.hexToBytes(PSBT_MAGIC_HEX));
@@ -439,14 +472,19 @@ public class PSBT {
 
         List<PSBTEntry> globalEntries = getGlobalEntries();
         for(PSBTEntry entry : globalEntries) {
-            entry.serializeToStream(baos);
+            if(includeXpubs || (entry.getKeyType() != PSBT_GLOBAL_BIP32_PUBKEY && entry.getKeyType() != PSBT_GLOBAL_PROPRIETARY)) {
+                entry.serializeToStream(baos);
+            }
         }
         baos.writeBytes(new byte[] {(byte)0x00});
 
         for(PSBTInput psbtInput : getPsbtInputs()) {
             List<PSBTEntry> inputEntries = psbtInput.getInputEntries();
             for(PSBTEntry entry : inputEntries) {
-                entry.serializeToStream(baos);
+                if(includeXpubs || (entry.getKeyType() != PSBT_IN_BIP32_DERIVATION && entry.getKeyType() != PSBT_IN_PROPRIETARY
+                        && entry.getKeyType() != PSBT_IN_TAP_INTERNAL_KEY && entry.getKeyType() != PSBT_IN_TAP_BIP32_DERIVATION)) {
+                    entry.serializeToStream(baos);
+                }
             }
             baos.writeBytes(new byte[] {(byte)0x00});
         }
@@ -454,7 +492,11 @@ public class PSBT {
         for(PSBTOutput psbtOutput : getPsbtOutputs()) {
             List<PSBTEntry> outputEntries = psbtOutput.getOutputEntries();
             for(PSBTEntry entry : outputEntries) {
-                entry.serializeToStream(baos);
+                if(includeXpubs || (entry.getKeyType() != PSBT_OUT_REDEEM_SCRIPT && entry.getKeyType() != PSBT_OUT_WITNESS_SCRIPT
+                        && entry.getKeyType() != PSBT_OUT_BIP32_DERIVATION && entry.getKeyType() != PSBT_OUT_PROPRIETARY
+                        && entry.getKeyType() != PSBT_OUT_TAP_INTERNAL_KEY && entry.getKeyType() != PSBT_OUT_TAP_BIP32_DERIVATION)) {
+                    entry.serializeToStream(baos);
+                }
             }
             baos.writeBytes(new byte[] {(byte)0x00});
         }
@@ -511,7 +553,7 @@ public class PSBT {
         Transaction finalTransaction = new Transaction(transaction.bitcoinSerialize());
 
         if(hasWitness && !finalTransaction.isSegwit()) {
-            finalTransaction.setSegwitVersion(1);
+            finalTransaction.setSegwitFlag(Transaction.DEFAULT_SEGWIT_FLAG);
         }
 
         for(int i = 0; i < finalTransaction.getInputs().size(); i++) {
@@ -584,7 +626,11 @@ public class PSBT {
     }
 
     public String toBase64String() {
-        return Base64.toBase64String(serialize());
+        return toBase64String(true);
+    }
+
+    public String toBase64String(boolean includeXpubs) {
+        return Base64.toBase64String(serialize(includeXpubs));
     }
 
     public static boolean isPSBT(byte[] b) {
@@ -600,14 +646,24 @@ public class PSBT {
     }
 
     public static boolean isPSBT(String s) {
-        if (Utils.isHex(s) && s.startsWith(PSBT_MAGIC_HEX)) {
-            return true;
-        } else {
-            return Utils.isBase64(s) && Utils.bytesToHex(Base64.decode(s)).startsWith(PSBT_MAGIC_HEX);
+        try {
+            if(Utils.isHex(s) && s.startsWith(PSBT_MAGIC_HEX)) {
+                return true;
+            } else {
+                return Utils.isBase64(s) && Utils.bytesToHex(Base64.decode(s)).startsWith(PSBT_MAGIC_HEX);
+            }
+        } catch(Exception e) {
+            //ignore
         }
+
+        return false;
     }
 
     public static PSBT fromString(String strPSBT) throws PSBTParseException {
+        return fromString(strPSBT, true);
+    }
+
+    public static PSBT fromString(String strPSBT, boolean verifySignatures) throws PSBTParseException {
         if (!isPSBT(strPSBT)) {
             throw new PSBTParseException("Provided string is not a PSBT");
         }
@@ -617,6 +673,6 @@ public class PSBT {
         }
 
         byte[] psbtBytes = Utils.hexToBytes(strPSBT);
-        return new PSBT(psbtBytes);
+        return new PSBT(psbtBytes, verifySignatures);
     }
 }

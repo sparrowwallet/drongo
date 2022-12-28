@@ -1,6 +1,11 @@
 package com.sparrowwallet.drongo.protocol;
 
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.OutputStream;
 import java.util.Date;
+
+import static com.sparrowwallet.drongo.Utils.uint32ToByteStreamLE;
 
 public class BlockHeader extends Message {
     private long version;
@@ -12,6 +17,16 @@ public class BlockHeader extends Message {
 
     public BlockHeader(byte[] rawheader) {
         super(rawheader, 0);
+    }
+
+    public BlockHeader(long version, Sha256Hash prevBlockHash, Sha256Hash merkleRoot, Sha256Hash witnessRoot, long time, long difficultyTarget, long nonce) {
+        this.version = version;
+        this.prevBlockHash = prevBlockHash;
+        this.merkleRoot = merkleRoot;
+        this.witnessRoot = witnessRoot;
+        this.time = time;
+        this.difficultyTarget = difficultyTarget;
+        this.nonce = nonce;
     }
 
     @Override
@@ -56,5 +71,26 @@ public class BlockHeader extends Message {
 
     public long getNonce() {
         return nonce;
+    }
+
+    public byte[] bitcoinSerialize() {
+        try {
+            ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+            bitcoinSerializeToStream(outputStream);
+            return outputStream.toByteArray();
+        } catch (IOException e) {
+            //can't happen
+        }
+
+        return null;
+    }
+
+    protected void bitcoinSerializeToStream(OutputStream stream) throws IOException {
+        uint32ToByteStreamLE(version, stream);
+        stream.write(prevBlockHash.getReversedBytes());
+        stream.write(merkleRoot.getReversedBytes());
+        uint32ToByteStreamLE(time, stream);
+        uint32ToByteStreamLE(difficultyTarget, stream);
+        uint32ToByteStreamLE(nonce, stream);
     }
 }

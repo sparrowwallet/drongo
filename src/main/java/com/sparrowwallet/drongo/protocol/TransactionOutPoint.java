@@ -3,6 +3,7 @@ package com.sparrowwallet.drongo.protocol;
 import com.sparrowwallet.drongo.Utils;
 import com.sparrowwallet.drongo.address.Address;
 
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.util.Objects;
@@ -49,6 +50,18 @@ public class TransactionOutPoint extends ChildMessage {
 
     public void setAddresses(Address[] addresses) {
         this.addresses = addresses;
+    }
+
+    public byte[] bitcoinSerialize() {
+        try {
+            ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+            bitcoinSerializeToStream(outputStream);
+            return outputStream.toByteArray();
+        } catch (IOException e) {
+            //can't happen
+        }
+
+        return null;
     }
 
     @Override

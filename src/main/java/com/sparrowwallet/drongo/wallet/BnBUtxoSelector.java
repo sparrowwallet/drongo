@@ -6,7 +6,7 @@ import org.slf4j.LoggerFactory;
 
 import java.util.*;
 
-public class BnBUtxoSelector implements UtxoSelector {
+public class BnBUtxoSelector extends SingleSetUtxoSelector {
     private static final Logger log = LoggerFactory.getLogger(BnBUtxoSelector.class);
 
     private static final int TOTAL_TRIES = 100000;

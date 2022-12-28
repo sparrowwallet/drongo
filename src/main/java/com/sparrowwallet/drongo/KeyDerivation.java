@@ -5,14 +5,19 @@ import com.sparrowwallet.drongo.crypto.ChildNumber;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Locale;
 
 public class KeyDerivation {
     private final String masterFingerprint;
     private final String derivationPath;
     private transient List<ChildNumber> derivation;
 
+    public KeyDerivation(String masterFingerprint, List<ChildNumber> derivation) {
+        this(masterFingerprint, writePath(derivation));
+    }
+
     public KeyDerivation(String masterFingerprint, String derivationPath) {
-        this.masterFingerprint = masterFingerprint == null ? null : masterFingerprint.toLowerCase();
+        this.masterFingerprint = masterFingerprint == null ? null : masterFingerprint.toLowerCase(Locale.ROOT);
         this.derivationPath = derivationPath;
         this.derivation = parsePath(derivationPath);
     }
@@ -68,13 +73,17 @@ public class KeyDerivation {
     }
 
     public static String writePath(List<ChildNumber> pathList) {
-        String path = "m";
-        for (ChildNumber child: pathList) {
-            path += "/";
-            path += child.toString();
+        return writePath(pathList, true);
+    }
+
+    public static String writePath(List<ChildNumber> pathList, boolean useApostrophes) {
+        StringBuilder path = new StringBuilder("m");
+        for(ChildNumber child: pathList) {
+            path.append("/");
+            path.append(child.toString(useApostrophes));
         }
 
-        return path;
+        return path.toString();
     }
 
     public static boolean isValid(String derivationPath) {
@@ -85,6 +94,10 @@ public class KeyDerivation {
         }
 
         return true;
+    }
+
+    public static List<ChildNumber> getBip47Derivation(int account) {
+        return List.of(new ChildNumber(47, true), new ChildNumber(Network.get() == Network.MAINNET ? 0 : 1, true), new ChildNumber(Math.max(0, account), true));
     }
 
     public KeyDerivation copy() {

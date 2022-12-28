@@ -5,10 +5,7 @@ import com.sparrowwallet.drongo.crypto.ECKey;
 import com.sparrowwallet.drongo.policy.Miniscript;
 import com.sparrowwallet.drongo.policy.Policy;
 import com.sparrowwallet.drongo.policy.PolicyType;
-import com.sparrowwallet.drongo.protocol.NonStandardScriptException;
-import com.sparrowwallet.drongo.protocol.Script;
-import com.sparrowwallet.drongo.protocol.ScriptType;
-import com.sparrowwallet.drongo.protocol.TransactionSignature;
+import com.sparrowwallet.drongo.protocol.*;
 import com.sparrowwallet.drongo.psbt.PSBT;
 import com.sparrowwallet.drongo.psbt.PSBTInput;
 
@@ -67,6 +64,9 @@ public class FinalizingPSBTWallet extends Wallet {
             }
         }
 
+        setGapLimit(0);
+        purposeNode.setChildren(new TreeSet<>());
+
         setPolicyType(numSignatures == 1 ? PolicyType.SINGLE : PolicyType.MULTI);
     }
 
@@ -124,5 +124,17 @@ public class FinalizingPSBTWallet extends Wallet {
     @Override
     public boolean canSign(PSBT psbt) {
         return !getSigningNodes(psbt).isEmpty();
+    }
+
+    @Override
+    public boolean isWalletTxo(TransactionInput txInput) {
+        for(PSBTInput psbtInput : signedInputNodes.keySet()) {
+            TransactionInput psbtTxInput = psbtInput.getInput();
+            if(psbtTxInput.getOutpoint().getHash().equals(txInput.getOutpoint().getHash()) && psbtTxInput.getOutpoint().getIndex() == txInput.getOutpoint().getIndex()) {
+                return true;
+            }
+        }
+
+        return false;
     }
 }

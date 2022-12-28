@@ -2,38 +2,66 @@ package com.sparrowwallet.drongo.wallet;
 
 import com.sparrowwallet.drongo.KeyDerivation;
 import com.sparrowwallet.drongo.KeyPurpose;
+import com.sparrowwallet.drongo.address.Address;
 import com.sparrowwallet.drongo.crypto.ChildNumber;
+import com.sparrowwallet.drongo.crypto.ECKey;
+import com.sparrowwallet.drongo.protocol.Script;
 
 import java.util.*;
 import java.util.stream.Collectors;
 
-public class WalletNode implements Comparable<WalletNode> {
+public class WalletNode extends Persistable implements Comparable<WalletNode> {
     private final String derivationPath;
     private String label;
+    private Address address;
     private TreeSet<WalletNode> children = new TreeSet<>();
     private TreeSet<BlockTransactionHashIndex> transactionOutputs = new TreeSet<>();
 
+    private transient Wallet wallet;
     private transient KeyPurpose keyPurpose;
     private transient int index = -1;
     private transient List<ChildNumber> derivation;
 
+    //Cache pubkeys for BIP47 wallets to avoid time-consuming ECDH calculations
+    private transient ECKey cachedPubKey;
+
+    //Note use of this constructor must be followed by setting the wallet field
     public WalletNode(String derivationPath) {
         this.derivationPath = derivationPath;
         parseDerivation();
     }
 
-    public WalletNode(KeyPurpose keyPurpose) {
+    public WalletNode(Wallet wallet, String derivationPath) {
+        this.wallet = wallet;
+        this.derivationPath = derivationPath;
+        parseDerivation();
+    }
+
+    public WalletNode(Wallet wallet, KeyPurpose keyPurpose) {
+        this.wallet = wallet;
         this.derivation = List.of(keyPurpose.getPathIndex());
         this.derivationPath = KeyDerivation.writePath(derivation);
         this.keyPurpose = keyPurpose;
         this.index = keyPurpose.getPathIndex().num();
     }
 
-    public WalletNode(KeyPurpose keyPurpose, int index) {
+    public WalletNode(Wallet wallet, KeyPurpose keyPurpose, int index) {
+        this.wallet = wallet;
         this.derivation = List.of(keyPurpose.getPathIndex(), new ChildNumber(index));
         this.derivationPath = KeyDerivation.writePath(derivation);
         this.keyPurpose = keyPurpose;
         this.index = index;
+    }
+
+    public Wallet getWallet() {
+        return wallet;
+    }
+
+    public void setWallet(Wallet wallet) {
+        this.wallet = wallet;
+        for(WalletNode childNode : getChildren()) {
+            childNode.setWallet(wallet);
+        }
     }
 
     public String getDerivationPath() {
@@ -87,25 +115,47 @@ public class WalletNode implements Comparable<WalletNode> {
     }
 
     public Set<WalletNode> getChildren() {
-        return children == null ? null : Collections.unmodifiableSet(children);
+        return children;
     }
 
     public void setChildren(TreeSet<WalletNode> children) {
         this.children = children;
     }
 
+    public boolean isUsed() {
+        return !transactionOutputs.isEmpty();
+    }
+
     public Set<BlockTransactionHashIndex> getTransactionOutputs() {
-        return transactionOutputs == null ? null : Collections.unmodifiableSet(transactionOutputs);
+        return transactionOutputs;
     }
 
     public void setTransactionOutputs(TreeSet<BlockTransactionHashIndex> transactionOutputs) {
         this.transactionOutputs = transactionOutputs;
     }
 
-    public synchronized void updateTransactionOutputs(Set<BlockTransactionHashIndex> updatedOutputs) {
+    public synchronized void updateTransactionOutputs(Wallet wallet, Set<BlockTransactionHashIndex> updatedOutputs) {
         for(BlockTransactionHashIndex txo : updatedOutputs) {
-            Optional<String> optionalLabel = transactionOutputs.stream().filter(oldTxo -> oldTxo.getHash().equals(txo.getHash()) && oldTxo.getIndex() == txo.getIndex()).map(BlockTransactionHash::getLabel).filter(Objects::nonNull).findFirst();
-            optionalLabel.ifPresent(txo::setLabel);
+            if(!transactionOutputs.isEmpty()) {
+                Optional<String> optionalLabel = transactionOutputs.stream().filter(oldTxo -> oldTxo.getHash().equals(txo.getHash()) && oldTxo.getIndex() == txo.getIndex()).map(BlockTransactionHash::getLabel).filter(Objects::nonNull).findFirst();
+                optionalLabel.ifPresent(txo::setLabel);
+                Optional<Status> optionalStatus = transactionOutputs.stream().filter(oldTxo -> oldTxo.getHash().equals(txo.getHash()) && oldTxo.getIndex() == txo.getIndex()).map(BlockTransactionHashIndex::getStatus).filter(Objects::nonNull).findFirst();
+                optionalStatus.ifPresent(txo::setStatus);
+            }
+
+            if(!wallet.getDetachedLabels().isEmpty()) {
+                String label = wallet.getDetachedLabels().remove(txo.getHash().toString() + "<" + txo.getIndex());
+                if(label != null && (txo.getLabel() == null || txo.getLabel().isEmpty())) {
+                    txo.setLabel(label);
+                }
+
+                if(txo.isSpent()) {
+                    String spentByLabel = wallet.getDetachedLabels().remove(txo.getSpentBy().getHash() + ">" + txo.getSpentBy().getIndex());
+                    if(spentByLabel != null && (txo.getSpentBy().getLabel() == null || txo.getSpentBy().getLabel().isEmpty())) {
+                        txo.getSpentBy().setLabel(spentByLabel);
+                    }
+                }
+            }
         }
 
         transactionOutputs.clear();
@@ -116,9 +166,14 @@ public class WalletNode implements Comparable<WalletNode> {
         return getUnspentTransactionOutputs(false);
     }
 
-    public Set<BlockTransactionHashIndex> getUnspentTransactionOutputs(boolean includeMempoolInputs) {
+    public Set<BlockTransactionHashIndex> getUnspentTransactionOutputs(boolean includeSpentMempoolOutputs) {
+        if(transactionOutputs.isEmpty()) {
+            return Collections.emptySet();
+        }
+
         Set<BlockTransactionHashIndex> unspentTXOs = new TreeSet<>(transactionOutputs);
-        return unspentTXOs.stream().filter(txo -> !txo.isSpent() || (includeMempoolInputs && txo.getSpentBy().getHeight() <= 0)).collect(Collectors.toCollection(HashSet::new));
+        unspentTXOs.removeIf(txo -> txo.isSpent() && (!includeSpentMempoolOutputs || txo.getSpentBy().getHeight() > 0));
+        return unspentTXOs;
     }
 
     public long getUnspentValue() {
@@ -130,11 +185,55 @@ public class WalletNode implements Comparable<WalletNode> {
         return value;
     }
 
-    public synchronized void fillToIndex(int index) {
-        for(int i = 0; i <= index; i++) {
-            WalletNode node = new WalletNode(getKeyPurpose(), i);
-            children.add(node);
+    public Set<WalletNode> fillToIndex(Wallet wallet, int index) {
+        Set<WalletNode> newNodes = fillToIndex(index);
+        if(wallet.isValid()) {
+            if(!wallet.getDetachedLabels().isEmpty()) {
+                for(WalletNode newNode : newNodes) {
+                    String label = wallet.getDetachedLabels().remove(newNode.getAddress().toString());
+                    if(label != null && (newNode.getLabel() == null || newNode.getLabel().isEmpty())) {
+                        newNode.setLabel(label);
+                    }
+                }
+            }
+
+            if(wallet.isBip47() && keyPurpose == KeyPurpose.RECEIVE && wallet.getLabel() != null && !newNodes.isEmpty()) {
+                String suffix = " " + wallet.getScriptType().getName();
+                for(WalletNode newNode : newNodes) {
+                    if((newNode.getLabel() == null || newNode.getLabel().isEmpty()) && wallet.getLabel().endsWith(suffix)) {
+                        newNode.setLabel("From " + wallet.getLabel().substring(0, wallet.getLabel().length() - suffix.length()));
+                    }
+                }
+            }
         }
+
+        return newNodes;
+    }
+
+    public synchronized Set<WalletNode> fillToIndex(int index) {
+        //Optimization to check if child nodes already monotonically increment to the desired index
+        int indexCheck = 0;
+        for(WalletNode childNode : getChildren()) {
+            if(childNode.index == indexCheck) {
+                indexCheck++;
+            } else {
+                break;
+            }
+
+            if(childNode.index == index) {
+                return Collections.emptySet();
+            }
+        }
+
+        Set<WalletNode> newNodes = new TreeSet<>();
+        for(int i = 0; i <= index; i++) {
+            WalletNode node = new WalletNode(wallet, getKeyPurpose(), i);
+            if(children.add(node)) {
+                newNodes.add(node);
+            }
+        }
+
+        return newNodes;
     }
 
     /**
@@ -151,9 +250,56 @@ public class WalletNode implements Comparable<WalletNode> {
         return highestNode == null ? null : highestNode.index;
     }
 
+    public ECKey getPubKey() {
+        if(cachedPubKey != null) {
+            return cachedPubKey;
+        }
+
+        if(wallet.isBip47()) {
+            cachedPubKey = wallet.getPubKey(this);
+            return cachedPubKey;
+        }
+
+        return wallet.getPubKey(this);
+    }
+
+    public List<ECKey> getPubKeys() {
+        return wallet.getPubKeys(this);
+    }
+
+    public Address getAddress() {
+        if(address != null) {
+            return address;
+        }
+
+        Wallet masterWallet = wallet.isMasterWallet() ? wallet : wallet.getMasterWallet();
+        if(masterWallet.getKeystores().stream().noneMatch(Keystore::needsPassphrase)) {
+            address = wallet.getAddress(this);
+            return address;
+        }
+
+        return wallet.getAddress(this);
+    }
+
+    public byte[] getAddressData() {
+        return address == null ? null : address.getData();
+    }
+
+    public void setAddress(Address address) {
+        this.address = address;
+    }
+
+    public Script getOutputScript() {
+        return getAddress().getOutputScript();
+    }
+
+    public String getOutputDescriptor() {
+        return wallet.getOutputDescriptor(this);
+    }
+
     @Override
     public String toString() {
-        return derivationPath;
+        return derivationPath.replace("m", "..");
     }
 
     @Override
@@ -161,12 +307,12 @@ public class WalletNode implements Comparable<WalletNode> {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
         WalletNode node = (WalletNode) o;
-        return derivationPath.equals(node.derivationPath);
+        return Objects.equals(wallet, node.wallet) && derivationPath.equals(node.derivationPath);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(derivationPath);
+        return Objects.hash(wallet, derivationPath);
     }
 
     @Override
@@ -193,12 +339,14 @@ public class WalletNode implements Comparable<WalletNode> {
         }
     }
 
-    public WalletNode copy() {
-        WalletNode copy = new WalletNode(derivationPath);
+    public WalletNode copy(Wallet walletCopy) {
+        WalletNode copy = new WalletNode(walletCopy, derivationPath);
+        copy.setId(getId());
         copy.setLabel(label);
+        copy.setAddress(address);
 
         for(WalletNode child : getChildren()) {
-            copy.children.add(child.copy());
+            copy.children.add(child.copy(walletCopy));
         }
 
         for(BlockTransactionHashIndex txo : getTransactionOutputs()) {
@@ -206,5 +354,70 @@ public class WalletNode implements Comparable<WalletNode> {
         }
 
         return copy;
+    }
+
+    public static String nodeRangesToString(Set<WalletNode> nodes) {
+        return nodeRangesToString(nodes.stream().map(WalletNode::getDerivationPath).collect(Collectors.toList()));
+    }
+
+    public static String nodeRangesToString(Collection<String> nodeDerivations) {
+        List<String> sortedDerivations = new ArrayList<>(nodeDerivations);
+
+        if(nodeDerivations.isEmpty()) {
+            return "[]";
+        }
+
+        List<List<String>> contiguous = splitToContiguous(sortedDerivations);
+
+        String abbrev = "[";
+        for(Iterator<List<String>> iter = contiguous.iterator(); iter.hasNext(); ) {
+            List<String> range = iter.next();
+            abbrev += range.get(0);
+            if(range.size() > 1) {
+                abbrev += "-" + range.get(range.size() - 1);
+            }
+            if(iter.hasNext()) {
+                abbrev += ", ";
+            }
+        }
+        abbrev += "]";
+
+        return abbrev;
+    }
+
+    private static List<List<String>> splitToContiguous(List<String> input) {
+        List<List<String>> result = new ArrayList<>();
+        int prev = 0;
+
+        int keyPurpose = getKeyPurpose(input.get(0));
+        int index = getIndex(input.get(0));
+
+        for (int cur = 0; cur < input.size(); cur++) {
+            if(getKeyPurpose(input.get(cur)) != keyPurpose || getIndex(input.get(cur)) != index) {
+                result.add(input.subList(prev, cur));
+                prev = cur;
+            }
+            index = getIndex(input.get(cur)) + 1;
+            keyPurpose = getKeyPurpose(input.get(cur));
+        }
+        result.add(input.subList(prev, input.size()));
+
+        return result;
+    }
+
+    private static int getKeyPurpose(String path) {
+        List<ChildNumber> childNumbers = KeyDerivation.parsePath(path);
+        if(childNumbers.isEmpty()) {
+            return -1;
+        }
+        return childNumbers.get(0).num();
+    }
+
+    private static int getIndex(String path) {
+        List<ChildNumber> childNumbers = KeyDerivation.parsePath(path);
+        if(childNumbers.isEmpty()) {
+            return -1;
+        }
+        return childNumbers.get(childNumbers.size() - 1).num();
     }
 }

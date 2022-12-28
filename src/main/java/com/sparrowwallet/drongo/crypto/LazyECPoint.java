@@ -20,7 +20,7 @@ public class LazyECPoint {
 
     public LazyECPoint(ECCurve curve, byte[] bits) {
         this.curve = curve;
-        this.bits = bits;
+        this.bits = (bits != null && bits.length == 32 ? addYCoord(bits) : bits);
         this.compressed = ECKey.isPubKeyCompressed(bits);
     }
 
@@ -61,6 +61,13 @@ public class LazyECPoint {
             return get().getEncoded(compressed);
     }
 
+    public byte[] getEncodedXCoord() {
+        byte[] compressed = getEncoded(true);
+        byte[] xcoord = new byte[32];
+        System.arraycopy(compressed, 1, xcoord, 0, 32);
+        return xcoord;
+    }
+
     public String toString() {
         return Hex.toHexString(getEncoded());
     }
@@ -79,5 +86,12 @@ public class LazyECPoint {
 
     private byte[] getCanonicalEncoding() {
         return getEncoded(true);
+    }
+
+    private static byte[] addYCoord(byte[] xcoord) {
+        byte[] compressed = new byte[33];
+        compressed[0] = 0x02;
+        System.arraycopy(xcoord, 0, compressed, 1, 32);
+        return compressed;
     }
 }

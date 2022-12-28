@@ -17,22 +17,12 @@ public class P2WPKHAddress extends Address {
 
     @Override
     public String getAddress(Network network) {
-        return Bech32.encode(network.getBech32AddressHRP(), getVersion(), hash);
+        return Bech32.encode(network.getBech32AddressHRP(), getVersion(), data);
     }
 
     @Override
     public ScriptType getScriptType() {
         return ScriptType.P2WPKH;
-    }
-
-    @Override
-    public Script getOutputScript() {
-        return getScriptType().getOutputScript(hash);
-    }
-
-    @Override
-    public byte[] getOutputScriptData() {
-        return hash;
     }
 
     @Override

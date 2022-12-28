@@ -1,5 +1,7 @@
 package com.sparrowwallet.drongo.wallet;
 
+import com.sparrowwallet.drongo.protocol.ScriptType;
+
 import java.util.ArrayList;
 import java.util.List;
 
@@ -7,6 +9,7 @@ import static com.sparrowwallet.drongo.protocol.Transaction.WITNESS_SCALE_FACTOR
 
 public class OutputGroup {
     private final List<BlockTransactionHashIndex> utxos = new ArrayList<>();
+    private final ScriptType scriptType;
     private final int walletBlockHeight;
     private final long inputWeightUnits;
     private final double feeRate;
@@ -17,15 +20,17 @@ public class OutputGroup {
     private long longTermFee = 0;
     private int depth = Integer.MAX_VALUE;
     private boolean allInputsFromWallet = true;
+    private boolean spendLast;
 
-    public OutputGroup(int walletBlockHeight, long inputWeightUnits, double feeRate, double longTermFeeRate) {
+    public OutputGroup(ScriptType scriptType, int walletBlockHeight, long inputWeightUnits, double feeRate, double longTermFeeRate) {
+        this.scriptType = scriptType;
         this.walletBlockHeight = walletBlockHeight;
         this.inputWeightUnits = inputWeightUnits;
         this.feeRate = feeRate;
         this.longTermFeeRate = longTermFeeRate;
     }
 
-    public void add(BlockTransactionHashIndex utxo, boolean allInputsFromWallet) {
+    public void add(BlockTransactionHashIndex utxo, boolean allInputsFromWallet, boolean spendLast) {
         utxos.add(utxo);
         value += utxo.getValue();
         effectiveValue += utxo.getValue() - (long)(inputWeightUnits * feeRate / WITNESS_SCALE_FACTOR);
@@ -33,6 +38,7 @@ public class OutputGroup {
         longTermFee += (long)(inputWeightUnits * longTermFeeRate / WITNESS_SCALE_FACTOR);
         depth = utxo.getHeight() <= 0 ? 0 : Math.min(depth, walletBlockHeight - utxo.getHeight() + 1);
         this.allInputsFromWallet &= allInputsFromWallet;
+        this.spendLast |= spendLast;
     }
 
     public void remove(BlockTransactionHashIndex utxo) {
@@ -46,6 +52,10 @@ public class OutputGroup {
 
     public List<BlockTransactionHashIndex> getUtxos() {
         return utxos;
+    }
+
+    public ScriptType getScriptType() {
+        return scriptType;
     }
 
     public long getValue() {
@@ -72,21 +82,27 @@ public class OutputGroup {
         return allInputsFromWallet;
     }
 
+    public boolean isSpendLast() {
+        return spendLast;
+    }
+
     public static class Filter {
         private final int minWalletConfirmations;
         private final int minExternalConfirmations;
+        private final boolean includeSpendLast;
 
-        public Filter(int minWalletConfirmations, int minExternalConfirmations) {
+        public Filter(int minWalletConfirmations, int minExternalConfirmations, boolean includeSpendLast) {
             this.minWalletConfirmations = minWalletConfirmations;
             this.minExternalConfirmations = minExternalConfirmations;
+            this.includeSpendLast = includeSpendLast;
         }
 
         public boolean isEligible(OutputGroup outputGroup) {
             if(outputGroup.isAllInputsFromWallet()) {
-                return outputGroup.getDepth() >= minWalletConfirmations;
+                return outputGroup.getDepth() >= minWalletConfirmations && (includeSpendLast || !outputGroup.isSpendLast());
             }
 
-            return outputGroup.getDepth() >= minExternalConfirmations;
+            return outputGroup.getDepth() >= minExternalConfirmations && (includeSpendLast || !outputGroup.isSpendLast());
         }
     }
 }

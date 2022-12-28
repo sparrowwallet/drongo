@@ -1,21 +1,26 @@
 package com.sparrowwallet.drongo.protocol;
 
+import java.util.List;
+
 /**
  * These constants are a part of a scriptSig signature on the inputs. They define the details of how a
  * transaction can be redeemed, specifically, they control how the hash of the transaction is calculated.
  */
 public enum SigHash {
-    ALL("All (Recommended)", (byte)1),
+    ALL("All", (byte)1),
     NONE("None", (byte)2),
     SINGLE("Single", (byte)3),
     ANYONECANPAY("Anyone Can Pay", (byte)0x80), // Caution: Using this type in isolation is non-standard. Treated similar to ANYONECANPAY_ALL.
     ANYONECANPAY_ALL("All + Anyone Can Pay", (byte)0x81),
     ANYONECANPAY_NONE("None + Anyone Can Pay", (byte)0x82),
     ANYONECANPAY_SINGLE("Single + Anyone Can Pay", (byte)0x83),
-    UNSET("Unset", (byte)0); // Caution: Using this type in isolation is non-standard. Treated similar to ALL.
+    DEFAULT("Default", (byte)0);
 
     private final String name;
     public final byte value;
+
+    public static final List<SigHash> LEGACY_SIGNING_TYPES = List.of(ALL, NONE, SINGLE, ANYONECANPAY_ALL, ANYONECANPAY_NONE, ANYONECANPAY_SINGLE);
+    public static final List<SigHash> TAPROOT_SIGNING_TYPES = List.of(DEFAULT, ALL, NONE, SINGLE, ANYONECANPAY_ALL, ANYONECANPAY_NONE, ANYONECANPAY_SINGLE);
 
     private SigHash(final String name, final byte value) {
         this.name = name;

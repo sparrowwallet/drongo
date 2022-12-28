@@ -46,7 +46,11 @@ public class ChildNumber {
     public int i() { return i; }
 
     public String toString() {
-        return String.format(Locale.US, "%d%s", num(), isHardened() ? "'" : "");
+        return toString(true);
+    }
+
+    public String toString(boolean useApostrophes) {
+        return num() + (isHardened() ? (useApostrophes ? "'" : "h") : "");
     }
 
     public boolean equals(Object o) {

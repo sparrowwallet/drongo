@@ -39,4 +39,16 @@ public class MnemonicException extends Exception {
             this.badWord = badWord;
         }
     }
+
+    /**
+     * Thrown when the mnemonic is valid, but for for the expected standard
+     */
+    public static class MnemonicTypeException extends MnemonicException {
+        public final DeterministicSeed.Type invalidType;
+
+        public MnemonicTypeException(DeterministicSeed.Type invalidType) {
+            super();
+            this.invalidType = invalidType;
+        }
+    }
 }
