@@ -3,11 +3,10 @@ package com.sparrowwallet.drongo;
 import java.util.Locale;
 
 public enum Network {
-    MAINNET("mainnet", 36, "F", 5, "3", "grs", ExtendedKey.Header.xprv, ExtendedKey.Header.xpub, 128, 1331),
-    TESTNET("testnet", 111, "mn", 196, "2", "tgrs", ExtendedKey.Header.tprv, ExtendedKey.Header.tpub, 239, 17777),
-    REGTEST("regtest", 111, "mn", 239, "2", "grsrt", ExtendedKey.Header.tprv, ExtendedKey.Header.tpub, 239, 18888),
-    SIGNET("signet", 111, "mn", 196, "2", "tgrs", ExtendedKey.Header.tprv, ExtendedKey.Header.tpub, 239, 31331);
-
+    MAINNET("mainnet", 36, "F", 5, "3", "grs", ExtendedKey.Header.xprv, ExtendedKey.Header.xpub, 128, 1441),
+    TESTNET("testnet", 111, "mn", 196, "2", "tgrs", ExtendedKey.Header.tprv, ExtendedKey.Header.tpub, 239, 17766),
+    REGTEST("regtest", 111, "mn", 239, "2", "grsrt", ExtendedKey.Header.tprv, ExtendedKey.Header.tpub, 239, 18443),
+    SIGNET("signet", 111, "mn", 196, "2", "tgrs", ExtendedKey.Header.tprv, ExtendedKey.Header.tpub, 239, 31441);
     public static final String BLOCK_HEIGHT_PROPERTY = "com.sparrowwallet.blockHeight";
 
     Network(String name, int p2pkhAddressHeader, String p2pkhAddressPrefix, int p2shAddressHeader, String p2shAddressPrefix, String bech32AddressHrp, ExtendedKey.Header xprvHeader, ExtendedKey.Header xpubHeader, int dumpedPrivateKeyHeader, int defaultPort) {
