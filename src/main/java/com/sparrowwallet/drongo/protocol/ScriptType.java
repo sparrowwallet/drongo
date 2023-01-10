@@ -1017,7 +1017,7 @@ public enum ScriptType {
             return List.of(MULTI, CUSTOM);
         }
     },
-    P2TR("P2TR", "Taproot (P2TR)", "m/86'/0'/0'") {
+    P2TR("P2TR", "Taproot (P2TR)", "m/86'/17'/0'") {
         @Override
         public ECKey getOutputKey(ECKey derivedKey) {
             return derivedKey.getTweakedOutputKey();
