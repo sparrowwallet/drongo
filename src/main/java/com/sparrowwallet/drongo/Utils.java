@@ -128,6 +128,20 @@ public class Utils {
         return c;
     }
 
+    public static byte[] xor(byte[] a, byte[] b) {
+        if(a.length != b.length) {
+            throw new IllegalArgumentException("Invalid length for xor: " + a.length + " vs " + b.length);
+        }
+
+        byte[] ret = new byte[a.length];
+
+        for(int i = 0; i < a.length; i++) {
+            ret[i] = (byte) ((int) b[i] ^ (int) a[i]);
+        }
+
+        return ret;
+    }
+
     /** Parse 4 bytes from the byte array (starting at the offset) as unsigned 32-bit integer in little endian format. */
     public static long readUint32(byte[] bytes, int offset) {
         return (bytes[offset] & 0xffl) |

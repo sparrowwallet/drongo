@@ -20,6 +20,8 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 
+import static com.sparrowwallet.drongo.Utils.xor;
+
 public class PaymentCode {
     private static final Logger log = LoggerFactory.getLogger(PaymentCode.class);
 
@@ -311,21 +313,6 @@ public class PaymentCode {
 
     private DeterministicKey createMasterPubKeyFromBytes() {
         return HDKeyDerivation.createMasterPubKeyFromBytes(pubkey, chain);
-    }
-
-    private static byte[] xor(byte[] a, byte[] b) {
-        if(a.length != b.length) {
-            log.error("Invalid length for xor: " + a.length + " vs " + b.length);
-            return null;
-        }
-
-        byte[] ret = new byte[a.length];
-
-        for(int i = 0; i < a.length; i++) {
-            ret[i] = (byte) ((int) b[i] ^ (int) a[i]);
-        }
-
-        return ret;
     }
 
     public boolean isValid() {
