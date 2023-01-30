@@ -576,9 +576,13 @@ public class ECKey {
      * @throws IllegalStateException if this ECKey does not have the private part.
      */
     public String signMessage(String message, ScriptType scriptType) {
+        return signMessage(message, scriptType, this::signEcdsa);
+    }
+
+    public String signMessage(String message, ScriptType scriptType, ECDSAHashSigner ecdsaHashSigner) {
         byte[] data = formatMessageForSigning(message);
         Sha256Hash hash = Sha256Hash.twiceOf(data);
-        ECDSASignature sig = signEcdsa(hash);
+        ECDSASignature sig = ecdsaHashSigner.sign(hash);
         byte recId = findRecoveryId(hash, sig);
         int headerByte = recId + getSigningTypeConstant(scriptType);
         byte[] sigData = new byte[65];  // 1 header + 32 bytes for R + 32 bytes for S
@@ -867,5 +871,9 @@ public class ECKey {
         } catch (IOException e) {
             throw new RuntimeException(e);  // Cannot happen.
         }
+    }
+
+    public interface ECDSAHashSigner {
+        ECDSASignature sign(Sha256Hash hash);
     }
 }

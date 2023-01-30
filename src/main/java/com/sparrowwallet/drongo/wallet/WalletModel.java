@@ -66,6 +66,10 @@ public enum WalletModel {
         return (this == TREZOR_1 || this == KEEPKEY);
     }
 
+    public boolean isCard() {
+        return (this == TAPSIGNER || this == SATSCARD);
+    }
+
     public static WalletModel fromType(String type) {
         for(WalletModel model : values()) {
             if(model.getType().equalsIgnoreCase(type)) {
