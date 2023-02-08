@@ -479,6 +479,10 @@ public class OutputDescriptor {
     }
 
     public String toString(boolean addKeyOrigin, boolean addChecksum) {
+        return toString(addKeyOrigin, true, addChecksum);
+    }
+
+    public String toString(boolean addKeyOrigin, boolean addKey, boolean addChecksum) {
         StringBuilder builder = new StringBuilder();
         builder.append(scriptType.getDescriptor());
 
@@ -487,14 +491,14 @@ public class OutputDescriptor {
             StringJoiner joiner = new StringJoiner(",");
             joiner.add(Integer.toString(multisigThreshold));
             for(ExtendedKey pubKey : sortExtendedPubKeys(extendedPublicKeys.keySet())) {
-                String extKeyString = toString(pubKey, addKeyOrigin);
+                String extKeyString = toString(pubKey, addKeyOrigin, addKey);
                 joiner.add(extKeyString);
             }
             builder.append(joiner.toString());
             builder.append(ScriptType.MULTISIG.getCloseDescriptor());
         } else {
             ExtendedKey extendedPublicKey = getSingletonExtendedPublicKey();
-            builder.append(toString(extendedPublicKey, addKeyOrigin));
+            builder.append(toString(extendedPublicKey, addKeyOrigin, addKey));
         }
         builder.append(scriptType.getCloseDescriptor());
 
@@ -548,7 +552,7 @@ public class OutputDescriptor {
         }
     }
 
-    private String toString(ExtendedKey pubKey, boolean addKeyOrigin) {
+    private String toString(ExtendedKey pubKey, boolean addKeyOrigin, boolean addKey) {
         StringBuilder keyBuilder = new StringBuilder();
         KeyDerivation keyDerivation = extendedPublicKeys.get(pubKey);
         if(keyDerivation != null && keyDerivation.getDerivationPath() != null && addKeyOrigin) {
@@ -561,17 +565,19 @@ public class OutputDescriptor {
             keyBuilder.append("]");
         }
 
-        if(pubKey != null) {
-            keyBuilder.append(pubKey.toString());
-        }
-
-        String childDerivation = mapChildrenDerivations.get(pubKey);
-        if(childDerivation != null) {
-            if(!childDerivation.startsWith("/")) {
-                keyBuilder.append("/");
+        if(addKey) {
+            if(pubKey != null) {
+                keyBuilder.append(pubKey.toString());
             }
 
-            keyBuilder.append(childDerivation);
+            String childDerivation = mapChildrenDerivations.get(pubKey);
+            if(childDerivation != null) {
+                if(!childDerivation.startsWith("/")) {
+                    keyBuilder.append("/");
+                }
+
+                keyBuilder.append(childDerivation);
+            }
         }
 
         return keyBuilder.toString();
