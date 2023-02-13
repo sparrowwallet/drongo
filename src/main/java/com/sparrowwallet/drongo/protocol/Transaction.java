@@ -685,7 +685,7 @@ public class Transaction extends ChildMessage {
 
             if(anyoneCanPay) {
                 getInputs().get(inputIndex).getOutpoint().bitcoinSerializeToStream(bos);
-                Utils.uint32ToByteStreamLE(spentUtxos.get(inputIndex).getValue(), bos);
+                Utils.int64ToByteStreamLE(spentUtxos.get(inputIndex).getValue(), bos);
                 byteArraySerialize(spentUtxos.get(inputIndex).getScriptBytes(), bos);
                 Utils.uint32ToByteStreamLE(getInputs().get(inputIndex).getSequenceNumber(), bos);
             } else {
