@@ -13,6 +13,7 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.math.BigInteger;
 import java.nio.ByteBuffer;
+import java.nio.charset.CharsetDecoder;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
 
@@ -29,6 +30,16 @@ public class Utils {
 
     public static boolean isBase64(String s)   {
         return s.matches(BASE64_REGEX);
+    }
+
+    public static boolean isUtf8(byte[] bytes) {
+        try {
+            CharsetDecoder decoder = StandardCharsets.UTF_8.newDecoder();
+            decoder.decode(java.nio.ByteBuffer.wrap(bytes));
+            return true;
+        } catch(Exception e) {
+            return false;
+        }
     }
 
     public static String bytesToHex(byte[] bytes) {
