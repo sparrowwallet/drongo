@@ -23,6 +23,7 @@ public class Utils {
 
     public static final String HEX_REGEX = "^[0-9A-Fa-f]+$";
     public static final String BASE64_REGEX = "^[0-9A-Za-z\\\\+=/]+$";
+    public static final String NUMERIC_REGEX = "^-?\\d+(\\.\\d+)?$";
 
     public static boolean isHex(String s)   {
         return s.matches(HEX_REGEX);
@@ -30,6 +31,10 @@ public class Utils {
 
     public static boolean isBase64(String s)   {
         return s.matches(BASE64_REGEX);
+    }
+
+    public static boolean isNumber(String s) {
+        return s.matches(NUMERIC_REGEX);
     }
 
     public static boolean isUtf8(byte[] bytes) {
