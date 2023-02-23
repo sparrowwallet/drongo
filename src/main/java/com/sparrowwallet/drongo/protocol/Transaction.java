@@ -8,10 +8,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.math.BigInteger;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashSet;
-import java.util.List;
+import java.util.*;
 
 import static com.sparrowwallet.drongo.Utils.uint32ToByteStreamLE;
 import static com.sparrowwallet.drongo.Utils.uint64ToByteStreamLE;
@@ -633,6 +630,9 @@ public class Transaction extends ChildMessage {
     public synchronized Sha256Hash hashForTaprootSignature(List<TransactionOutput> spentUtxos, int inputIndex, boolean scriptPath, Script script, byte sigHashType, byte[] annex) {
         if(spentUtxos.size() != getInputs().size()) {
             throw new IllegalArgumentException("Provided spent UTXOs length does not equal the number of transaction inputs");
+        }
+        if(spentUtxos.stream().anyMatch(Objects::isNull)) {
+            throw new IllegalArgumentException("Not all spent UTXOs are provided");
         }
         if(inputIndex >= getInputs().size()) {
             throw new IllegalArgumentException("Input index is greater than the number of transaction inputs");
