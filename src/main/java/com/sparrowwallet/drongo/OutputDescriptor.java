@@ -22,7 +22,7 @@ public class OutputDescriptor {
     private static final String INPUT_CHARSET = "0123456789()[],'/*abcdefgh@:$%{}IJKLMNOPQRSTUVWXYZ&+-.;<=>?!^_|~ijklmnopqrstuvwxyzABCDEFGH`#\"\\ ";
     private static final String CHECKSUM_CHARSET = "qpzry9x8gf2tvdw0s3jn54khce6mua7l";
 
-    private static final Pattern XPUB_PATTERN = Pattern.compile("(\\[[^\\]]+\\])?(.pub[^/\\,)]{100,112})(/[/\\d*'hH<>;]+)?");
+    private static final Pattern XPUB_PATTERN = Pattern.compile("(\\[[^\\]]+\\])?(.(?:pub|prv)[^/\\,)]{100,112})(/[/\\d*'hH<>;]+)?");
     private static final Pattern PUBKEY_PATTERN = Pattern.compile("(\\[[^\\]]+\\])?(0[23][0-9a-fA-F]{32})");
     private static final Pattern MULTI_PATTERN = Pattern.compile("multi\\(([\\d+])");
     private static final Pattern KEY_ORIGIN_PATTERN = Pattern.compile("\\[([A-Fa-f0-9]{8})([/\\d'hH]+)\\]");
@@ -379,6 +379,13 @@ public class OutputDescriptor {
             KeyDerivation keyDerivation = new KeyDerivation(masterFingerprint, keyDerivationPath);
             try {
                 ExtendedKey extendedPublicKey = ExtendedKey.fromDescriptor(extPubKey);
+                if(extendedPublicKey.getKey().hasPrivKey()) {
+                    List<ChildNumber> derivation = keyDerivation.getDerivation();
+                    int depth = derivation.size() == 0 ? scriptType.getDefaultDerivation().size() : derivation.size();
+                    DeterministicKey prvKey = extendedPublicKey.getKey();
+                    DeterministicKey pubKey = new DeterministicKey(prvKey.getPath(), prvKey.getChainCode(), prvKey.getPubKey(), depth, extendedPublicKey.getParentFingerprint());
+                    extendedPublicKey = new ExtendedKey(pubKey, pubKey.getParentFingerprint(), extendedPublicKey.getKeyChildNumber());
+                }
                 keyDerivationMap.put(extendedPublicKey, keyDerivation);
                 keyChildDerivationMap.put(extendedPublicKey, childDerivationPath);
             } catch(ProtocolException e) {
