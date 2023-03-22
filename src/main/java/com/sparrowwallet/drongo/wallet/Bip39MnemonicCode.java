@@ -229,4 +229,85 @@ public class Bip39MnemonicCode {
                 bits[(i * 8) + j] = (data[i] & (1 << (7 - j))) != 0;
         return bits;
     }
+
+    public List<String> getPossibleLastWords(List<String> previousWords) throws MnemonicException.MnemonicLengthException, MnemonicException.MnemonicWordException {
+        if((previousWords.size() + 1) % 3 > 0) {
+            throw new MnemonicException.MnemonicLengthException("Previous word list size must be multiple of three words, less one.");
+        }
+
+        // Look up all the words in the list and construct the
+        // concatenation of the original entropy and the checksum.
+        //
+        int concatLenBits = previousWords.size() * 11;
+        boolean[] concatBits = new boolean[concatLenBits];
+        int wordindex = 0;
+        for (String word : previousWords) {
+            // Find the words index in the wordlist.
+            int ndx = Collections.binarySearch(this.wordList, word);
+            if (ndx < 0) {
+                throw new MnemonicException.MnemonicWordException(word);
+            }
+            // Set the next 11 bits to the value of the index.
+            for (int ii = 0; ii < 11; ++ii) {
+                concatBits[(wordindex * 11) + ii] = (ndx & (1 << (10 - ii))) != 0;
+            }
+            ++wordindex;
+        }
+
+        int checksumLengthBits = (concatLenBits + 11) / 33;
+        int entropyLengthBits = (concatLenBits + 11) - checksumLengthBits;
+        int varyingLengthBits = entropyLengthBits - concatLenBits;
+
+        boolean[][] bitPermutations = getBitPermutations(varyingLengthBits);
+
+        ArrayList<String> possibleWords = new ArrayList<>();
+        for(boolean[] bitPermutation : bitPermutations) {
+            boolean[] entropyBits = new boolean[concatLenBits + varyingLengthBits];
+            System.arraycopy(concatBits, 0, entropyBits, 0, concatBits.length);
+            System.arraycopy(bitPermutation, 0, entropyBits, concatBits.length, varyingLengthBits);
+
+            byte[] entropy = new byte[entropyLengthBits / 8];
+            for(int ii = 0; ii < entropy.length; ++ii) {
+                for(int jj = 0; jj < 8; ++jj) {
+                    if(entropyBits[(ii * 8) + jj]) {
+                        entropy[ii] |= 1 << (7 - jj);
+                    }
+                }
+            }
+
+            byte[] hash = Sha256Hash.hash(entropy);
+            boolean[] hashBits = bytesToBits(hash);
+
+            boolean[] wordBits = new boolean[11];
+            System.arraycopy(bitPermutation, 0, wordBits, 0, varyingLengthBits);
+            System.arraycopy(hashBits, 0, wordBits, varyingLengthBits, checksumLengthBits);
+
+            int index = 0;
+            for(int j = 0; j < 11; ++j) {
+                index <<= 1;
+                if(wordBits[j]) {
+                    index |= 0x1;
+                }
+            }
+
+            possibleWords.add(this.wordList.get(index));
+        }
+
+        Collections.sort(possibleWords);
+
+        return possibleWords;
+    }
+
+    public static boolean[][] getBitPermutations(int length) {
+        int numPermutations = (int) Math.pow(2, length);
+        boolean[][] permutations = new boolean[numPermutations][length];
+
+        for (int i = 0; i < numPermutations; i++) {
+            for (int j = 0; j < length; j++) {
+                permutations[i][j] = ((i >> j) & 1) == 1;
+            }
+        }
+
+        return permutations;
+    }
 }
