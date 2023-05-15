@@ -41,10 +41,12 @@ public class SeedQR {
 
         String qrHex = Utils.bytesToHex(compactSeedQr);
         String seedHex;
-        if(qrHex.endsWith("0ec")) {
-            seedHex = qrHex.substring(3, qrHex.length() - 3);
+        if(qrHex.endsWith("0ec11ec11")) {
+            seedHex = qrHex.substring(3, qrHex.length() - 9); //12 word, high EC
+        } else if(qrHex.endsWith("0ec")) {
+            seedHex = qrHex.substring(3, qrHex.length() - 3); //12 word, low EC
         } else {
-            seedHex = qrHex.substring(3, qrHex.length() - 1);
+            seedHex = qrHex.substring(3, qrHex.length() - 1); //24 word
         }
 
         byte[] seed = Utils.hexToBytes(seedHex);
