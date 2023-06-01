@@ -7,15 +7,22 @@ import java.util.stream.Collectors;
 
 public class PresetUtxoSelector extends SingleSetUtxoSelector {
     private final Collection<BlockTransactionHashIndex> presetUtxos;
+    private final Collection<BlockTransactionHashIndex> excludedUtxos;
     private final boolean maintainOrder;
 
     public PresetUtxoSelector(Collection<BlockTransactionHashIndex> presetUtxos) {
+        this(presetUtxos, new ArrayList<>());
+    }
+
+    public PresetUtxoSelector(Collection<BlockTransactionHashIndex> presetUtxos, Collection<BlockTransactionHashIndex> excludedUtxos) {
         this.presetUtxos = presetUtxos;
+        this.excludedUtxos = excludedUtxos;
         this.maintainOrder = false;
     }
 
     public PresetUtxoSelector(Collection<BlockTransactionHashIndex> presetUtxos, boolean maintainOrder) {
         this.presetUtxos = presetUtxos;
+        this.excludedUtxos = new ArrayList<>();
         this.maintainOrder = maintainOrder;
     }
 
@@ -42,6 +49,10 @@ public class PresetUtxoSelector extends SingleSetUtxoSelector {
 
     public Collection<BlockTransactionHashIndex> getPresetUtxos() {
         return presetUtxos;
+    }
+
+    public Collection<BlockTransactionHashIndex> getExcludedUtxos() {
+        return excludedUtxos;
     }
 
     @Override

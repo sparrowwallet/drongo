@@ -1224,7 +1224,7 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
             }
         }
 
-        throw new InsufficientFundsException("Not enough combined value in UTXOs for output value " + targetValue);
+        throw new InsufficientFundsException("Not enough combined value in UTXOs for output value " + targetValue, targetValue);
     }
 
     private List<OutputGroup> getGroupedUtxos(List<UtxoFilter> utxoFilters, double feeRate, double longTermFeeRate, boolean groupByAddress, boolean includeSpentMempoolOutputs) {
