@@ -1660,6 +1660,10 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
                         labels.put(output.getHash().toString() + "<" + output.getIndex(), output.getLabel());
                     }
 
+                    if(output.getStatus() != null) {
+                        labels.put(output.getHash().toString() + ":" + output.getIndex(), output.getStatus().toString());
+                    }
+
                     if(output.isSpent() && output.getSpentBy().getLabel() != null && !output.getSpentBy().getLabel().isEmpty()) {
                         labels.put(output.getSpentBy().getHash() + ">" + output.getSpentBy().getIndex(), output.getSpentBy().getLabel());
                     }
