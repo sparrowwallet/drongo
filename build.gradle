@@ -10,6 +10,7 @@ plugins {
     id 'java-library'
     id 'extra-java-module-info'
     id 'com.github.johnrengelman.shadow' version '5.2.0'
+    id 'jacoco'
 }
 
 tasks.withType(AbstractArchiveTask) {
@@ -90,6 +91,18 @@ jar {
 shadowJar {
     archiveVersion = '0.9'
     classifier = 'all'
+}
+
+test {
+    finalizedBy jacocoTestReport
+}
+
+jacocoTestReport {
+    dependsOn test
+}
+
+jacoco {
+    toolVersion = '0.8.10'
 }
 
 extraJavaModuleInfo {
