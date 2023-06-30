@@ -62,6 +62,18 @@ public class Sha256Hash implements Comparable<Sha256Hash> {
     }
 
     /**
+     * Duplicate method with default name for deserialization mappers.
+     *
+     * @param hexString a hash value represented as a hex string
+     * @return a new instance
+     * @throws IllegalArgumentException if the given string is not a valid
+     *         hex string, or if it does not represent exactly 32 bytes
+     */
+    public static Sha256Hash fromString(String hexString) {
+        return wrap(hexString);
+    }
+
+    /**
      * Creates a new instance that wraps the given hash value, but with byte order reversed.
      *
      * @param rawHashBytes the raw hash bytes to wrap
