@@ -103,7 +103,7 @@ public class TransactionSignature {
     }
 
     public static TransactionSignature decodeFromBitcoin(byte[] bytes, boolean requireCanonicalEncoding) throws SignatureDecodeException {
-        if(bytes.length == 64) {
+        if(bytes.length == 64 || bytes.length == 65) {
             return decodeFromBitcoin(Type.SCHNORR, bytes, requireCanonicalEncoding);
         }
 
