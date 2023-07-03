@@ -2,6 +2,7 @@ package com.sparrowwallet.drongo.crypto;
 
 import com.sparrowwallet.drongo.Utils;
 import com.sparrowwallet.drongo.address.Address;
+import com.sparrowwallet.drongo.policy.PolicyType;
 import com.sparrowwallet.drongo.protocol.*;
 import com.sparrowwallet.drongo.psbt.PSBT;
 import com.sparrowwallet.drongo.psbt.PSBTInput;
@@ -15,7 +16,9 @@ import java.util.*;
 import static com.sparrowwallet.drongo.protocol.ScriptType.P2TR;
 
 public class Bip322 {
-    public static String signMessageBip322(Address address, String message, PSBTInputSigner psbtInputSigner) {
+    public static String signMessageBip322(ScriptType scriptType, Address address, String message, PSBTInputSigner psbtInputSigner) {
+        checkScriptType(scriptType);
+
         Transaction toSpend = getBip322ToSpend(address, message);
         Transaction toSign = getBip322ToSign(toSpend);
 
@@ -31,12 +34,14 @@ public class Bip322 {
         TransactionSignature signature = psbtInput.isTaproot() ? psbtInput.getTapKeyPathSignature() : psbtInput.getPartialSignature(pubKey);
 
         Transaction finalizeTransaction = new Transaction();
-        TransactionInput finalizedTxInput = address.getScriptType().addSpendingInput(finalizeTransaction, utxoOutput, pubKey, signature);
+        TransactionInput finalizedTxInput = scriptType.addSpendingInput(finalizeTransaction, utxoOutput, pubKey, signature);
 
         return Base64.getEncoder().encodeToString(finalizedTxInput.getWitness().toByteArray());
     }
 
-    public static void verifyMessageBip322(Address address, String message, String signatureBase64) throws SignatureException {
+    public static void verifyMessageBip322(ScriptType scriptType, Address address, String message, String signatureBase64) throws SignatureException {
+        checkScriptType(scriptType);
+
         byte[] signatureEncoded;
         try {
             signatureEncoded = Base64.getDecoder().decode(signatureBase64);
@@ -52,14 +57,14 @@ public class Bip322 {
             signature = witness.getSignatures().get(0);
             pubKey = ECKey.fromPublicOnly(witness.getPushes().get(1));
 
-            if(!address.equals(address.getScriptType().getAddress(pubKey))) {
+            if(!address.equals(scriptType.getAddress(pubKey))) {
                 throw new SignatureException("Provided address does not match pubkey in signature");
             }
-        } else if(address.getScriptType() == ScriptType.P2TR) {
+        } else if(scriptType == ScriptType.P2TR) {
             signature = witness.getSignatures().get(0);
             pubKey = P2TR.getPublicKeyFromScript(address.getOutputScript());
         } else {
-            throw new IllegalArgumentException(address.getScriptType() + " addresses are not supported");
+            throw new IllegalArgumentException(scriptType + " addresses are not supported");
         }
 
         Transaction toSpend = getBip322ToSpend(address, message);
@@ -70,16 +75,30 @@ public class Bip322 {
         psbtInput.setWitnessUtxo(toSpend.getOutputs().get(0));
         psbtInput.setSigHash(SigHash.ALL);
 
-        if(address.getScriptType() == ScriptType.P2WPKH) {
-            psbtInput.getPartialSignatures().put(pubKey, signature);
-        } else if(address.getScriptType() == ScriptType.P2TR) {
+        if(scriptType == ScriptType.P2TR) {
             psbtInput.setTapKeyPathSignature(signature);
+        } else {
+            psbtInput.getPartialSignatures().put(pubKey, signature);
         }
 
         try {
             psbt.verifySignatures();
         } catch(PSBTSignatureException e) {
             throw new SignatureException("Signature did not match for message", e);
+        }
+    }
+
+    private static void checkScriptType(ScriptType scriptType) {
+        if(!scriptType.isAllowed(PolicyType.SINGLE)) {
+            throw new UnsupportedOperationException("Only singlesig addresses are currently supported");
+        }
+
+        if(!Arrays.asList(ScriptType.WITNESS_TYPES).contains(scriptType)) {
+            throw new UnsupportedOperationException("Legacy addresses are not supported for BIP322 simple signatures");
+        }
+
+        if(scriptType == ScriptType.P2SH_P2WPKH) {
+            throw new UnsupportedOperationException("The P2SH-P2WPKH script type is not currently supported");
         }
     }
 
