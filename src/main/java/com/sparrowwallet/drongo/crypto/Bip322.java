@@ -41,7 +41,7 @@ public class Bip322 {
         return Base64.getEncoder().encodeToString(finalizedTxInput.getWitness().toByteArray());
     }
 
-    public static void verifyMessageBip322(ScriptType scriptType, Address address, String message, String signatureBase64) throws SignatureException {
+    public static boolean verifyMessageBip322(ScriptType scriptType, Address address, String message, String signatureBase64) throws SignatureException {
         checkScriptType(scriptType);
 
         byte[] signatureEncoded;
@@ -55,6 +55,10 @@ public class Bip322 {
         TransactionSignature signature;
         ECKey pubKey;
 
+        if(witness.getWitnessScript() != null) {
+            throw new IllegalArgumentException("Multisig signatures are not supported.");
+        }
+
         if(scriptType == ScriptType.P2WPKH) {
             signature = witness.getSignatures().get(0);
             pubKey = ECKey.fromPublicOnly(witness.getPushes().get(1));
@@ -66,7 +70,7 @@ public class Bip322 {
             signature = witness.getSignatures().get(0);
             pubKey = P2TR.getPublicKeyFromScript(address.getOutputScript());
         } else {
-            throw new IllegalArgumentException(scriptType + " addresses are not supported");
+            throw new SignatureException(scriptType + " addresses are not supported");
         }
 
         Transaction toSpend = getBip322ToSpend(address, message);
@@ -86,8 +90,10 @@ public class Bip322 {
         try {
             psbt.verifySignatures();
         } catch(PSBTSignatureException e) {
-            throw new SignatureException("Signature did not match for message", e);
+            return false;
         }
+
+        return true;
     }
 
     private static void checkScriptType(ScriptType scriptType) {
@@ -102,6 +108,10 @@ public class Bip322 {
         if(scriptType == ScriptType.P2SH_P2WPKH) {
             throw new UnsupportedOperationException("The P2SH-P2WPKH script type is not currently supported");
         }
+    }
+
+    public static boolean isSupported(ScriptType scriptType) {
+        return scriptType == ScriptType.P2WPKH || scriptType == P2TR;
     }
 
     public static Transaction getBip322ToSpend(Address address, String message) {
