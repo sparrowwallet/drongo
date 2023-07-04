@@ -4,10 +4,6 @@ import com.sparrowwallet.drongo.Utils;
 import com.sparrowwallet.drongo.address.Address;
 import com.sparrowwallet.drongo.address.InvalidAddressException;
 import com.sparrowwallet.drongo.protocol.ScriptType;
-import com.sparrowwallet.drongo.protocol.Sha256Hash;
-import com.sparrowwallet.drongo.protocol.SigHash;
-import com.sparrowwallet.drongo.protocol.TransactionSignature;
-import com.sparrowwallet.drongo.psbt.PSBTInputSigner;
 import org.junit.Assert;
 import org.junit.Test;
 
@@ -29,32 +25,10 @@ public class Bip322Test {
         Address address = ScriptType.P2WPKH.getAddress(privKey);
         Assert.assertEquals("bc1q9vza2e8x573nczrlzms0wvx3gsqjx7vavgkx0l", address.toString());
 
-        String signature = Bip322.signMessageBip322(ScriptType.P2WPKH, address, "", new PSBTInputSigner() {
-            @Override
-            public TransactionSignature sign(Sha256Hash hash, SigHash sigHash, TransactionSignature.Type signatureType) {
-                return privKey.sign(hash, sigHash, signatureType);
-            }
-
-            @Override
-            public ECKey getPubKey() {
-                return ECKey.fromPublicOnly(privKey);
-            }
-        });
-
+        String signature = Bip322.signMessageBip322(ScriptType.P2WPKH, "", privKey);
         Assert.assertEquals("AkcwRAIgM2gBAQqvZX15ZiysmKmQpDrG83avLIT492QBzLnQIxYCIBaTpOaD20qRlEylyxFSeEA2ba9YOixpX8z46TSDtS40ASECx/EgAxlkQpQ9hYjgGu6EBCPMVPwVIVJqO4XCsMvViHI=", signature);
 
-        String signature2 = Bip322.signMessageBip322(ScriptType.P2WPKH, address, "Hello World", new PSBTInputSigner() {
-            @Override
-            public TransactionSignature sign(Sha256Hash hash, SigHash sigHash, TransactionSignature.Type signatureType) {
-                return privKey.sign(hash, sigHash, signatureType);
-            }
-
-            @Override
-            public ECKey getPubKey() {
-                return ECKey.fromPublicOnly(privKey);
-            }
-        });
-
+        String signature2 = Bip322.signMessageBip322(ScriptType.P2WPKH, "Hello World", privKey);
         Assert.assertEquals("AkcwRAIgZRfIY3p7/DoVTty6YZbWS71bc5Vct9p9Fia83eRmw2QCICK/ENGfwLtptFluMGs2KsqoNSk89pO7F29zJLUx9a/sASECx/EgAxlkQpQ9hYjgGu6EBCPMVPwVIVJqO4XCsMvViHI=", signature2);
     }
 
@@ -89,18 +63,7 @@ public class Bip322Test {
         Address address = ScriptType.P2TR.getAddress(privKey);
         Assert.assertEquals("bc1ppv609nr0vr25u07u95waq5lucwfm6tde4nydujnu8npg4q75mr5sxq8lt3", address.toString());
 
-        String signature = Bip322.signMessageBip322(ScriptType.P2TR, address, "Hello World", new PSBTInputSigner() {
-            @Override
-            public TransactionSignature sign(Sha256Hash hash, SigHash sigHash, TransactionSignature.Type signatureType) {
-                return address.getScriptType().getOutputKey(privKey).sign(hash, sigHash, signatureType);
-            }
-
-            @Override
-            public ECKey getPubKey() {
-                return ECKey.fromPublicOnly(privKey);
-            }
-        });
-
+        String signature = Bip322.signMessageBip322(ScriptType.P2TR, "Hello World", privKey);
         Assert.assertEquals("AUHd69PrJQEv+oKTfZ8l+WROBHuy9HKrbFCJu7U1iK2iiEy1vMU5EfMtjc+VSHM7aU0SDbak5IUZRVno2P5mjSafAQ==", signature);
     }
 
@@ -122,18 +85,7 @@ public class Bip322Test {
         Address address = ScriptType.P2SH_P2WPKH.getAddress(privKey);
         Assert.assertEquals("37qyp7jQAzqb2rCBpMvVtLDuuzKAUCVnJb", address.toString());
 
-        String signature = Bip322.signMessageBip322(ScriptType.P2SH_P2WPKH, address, "Hello World", new PSBTInputSigner() {
-            @Override
-            public TransactionSignature sign(Sha256Hash hash, SigHash sigHash, TransactionSignature.Type signatureType) {
-                return address.getScriptType().getOutputKey(privKey).sign(hash, sigHash, signatureType);
-            }
-
-            @Override
-            public ECKey getPubKey() {
-                return ECKey.fromPublicOnly(privKey);
-            }
-        });
-
+        String signature = Bip322.signMessageBip322(ScriptType.P2SH_P2WPKH, "Hello World", privKey);
         Assert.assertEquals("AkcwRAIgHx821fcP3D4R6RsXHF8kXza4d/SqpKGaGu++AEQjJz0CIH9cN5XGDkgkqqF9OMTbYvhgI7Yp9NoHXEgLstjqDOqDASECx/EgAxlkQpQ9hYjgGu6EBCPMVPwVIVJqO4XCsMvViHI=", signature);
     }
 

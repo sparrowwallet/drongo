@@ -16,8 +16,11 @@ import java.util.*;
 import static com.sparrowwallet.drongo.protocol.ScriptType.P2TR;
 
 public class Bip322 {
-    public static String signMessageBip322(ScriptType scriptType, Address address, String message, PSBTInputSigner psbtInputSigner) {
+    public static String signMessageBip322(ScriptType scriptType, String message, ECKey privKey) {
         checkScriptType(scriptType);
+
+        ECKey pubKey = ECKey.fromPublicOnly(privKey);
+        Address address = scriptType.getAddress(pubKey);
 
         Transaction toSpend = getBip322ToSpend(address, message);
         Transaction toSign = getBip322ToSign(toSpend);
@@ -28,9 +31,8 @@ public class Bip322 {
         PSBTInput psbtInput = psbt.getPsbtInputs().get(0);
         psbtInput.setWitnessUtxo(utxoOutput);
         psbtInput.setSigHash(SigHash.ALL);
-        psbtInput.sign(psbtInputSigner);
+        psbtInput.sign(scriptType.getOutputKey(privKey));
 
-        ECKey pubKey = psbtInputSigner.getPubKey();
         TransactionSignature signature = psbtInput.isTaproot() ? psbtInput.getTapKeyPathSignature() : psbtInput.getPartialSignature(pubKey);
 
         Transaction finalizeTransaction = new Transaction();
@@ -53,7 +55,7 @@ public class Bip322 {
         TransactionSignature signature;
         ECKey pubKey;
 
-        if(address.getScriptType() == ScriptType.P2WPKH) {
+        if(scriptType == ScriptType.P2WPKH) {
             signature = witness.getSignatures().get(0);
             pubKey = ECKey.fromPublicOnly(witness.getPushes().get(1));
 
