@@ -59,6 +59,13 @@ public class PresetUtxoSelector extends SingleSetUtxoSelector {
         return excludedUtxos;
     }
 
+    public TxoFilter asExcludeTxoFilter() {
+        List<BlockTransactionHashIndex> utxos = new ArrayList<>();
+        utxos.addAll(presetUtxos);
+        utxos.addAll(excludedUtxos);
+        return new ExcludeTxoFilter(utxos);
+    }
+
     @Override
     public boolean shuffleInputs() {
         return !maintainOrder;
