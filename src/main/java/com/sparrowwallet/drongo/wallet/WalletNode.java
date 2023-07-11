@@ -168,16 +168,16 @@ public class WalletNode extends Persistable implements Comparable<WalletNode> {
     }
 
     public Set<BlockTransactionHashIndex> getUnspentTransactionOutputs() {
-        return getUnspentTransactionOutputs(false);
+        return getTransactionOutputs(List.of(new SpentTxoFilter()));
     }
 
-    public Set<BlockTransactionHashIndex> getUnspentTransactionOutputs(boolean includeSpentMempoolOutputs) {
+    public Set<BlockTransactionHashIndex> getTransactionOutputs(Collection<TxoFilter> txoFilters) {
         if(transactionOutputs.isEmpty()) {
             return Collections.emptySet();
         }
 
         Set<BlockTransactionHashIndex> unspentTXOs = new TreeSet<>(transactionOutputs);
-        unspentTXOs.removeIf(txo -> txo.isSpent() && (!includeSpentMempoolOutputs || txo.getSpentBy().getHeight() > 0));
+        unspentTXOs.removeIf(txo -> !txoFilters.stream().allMatch(txoFilter -> txoFilter.isEligible(txo)));
         return unspentTXOs;
     }
 
