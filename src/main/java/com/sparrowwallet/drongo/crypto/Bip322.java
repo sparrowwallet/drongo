@@ -44,6 +44,10 @@ public class Bip322 {
     public static boolean verifyMessageBip322(ScriptType scriptType, Address address, String message, String signatureBase64) throws SignatureException {
         checkScriptType(scriptType);
 
+        if(signatureBase64.trim().isEmpty()) {
+            throw new SignatureException("Provided signature is empty.");
+        }
+
         byte[] signatureEncoded;
         try {
             signatureEncoded = Base64.getDecoder().decode(signatureBase64);
@@ -51,7 +55,13 @@ public class Bip322 {
             throw new SignatureException("Could not decode base64 signature", e);
         }
 
-        TransactionWitness witness = new TransactionWitness(null, signatureEncoded, 0);
+        TransactionWitness witness;
+        try {
+            witness = new TransactionWitness(null, signatureEncoded, 0);
+        } catch(Exception e) {
+            throw new SignatureException("Provided signature is not a BIP322 simple signature.", e);
+        }
+
         TransactionSignature signature;
         ECKey pubKey;
 
@@ -59,8 +69,15 @@ public class Bip322 {
             throw new IllegalArgumentException("Multisig signatures are not supported.");
         }
 
+        if(witness.getSignatures().isEmpty()) {
+            throw new SignatureException("BIP322 simple signature contains no transaction signatures.");
+        }
+
         if(scriptType == ScriptType.P2WPKH) {
             signature = witness.getSignatures().get(0);
+            if(witness.getPushes().size() <= 1) {
+                throw new SignatureException("BIP322 simple signature for P2WPKH script type does not contain a pubkey.");
+            }
             pubKey = ECKey.fromPublicOnly(witness.getPushes().get(1));
 
             if(!address.equals(scriptType.getAddress(pubKey))) {
