@@ -6,7 +6,7 @@ import java.util.regex.Pattern;
 public class Miniscript {
     private static final Pattern SINGLE_PATTERN = Pattern.compile("pkh?\\(");
     private static final Pattern TAPROOT_PATTERN = Pattern.compile("tr\\(");
-    private static final Pattern MULTI_PATTERN = Pattern.compile("multi\\(([\\d+])");
+    private static final Pattern MULTI_PATTERN = Pattern.compile("multi\\((\\d+)");
 
     private String script;
 
