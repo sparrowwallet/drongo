@@ -31,25 +31,33 @@ public class SeedQR {
     }
 
     public static DeterministicSeed getSeed(byte[] compactSeedQr) {
-        if(compactSeedQr[0] != 0x41 && compactSeedQr[0] != 0x42) {
-            throw new IllegalArgumentException("Invalid CompactSeedQR header");
-        }
+        byte[] seed;
 
-        if(compactSeedQr.length < 19) {
-            throw new IllegalArgumentException("Invalid CompactSeedQR length");
-        }
-
-        String qrHex = Utils.bytesToHex(compactSeedQr);
-        String seedHex;
-        if(qrHex.endsWith("0ec11ec11")) {
-            seedHex = qrHex.substring(3, qrHex.length() - 9); //12 word, high EC
-        } else if(qrHex.endsWith("0ec")) {
-            seedHex = qrHex.substring(3, qrHex.length() - 3); //12 word, low EC
+        if(compactSeedQr.length == 16 || compactSeedQr.length == 32) {
+            //Assume scan contains seed only
+            seed = compactSeedQr;
         } else {
-            seedHex = qrHex.substring(3, qrHex.length() - 1); //24 word
-        }
+            //Assume scan contains header, seed and EC bytes
+            if(compactSeedQr[0] != 0x41 && compactSeedQr[0] != 0x42) {
+                throw new IllegalArgumentException("Invalid CompactSeedQR header");
+            }
 
-        byte[] seed = Utils.hexToBytes(seedHex);
+            if(compactSeedQr.length < 19) {
+                throw new IllegalArgumentException("Invalid CompactSeedQR length");
+            }
+
+            String qrHex = Utils.bytesToHex(compactSeedQr);
+            String seedHex;
+            if(qrHex.endsWith("0ec11ec11")) {
+                seedHex = qrHex.substring(3, qrHex.length() - 9); //12 word, high EC
+            } else if(qrHex.endsWith("0ec")) {
+                seedHex = qrHex.substring(3, qrHex.length() - 3); //12 word, low EC
+            } else {
+                seedHex = qrHex.substring(3, qrHex.length() - 1); //24 word
+            }
+
+            seed = Utils.hexToBytes(seedHex);
+        }
 
         if(seed.length < 16 || seed.length > 32 || seed.length % 4 > 0) {
             throw new IllegalArgumentException("Invalid CompactSeedQR length: " + compactSeedQr.length);
