@@ -71,7 +71,7 @@ public class PaymentAddress {
     private BigInteger addSecp256k1(BigInteger b1, BigInteger b2) {
         BigInteger ret = b1.add(b2);
 
-        if(ret.bitLength() > CURVE.getN().bitLength()) {
+        if(ret.compareTo(CURVE.getN()) > 0) {
             return ret.mod(CURVE.getN());
         }
 
@@ -83,7 +83,7 @@ public class PaymentAddress {
     }
 
     private boolean isSecp256k1(BigInteger b) {
-        return b.compareTo(BigInteger.ONE) > 0 && b.bitLength() <= CURVE.getN().bitLength();
+        return (b.compareTo(BigInteger.ONE) > 0) && (b.compareTo(CURVE.getN()) < 0);
     }
 
     private BigInteger secretPoint() throws InvalidKeyException, NoSuchAlgorithmException, NoSuchProviderException, InvalidKeySpecException, NotSecp256k1Exception {

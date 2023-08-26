@@ -2,10 +2,10 @@ package com.sparrowwallet.drongo.wallet;
 
 import com.sparrowwallet.drongo.protocol.Transaction;
 
-public class CoinbaseUtxoFilter implements UtxoFilter {
+public class CoinbaseTxoFilter implements TxoFilter {
     private final Wallet wallet;
 
-    public CoinbaseUtxoFilter(Wallet wallet) {
+    public CoinbaseTxoFilter(Wallet wallet) {
         this.wallet = wallet;
     }
 

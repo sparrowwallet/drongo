@@ -1,22 +1,30 @@
 package com.sparrowwallet.drongo.wallet;
 
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.List;
+import java.util.*;
 import java.util.stream.Collectors;
 
 public class PresetUtxoSelector extends SingleSetUtxoSelector {
     private final Collection<BlockTransactionHashIndex> presetUtxos;
+    private final Collection<BlockTransactionHashIndex> excludedUtxos;
     private final boolean maintainOrder;
+    private final boolean requireAll;
 
     public PresetUtxoSelector(Collection<BlockTransactionHashIndex> presetUtxos) {
-        this.presetUtxos = presetUtxos;
-        this.maintainOrder = false;
+        this(presetUtxos, new ArrayList<>());
     }
 
-    public PresetUtxoSelector(Collection<BlockTransactionHashIndex> presetUtxos, boolean maintainOrder) {
+    public PresetUtxoSelector(Collection<BlockTransactionHashIndex> presetUtxos, Collection<BlockTransactionHashIndex> excludedUtxos) {
         this.presetUtxos = presetUtxos;
+        this.excludedUtxos = excludedUtxos;
+        this.maintainOrder = false;
+        this.requireAll = false;
+    }
+
+    public PresetUtxoSelector(Collection<BlockTransactionHashIndex> presetUtxos, boolean maintainOrder, boolean requireAll) {
+        this.presetUtxos = presetUtxos;
+        this.excludedUtxos = new ArrayList<>();
         this.maintainOrder = maintainOrder;
+        this.requireAll = requireAll;
     }
 
     @Override
@@ -33,8 +41,11 @@ public class PresetUtxoSelector extends SingleSetUtxoSelector {
             }
         }
 
-        if(maintainOrder && utxos.containsAll(presetUtxos)) {
+        Set<BlockTransactionHashIndex> utxosSet = new HashSet<>(utxos);
+        if(maintainOrder && utxosSet.containsAll(presetUtxos)) {
             return presetUtxos;
+        } else if(requireAll && !utxosSet.containsAll(presetUtxos)) {
+            return Collections.emptyList();
         }
 
         return utxos;
@@ -42,6 +53,17 @@ public class PresetUtxoSelector extends SingleSetUtxoSelector {
 
     public Collection<BlockTransactionHashIndex> getPresetUtxos() {
         return presetUtxos;
+    }
+
+    public Collection<BlockTransactionHashIndex> getExcludedUtxos() {
+        return excludedUtxos;
+    }
+
+    public TxoFilter asExcludeTxoFilter() {
+        List<BlockTransactionHashIndex> utxos = new ArrayList<>();
+        utxos.addAll(presetUtxos);
+        utxos.addAll(excludedUtxos);
+        return new ExcludeTxoFilter(utxos);
     }
 
     @Override

@@ -90,8 +90,8 @@ public class ExtendedKey {
         ChildNumber childNumber;
         List<ChildNumber> path;
 
-        if(depth == 0) {
-            //Poorly formatted extended key, add first child path element
+        if(depth == 0 && !header.isPrivateKey()) {
+            //Poorly formatted public extended key, add first child path element
             childNumber = new ChildNumber(0, false);
         } else if ((i & ChildNumber.HARDENED_BIT) != 0) {
             childNumber = new ChildNumber(i ^ ChildNumber.HARDENED_BIT, true); //already hardened

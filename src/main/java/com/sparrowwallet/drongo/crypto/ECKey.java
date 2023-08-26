@@ -576,9 +576,13 @@ public class ECKey {
      * @throws IllegalStateException if this ECKey does not have the private part.
      */
     public String signMessage(String message, ScriptType scriptType) {
+        return signMessage(message, scriptType, this::signEcdsa);
+    }
+
+    public String signMessage(String message, ScriptType scriptType, ECDSAHashSigner ecdsaHashSigner) {
         byte[] data = formatMessageForSigning(message);
         Sha256Hash hash = Sha256Hash.of(data);
-        ECDSASignature sig = signEcdsa(hash);
+        ECDSASignature sig = ecdsaHashSigner.sign(hash);
         byte recId = findRecoveryId(hash, sig);
         int headerByte = recId + getSigningTypeConstant(scriptType);
         byte[] sigData = new byte[65];  // 1 header + 32 bytes for R + 32 bytes for S
@@ -627,6 +631,14 @@ public class ECKey {
             // This is what you get back from Bouncy Castle if base64 doesn't decode :(
             throw new SignatureException("Could not decode base64", e);
         }
+        byte[] messageBytes = formatMessageForSigning(message);
+        // Note that the C++ code doesn't actually seem to specify any character encoding. Presumably it's whatever
+        // JSON-SPIRIT hands back. Assume UTF-8 for now.
+        Sha256Hash messageHash = Sha256Hash.twiceOf(messageBytes);
+        return signedHashToKey(messageHash, signatureEncoded, electrumFormat);
+    }
+
+    public static ECKey signedHashToKey(Sha256Hash messageHash, byte[] signatureEncoded, boolean electrumFormat) throws SignatureException {
         // Parse the signature bytes into r/s and the selector value.
         if(signatureEncoded.length < 65) {
             throw new SignatureException("Signature truncated, expected 65 bytes and got " + signatureEncoded.length);
@@ -640,10 +652,7 @@ public class ECKey {
         BigInteger r = new BigInteger(1, Arrays.copyOfRange(signatureEncoded, 1, 33));
         BigInteger s = new BigInteger(1, Arrays.copyOfRange(signatureEncoded, 33, 65));
         ECDSASignature sig = new ECDSASignature(r, s);
-        byte[] messageBytes = formatMessageForSigning(message);
-        // Note that the C++ code doesn't actually seem to specify any character encoding. Presumably it's whatever
-        // JSON-SPIRIT hands back. Assume UTF-8 for now.
-        Sha256Hash messageHash = Sha256Hash.of(messageBytes);
+
         boolean compressed = false;
         if(header >= 39) { // this is a bech32 signature
             header -= 12;
@@ -862,5 +871,9 @@ public class ECKey {
         } catch (IOException e) {
             throw new RuntimeException(e);  // Cannot happen.
         }
+    }
+
+    public interface ECDSAHashSigner {
+        ECDSASignature sign(Sha256Hash hash);
     }
 }

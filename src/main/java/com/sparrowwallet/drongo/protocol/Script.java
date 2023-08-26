@@ -4,6 +4,8 @@ import com.sparrowwallet.drongo.Utils;
 import com.sparrowwallet.drongo.address.*;
 import com.sparrowwallet.drongo.crypto.ECKey;
 import org.bouncycastle.util.encoders.Hex;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
@@ -18,6 +20,8 @@ import static com.sparrowwallet.drongo.protocol.ScriptType.*;
 import static com.sparrowwallet.drongo.protocol.ScriptOpCodes.*;
 
 public class Script {
+    private static final Logger log = LoggerFactory.getLogger(Script.class);
+
     public static final long MAX_SCRIPT_ELEMENT_SIZE = 520;
 
     // The program is a set of chunks where each element is either [opcode] or [data, data, data ...]
@@ -32,7 +36,11 @@ public class Script {
     Script(byte[] programBytes, boolean parse) {
         program = programBytes;
         if(parse) {
-            parse();
+            try {
+                parse();
+            } catch(ProtocolException e) {
+                log.warn("Invalid script, continuing with already parsed chunks", e);
+            }
         }
     }
 
@@ -59,16 +67,16 @@ public class Script {
                 // Read some bytes of data, where how many is the opcode value itself.
                 dataToRead = opcode;
             } else if (opcode == OP_PUSHDATA1) {
-                if (bis.available() < 1) throw new ProtocolException("Unexpected end of script");
+                if (bis.available() < 1) throw new ProtocolException("Unexpected end of script - OP_PUSHDATA1 was followed by " + bis.available() + " bytes");
                 dataToRead = bis.read();
             } else if (opcode == OP_PUSHDATA2) {
                 // Read a short, then read that many bytes of data.
-                if (bis.available() < 2) throw new ProtocolException("Unexpected end of script");
+                if (bis.available() < 2) throw new ProtocolException("Unexpected end of script - OP_PUSHDATA2 was followed by only " + bis.available() + " bytes");
                 dataToRead = Utils.readUint16FromStream(bis);
             } else if (opcode == OP_PUSHDATA4) {
                 // Read a uint32, then read that many bytes of data.
                 // Though this is allowed, because its value cannot be > 520, it should never actually be used
-                if (bis.available() < 4) throw new ProtocolException("Unexpected end of script");
+                if (bis.available() < 4) throw new ProtocolException("Unexpected end of script - OP_PUSHDATA4 was followed by only " + bis.available() + " bytes");
                 dataToRead = Utils.readUint32FromStream(bis);
             }
 

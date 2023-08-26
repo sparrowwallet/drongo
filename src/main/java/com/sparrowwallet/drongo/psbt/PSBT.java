@@ -461,10 +461,10 @@ public class PSBT {
     }
 
     public byte[] serialize() {
-        return serialize(true);
+        return serialize(true, true);
     }
 
-    public byte[] serialize(boolean includeXpubs) {
+    public byte[] serialize(boolean includeXpubs, boolean includeNonWitnessUtxos) {
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
 
         baos.writeBytes(Utils.hexToBytes(PSBT_MAGIC_HEX));
@@ -481,8 +481,9 @@ public class PSBT {
         for(PSBTInput psbtInput : getPsbtInputs()) {
             List<PSBTEntry> inputEntries = psbtInput.getInputEntries();
             for(PSBTEntry entry : inputEntries) {
-                if(includeXpubs || (entry.getKeyType() != PSBT_IN_BIP32_DERIVATION && entry.getKeyType() != PSBT_IN_PROPRIETARY
-                        && entry.getKeyType() != PSBT_IN_TAP_INTERNAL_KEY && entry.getKeyType() != PSBT_IN_TAP_BIP32_DERIVATION)) {
+                if((includeXpubs || (entry.getKeyType() != PSBT_IN_BIP32_DERIVATION && entry.getKeyType() != PSBT_IN_PROPRIETARY
+                        && entry.getKeyType() != PSBT_IN_TAP_INTERNAL_KEY && entry.getKeyType() != PSBT_IN_TAP_BIP32_DERIVATION))
+                        && (includeNonWitnessUtxos || entry.getKeyType() != PSBT_IN_NON_WITNESS_UTXO)) {
                     entry.serializeToStream(baos);
                 }
             }
@@ -630,7 +631,7 @@ public class PSBT {
     }
 
     public String toBase64String(boolean includeXpubs) {
-        return Base64.toBase64String(serialize(includeXpubs));
+        return Base64.toBase64String(serialize(includeXpubs, true));
     }
 
     public static boolean isPSBT(byte[] b) {

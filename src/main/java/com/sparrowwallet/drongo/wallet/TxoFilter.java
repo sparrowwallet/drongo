@@ -1,5 +1,5 @@
 package com.sparrowwallet.drongo.wallet;
 
-public interface UtxoFilter {
+public interface TxoFilter {
     boolean isEligible(BlockTransactionHashIndex candidate);
 }

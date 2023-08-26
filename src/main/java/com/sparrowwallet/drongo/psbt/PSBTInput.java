@@ -519,6 +519,20 @@ public class PSBTInput {
     }
 
     public boolean sign(ECKey privKey) {
+        return sign(new PSBTInputSigner() {
+            @Override
+            public TransactionSignature sign(Sha256Hash hash, SigHash sigHash, TransactionSignature.Type signatureType) {
+                return privKey.sign(hash, sigHash, signatureType);
+            }
+
+            @Override
+            public ECKey getPubKey() {
+                return ECKey.fromPublicOnly(privKey);
+            }
+        });
+    }
+
+    public boolean sign(PSBTInputSigner psbtInputSigner) {
         SigHash localSigHash = getSigHash();
         if(localSigHash == null) {
             localSigHash = getDefaultSigHash();
@@ -529,12 +543,12 @@ public class PSBTInput {
             if(signingScript != null) {
                 Sha256Hash hash = getHashForSignature(signingScript, localSigHash);
                 TransactionSignature.Type type = isTaproot() ? SCHNORR : ECDSA;
-                TransactionSignature transactionSignature = privKey.sign(hash, localSigHash, type);
+                TransactionSignature transactionSignature = psbtInputSigner.sign(hash, localSigHash, type);
 
                 if(type == SCHNORR) {
                     tapKeyPathSignature = transactionSignature;
                 } else {
-                    ECKey pubKey = ECKey.fromPublicOnly(privKey);
+                    ECKey pubKey = psbtInputSigner.getPubKey();
                     getPartialSignatures().put(pubKey, transactionSignature);
                 }
 

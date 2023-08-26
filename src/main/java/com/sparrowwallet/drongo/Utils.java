@@ -13,6 +13,7 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.math.BigInteger;
 import java.nio.ByteBuffer;
+import java.nio.charset.CharsetDecoder;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
 
@@ -22,6 +23,7 @@ public class Utils {
 
     public static final String HEX_REGEX = "^[0-9A-Fa-f]+$";
     public static final String BASE64_REGEX = "^[0-9A-Za-z\\\\+=/]+$";
+    public static final String NUMERIC_REGEX = "^-?\\d+(\\.\\d+)?$";
 
     public static boolean isHex(String s)   {
         return s.matches(HEX_REGEX);
@@ -29,6 +31,20 @@ public class Utils {
 
     public static boolean isBase64(String s)   {
         return s.matches(BASE64_REGEX);
+    }
+
+    public static boolean isNumber(String s) {
+        return s.matches(NUMERIC_REGEX);
+    }
+
+    public static boolean isUtf8(byte[] bytes) {
+        try {
+            CharsetDecoder decoder = StandardCharsets.UTF_8.newDecoder();
+            decoder.decode(java.nio.ByteBuffer.wrap(bytes));
+            return true;
+        } catch(Exception e) {
+            return false;
+        }
     }
 
     public static String bytesToHex(byte[] bytes) {
@@ -126,6 +142,20 @@ public class Utils {
         System.arraycopy(a, 0, c, 0, a.length);
         System.arraycopy(b, 0, c, a.length, b.length);
         return c;
+    }
+
+    public static byte[] xor(byte[] a, byte[] b) {
+        if(a.length != b.length) {
+            throw new IllegalArgumentException("Invalid length for xor: " + a.length + " vs " + b.length);
+        }
+
+        byte[] ret = new byte[a.length];
+
+        for(int i = 0; i < a.length; i++) {
+            ret[i] = (byte) ((int) b[i] ^ (int) a[i]);
+        }
+
+        return ret;
     }
 
     /** Parse 4 bytes from the byte array (starting at the offset) as unsigned 32-bit integer in little endian format. */

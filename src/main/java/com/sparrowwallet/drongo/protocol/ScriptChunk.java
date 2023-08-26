@@ -7,6 +7,8 @@ import org.bouncycastle.util.encoders.Hex;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
+import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.Objects;
 
@@ -28,7 +30,11 @@ public class ScriptChunk {
     }
 
     public static ScriptChunk fromOpcode(int opcode) {
-        return new ScriptChunk(opcode, null);
+        return new ScriptChunk(opcode, opcode == ScriptOpCodes.OP_0 ? new byte[0] : null);
+    }
+
+    public static ScriptChunk fromString(String strData, Charset charset) {
+        return fromData(strData.getBytes(charset));
     }
 
     public static ScriptChunk fromData(byte[] data) {
@@ -68,7 +74,7 @@ public class ScriptChunk {
     }
 
     public void write(OutputStream stream) throws IOException {
-        if (isOpCode()) {
+        if (isOpCode() && opcode != ScriptOpCodes.OP_0) {
             if(data != null) throw new IllegalStateException("Data must be null for opcode chunk");
             stream.write(opcode);
         } else if (data != null) {
@@ -124,6 +130,18 @@ public class ScriptChunk {
         } catch(SignatureDecodeException e) {
             throw new ProtocolException("Could not decode signature", e);
         }
+    }
+
+    public boolean isString() {
+        if(data == null || data.length == 0) {
+            return false;
+        }
+
+        if(isSignature() || isPubKey()) {
+            return false;
+        }
+
+        return Utils.isUtf8(data);
     }
 
     public boolean isScript() {
@@ -212,6 +230,9 @@ public class ScriptChunk {
         }
         if (data.length == 0) {
             return "OP_0";
+        }
+        if(Utils.isUtf8(data)) {
+            return new String(data, StandardCharsets.UTF_8);
         }
 
         return Hex.toHexString(data);

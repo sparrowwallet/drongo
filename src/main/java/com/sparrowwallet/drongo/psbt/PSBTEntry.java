@@ -188,7 +188,7 @@ public class PSBTEntry {
                 psbtByteBuffer.get(buf);
                 ByteBuffer byteBuffer = ByteBuffer.wrap(buf);
                 byteBuffer.order(ByteOrder.LITTLE_ENDIAN);
-                return byteBuffer.getShort();
+                return Short.toUnsignedInt(byteBuffer.getShort());
             }
             case (byte) 0xfe: {
                 byte[] buf = new byte[4];

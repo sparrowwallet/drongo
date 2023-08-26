@@ -149,6 +149,11 @@ public class WalletNode extends Persistable implements Comparable<WalletNode> {
                     txo.setLabel(label);
                 }
 
+                String status = wallet.getDetachedLabels().remove(txo.getHash().toString() + ":" + txo.getIndex());
+                if(status != null && txo.getStatus() == null) {
+                    txo.setStatus(Status.valueOf(status));
+                }
+
                 if(txo.isSpent()) {
                     String spentByLabel = wallet.getDetachedLabels().remove(txo.getSpentBy().getHash() + ">" + txo.getSpentBy().getIndex());
                     if(spentByLabel != null && (txo.getSpentBy().getLabel() == null || txo.getSpentBy().getLabel().isEmpty())) {
@@ -163,16 +168,16 @@ public class WalletNode extends Persistable implements Comparable<WalletNode> {
     }
 
     public Set<BlockTransactionHashIndex> getUnspentTransactionOutputs() {
-        return getUnspentTransactionOutputs(false);
+        return getTransactionOutputs(List.of(new SpentTxoFilter()));
     }
 
-    public Set<BlockTransactionHashIndex> getUnspentTransactionOutputs(boolean includeSpentMempoolOutputs) {
+    public Set<BlockTransactionHashIndex> getTransactionOutputs(Collection<TxoFilter> txoFilters) {
         if(transactionOutputs.isEmpty()) {
             return Collections.emptySet();
         }
 
         Set<BlockTransactionHashIndex> unspentTXOs = new TreeSet<>(transactionOutputs);
-        unspentTXOs.removeIf(txo -> txo.isSpent() && (!includeSpentMempoolOutputs || txo.getSpentBy().getHeight() > 0));
+        unspentTXOs.removeIf(txo -> !txoFilters.stream().allMatch(txoFilter -> txoFilter.isEligible(txo)));
         return unspentTXOs;
     }
 
