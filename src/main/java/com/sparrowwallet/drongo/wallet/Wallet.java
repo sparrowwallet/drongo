@@ -1773,7 +1773,10 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
     }
 
     public void makeLabelsUnique(Keystore newKeystore) {
-        makeLabelsUnique(newKeystore, false);
+        Set<String> labels = getKeystores().stream().map(Keystore::getLabel).collect(Collectors.toSet());
+        if(!labels.add(newKeystore.getLabel())) {
+            makeLabelsUnique(newKeystore, false);
+        }
     }
 
     private int makeLabelsUnique(Keystore newKeystore, boolean duplicateFound) {
@@ -1800,6 +1803,8 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
             max++;
             if(newKeystore.getLabel().equals(Keystore.DEFAULT_LABEL)) {
                 newKeystore.setLabel(Keystore.DEFAULT_LABEL.substring(0, Keystore.DEFAULT_LABEL.length() - 2) + " " + max);
+            } else if(newKeystore.getLabel().length() + Integer.toString(max).length() + 1 > Keystore.MAX_LABEL_LENGTH) {
+                newKeystore.setLabel(newKeystore.getLabel().substring(0, Keystore.MAX_LABEL_LENGTH - (Integer.toString(max).length() + 1)) + " " + max);
             } else {
                 newKeystore.setLabel(newKeystore.getLabel() + " " + max);
             }
