@@ -1,9 +1,13 @@
 package com.sparrowwallet.drongo;
 
+import com.sparrowwallet.drongo.protocol.ScriptType;
+import com.sparrowwallet.drongo.wallet.Wallet;
 import org.junit.Assert;
 import org.junit.Test;
 
 import java.util.Iterator;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.Set;
 
 public class OutputDescriptorTest {
@@ -106,5 +110,28 @@ public class OutputDescriptorTest {
     @Test(expected = IllegalArgumentException.class)
     public void testPubKeyMulti() {
         OutputDescriptor descriptor = OutputDescriptor.getOutputDescriptor("sh(multi(2,022f01e5e15cca351daff3843fb70f3c2f0a1bdd05e5af888a67784ef3e10a2a01,03acd484e2f0c7f65309ad178a9f559abde09796974c57e714c35f110dfc27ccbe))");
+    }
+
+    @Test
+    public void testUniqueLabels() {
+        Map<ExtendedKey, KeyDerivation> extendedKeys = new LinkedHashMap<>();
+        Map<ExtendedKey, String> extendedKeyLabels = new LinkedHashMap<>();
+
+        ExtendedKey ext1 = ExtendedKey.fromDescriptor("xpub661MyMwAqRbcFW31YEwpkMuc5THy2PSt5bDMsktWQcFF8syAmRUapSCGu8ED9W6oDMSgv6Zz8idoc4a6mr8BDzTJY47LJhkJ8UB7WEGuduB");
+        KeyDerivation kd1 = new KeyDerivation("04fefef0", "m/48'/0'/0'/2'");
+        extendedKeys.put(ext1, kd1);
+        extendedKeyLabels.put(ext1, "Unique");
+
+        ExtendedKey ext2 = ExtendedKey.fromDescriptor("xpub69H7F5d8KSRgmmdJg2KhpAK8SR3DjMwAdkxj3ZuxV27CprR9LgpeyGmXUbC6wb7ERfvrnKZjXoUmmDznezpbZb7ap6r1D3tgFxHmwMkQTPH");
+        KeyDerivation kd2 = new KeyDerivation("04ba1ef0", "m/48'/0'/0'/2'");
+        extendedKeys.put(ext2, kd2);
+        extendedKeyLabels.put(ext2, "Unique");
+
+        OutputDescriptor descriptor = new OutputDescriptor(ScriptType.P2WSH, 2, extendedKeys, new LinkedHashMap<>(), extendedKeyLabels);
+        Assert.assertEquals("wsh(sortedmulti(2,[04fefef0/48h/0h/0h/2h]xpub661MyMwAqRbcFW31YEwpkMuc5THy2PSt5bDMsktWQcFF8syAmRUapSCGu8ED9W6oDMSgv6Zz8idoc4a6mr8BDzTJY47LJhkJ8UB7WEGuduB,[04ba1ef0/48h/0h/0h/2h]xpub69H7F5d8KSRgmmdJg2KhpAK8SR3DjMwAdkxj3ZuxV27CprR9LgpeyGmXUbC6wb7ERfvrnKZjXoUmmDznezpbZb7ap6r1D3tgFxHmwMkQTPH))", descriptor.toString());
+
+        Wallet wallet = descriptor.toWallet();
+        Assert.assertEquals("Unique 1", wallet.getKeystores().get(0).getLabel());
+        Assert.assertEquals("Unique 2", wallet.getKeystores().get(1).getLabel());
     }
 }
