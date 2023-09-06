@@ -4,7 +4,7 @@ import java.util.Locale;
 
 public enum WalletModel {
     SEED, SPARROW, BITCOIN_CORE, ELECTRUM, TREZOR_1, TREZOR_T, COLDCARD, LEDGER_NANO_S, LEDGER_NANO_X, DIGITALBITBOX_01, KEEPKEY, SPECTER_DESKTOP, COBO_VAULT,
-    BITBOX_02, SPECTER_DIY, PASSPORT, BLUE_WALLET, KEYSTONE, SEEDSIGNER, CARAVAN, GORDIAN_SEED_TOOL, JADE, LEDGER_NANO_S_PLUS, EPS, TAPSIGNER, SATSCARD, LABELS, BSMS;
+    BITBOX_02, SPECTER_DIY, PASSPORT, BLUE_WALLET, KEYSTONE, SEEDSIGNER, CARAVAN, GORDIAN_SEED_TOOL, JADE, LEDGER_NANO_S_PLUS, EPS, TAPSIGNER, SATSCARD, SATOCHIP, LABELS, BSMS;
 
     public static WalletModel getModel(String model) {
         return valueOf(model.toUpperCase(Locale.ROOT));
@@ -68,6 +68,19 @@ public enum WalletModel {
 
     public boolean isCard() {
         return (this == TAPSIGNER || this == SATSCARD);
+    }
+
+    // for card devices that require a PIN code, returns the minimum size of valid PIN code
+    public int getMinPinLength() {
+        if (this == TAPSIGNER || this == SATSCARD){
+            return 6;
+        }
+        else if (this == SATOCHIP){
+            return 4;
+        }
+        else {
+            return 0; // default?
+        }
     }
 
     public static WalletModel fromType(String type) {

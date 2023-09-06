@@ -308,6 +308,13 @@ public class ECKey {
     }
 
     /**
+     * Gets the raw public key value in compressed or uncompressed form. This is needed by Satochip
+     */
+    public byte[] getPubKey(Boolean compressed) {
+        return pub.getEncoded(compressed);
+    }
+
+    /**
      * Gets the x coordinate of the raw public key value. This appears in transaction scriptPubKeys for Taproot outputs.
      */
     public byte[] getPubKeyXCoord() {
