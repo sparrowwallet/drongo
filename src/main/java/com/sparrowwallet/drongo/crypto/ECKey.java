@@ -435,31 +435,6 @@ public class ECKey {
         return verify(sigHash.getBytes(), signature);
     }
 
-    public ECKey getTweakedOutputKeyNEW() {
-        TaprootPubKey taprootPubKey = liftX(getPubKeyXCoord());
-        ECPoint internalKey = taprootPubKey.ecPoint;
-        byte[] taggedHash = Utils.taggedHash("TapTweak", internalKey.getXCoord().getEncoded());
-        ECKey tweakValue = ECKey.fromPrivate(taggedHash);
-        ECPoint outputKey = internalKey.add(tweakValue.getPubKeyPoint());
-        if(hasPrivKey()) {
-            // isEven => used to determine private key for tweaking
-            // see taproot_tweak_seckey(seckey0, h) in 
-            // https://github.com/bitcoin/bips/blob/master/bip-0341.mediawiki#constructing-and-spending-taproot-outputs
-            Boolean isEven = (getPubKey()[0] == 0x02);
-            BigInteger taprootPriv;
-            if (isEven){
-                taprootPriv = priv; 
-            } else {
-                taprootPriv = CURVE_PARAMS.getCurve().getOrder().subtract(priv);
-            }
-            BigInteger tweakedPrivKey = taprootPriv.add(tweakValue.getPrivKey()).mod(CURVE_PARAMS.getCurve().getOrder());
-            
-            return new ECKey(tweakedPrivKey, outputKey, true);
-        }
-
-        return ECKey.fromPublicOnly(outputKey, true);
-    }
-
     public ECKey getTweakedOutputKey() {
         TaprootPubKey taprootPubKey = liftX(getPubKeyXCoord());
         ECPoint internalKey = taprootPubKey.ecPoint;
