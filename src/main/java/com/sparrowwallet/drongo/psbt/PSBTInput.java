@@ -250,6 +250,75 @@ public class PSBTInput {
         this.index = index;
     }
 
+    // satochip debug
+    public void printDebugInfo(){
+        log.debug("SATOCHIP PSBTInput printDebugInfo() START");
+        // partialSignatures
+        try{
+            log.debug("SATOCHIP PSBTInput printDebugInfo() partialSignatures: Map<ECKey, TransactionSignature>");
+            log.debug("SATOCHIP PSBTInput printDebugInfo() partialSignatures.size(): " + partialSignatures.size());
+            log.debug("SATOCHIP PSBTInput printDebugInfo() partialSignatures: " + partialSignatures);
+            for (Map.Entry<ECKey, TransactionSignature> entry : partialSignatures.entrySet()) {
+                ECKey key = entry.getKey();
+                TransactionSignature value = entry.getValue();
+                log.debug("SATOCHIP PSBTInput printDebugInfo() partialSignatures pubkey: " + Utils.bytesToHex(key.getPubKey()));
+                log.debug("SATOCHIP PSBTInput printDebugInfo() partialSignatures sig: " + Utils.bytesToHex(value.encodeToBitcoin()));
+            }
+            log.debug("SATOCHIP PSBTInput printDebugInfo() partialSignatures END");
+        } catch(Exception e) {
+            log.debug("SATOCHIP PSBTInput printDebugInfo() partialSignatures exception: " + e);
+        }
+
+        // derivedPublicKeys
+        try{
+            log.debug("SATOCHIP PSBTInput printDebugInfo() derivedPublicKeys: Map<ECKey, KeyDerivation>");
+            log.debug("SATOCHIP PSBTInput printDebugInfo() derivedPublicKeys.size(): " + derivedPublicKeys.size());
+            log.debug("SATOCHIP PSBTInput printDebugInfo() derivedPublicKeys: " + derivedPublicKeys);
+            for (Map.Entry<ECKey, KeyDerivation> entry : derivedPublicKeys.entrySet()) {
+                ECKey key = entry.getKey();
+                KeyDerivation value = entry.getValue();
+                log.debug("SATOCHIP PSBTInput printDebugInfo() derivedPublicKeys pubkey: " + Utils.bytesToHex(key.getPubKey()));
+                log.debug("SATOCHIP PSBTInput printDebugInfo() derivedPublicKeys derivation: " + value.getDerivationPath());
+            }
+            log.debug("SATOCHIP PSBTInput printDebugInfo() derivedPublicKeys END");
+        } catch(Exception e) {
+            log.debug("SATOCHIP PSBTInput printDebugInfo() derivedPublicKeys exception: " + e);
+        }
+        
+        // TransactionSignature tapKeyPathSignature;
+        if (tapKeyPathSignature!=null) {
+            log.debug("SATOCHIP PSBTInput printDebugInfo() tapKeyPathSignature: " + Utils.bytesToHex(tapKeyPathSignature.encodeToBitcoin()));
+        } else {
+            log.debug("SATOCHIP PSBTInput printDebugInfo() tapKeyPathSignature: null");
+        }
+        // ECKey tapInternalKey
+        if (tapInternalKey!=null) {
+            log.debug("SATOCHIP PSBTInput printDebugInfo() tapInternalKey: " + Utils.bytesToHex(tapInternalKey.getPubKey()));
+        } else {
+            log.debug("SATOCHIP PSBTInput printDebugInfo() tapInternalKey: null");
+        }
+        // tapDerivedPublicKeys
+
+        try {
+            log.debug("SATOCHIP PSBTInput printDebugInfo() tapDerivedPublicKeys: Map<ECKey, Map<KeyDerivation, List<Sha256Hash>>>");
+            log.debug("SATOCHIP PSBTInput printDebugInfo() tapDerivedPublicKeys.size(): " + tapDerivedPublicKeys.size());
+            log.debug("SATOCHIP PSBTInput printDebugInfo() tapDerivedPublicKeys: " + tapDerivedPublicKeys);
+            for (Map.Entry<ECKey, Map<KeyDerivation, List<Sha256Hash>>> entry : tapDerivedPublicKeys.entrySet()) {
+                ECKey key = entry.getKey();
+                Map<KeyDerivation, List<Sha256Hash>> value = entry.getValue();
+                log.debug("SATOCHIP PSBTInput printDebugInfo() tapDerivedPublicKeys pubkey: " + Utils.bytesToHex(key.getPubKey()));
+                log.debug("SATOCHIP PSBTInput printDebugInfo() tapDerivedPublicKeys map<keyderivation, listhash>: " + value);
+            }
+            log.debug("SATOCHIP PSBTInput printDebugInfo() tapDerivedPublicKeys END");
+        } catch(Exception e) {
+            log.debug("SATOCHIP PSBTInput printDebugInfo() tapDerivedPublicKeys exception: " + e);
+        }
+
+        log.debug("SATOCHIP PSBTInput printDebugInfo() END");
+
+    }
+    // endbug 
+
     public List<PSBTEntry> getInputEntries() {
         List<PSBTEntry> entries = new ArrayList<>();
 
@@ -573,6 +642,15 @@ public class PSBTInput {
                 if(isTaproot() && tapKeyPathSignature != null) {
                     ECKey outputKey = P2TR.getPublicKeyFromScript(getUtxo().getScript());
                     if(!outputKey.verify(hash, tapKeyPathSignature)) {
+                        log.error("SATOCHIP PSBTInput verifySignatures error: " + "Tweaked internal key does not verify against provided taproot keypath signature");
+                        log.error("SATOCHIP PSBTInput verifySignatures error: psbtinput: " + this);
+                        log.error("SATOCHIP PSBTInput verifySignatures error: outputKey: " + Utils.bytesToHex(outputKey.getPubKey()));
+                        log.error("SATOCHIP PSBTInput verifySignatures error: hash: " + Utils.bytesToHex(hash.getBytes()));
+                        log.error("SATOCHIP PSBTInput verifySignatures error: tapKeyPathSignature: " + Utils.bytesToHex(tapKeyPathSignature.encodeToBitcoin()));
+                        log.error("SATOCHIP PSBTInput verifySignatures error: getUtxo().getScript(): " + getUtxo().getScript());
+                        log.error("SATOCHIP PSBTInput verifySignatures error: getUtxo(): " + getUtxo());
+                        log.error("SATOCHIP PSBTInput verifySignatures error: getUtxo().getHash(): " + getUtxo().getHash());
+                        log.error("SATOCHIP PSBTInput verifySignatures error: getUtxo().getIndex(): " + getUtxo().getIndex());
                         throw new PSBTSignatureException("Tweaked internal key does not verify against provided taproot keypath signature");
                     }
                 } else {

@@ -307,6 +307,11 @@ public class ECKey {
         return pub.getEncoded();
     }
 
+    // SATOCHIP
+    public byte[] getPubKey(Boolean compressed) {
+        return pub.getEncoded(compressed);
+    }
+
     /**
      * Gets the x coordinate of the raw public key value. This appears in transaction scriptPubKeys for Taproot outputs.
      */
@@ -428,14 +433,119 @@ public class ECKey {
         return verify(sigHash.getBytes(), signature);
     }
 
+
     public ECKey getTweakedOutputKey() {
+        log.debug("SATOCHIP ECKey getTweakedOutputKey START");
         TaprootPubKey taprootPubKey = liftX(getPubKeyXCoord());
+        log.debug("SATOCHIP ECKey getTweakedOutputKey taprootPubKey: " + taprootPubKey);
+        log.debug("SATOCHIP ECKey getTweakedOutputKey taprootPubKey.ecPoint: " + taprootPubKey.ecPoint);
         ECPoint internalKey = taprootPubKey.ecPoint;
+        log.debug("SATOCHIP ECKey getTweakedOutputKey internalKey: " + internalKey);
+        //debug
+        ECKey tmp2 = ECKey.fromPublicOnly(internalKey, true);
+        log.debug("SATOCHIP ECKey getTweakedOutputKey internalKey: " + Utils.bytesToHex(tmp2.getPubKey()));
+        //endbug
+
         byte[] taggedHash = Utils.taggedHash("TapTweak", internalKey.getXCoord().getEncoded());
         ECKey tweakValue = ECKey.fromPrivate(taggedHash);
+        log.debug("SATOCHIP ECKey getTweakedOutputKey tweakValue: " + Utils.bytesToHex(tweakValue.getPubKey()));
         ECPoint outputKey = internalKey.add(tweakValue.getPubKeyPoint());
+        log.debug("SATOCHIP ECKey getTweakedOutputKey outputKey: " + outputKey);
+
+        //debug
+        ECKey tmp = ECKey.fromPublicOnly(outputKey, true);
+        log.debug("SATOCHIP ECKey getTweakedOutputKey outputKey: " + Utils.bytesToHex(tmp.getPubKey()));
+        //endbug
 
         if(hasPrivKey()) {
+            log.debug("SATOCHIP ECKey getTweakedOutputKey PRIVKEY NEW VERSION");
+
+            // isEven => used to determine private key for tweaking
+            Boolean isEven = (getPubKey()[0] == 0x02);
+            log.debug("SATOCHIP ECKey getTweakedOutputKey getPubKey(): " + Utils.bytesToHex(getPubKey()));
+            log.debug("SATOCHIP ECKey getTweakedOutputKey isEven getPubKey()[0]: " + getPubKey()[0]);
+            log.debug("SATOCHIP ECKey getTweakedOutputKey isEven: " + isEven);
+
+            BigInteger taprootPriv;
+            if (isEven){
+                taprootPriv = priv; 
+            } else {
+                taprootPriv = CURVE_PARAMS.getCurve().getOrder().subtract(priv);
+            }
+            BigInteger tweakedPrivKey = taprootPriv.add(tweakValue.getPrivKey()).mod(CURVE_PARAMS.getCurve().getOrder());
+
+            //debug
+            ECKey tmp3 = new ECKey(tweakedPrivKey, outputKey, true);
+            log.debug("SATOCHIP ECKey getTweakedOutputKey outputKey with private: " + Utils.bytesToHex(tmp3.getPubKey()));
+            log.debug("SATOCHIP ECKey getTweakedOutputKey outputKey private: " + tmp3.getPrivKey());
+            //endbug
+
+
+/*            log.debug("SATOCHIP ECKey getTweakedOutputKey PRIVKEY NEW VERSION SWITCH EVENNESS");
+            if (isEven){
+                //taprootPriv = priv; 
+                taprootPriv = CURVE_PARAMS.getCurve().getOrder().subtract(priv);
+            } else {
+                taprootPriv = priv; 
+                //taprootPriv = CURVE_PARAMS.getCurve().getOrder().subtract(priv);
+            }
+            tweakedPrivKey = taprootPriv.add(tweakValue.getPrivKey()).mod(CURVE_PARAMS.getCurve().getOrder());
+
+            //debug
+            ECKey tmp5 = new ECKey(tweakedPrivKey, outputKey, true);
+            log.debug("SATOCHIP ECKey getTweakedOutputKey outputKey with private: " + Utils.bytesToHex(tmp5.getPubKey()));
+            log.debug("SATOCHIP ECKey getTweakedOutputKey outputKey private: " + tmp5.getPrivKey());
+            //endbug*/
+
+
+/*            // ORIGNAL VERSION
+            log.debug("SATOCHIP ECKey getTweakedOutputKey PRIVKEY OLD VERSION");
+            taprootPriv = priv;
+            tweakedPrivKey = taprootPriv.add(tweakValue.getPrivKey()).mod(CURVE_PARAMS.getCurve().getOrder());
+            //TODO: Improve on this hack. How do we know whether to negate the private key before tweaking it?
+            if(!ECKey.fromPrivate(tweakedPrivKey).getPubKeyPoint().equals(outputKey)) {
+                taprootPriv = CURVE_PARAMS.getCurve().getOrder().subtract(priv);
+                tweakedPrivKey = taprootPriv.add(tweakValue.getPrivKey()).mod(CURVE_PARAMS.getCurve().getOrder());
+            }
+            //debug
+            ECKey tmp4 = new ECKey(tweakedPrivKey, outputKey, true);
+            log.debug("SATOCHIP ECKey getTweakedOutputKey outputKey with private: " + Utils.bytesToHex(tmp4.getPubKey()));
+            log.debug("SATOCHIP ECKey getTweakedOutputKey outputKey private: " + tmp4.getPrivKey());
+            //endbug*/
+
+
+            return new ECKey(tweakedPrivKey, outputKey, true);
+        }
+
+        return ECKey.fromPublicOnly(outputKey, true);
+    }
+
+
+    public ECKey getTweakedOutputKeyOLD() {
+        log.debug("SATOCHIP ECKey getTweakedOutputKey START");
+        TaprootPubKey taprootPubKey = liftX(getPubKeyXCoord());
+        log.debug("SATOCHIP ECKey getTweakedOutputKey taprootPubKey: " + taprootPubKey);
+        log.debug("SATOCHIP ECKey getTweakedOutputKey taprootPubKey.ecPoint: " + taprootPubKey.ecPoint);
+        ECPoint internalKey = taprootPubKey.ecPoint;
+        log.debug("SATOCHIP ECKey getTweakedOutputKey internalKey: " + internalKey);
+        //debug
+        ECKey tmp2 = ECKey.fromPublicOnly(internalKey, true);
+        log.debug("SATOCHIP ECKey getTweakedOutputKey outputKey: " + Utils.bytesToHex(tmp2.getPubKey()));
+        //endbug
+
+        byte[] taggedHash = Utils.taggedHash("TapTweak", internalKey.getXCoord().getEncoded());
+        ECKey tweakValue = ECKey.fromPrivate(taggedHash);
+        log.debug("SATOCHIP ECKey getTweakedOutputKey tweakValue: " + Utils.bytesToHex(tweakValue.getPubKey()));
+        ECPoint outputKey = internalKey.add(tweakValue.getPubKeyPoint());
+        log.debug("SATOCHIP ECKey getTweakedOutputKey outputKey: " + outputKey);
+
+        //debug
+        ECKey tmp = ECKey.fromPublicOnly(outputKey, true);
+        log.debug("SATOCHIP ECKey getTweakedOutputKey outputKey: " + Utils.bytesToHex(tmp.getPubKey()));
+        //endbug
+
+        if(hasPrivKey()) {
+            log.debug("SATOCHIP ECKey getTweakedOutputKey hasPrivKey(): true");
             BigInteger taprootPriv = priv;
             BigInteger tweakedPrivKey = taprootPriv.add(tweakValue.getPrivKey()).mod(CURVE_PARAMS.getCurve().getOrder());
             //TODO: Improve on this hack. How do we know whether to negate the private key before tweaking it?
