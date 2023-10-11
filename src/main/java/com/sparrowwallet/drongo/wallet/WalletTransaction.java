@@ -129,13 +129,18 @@ public class WalletTransaction {
         return isWalletSend(StandardAccount.WHIRLPOOL_PREMIX, payment);
     }
 
+    public boolean isPostmixSend(Payment payment) {
+        return isWalletSend(StandardAccount.WHIRLPOOL_POSTMIX, payment);
+    }
+
     public boolean isBadbankSend(Payment payment) {
         return isWalletSend(StandardAccount.WHIRLPOOL_BADBANK, payment);
     }
 
     private boolean isWalletSend(StandardAccount childAccount, Payment payment) {
         if(getWallet() != null) {
-            return isWalletSend(getWallet().getChildWallet(childAccount), payment);
+            Wallet masterWallet = getWallet().isMasterWallet() ? getWallet() : getWallet().getMasterWallet();
+            return isWalletSend(masterWallet.getChildWallet(childAccount), payment);
         }
 
         return false;
