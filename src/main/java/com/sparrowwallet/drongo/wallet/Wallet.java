@@ -24,6 +24,7 @@ import static com.sparrowwallet.drongo.protocol.Transaction.WITNESS_SCALE_FACTOR
 
 public class Wallet extends Persistable implements Comparable<Wallet> {
     public static final int DEFAULT_LOOKAHEAD = 20;
+    public static final int SEARCH_LOOKAHEAD = 4000;
     public static final String ALLOW_DERIVATIONS_MATCHING_OTHER_SCRIPT_TYPES_PROPERTY = "com.sparrowwallet.allowDerivationsMatchingOtherScriptTypes";
 
     private String name;
@@ -1482,6 +1483,41 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
         }
 
         return signingNodes;
+    }
+
+    public List<Keystore> getSigningKeystores(PSBT psbt) {
+        List<Keystore> signingKeystores = new ArrayList<>();
+
+        for(Map.Entry<ExtendedKey, KeyDerivation> entry : psbt.getExtendedPublicKeys().entrySet()) {
+            for(Keystore keystore : getKeystores()) {
+                if(entry.getKey().equals(keystore.getExtendedPublicKey()) && entry.getValue().equals(keystore.getKeyDerivation())) {
+                    signingKeystores.add(keystore);
+                }
+            }
+        }
+
+        return signingKeystores;
+    }
+
+    public Integer getRequiredGapLimit(PSBT psbt) {
+        Wallet copy = this.copy();
+        for(KeyPurpose keyPurpose : KeyPurpose.DEFAULT_PURPOSES) {
+            WalletNode purposeNode = copy.getNode(keyPurpose);
+            purposeNode.fillToIndex(purposeNode.getChildren().size() + SEARCH_LOOKAHEAD);
+        }
+        Map<PSBTInput, WalletNode> copySigningNodes = copy.getSigningNodes(psbt);
+        boolean found = false;
+        int gapLimit = getGapLimit();
+        for(KeyPurpose keyPurpose : KeyPurpose.DEFAULT_PURPOSES) {
+            OptionalInt optHighestIndex = copySigningNodes.values().stream().filter(node -> node.getKeyPurpose() == keyPurpose).mapToInt(WalletNode::getIndex).max();
+            if(optHighestIndex.isPresent()) {
+                found = true;
+                Integer highestUsedIndex = getNode(keyPurpose).getHighestUsedIndex();
+                gapLimit = Math.max(gapLimit, optHighestIndex.getAsInt() - (highestUsedIndex == null ? -1 : highestUsedIndex));
+            }
+        }
+
+        return found ? gapLimit : null;
     }
 
     /**
