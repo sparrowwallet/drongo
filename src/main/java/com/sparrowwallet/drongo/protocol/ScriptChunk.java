@@ -145,7 +145,8 @@ public class ScriptChunk {
     }
 
     public boolean isScript() {
-        if(data == null || data.length == 0) {
+        //Do not attempt to parse long data byte arrays into scripts
+        if(data == null || data.length == 0 || data.length > 1000) {
             return false;
         }
 
@@ -153,16 +154,18 @@ public class ScriptChunk {
             return false;
         }
 
+        Script script = new Script(data, false);
         try {
-            Script script = new Script(data);
-            //Flaky: Test if contains a non-zero opcode, otherwise not a script
-            for(ScriptChunk chunk : script.getChunks()) {
-                if(chunk.getOpcode() != OP_0) {
-                    return true;
-                }
-            }
-        } catch(ProtocolException e) {
+            script.parse();
+        } catch (ProtocolException e) {
             return false;
+        }
+
+        //Flaky: Test if contains a non-zero opcode, otherwise not a script
+        for(ScriptChunk chunk : script.getChunks()) {
+            if(chunk.getOpcode() != OP_0) {
+                return true;
+            }
         }
 
         return false;
