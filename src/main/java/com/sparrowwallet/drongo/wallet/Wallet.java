@@ -1809,8 +1809,8 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
     }
 
     public void makeLabelsUnique(Keystore newKeystore) {
-        Set<String> labels = getKeystores().stream().map(Keystore::getLabel).collect(Collectors.toSet());
-        if(!labels.add(newKeystore.getLabel())) {
+        Set<String> labels = getKeystores().stream().map(Keystore::getBaseLabel).collect(Collectors.toSet());
+        if(!labels.add(newKeystore.getBaseLabel())) {
             makeLabelsUnique(newKeystore, false);
         }
     }

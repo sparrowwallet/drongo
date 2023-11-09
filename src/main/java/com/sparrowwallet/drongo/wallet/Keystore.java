@@ -48,6 +48,10 @@ public class Keystore extends Persistable {
         return label;
     }
 
+    public String getBaseLabel() {
+        return label.replaceAll(" \\d*$", "");
+    }
+
     public String getScriptName() {
         return label.replace(" ", "");
     }

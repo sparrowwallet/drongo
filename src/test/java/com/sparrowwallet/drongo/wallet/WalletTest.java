@@ -85,12 +85,17 @@ public class WalletTest {
         wallet.getKeystores().add(defaultKeystore3);
         Keystore defaultKeystore4 = new Keystore("Keystore");
         wallet.makeLabelsUnique(defaultKeystore4);
-        Assert.assertEquals("Keystore", defaultKeystore4.getLabel());
+        Assert.assertEquals("Keystore 4", defaultKeystore4.getLabel());
         wallet.getKeystores().add(defaultKeystore4);
         Keystore defaultKeystore5 = new Keystore("Keystore 3");
         wallet.makeLabelsUnique(defaultKeystore5);
         Assert.assertEquals("Keystore 3 2", defaultKeystore5.getLabel());
         wallet.getKeystores().add(defaultKeystore5);
+
+        Keystore keystore6 = new Keystore("Coldcard -1");
+        wallet.makeLabelsUnique(keystore6);
+        Assert.assertEquals("Coldcard -1 2", keystore6.getLabel());
+        wallet.getKeystores().add(keystore6);
 
         Keystore longKeystore1 = new Keystore("1234567890ABCDEFG");
         wallet.getKeystores().add(longKeystore1);
