@@ -358,11 +358,11 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
     }
 
     public boolean isWhirlpoolChildWallet() {
-        return !isMasterWallet() && getStandardAccountType() != null && StandardAccount.WHIRLPOOL_ACCOUNTS.contains(getStandardAccountType());
+        return !isMasterWallet() && getStandardAccountType() != null && StandardAccount.isWhirlpoolAccount(getStandardAccountType());
     }
 
     public boolean isWhirlpoolMixWallet() {
-        return !isMasterWallet() && getMasterWallet().isWhirlpoolMasterWallet() && StandardAccount.WHIRLPOOL_MIX_ACCOUNTS.contains(getStandardAccountType());
+        return !isMasterWallet() && getMasterWallet().isWhirlpoolMasterWallet() && StandardAccount.isWhirlpoolMixAccount(getStandardAccountType());
     }
 
     public void setName(String name) {

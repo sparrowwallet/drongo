@@ -67,4 +67,16 @@ public enum StandardAccount {
     public String toString() {
         return name;
     }
+
+    public static boolean isMixableAccount(StandardAccount standardAccount) {
+        return standardAccount != null && MIXABLE_ACCOUNTS.contains(standardAccount);
+    }
+
+    public static boolean isWhirlpoolAccount(StandardAccount standardAccount) {
+        return standardAccount != null && WHIRLPOOL_ACCOUNTS.contains(standardAccount);
+    }
+
+    public static boolean isWhirlpoolMixAccount(StandardAccount standardAccount) {
+        return standardAccount != null && WHIRLPOOL_MIX_ACCOUNTS.contains(standardAccount);
+    }
 }
