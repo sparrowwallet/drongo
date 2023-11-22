@@ -39,8 +39,8 @@ public class Transaction extends ChildMessage {
     private Sha256Hash cachedTxId;
     private Sha256Hash cachedWTxId;
 
-    private ArrayList<TransactionInput> inputs;
-    private ArrayList<TransactionOutput> outputs;
+    private List<TransactionInput> inputs;
+    private List<TransactionOutput> outputs;
 
     public Transaction() {
         version = 1;
@@ -730,5 +730,25 @@ public class Transaction extends ChildMessage {
     private void byteArraySerialize(byte[] bytes, OutputStream outputStream) throws IOException {
         outputStream.write(new VarInt(bytes.length).encode());
         outputStream.write(bytes);
+    }
+
+    public void moveInput(int fromIndex, int toIndex) {
+        moveItem(inputs, fromIndex, toIndex);
+    }
+
+    public void moveOutput(int fromIndex, int toIndex) {
+        moveItem(outputs, fromIndex, toIndex);
+    }
+
+    private <T> void moveItem(List<T> list, int fromIndex, int toIndex) {
+        if(fromIndex < 0 || fromIndex >= list.size() || toIndex < 0 || toIndex >= list.size()) {
+            throw new IllegalArgumentException("Invalid indices [" + fromIndex + ", " + toIndex + "] provided to list of size " + list.size());
+        }
+
+        T item = list.remove(fromIndex);
+        list.add(toIndex, item);
+
+        cachedTxId = null;
+        cachedWTxId = null;
     }
 }

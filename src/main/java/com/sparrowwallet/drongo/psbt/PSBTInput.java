@@ -48,7 +48,7 @@ public class PSBTInput {
     private ECKey tapInternalKey;
 
     private final Transaction transaction;
-    private final int index;
+    private int index;
 
     private static final Logger log = LoggerFactory.getLogger(PSBTInput.class);
 
@@ -680,8 +680,12 @@ public class PSBTInput {
     }
 
     public TransactionOutput getUtxo() {
-        int vout = (int)transaction.getInputs().get(index).getOutpoint().getIndex();
+        int vout = (int)getInput().getOutpoint().getIndex();
         return getWitnessUtxo() != null ? getWitnessUtxo() : (getNonWitnessUtxo() != null ?  getNonWitnessUtxo().getOutputs().get(vout) : null);
+    }
+
+    void setIndex(int index) {
+        this.index = index;
     }
 
     public void clearNonFinalFields() {

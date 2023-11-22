@@ -594,6 +594,28 @@ public class PSBT {
         }
     }
 
+    public void moveInput(int fromIndex, int toIndex) {
+        moveItem(psbtInputs, fromIndex, toIndex);
+        transaction.moveInput(fromIndex, toIndex);
+        for(int i = 0; i < psbtInputs.size(); i++) {
+            psbtInputs.get(i).setIndex(i);
+        }
+    }
+
+    public void moveOutput(int fromIndex, int toIndex) {
+        moveItem(psbtOutputs, fromIndex, toIndex);
+        transaction.moveOutput(fromIndex, toIndex);
+    }
+
+    private <T> void moveItem(List<T> list, int fromIndex, int toIndex) {
+        if(fromIndex < 0 || fromIndex >= list.size() || toIndex < 0 || toIndex >= list.size()) {
+            throw new IllegalArgumentException("Invalid indices [" + fromIndex + ", " + toIndex + "] provided to list of size " + list.size());
+        }
+
+        T item = list.remove(fromIndex);
+        list.add(toIndex, item);
+    }
+
     public List<PSBTInput> getPsbtInputs() {
         return psbtInputs;
     }
