@@ -5,7 +5,7 @@ import java.util.Locale;
 public enum WalletModel {
     SEED, SPARROW, BITCOIN_CORE, ELECTRUM, TREZOR_1, TREZOR_T, COLDCARD, LEDGER_NANO_S, LEDGER_NANO_X, DIGITALBITBOX_01, KEEPKEY, SPECTER_DESKTOP, COBO_VAULT,
     BITBOX_02, SPECTER_DIY, PASSPORT, BLUE_WALLET, KEYSTONE, SEEDSIGNER, CARAVAN, GORDIAN_SEED_TOOL, JADE, LEDGER_NANO_S_PLUS, EPS, TAPSIGNER, SATSCARD, LABELS,
-    BSMS, KRUX, SATOCHIP, TRANSACTIONS;
+    BSMS, KRUX, SATOCHIP, TRANSACTIONS, AIRGAP_VAULT;
 
     public static WalletModel getModel(String model) {
         return valueOf(model.toUpperCase(Locale.ROOT));
@@ -46,6 +46,10 @@ public enum WalletModel {
 
         if(this == GORDIAN_SEED_TOOL) {
             return "seedtool";
+        }
+
+        if(this == AIRGAP_VAULT) {
+            return "airgapvault";
         }
 
         return this.toString().toLowerCase(Locale.ROOT);
