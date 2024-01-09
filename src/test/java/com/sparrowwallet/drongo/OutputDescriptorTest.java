@@ -134,4 +134,34 @@ public class OutputDescriptorTest {
         Assert.assertEquals("Unique 1", wallet.getKeystores().get(0).getLabel());
         Assert.assertEquals("Unique 2", wallet.getKeystores().get(1).getLabel());
     }
+
+    @Test
+    public void testMasterPrivateKey() {
+        String desc = "wpkh(xprv9s21ZrQH143K2x63uS9B5XiQqBKDs5ke5jF7dH7cwKaAycKs72VyR7zfBAqQFAnWMwpW6w2eJKc4pKfkMebXv1qi5cs5eQ1N9n2rwbsp94g)";
+        OutputDescriptor outputDescriptor = OutputDescriptor.getOutputDescriptor(desc);
+        Wallet wallet = outputDescriptor.toWallet();
+        Assert.assertEquals("fe05631b", wallet.getKeystores().get(0).getKeyDerivation().getMasterFingerprint());
+        Assert.assertEquals("m/84'/0'/0'", wallet.getKeystores().get(0).getKeyDerivation().getDerivationPath());
+        Assert.assertEquals("xpub6DTvSp2zaQ3DHrB19BnXTPEsMhnsVPKFgb47x8tkg1VjuwkKvyEeL3Jc4ojgiVUit2ron1SqkQph1hVPtGfREGkiZ8KCbN2TGXnoXHnQ12E", wallet.getKeystores().get(0).getExtendedPublicKey().toString());
+    }
+
+    @Test
+    public void testMasterPrivateKeyWithChildDerivation() {
+        String desc = "wpkh(xprv9s21ZrQH143K2x63uS9B5XiQqBKDs5ke5jF7dH7cwKaAycKs72VyR7zfBAqQFAnWMwpW6w2eJKc4pKfkMebXv1qi5cs5eQ1N9n2rwbsp94g/84'/1'/0'/0/*)";
+        OutputDescriptor outputDescriptor = OutputDescriptor.getOutputDescriptor(desc);
+        Wallet wallet = outputDescriptor.toWallet();
+        Assert.assertEquals("fe05631b", wallet.getKeystores().get(0).getKeyDerivation().getMasterFingerprint());
+        Assert.assertEquals("m/84'/1'/0'", wallet.getKeystores().get(0).getKeyDerivation().getDerivationPath());
+        Assert.assertEquals("xpub6BwAZuXFhV4oufDPGLi89BXMWkFSWDY8EGjLN7GReoKcBQC2MV9A6siCKefwMitca3YnvRCWKWp2RJoDeG9djtucWkH2EibPEvpm2fyNLK3", wallet.getKeystores().get(0).getExtendedPublicKey().toString());
+    }
+
+    @Test
+    public void testMasterPrivateKeyWithNonBip32ChildDerivation() {
+        String desc = "wpkh(xprv9s21ZrQH143K2x63uS9B5XiQqBKDs5ke5jF7dH7cwKaAycKs72VyR7zfBAqQFAnWMwpW6w2eJKc4pKfkMebXv1qi5cs5eQ1N9n2rwbsp94g/84'/1'/0'/3/*)";
+        OutputDescriptor outputDescriptor = OutputDescriptor.getOutputDescriptor(desc);
+        Wallet wallet = outputDescriptor.toWallet();
+        Assert.assertEquals("fe05631b", wallet.getKeystores().get(0).getKeyDerivation().getMasterFingerprint());
+        Assert.assertEquals("m/84'/1'/0'/3/0", wallet.getKeystores().get(0).getKeyDerivation().getDerivationPath());
+        Assert.assertEquals("xpub6FmRnopYz7J3zbEmKVnrxkuqQUqoL6wbAffNQJrDeXF29nJaTzUruDWbwG4Q3UR7MWpw3GfbqVnt65GbHsYJitzQpTCLkv8oh8dtcW9bNmr", wallet.getKeystores().get(0).getExtendedPublicKey().toString());
+    }
 }
