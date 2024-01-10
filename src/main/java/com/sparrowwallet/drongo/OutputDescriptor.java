@@ -362,6 +362,10 @@ public class OutputDescriptor {
 
     // See https://github.com/bitcoin/bitcoin/blob/master/doc/descriptors.md
     public static OutputDescriptor getOutputDescriptor(String descriptor) {
+        return getOutputDescriptor(descriptor, new LinkedHashMap<>());
+    }
+
+    public static OutputDescriptor getOutputDescriptor(String descriptor, Map<ExtendedKey, String> mapExtendedPublicKeyLabels) {
         ScriptType scriptType = ScriptType.fromDescriptor(descriptor);
         if(scriptType == null) {
             ExtendedKey.Header header = ExtendedKey.Header.fromExtendedKey(descriptor);
@@ -373,7 +377,7 @@ public class OutputDescriptor {
         }
 
         int threshold = getMultisigThreshold(descriptor);
-        return getOutputDescriptorImpl(scriptType, threshold, descriptor);
+        return getOutputDescriptorImpl(scriptType, threshold, descriptor, mapExtendedPublicKeyLabels);
     }
 
     private static int getMultisigThreshold(String descriptor) {
@@ -386,7 +390,7 @@ public class OutputDescriptor {
         }
     }
 
-    private static OutputDescriptor getOutputDescriptorImpl(ScriptType scriptType, int multisigThreshold, String descriptor) {
+    private static OutputDescriptor getOutputDescriptorImpl(ScriptType scriptType, int multisigThreshold, String descriptor, Map<ExtendedKey, String> mapExtendedPublicKeyLabels) {
         Matcher checksumMatcher = CHECKSUM_PATTERN.matcher(descriptor);
         if(checksumMatcher.find()) {
             String checksum = checksumMatcher.group(1);
@@ -453,7 +457,7 @@ public class OutputDescriptor {
             }
         }
 
-        return new OutputDescriptor(scriptType, multisigThreshold, keyDerivationMap, keyChildDerivationMap, new LinkedHashMap<>(), masterPrivateKeyMap);
+        return new OutputDescriptor(scriptType, multisigThreshold, keyDerivationMap, keyChildDerivationMap, mapExtendedPublicKeyLabels, masterPrivateKeyMap);
     }
 
     public static String normalize(String descriptor) {
@@ -613,8 +617,13 @@ public class OutputDescriptor {
     }
 
     private String toString(ExtendedKey pubKey, boolean addKeyOrigin, boolean addKey) {
-        StringBuilder keyBuilder = new StringBuilder();
         KeyDerivation keyDerivation = extendedPublicKeys.get(pubKey);
+        String childDerivation = mapChildrenDerivations.get(pubKey);
+        return writeKey(pubKey, keyDerivation, childDerivation, addKeyOrigin, addKey);
+    }
+
+    public static String writeKey(ExtendedKey pubKey, KeyDerivation keyDerivation, String childDerivation, boolean addKeyOrigin, boolean addKey) {
+        StringBuilder keyBuilder = new StringBuilder();
         if(keyDerivation != null && keyDerivation.getDerivationPath() != null && addKeyOrigin) {
             keyBuilder.append("[");
             if(keyDerivation.getMasterFingerprint() != null) {
@@ -630,7 +639,6 @@ public class OutputDescriptor {
                 keyBuilder.append(pubKey.toString());
             }
 
-            String childDerivation = mapChildrenDerivations.get(pubKey);
             if(childDerivation != null) {
                 if(!childDerivation.startsWith("/")) {
                     keyBuilder.append("/");
