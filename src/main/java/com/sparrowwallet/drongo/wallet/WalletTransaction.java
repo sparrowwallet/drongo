@@ -1,9 +1,7 @@
 package com.sparrowwallet.drongo.wallet;
 
 import com.sparrowwallet.drongo.address.Address;
-import com.sparrowwallet.drongo.protocol.Script;
-import com.sparrowwallet.drongo.protocol.Sha256Hash;
-import com.sparrowwallet.drongo.protocol.Transaction;
+import com.sparrowwallet.drongo.protocol.*;
 import com.sparrowwallet.drongo.psbt.PSBT;
 
 import java.util.*;
@@ -21,6 +19,7 @@ public class WalletTransaction {
     private final Map<WalletNode, Long> changeMap;
     private final long fee;
     private final Map<Sha256Hash, BlockTransaction> inputTransactions;
+    private final List<Output> outputs;
 
     private Map<Wallet, Map<Address, WalletNode>> addressNodeMap = new HashMap<>();
 
@@ -41,6 +40,11 @@ public class WalletTransaction {
         this.changeMap = changeMap;
         this.fee = fee;
         this.inputTransactions = inputTransactions;
+        this.outputs = calculateOutputs();
+
+        for(Payment payment : payments) {
+            payment.setLabel(getOutputLabel(payment));
+        }
     }
 
     public PSBT createPSBT() {
@@ -105,6 +109,10 @@ public class WalletTransaction {
         return inputTransactions;
     }
 
+    public List<Output> getOutputs() {
+        return outputs;
+    }
+
     /**
      * Fee percentage matches the Coldcard implementation of total fee as a percentage of total value out
      * @return the fee percentage
@@ -154,6 +162,47 @@ public class WalletTransaction {
         return getAddressNodeMap(wallet).get(payment.getAddress()) != null;
     }
 
+    private String getOutputLabel(Payment payment) {
+        if(payment.getLabel() != null) {
+            return payment.getLabel();
+        }
+
+        if(payment.getType() == Payment.Type.WHIRLPOOL_FEE) {
+            return "Whirlpool fee";
+        } else if(isPremixSend(payment)) {
+            int premixIndex = getOutputIndex(payment.getAddress(), payment.getAmount(), Collections.emptySet()) - 2;
+            return "Premix #" + premixIndex;
+        } else if(isBadbankSend(payment)) {
+            return "Badbank change";
+        }
+
+        return null;
+    }
+
+    public int getOutputIndex(Address address, long amount, Collection<Integer> seenIndexes) {
+        TransactionOutput output = getTransaction().getOutputs().stream()
+                .filter(txOutput -> address.equals(txOutput.getScript().getToAddress()) && txOutput.getValue() == amount && !seenIndexes.contains(txOutput.getIndex()))
+                .findFirst().orElseThrow();
+        return getTransaction().getOutputs().indexOf(output);
+    }
+
+    public Wallet getToWallet(Collection<Wallet> wallets, Payment payment) {
+        for(Wallet openWallet : wallets) {
+            if(openWallet != getWallet() && openWallet.isValid()) {
+                WalletNode addressNode = openWallet.getWalletAddresses().get(payment.getAddress());
+                if(addressNode != null) {
+                    return addressNode.getWallet();
+                }
+            }
+        }
+
+        return null;
+    }
+
+    public boolean isDuplicateAddress(Payment payment) {
+        return getPayments().stream().filter(p -> payment != p).anyMatch(p -> payment.getAddress() != null && payment.getAddress().equals(p.getAddress()));
+    }
+
     public void updateAddressNodeMap(Map<Wallet, Map<Address, WalletNode>> addressNodeMap, Wallet wallet) {
         this.addressNodeMap = addressNodeMap;
         getAddressNodeMap(wallet);
@@ -183,5 +232,80 @@ public class WalletTransaction {
         }
 
         return walletAddressNodeMap;
+    }
+
+    private List<Output> calculateOutputs() {
+        List<Output> outputs = new ArrayList<>();
+
+        for(int i = 0, paymentIndex = 0; i < transaction.getOutputs().size(); i++) {
+            TransactionOutput txOutput = transaction.getOutputs().get(i);
+            Address address = txOutput.getScript().getToAddress();
+            if(address == null) {
+                outputs.add(new NonAddressOutput(txOutput));
+            } else if(paymentIndex < payments.size()) {
+                Payment payment = payments.get(paymentIndex++);
+                outputs.add(new PaymentOutput(txOutput, payment));
+            }
+        }
+
+        Set<Integer> seenIndexes = new HashSet<>();
+        for(Map.Entry<WalletNode, Long> changeEntry : changeMap.entrySet()) {
+            int outputIndex = getOutputIndex(changeEntry.getKey().getAddress(), changeEntry.getValue(), seenIndexes);
+            TransactionOutput txOutput = transaction.getOutputs().get(outputIndex);
+            seenIndexes.add(outputIndex);
+            outputs.add(outputIndex, new ChangeOutput(txOutput, changeEntry.getKey(), changeEntry.getValue()));
+        }
+
+        return outputs;
+    }
+
+    public static class Output {
+        private final TransactionOutput transactionOutput;
+
+        public Output(TransactionOutput transactionOutput) {
+            this.transactionOutput = transactionOutput;
+        }
+
+        public TransactionOutput getTransactionOutput() {
+            return transactionOutput;
+        }
+    }
+
+    public static class NonAddressOutput extends Output {
+        public NonAddressOutput(TransactionOutput transactionOutput) {
+            super(transactionOutput);
+        }
+    }
+
+    public static class PaymentOutput extends Output {
+        private final Payment payment;
+
+        public PaymentOutput(TransactionOutput transactionOutput, Payment payment) {
+            super(transactionOutput);
+            this.payment = payment;
+        }
+
+        public Payment getPayment() {
+            return payment;
+        }
+    }
+
+    public static class ChangeOutput extends Output {
+        private final WalletNode walletNode;
+        private final Long value;
+
+        public ChangeOutput(TransactionOutput transactionOutput, WalletNode walletNode, Long value) {
+            super(transactionOutput);
+            this.walletNode = walletNode;
+            this.value = value;
+        }
+
+        public WalletNode getWalletNode() {
+            return walletNode;
+        }
+
+        public Long getValue() {
+            return value;
+        }
     }
 }
