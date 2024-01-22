@@ -161,6 +161,10 @@ public class WalletNode extends Persistable implements Comparable<WalletNode> {
                     }
                 }
             }
+
+            if(txo.isSpent() && txo.getStatus() == Status.FROZEN) {
+                txo.setStatus(null);
+            }
         }
 
         transactionOutputs.clear();
