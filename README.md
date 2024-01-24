@@ -14,4 +14,4 @@ Drongo is licensed under the Apache 2 software licence.
 
 ## Credits
 
-Drongo was inspired by (and is in part derived from) by the [BitcoinJ](https://bitcoinj.github.io/) Bitcoin library.  
+Drongo was inspired by (and is in part derived from) by the [bitcoinj](https://bitcoinj.org) Bitcoin library.
