@@ -89,7 +89,7 @@ jar {
 
 shadowJar {
     archiveVersion = '0.9'
-    classifier = 'all'
+    archiveClassifier = 'all'
 }
 
 extraJavaModuleInfo {
