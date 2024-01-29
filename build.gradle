@@ -9,7 +9,6 @@ buildscript {
 plugins {
     id 'java-library'
     id 'extra-java-module-info'
-    id 'com.github.johnrengelman.shadow' version '5.2.0'
 }
 
 tasks.withType(AbstractArchiveTask) {
@@ -17,26 +16,17 @@ tasks.withType(AbstractArchiveTask) {
     reproducibleFileOrder = true
 }
 
-group 'com.sparrowwallet'
-version '1.0'
-
 def os = org.gradle.internal.os.OperatingSystem.current()
 def osName = os.getFamilyName()
 if(os.macOsX) {
     osName = "osx"
 }
 
-sourceCompatibility = 16
-targetCompatibility = 16
-
 repositories {
     mavenCentral()
 }
 
 dependencies {
-    implementation ('org.zeromq:jeromq:0.5.0') {
-        exclude group: 'org.hamcrest', module: 'hamcrest-core'
-    }
     implementation ('com.googlecode.json-simple:json-simple:1.1.1') {
         exclude group: 'org.hamcrest', module: 'hamcrest-core'
         exclude group: 'junit', module: 'junit'
@@ -70,28 +60,6 @@ processResources {
     }
 }
 
-task(runDrongo, dependsOn: 'classes', type: JavaExec) {
-    mainClass = 'com.sparrowwallet.drongo.Main'
-    classpath = sourceSets.main.runtimeClasspath
-    args 'drongo.properties'
-}
-
-jar {
-    manifest {
-        attributes "Main-Class": "com.sparrowwallet.drongo.Main"
-    }
-
-    exclude('logback.xml')
-
-    archiveBaseName = 'drongo'
-    archiveVersion = '0.9'
-}
-
-shadowJar {
-    archiveVersion = '0.9'
-    classifier = 'all'
-}
-
 extraJavaModuleInfo {
     module('logback-core-1.2.8.jar', 'logback.core', '1.2.8') {
         exports('ch.qos.logback.core')
@@ -105,9 +73,6 @@ extraJavaModuleInfo {
         requires('logback.core')
         requires('java.xml')
         requires('java.logging')
-    }
-    module('jeromq-0.5.0.jar', 'jeromq', '0.5.0') {
-        exports('org.zeromq')
     }
     module('json-simple-1.1.1.jar', 'json.simple', '1.1.1') {
         exports('org.json.simple')
