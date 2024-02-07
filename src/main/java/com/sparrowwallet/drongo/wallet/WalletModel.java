@@ -5,7 +5,7 @@ import java.util.Locale;
 public enum WalletModel {
     SEED, SPARROW, BITCOIN_CORE, ELECTRUM, TREZOR_1, TREZOR_T, COLDCARD, LEDGER_NANO_S, LEDGER_NANO_X, DIGITALBITBOX_01, KEEPKEY, SPECTER_DESKTOP, COBO_VAULT,
     BITBOX_02, SPECTER_DIY, PASSPORT, BLUE_WALLET, KEYSTONE, SEEDSIGNER, CARAVAN, GORDIAN_SEED_TOOL, JADE, LEDGER_NANO_S_PLUS, EPS, TAPSIGNER, SATSCARD, LABELS,
-    BSMS, KRUX, SATOCHIP, TRANSACTIONS, AIRGAP_VAULT, TREZOR_SAFE_3;
+    BSMS, KRUX, SATOCHIP, TRANSACTIONS, AIRGAP_VAULT, TREZOR_SAFE_3, SATSCHIP;
 
     public static WalletModel getModel(String model) {
         return valueOf(model.toUpperCase(Locale.ROOT));
@@ -72,7 +72,7 @@ public enum WalletModel {
     }
 
     public boolean isCard() {
-        return (this == TAPSIGNER || this == SATSCARD || this == SATOCHIP);
+        return (this == TAPSIGNER || this == SATSCHIP || this == SATSCARD || this == SATOCHIP);
     }
 
     public int getMinPinLength() {
@@ -108,7 +108,7 @@ public enum WalletModel {
     }
 
     public boolean supportsBackup() {
-        if(this == SATOCHIP) {
+        if(this == SATOCHIP || this == SATSCHIP) {
             return false;
         } else {
             return true;
