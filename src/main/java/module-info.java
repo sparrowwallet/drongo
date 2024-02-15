@@ -2,8 +2,8 @@ open module com.sparrowwallet.drongo {
     requires org.bouncycastle.provider;
     requires de.mkammerer.argon2.nolibs;
     requires org.slf4j;
-    requires logback.core;
-    requires logback.classic;
+    requires ch.qos.logback.core;
+    requires ch.qos.logback.classic;
     requires json.simple;
     exports com.sparrowwallet.drongo;
     exports com.sparrowwallet.drongo.psbt;

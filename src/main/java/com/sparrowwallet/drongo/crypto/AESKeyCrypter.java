@@ -41,7 +41,7 @@ public class AESKeyCrypter implements KeyCrypter {
             ParametersWithIV keyWithIv = new ParametersWithIV(new KeyParameter(aesKey.getKeyBytes()), dataToDecrypt.getInitialisationVector());
 
             // Decrypt the message.
-            BufferedBlockCipher cipher = new PaddedBufferedBlockCipher(new CBCBlockCipher(new AESEngine()));
+            BufferedBlockCipher cipher = new PaddedBufferedBlockCipher(CBCBlockCipher.newInstance(AESEngine.newInstance()));
             cipher.init(false, keyWithIv);
 
             byte[] cipherBytes = dataToDecrypt.getEncryptedBytes();
@@ -79,7 +79,7 @@ public class AESKeyCrypter implements KeyCrypter {
             ParametersWithIV keyWithIv = new ParametersWithIV(new KeyParameter(aesKey.getKeyBytes()), iv);
 
             // Encrypt using AES.
-            BufferedBlockCipher cipher = new PaddedBufferedBlockCipher(new CBCBlockCipher(new AESEngine()));
+            BufferedBlockCipher cipher = new PaddedBufferedBlockCipher(CBCBlockCipher.newInstance(AESEngine.newInstance()));
             cipher.init(true, keyWithIv);
             byte[] encryptedBytes = new byte[cipher.getOutputSize(plainBytes.length)];
             final int length1 = cipher.processBytes(plainBytes, 0, plainBytes.length, encryptedBytes, 0);

@@ -552,7 +552,7 @@ public class ECKey {
                 throw new IllegalArgumentException("Input has 'publicKey' with bad tag number");
             }
 
-            byte[] pubbits = ((DERBitString)pubkey.getObject()).getBytes();
+            byte[] pubbits = ((DERBitString)pubkey.getBaseObject()).getBytes();
             if(pubbits.length != 33 && pubbits.length != 65) {
                 throw new IllegalArgumentException("Input has 'publicKey' with invalid length");
             };
