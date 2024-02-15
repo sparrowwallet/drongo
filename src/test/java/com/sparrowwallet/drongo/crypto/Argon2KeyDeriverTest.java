@@ -1,8 +1,8 @@
 package com.sparrowwallet.drongo.crypto;
 
 import com.sparrowwallet.drongo.Utils;
-import org.junit.Assert;
-import org.junit.Test;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
 
 import java.nio.charset.StandardCharsets;
 import java.security.SecureRandom;
@@ -18,7 +18,7 @@ public class Argon2KeyDeriverTest {
         Key key = keyDeriver.deriveKey(password);
 
         String hex = Utils.bytesToHex(key.getKeyBytes());
-        Assert.assertEquals("6f6600a054c0271b96788906f62dfb1323c37b761715a0ae95ac524e4e1f2811", hex);
+        Assertions.assertEquals("6f6600a054c0271b96788906f62dfb1323c37b761715a0ae95ac524e4e1f2811", hex);
     }
 
     @Test
@@ -47,7 +47,7 @@ public class Argon2KeyDeriverTest {
         byte[] decrypted = keyCrypter.decrypt(encrypted, key2);
         String decryptedMessage = new String(decrypted, StandardCharsets.UTF_8);
 
-        Assert.assertEquals(message, decryptedMessage);
+        Assertions.assertEquals(message, decryptedMessage);
     }
 
 //    @Test

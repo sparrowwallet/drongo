@@ -1,7 +1,7 @@
 package com.sparrowwallet.drongo.crypto;
 
-import org.junit.Assert;
-import org.junit.Test;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
 
 import java.nio.charset.StandardCharsets;
 import java.security.SecureRandom;
@@ -31,6 +31,6 @@ public class ScryptKeyDeriverTest {
         byte[] sdecrypted = keyCrypter.decrypt(scrypted, key2);
         String decryptedMessage = new String(sdecrypted, StandardCharsets.UTF_8);
 
-        Assert.assertEquals(message, decryptedMessage);
+        Assertions.assertEquals(message, decryptedMessage);
     }
 }

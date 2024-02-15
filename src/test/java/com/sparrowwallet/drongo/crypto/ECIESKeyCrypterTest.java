@@ -1,7 +1,7 @@
 package com.sparrowwallet.drongo.crypto;
 
-import org.junit.Assert;
-import org.junit.Test;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
 
 import java.nio.charset.StandardCharsets;
 
@@ -20,6 +20,6 @@ public class ECIESKeyCrypterTest {
         byte[] crypterDecrypted = keyCrypter.decrypt(encryptedData, key);
 
         String cryDecStr = new String(crypterDecrypted, StandardCharsets.UTF_8);
-        Assert.assertEquals(testMessage, cryDecStr);
+        Assertions.assertEquals(testMessage, cryDecStr);
     }
 }

@@ -28,25 +28,24 @@ repositories {
 
 dependencies {
     implementation ('com.googlecode.json-simple:json-simple:1.1.1') {
-        exclude group: 'org.hamcrest', module: 'hamcrest-core'
         exclude group: 'junit', module: 'junit'
     }
-    implementation ('org.bouncycastle:bcprov-jdk18on:1.77') {
-        exclude group: 'org.hamcrest', module: 'hamcrest-core'
-    }
+    implementation ('org.bouncycastle:bcprov-jdk18on:1.77')
     implementation ('de.mkammerer:argon2-jvm:2.11') {
-        exclude group: 'org.hamcrest', module: 'hamcrest-core'
-        exclude group: 'junit', module: 'junit'
         exclude group: 'net.java.dev.jna', module: 'jna'
     }
     implementation ('net.java.dev.jna:jna:5.8.0')
     implementation ('ch.qos.logback:logback-classic:1.4.14') {
-        exclude group: 'org.hamcrest', module: 'hamcrest-core'
         exclude group: 'org.slf4j'
     }
     implementation ('org.slf4j:slf4j-api:2.0.12')
     testImplementation('org.junit.jupiter:junit-jupiter-api:5.10.0')
-    testImplementation('org.junit.vintage:junit-vintage-engine:5.10.0')
+    testRuntimeOnly('org.junit.jupiter:junit-jupiter-engine:5.10.0')
+    testRuntimeOnly('org.junit.platform:junit-platform-launcher')
+}
+
+test {
+    useJUnitPlatform()
 }
 
 processResources {
@@ -63,5 +62,4 @@ extraJavaModuleInfo {
         exports('org.json.simple.parser')
     }
     module('jnacl-1.0.0.jar', 'eu.neilalexander.jnacl', '1.0.0')
-    module('hamcrest-core-1.3.jar', 'org.hamcrest.core', '1.3')
 }

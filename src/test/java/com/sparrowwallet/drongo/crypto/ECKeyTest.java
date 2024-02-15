@@ -6,8 +6,8 @@ import com.sparrowwallet.drongo.policy.Policy;
 import com.sparrowwallet.drongo.policy.PolicyType;
 import com.sparrowwallet.drongo.protocol.ScriptType;
 import com.sparrowwallet.drongo.wallet.*;
-import org.junit.Assert;
-import org.junit.Test;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
 
 public class ECKeyTest {
     @Test
@@ -23,19 +23,19 @@ public class ECKeyTest {
 
         WalletNode firstReceive = wallet.getNode(KeyPurpose.RECEIVE).getChildren().iterator().next();
         Address address = firstReceive.getAddress();
-        Assert.assertEquals("14JmU9a7SzieZNEtBnsZo688rt3mGrw6hr", address.toString());
+        Assertions.assertEquals("14JmU9a7SzieZNEtBnsZo688rt3mGrw6hr", address.toString());
         ECKey privKey = keystore.getKey(firstReceive);
 
         //1 attempt required for low R
         String signature1 = privKey.signMessage("Test2", ScriptType.P2PKH);
-        Assert.assertEquals("IHra0jSywF1TjIJ5uf7IDECae438cr4o3VmG6Ri7hYlDL+pUEXyUfwLwpiAfUQVqQFLgs6OaX0KsoydpuwRI71o=", signature1);
+        Assertions.assertEquals("IHra0jSywF1TjIJ5uf7IDECae438cr4o3VmG6Ri7hYlDL+pUEXyUfwLwpiAfUQVqQFLgs6OaX0KsoydpuwRI71o=", signature1);
 
         //2 attempts required for low R
         String signature2 = privKey.signMessage("Test", ScriptType.P2PKH);
-        Assert.assertEquals("IDgMx1ljPhLHlKUOwnO/jBIgK+K8n8mvDUDROzTgU8gOaPDMs+eYXJpNXXINUx5WpeV605p5uO6B3TzBVcvs478=", signature2);
+        Assertions.assertEquals("IDgMx1ljPhLHlKUOwnO/jBIgK+K8n8mvDUDROzTgU8gOaPDMs+eYXJpNXXINUx5WpeV605p5uO6B3TzBVcvs478=", signature2);
 
         //3 attempts required for low R
         String signature3 = privKey.signMessage("Test1", ScriptType.P2PKH);
-        Assert.assertEquals("IEt/v9K95YVFuRtRtWaabPVwWOFv1FSA/e874I8ABgYMbRyVvHhSwLFz0RZuO87ukxDd4TOsRdofQwMEA90LCgI=", signature3);
+        Assertions.assertEquals("IEt/v9K95YVFuRtRtWaabPVwWOFv1FSA/e874I8ABgYMbRyVvHhSwLFz0RZuO87ukxDd4TOsRdofQwMEA90LCgI=", signature3);
     }
 }

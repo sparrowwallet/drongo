@@ -1,8 +1,8 @@
 package com.sparrowwallet.drongo.wallet;
 
 import com.sparrowwallet.drongo.Utils;
-import org.junit.Assert;
-import org.junit.Test;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
 
 import java.util.Arrays;
 import java.util.List;
@@ -16,16 +16,15 @@ public class Bip39MnemonicCodeTest {
         Bip39MnemonicCode.INSTANCE.check(wordlist);
         byte[] seed = Bip39MnemonicCode.toSeed(wordlist, "");
 
-        Assert.assertEquals("727ecfcf0bce9d8ec0ef066f7aeb845c271bdd4ee06a37398cebd40dc810140bb620b6c10a8ad671afdceaf37aa55d92d6478f747e8b92430dd938ab5be961dd", Utils.bytesToHex(seed));
+        Assertions.assertEquals("727ecfcf0bce9d8ec0ef066f7aeb845c271bdd4ee06a37398cebd40dc810140bb620b6c10a8ad671afdceaf37aa55d92d6478f747e8b92430dd938ab5be961dd", Utils.bytesToHex(seed));
     }
 
-    @Test(expected = MnemonicException.MnemonicChecksumException.class)
+    @Test
     public void bip39TwelveWordsInvalidTest() throws MnemonicException {
         String words = "absent absent absent absent absent absent absent absent absent absent absent absent";
         List<String> wordlist = Arrays.asList(words.split(" "));
 
-        Bip39MnemonicCode.INSTANCE.check(wordlist);
-        byte[] seed = Bip39MnemonicCode.toSeed(wordlist, "");
+        Assertions.assertThrows(MnemonicException.MnemonicChecksumException.class, () -> Bip39MnemonicCode.INSTANCE.check(wordlist));
     }
 
     @Test
@@ -36,7 +35,7 @@ public class Bip39MnemonicCodeTest {
         Bip39MnemonicCode.INSTANCE.check(wordlist);
         byte[] seed = Bip39MnemonicCode.toSeed(wordlist, "anotherpass867");
 
-        Assert.assertEquals("ca50764cda44a2cf52aef3c677bebf26011f9dc2b9fddfed2a8a5a9ecb8542956990a16e6873b7724044e83708d9d3a662b765e8800e6e79b289f51c2bcad756", Utils.bytesToHex(seed));
+        Assertions.assertEquals("ca50764cda44a2cf52aef3c677bebf26011f9dc2b9fddfed2a8a5a9ecb8542956990a16e6873b7724044e83708d9d3a662b765e8800e6e79b289f51c2bcad756", Utils.bytesToHex(seed));
     }
 
     @Test
@@ -47,7 +46,7 @@ public class Bip39MnemonicCodeTest {
         Bip39MnemonicCode.INSTANCE.check(wordlist);
         byte[] seed = Bip39MnemonicCode.toSeed(wordlist, "");
 
-        Assert.assertEquals("2174deae5fd315253dc065db7ef97f46957eb68a12505adccfb7f8aca5b63788c587e73430848f85417d9a7d95e6396d2eb3af73c9fb507ebcb9268a5ad47885", Utils.bytesToHex(seed));
+        Assertions.assertEquals("2174deae5fd315253dc065db7ef97f46957eb68a12505adccfb7f8aca5b63788c587e73430848f85417d9a7d95e6396d2eb3af73c9fb507ebcb9268a5ad47885", Utils.bytesToHex(seed));
     }
 
     @Test
@@ -58,7 +57,7 @@ public class Bip39MnemonicCodeTest {
         Bip39MnemonicCode.INSTANCE.check(wordlist);
         byte[] seed = Bip39MnemonicCode.toSeed(wordlist, "");
 
-        Assert.assertEquals("04bd65f582e288bbf595213048b06e1552017776d20ca290ac06d840e197bcaaccd4a85a45a41219be4183dd2e521e7a7a2d6aea3069f04e503ef6d9c8dfa651", Utils.bytesToHex(seed));
+        Assertions.assertEquals("04bd65f582e288bbf595213048b06e1552017776d20ca290ac06d840e197bcaaccd4a85a45a41219be4183dd2e521e7a7a2d6aea3069f04e503ef6d9c8dfa651", Utils.bytesToHex(seed));
     }
 
     @Test
@@ -69,7 +68,7 @@ public class Bip39MnemonicCodeTest {
         Bip39MnemonicCode.INSTANCE.check(wordlist);
         byte[] seed = Bip39MnemonicCode.toSeed(wordlist, "");
 
-        Assert.assertEquals("f3a88a437153333f9759f323dfe7910e6a649c34da5800e6c978d77baad54b67b06eab17c0107243f3e8b395a2de98c910e9528127539efda2eea5ae50e94019", Utils.bytesToHex(seed));
+        Assertions.assertEquals("f3a88a437153333f9759f323dfe7910e6a649c34da5800e6c978d77baad54b67b06eab17c0107243f3e8b395a2de98c910e9528127539efda2eea5ae50e94019", Utils.bytesToHex(seed));
     }
 
     @Test
@@ -80,7 +79,7 @@ public class Bip39MnemonicCodeTest {
         Bip39MnemonicCode.INSTANCE.check(wordlist);
         byte[] seed = Bip39MnemonicCode.toSeed(wordlist, "");
 
-        Assert.assertEquals("60f825219a1fcfa479de28435e9bf2aa5734e212982daee582ca0427ad6141c65be9863c3ce0f18e2b173083ea49dcf47d07148734a5f748ac60d470cee6a2bc", Utils.bytesToHex(seed));
+        Assertions.assertEquals("60f825219a1fcfa479de28435e9bf2aa5734e212982daee582ca0427ad6141c65be9863c3ce0f18e2b173083ea49dcf47d07148734a5f748ac60d470cee6a2bc", Utils.bytesToHex(seed));
     }
 
     @Test
@@ -91,7 +90,7 @@ public class Bip39MnemonicCodeTest {
         Bip39MnemonicCode.INSTANCE.check(wordlist);
         byte[] seed = Bip39MnemonicCode.toSeed(wordlist, "thispass");
 
-        Assert.assertEquals("a652d123f421f56257391af26063e900619678b552dafd3850e699f6da0667269bbcaebb0509557481db29607caac0294b3cd337d740174cfa05f552fe9e0272", Utils.bytesToHex(seed));
+        Assertions.assertEquals("a652d123f421f56257391af26063e900619678b552dafd3850e699f6da0667269bbcaebb0509557481db29607caac0294b3cd337d740174cfa05f552fe9e0272", Utils.bytesToHex(seed));
     }
 
     @Test
@@ -102,7 +101,7 @@ public class Bip39MnemonicCodeTest {
         Bip39MnemonicCode.INSTANCE.check(wordlist);
         byte[] seed = Bip39MnemonicCode.toSeed(wordlist, "TREZOR");
 
-        Assert.assertEquals("107d7c02a5aa6f38c58083ff74f04c607c2d2c0ecc55501dadd72d025b751bc27fe913ffb796f841c49b1d33b610cf0e91d3aa239027f5e99fe4ce9e5088cd65", Utils.bytesToHex(seed));
+        Assertions.assertEquals("107d7c02a5aa6f38c58083ff74f04c607c2d2c0ecc55501dadd72d025b751bc27fe913ffb796f841c49b1d33b610cf0e91d3aa239027f5e99fe4ce9e5088cd65", Utils.bytesToHex(seed));
     }
 
     @Test
@@ -113,6 +112,6 @@ public class Bip39MnemonicCodeTest {
         Bip39MnemonicCode.INSTANCE.check(wordlist);
         byte[] seed = Bip39MnemonicCode.toSeed(wordlist, "TREZOR");
 
-        Assert.assertEquals("628c3827a8823298ee685db84f55caa34b5cc195a778e52d45f59bcf75aba68e4d7590e101dc414bc1bbd5737666fbbef35d1f1903953b66624f910feef245ac", Utils.bytesToHex(seed));
+        Assertions.assertEquals("628c3827a8823298ee685db84f55caa34b5cc195a778e52d45f59bcf75aba68e4d7590e101dc414bc1bbd5737666fbbef35d1f1903953b66624f910feef245ac", Utils.bytesToHex(seed));
     }
 }
