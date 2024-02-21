@@ -121,7 +121,7 @@ public class Bip39MnemonicCode {
             throw new MnemonicException.MnemonicLengthException("Word list size must be multiple of three words.");
         }
 
-        if (words.size() == 0) {
+        if (words.isEmpty()) {
             throw new MnemonicException.MnemonicLengthException("Word list is empty.");
         }
 

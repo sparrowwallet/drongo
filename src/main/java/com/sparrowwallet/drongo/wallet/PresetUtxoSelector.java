@@ -29,7 +29,7 @@ public class PresetUtxoSelector extends SingleSetUtxoSelector {
 
     @Override
     public Collection<BlockTransactionHashIndex> select(long targetValue, Collection<OutputGroup> candidates) {
-        List<BlockTransactionHashIndex> flattenedCandidates = candidates.stream().flatMap(outputGroup -> outputGroup.getUtxos().stream()).collect(Collectors.toList());
+        List<BlockTransactionHashIndex> flattenedCandidates = candidates.stream().flatMap(outputGroup -> outputGroup.getUtxos().stream()).toList();
         List<BlockTransactionHashIndex> utxos = new ArrayList<>();
 
         //Don't use equals() here as we don't want to consider height which may change as txes are confirmed

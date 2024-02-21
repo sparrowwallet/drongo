@@ -434,12 +434,12 @@ public class OutputDescriptor {
                 if(extendedKey.getKey().hasPrivKey()) {
                     ExtendedKey privateExtendedKey = extendedKey;
                     List<ChildNumber> derivation = keyDerivation.getDerivation();
-                    int depth = derivation.size() == 0 ? scriptType.getDefaultDerivation().size() : derivation.size();
+                    int depth = derivation.isEmpty() ? scriptType.getDefaultDerivation().size() : derivation.size();
                     DeterministicKey prvKey = extendedKey.getKey();
                     DeterministicKey pubKey = new DeterministicKey(prvKey.getPath(), prvKey.getChainCode(), prvKey.getPubKey(), depth, extendedKey.getParentFingerprint());
                     extendedKey = new ExtendedKey(pubKey, pubKey.getParentFingerprint(), extendedKey.getKeyChildNumber());
 
-                    if(derivation.size() == 0) {
+                    if(derivation.isEmpty()) {
                         masterPrivateKeyMap.put(extendedKey, privateExtendedKey);
                     }
                 }

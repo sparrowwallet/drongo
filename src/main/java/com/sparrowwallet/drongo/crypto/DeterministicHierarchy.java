@@ -34,7 +34,7 @@ public class DeterministicHierarchy {
      */
     public DeterministicKey get(List<ChildNumber> path) throws HDDerivationException {
         if(!keys.containsKey(path)) {
-            if(path.size() == 0) {
+            if(path.isEmpty()) {
                 throw new IllegalArgumentException("Can't derive the master key: nothing to derive from.");
             }
 

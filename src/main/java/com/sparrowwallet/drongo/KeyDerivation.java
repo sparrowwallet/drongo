@@ -61,7 +61,7 @@ public class KeyDerivation {
         String[] parsedNodes = path.replace("M", "").replace("m", "").split("/");
         for (String n : parsedNodes) {
             n = n.replaceAll(" ", "");
-            if (n.length() == 0) continue;
+            if (n.isEmpty()) continue;
             boolean isHard = n.endsWith("H") || n.endsWith("h") || n.endsWith("'");
             if (isHard) n = n.substring(0, n.length() - 1);
             if (n.equals("*")) n = Integer.toString(wildcardReplacement);

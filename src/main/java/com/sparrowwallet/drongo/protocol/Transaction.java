@@ -393,7 +393,7 @@ public class Transaction extends ChildMessage {
     }
 
     public void verify() throws VerificationException {
-        if (inputs.size() == 0 || outputs.size() == 0)
+        if (inputs.isEmpty() || outputs.isEmpty())
             throw new VerificationException.EmptyInputsOrOutputs();
         if (this.getMessageSize() > MAX_BLOCK_SIZE)
             throw new VerificationException.LargerThanMaxBlockSize();
@@ -464,7 +464,7 @@ public class Transaction extends ChildMessage {
 
             // This step has no purpose beyond being synchronized with Bitcoin Core's bugs. OP_CODESEPARATOR
             // is a legacy holdover from a previous, broken design of executing scripts that shipped in Bitcoin 0.1.
-            // It was seriously flawed and would have let anyone take anyone elses money. Later versions switched to
+            // It was seriously flawed and would have let anyone take anyone else's money. Later versions switched to
             // the design we use today where scripts are executed independently but share a stack. This left the
             // OP_CODESEPARATOR instruction having no purpose as it was only meant to be used internally, not actually
             // ever put into scripts. Deleting OP_CODESEPARATOR is a step that should never be required but if we don't

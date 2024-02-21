@@ -9,10 +9,10 @@ import java.util.List;
 public class WatchWallet {
     private static final int LOOK_AHEAD_LIMIT = 500;
 
-    private String name;
-    private OutputDescriptor outputDescriptor;
+    private final String name;
+    private final OutputDescriptor outputDescriptor;
 
-    private HashMap<Address,List<ChildNumber>> addresses = new HashMap<>(LOOK_AHEAD_LIMIT*2);
+    private final HashMap<Address, List<ChildNumber>> addresses = new HashMap<>(LOOK_AHEAD_LIMIT*2);
 
     public WatchWallet(String name, String descriptor) {
         this.name = name;

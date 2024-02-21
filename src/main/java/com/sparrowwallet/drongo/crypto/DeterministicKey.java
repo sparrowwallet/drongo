@@ -160,7 +160,7 @@ public class DeterministicKey extends ECKey {
 
     /** Returns the last element of the path returned by {@link DeterministicKey#getPath()} */
     public ChildNumber getChildNumber() {
-        return childNumberPath.size() == 0 ? ChildNumber.ZERO : childNumberPath.get(childNumberPath.size() - 1);
+        return childNumberPath.isEmpty() ? ChildNumber.ZERO : childNumberPath.get(childNumberPath.size() - 1);
     }
 
     public byte[] getChainCode() {

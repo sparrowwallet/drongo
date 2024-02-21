@@ -17,9 +17,13 @@ import org.junit.jupiter.api.Test;
 import java.util.List;
 
 public class WalletTest {
+    private static final String words = "absent essay fox snake vast pumpkin height crouch silent bulb excuse razor";
+
+    private static final String words2 = "chef huge whisper year move obscure post pepper play minute foster lawn";
+
+
     @Test
     public void encryptTest() throws MnemonicException {
-        String words = "absent essay fox snake vast pumpkin height crouch silent bulb excuse razor";
         DeterministicSeed seed = new DeterministicSeed(words, "pp", 0, DeterministicSeed.Type.BIP39);
         Wallet wallet = new Wallet();
         wallet.setPolicyType(PolicyType.SINGLE);
@@ -107,7 +111,6 @@ public class WalletTest {
 
     @Test
     public void p2pkhDerivationTest() throws MnemonicException {
-        String words = "absent essay fox snake vast pumpkin height crouch silent bulb excuse razor";
         DeterministicSeed seed = new DeterministicSeed(words, "pp", 0, DeterministicSeed.Type.BIP39);
         Wallet wallet = new Wallet();
         wallet.setPolicyType(PolicyType.SINGLE);
@@ -124,7 +127,6 @@ public class WalletTest {
 
     @Test
     public void p2shP2wpkhDerivationTest() throws MnemonicException {
-        String words = "absent essay fox snake vast pumpkin height crouch silent bulb excuse razor";
         DeterministicSeed seed = new DeterministicSeed(words, "pp", 0, DeterministicSeed.Type.BIP39);
         Wallet wallet = new Wallet();
         wallet.setPolicyType(PolicyType.SINGLE);
@@ -141,7 +143,6 @@ public class WalletTest {
 
     @Test
     public void p2wpkhDerivationTest() throws MnemonicException {
-        String words = "absent essay fox snake vast pumpkin height crouch silent bulb excuse razor";
         DeterministicSeed seed = new DeterministicSeed(words, "pp", 0, DeterministicSeed.Type.BIP39);
         Wallet wallet = new Wallet();
         wallet.setPolicyType(PolicyType.SINGLE);
@@ -158,10 +159,8 @@ public class WalletTest {
 
     @Test
     public void p2shDerivationTest() throws MnemonicException {
-        String words = "absent essay fox snake vast pumpkin height crouch silent bulb excuse razor";
         DeterministicSeed seed = new DeterministicSeed(words, "pp", 0, DeterministicSeed.Type.BIP39);
 
-        String words2 = "chef huge whisper year move obscure post pepper play minute foster lawn";
         DeterministicSeed seed2 = new DeterministicSeed(words2, "", 0, DeterministicSeed.Type.BIP39);
 
         Wallet wallet = new Wallet();
@@ -185,10 +184,8 @@ public class WalletTest {
 
     @Test
     public void p2shP2wshDerivationTest() throws MnemonicException {
-        String words = "absent essay fox snake vast pumpkin height crouch silent bulb excuse razor";
         DeterministicSeed seed = new DeterministicSeed(words, "pp", 0, DeterministicSeed.Type.BIP39);
 
-        String words2 = "chef huge whisper year move obscure post pepper play minute foster lawn";
         DeterministicSeed seed2 = new DeterministicSeed(words2, "", 0, DeterministicSeed.Type.BIP39);
 
         Wallet wallet = new Wallet();
@@ -212,10 +209,8 @@ public class WalletTest {
 
     @Test
     public void p2wshDerivationTest() throws MnemonicException {
-        String words = "absent essay fox snake vast pumpkin height crouch silent bulb excuse razor";
         DeterministicSeed seed = new DeterministicSeed(words, "pp", 0, DeterministicSeed.Type.BIP39);
 
-        String words2 = "chef huge whisper year move obscure post pepper play minute foster lawn";
         DeterministicSeed seed2 = new DeterministicSeed(words2, "", 0, DeterministicSeed.Type.BIP39);
 
         Wallet wallet = new Wallet();
