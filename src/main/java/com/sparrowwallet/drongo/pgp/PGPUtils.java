@@ -172,7 +172,10 @@ public class PGPUtils {
         }
 
         if(isWindows()) {
-            return new File(System.getenv("APPDATA"), "gnupg");
+            File winHome = new File(System.getenv("APPDATA"), "gnupg");
+            if(winHome.exists()) {
+                return winHome;
+            }
         }
 
         return new File(System.getProperty("user.home"), ".gnupg");
