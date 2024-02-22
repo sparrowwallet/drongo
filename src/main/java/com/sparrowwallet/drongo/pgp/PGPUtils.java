@@ -132,42 +132,31 @@ public class PGPUtils {
         return null;
     }
 
-    private static PGPPublicKeyRingCollection getUserKeyRingCollection() throws IOException {
+    private static PGPPublicKeyRingCollection getUserKeyRingCollection() {
         try {
-            File gnupgPubRing = getGnuPGPubRing();
-            if(gnupgPubRing != null) {
-                if(gnupgPubRing.getName().equals(PUBRING_GPG)) {
-                    return PGPainless.readKeyRing().publicKeyRingCollection(new FileInputStream(gnupgPubRing));
-                } else if(gnupgPubRing.getName().equals(PUBRING_KBX)) {
-                    BcKeyBox bcKeyBox = new BcKeyBox(new FileInputStream(gnupgPubRing));
+            File gnupgHome = getGnuPGHome();
+            if(gnupgHome.exists()) {
+                File kbxPubRing = new File(gnupgHome, PUBRING_KBX);
+                if(kbxPubRing.exists()) {
+                    BcKeyBox bcKeyBox = new BcKeyBox(new FileInputStream(kbxPubRing));
                     List<PGPPublicKeyRing> rings = new ArrayList<>();
                     for(KeyBlob keyBlob : bcKeyBox.getKeyBlobs()) {
                         if(keyBlob instanceof PublicKeyRingBlob publicKeyRingBlob) {
                             rings.add(publicKeyRingBlob.getPGPPublicKeyRing());
                         }
                     }
-                    return new PGPPublicKeyRingCollection(rings);
+                    if(!rings.isEmpty()) {
+                        return new PGPPublicKeyRingCollection(rings);
+                    }
+                }
+
+                File gpgPubRing = new File(gnupgHome, PUBRING_GPG);
+                if(gpgPubRing.exists()) {
+                    return PGPainless.readKeyRing().publicKeyRingCollection(new FileInputStream(gpgPubRing));
                 }
             }
         } catch(Exception e) {
             log.warn("Error loading user key rings: " + e.getMessage());
-        }
-
-        return null;
-    }
-
-    private static File getGnuPGPubRing() {
-        File gnupgHome = getGnuPGHome();
-        if(gnupgHome.exists()) {
-            File gpgPubRing = new File(gnupgHome, PUBRING_GPG);
-            if(gpgPubRing.exists()) {
-                return gpgPubRing;
-            }
-
-            File kbxPubRing = new File(gnupgHome, PUBRING_KBX);
-            if(kbxPubRing.exists()) {
-                return kbxPubRing;
-            }
         }
 
         return null;
