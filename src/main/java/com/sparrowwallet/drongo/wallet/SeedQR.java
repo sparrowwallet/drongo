@@ -20,7 +20,7 @@ public class SeedQR {
         List<Integer> indexes = IntStream.iterate(0, i -> i + 4).limit((int)Math.ceil(seedQr.length() / 4.0))
                 .mapToObj(i -> seedQr.substring(i, Math.min(i + 4, seedQr.length())))
                 .map(Integer::parseInt)
-                .collect(Collectors.toList());
+                .toList();
 
         List<String> words = new ArrayList<>(indexes.size());
         for(Integer index : indexes) {

@@ -126,7 +126,7 @@ public class Bech32 {
 
         /** Encode a Bech32 string. */
     public static String encode(String hrp, Encoding encoding, final byte[] values) {
-        if(hrp.length() < 1) {
+        if(hrp.isEmpty()) {
             throw new ProtocolException("Human-readable part is too short");
         }
 
