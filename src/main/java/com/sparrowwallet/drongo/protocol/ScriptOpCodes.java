@@ -161,6 +161,7 @@ public class ScriptOpCodes {
     public static final int OP_NOP8 = 0xb7;
     public static final int OP_NOP9 = 0xb8;
     public static final int OP_NOP10 = 0xb9;
+    public static final int OP_CHECKSIGADD = 0xba;
     public static final int OP_INVALIDOPCODE = 0xff;
 
     private static final Map<Integer, String> opCodeNameMap;
@@ -269,6 +270,7 @@ public class ScriptOpCodes {
         opCodeNameMap.put(OP_CHECKSIGVERIFY, "CHECKSIGVERIFY");
         opCodeNameMap.put(OP_CHECKMULTISIG, "CHECKMULTISIG");
         opCodeNameMap.put(OP_CHECKMULTISIGVERIFY, "CHECKMULTISIGVERIFY");
+        opCodeNameMap.put(OP_CHECKSIGADD, "CHECKSIGADD");
         opCodeNameMap.put(OP_NOP1, "NOP1");
         opCodeNameMap.put(OP_CHECKLOCKTIMEVERIFY, "CHECKLOCKTIMEVERIFY");
         opCodeNameMap.put(OP_CHECKSEQUENCEVERIFY, "CHECKSEQUENCEVERIFY");

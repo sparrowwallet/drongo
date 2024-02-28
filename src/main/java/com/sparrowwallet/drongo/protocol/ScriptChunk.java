@@ -11,6 +11,7 @@ import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.Objects;
+import java.util.stream.IntStream;
 
 import static com.sparrowwallet.drongo.protocol.ScriptOpCodes.*;
 
@@ -150,7 +151,7 @@ public class ScriptChunk {
             return false;
         }
 
-        if(isSignature() || isPubKey()) {
+        if(isSignature() || isPubKey() || isTaprootControlBlock()) {
             return false;
         }
 
@@ -180,11 +181,20 @@ public class ScriptChunk {
             return false;
         }
 
-        return ECKey.isPubKeyCanonical(data);
+        return ECKey.isPubKeyCanonical(data) && !IntStream.range(0, data.length).mapToObj(i -> data[i]).allMatch(b -> b == 0);
     }
 
     public ECKey getPubKey() {
         return ECKey.fromPublicOnly(data);
+    }
+
+    public boolean isTaprootControlBlock() {
+        if(data == null || data.length == 0 || (data.length - 1) % 32 != 0) {
+            return false;
+        }
+
+        //Test for BIP341 leaf version and both parity options
+        return ((data[0] & 0xff) == 0xc0 || (data[0] & 0xff) == 0xc1);
     }
 
     public byte[] toByteArray() {
