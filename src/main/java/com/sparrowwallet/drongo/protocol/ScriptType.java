@@ -8,8 +8,6 @@ import com.sparrowwallet.drongo.crypto.ChildNumber;
 import com.sparrowwallet.drongo.crypto.ECKey;
 import com.sparrowwallet.drongo.policy.PolicyType;
 
-import java.time.LocalDate;
-import java.time.Month;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -1174,10 +1172,31 @@ public enum ScriptType {
         return Collections.unmodifiableList(copy);
     }
 
+    public static boolean derivationMatchesAnotherNetwork(String derivationPath) {
+        if(KeyDerivation.isValid(derivationPath)) {
+            List<ChildNumber> derivation = new ArrayList<>(KeyDerivation.parsePath(derivationPath));
+            if(derivation.size() > 1) {
+                int networkIndex = derivation.get(1).num();
+                return Network.get() == Network.MAINNET ? (networkIndex == 1) : (networkIndex == 0);
+            }
+        }
+
+        return false;
+    }
+
     public int getAccount(String derivationPath) {
+        return getAccount(derivationPath, false);
+    }
+
+    public int getAccount(String derivationPath, boolean ignoreNetwork) {
         if(KeyDerivation.isValid(derivationPath)) {
             List<ChildNumber> derivation = new ArrayList<>(KeyDerivation.parsePath(derivationPath));
             if(derivation.size() > 2) {
+                if(ignoreNetwork) {
+                    ChildNumber networkChildNumber = new ChildNumber(Network.get() == Network.MAINNET ? 0 : 1, true);
+                    derivation.set(1, networkChildNumber);
+                }
+
                 int account = derivation.get(2).num();
                 List<ChildNumber> defaultDerivation = getDefaultDerivation(account);
                 if(defaultDerivation.equals(derivation)) {

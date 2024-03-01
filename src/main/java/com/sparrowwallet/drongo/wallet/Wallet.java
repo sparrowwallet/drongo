@@ -26,6 +26,7 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
     public static final int DEFAULT_LOOKAHEAD = 20;
     public static final int SEARCH_LOOKAHEAD = 4000;
     public static final String ALLOW_DERIVATIONS_MATCHING_OTHER_SCRIPT_TYPES_PROPERTY = "com.sparrowwallet.allowDerivationsMatchingOtherScriptTypes";
+    public static final String ALLOW_DERIVATIONS_MATCHING_OTHER_NETWORKS_PROPERTY = "com.sparrowwallet.allowDerivationsMatchingOtherNetworks";
 
     private String name;
     private String label;
@@ -1773,6 +1774,10 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
             if(derivationMatchesAnotherScriptType(keystore.getKeyDerivation().getDerivationPath())) {
                 throw new InvalidWalletException("Keystore " + keystore.getLabel() + " derivation of " + keystore.getKeyDerivation().getDerivationPath() + " in " + scriptType.getName() + " wallet matches another default script type.");
             }
+
+            if(derivationMatchesAnotherNetwork(keystore.getKeyDerivation().getDerivationPath())) {
+                throw new InvalidWalletException("Keystore " + keystore.getLabel() + " derivation of " + keystore.getKeyDerivation().getDerivationPath() + " in " + scriptType.getName() + " wallet matches another network.");
+            }
         }
 
         if(containsDuplicateExtendedKeys()) {
@@ -1789,7 +1794,19 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
             return false;
         }
 
-        return Arrays.stream(ScriptType.values()).anyMatch(scriptType -> !scriptType.equals(this.scriptType) && scriptType.getAccount(derivationPath) > -1);
+        return Arrays.stream(ScriptType.values()).anyMatch(scriptType -> !scriptType.equals(this.scriptType) && scriptType.getAccount(derivationPath, true) > -1);
+    }
+
+    public boolean derivationMatchesAnotherNetwork(String derivationPath) {
+        if(Boolean.TRUE.toString().equals(System.getProperty(ALLOW_DERIVATIONS_MATCHING_OTHER_NETWORKS_PROPERTY))) {
+            return false;
+        }
+
+        if(scriptType != null && scriptType.getAccount(derivationPath, true) > -1) {
+            return ScriptType.derivationMatchesAnotherNetwork(derivationPath);
+        }
+
+        return false;
     }
 
     public boolean containsDuplicateKeystoreLabels() {
