@@ -75,8 +75,10 @@ public class PGPUtils {
                     if(subkeyIdentifier != null) {
                         PGPPublicKey signedByKey = null;
                         long primaryKeyId = subkeyIdentifier.getPrimaryKeyId();
+                        boolean userProvidedKey = false;
                         if(publicKeyRing != null && publicKeyRing.getPublicKey(primaryKeyId) != null) {
                             signedByKey = publicKeyRing.getPublicKey(primaryKeyId);
+                            userProvidedKey = true;
                             log.debug("Signed using provided public key");
                         } else if(appPgpPublicKeyRingCollection != null && appPgpPublicKeyRingCollection.getPublicKey(primaryKeyId) != null
                                 && !isExpired(appPgpPublicKeyRingCollection.getPublicKey(primaryKeyId))) {
@@ -102,7 +104,7 @@ public class PGPUtils {
                             expired = isExpired(signedByKey);
                         }
 
-                        return new PGPVerificationResult(primaryKeyId, userId, signatureVerification.getSignature().getCreationTime(), expired);
+                        return new PGPVerificationResult(primaryKeyId, userId, signatureVerification.getSignature().getCreationTime(), expired, userProvidedKey);
                     }
                 }
             }
