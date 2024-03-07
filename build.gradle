@@ -75,4 +75,5 @@ extraJavaModuleInfo {
         requires('org.bouncycastle.pg')
         requires('org.slf4j')
     }
+    module('jsr305-3.0.2.jar', 'com.google.code.findbugs.jsr305', '3.0.2')
 }
