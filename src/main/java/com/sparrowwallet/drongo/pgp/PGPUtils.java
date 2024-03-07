@@ -98,7 +98,8 @@ public class PGPUtils {
                             log.debug("Could not find public key for primary key id " + primaryKeyId);
                         }
 
-                        String userId = subkeyIdentifier.getPrimaryKeyFingerprint().prettyPrint();
+                        String fingerprint = subkeyIdentifier.getPrimaryKeyFingerprint().prettyPrint();
+                        String userId = fingerprint;
                         boolean expired = false;
                         if(signedByKey != null) {
                             Iterator<String> userIds = signedByKey.getUserIDs();
@@ -108,7 +109,7 @@ public class PGPUtils {
                             expired = isExpired(signedByKey);
                         }
 
-                        return new PGPVerificationResult(primaryKeyId, userId, signatureVerification.getSignature().getCreationTime(), expired, keySource);
+                        return new PGPVerificationResult(primaryKeyId, userId, fingerprint, signatureVerification.getSignature().getCreationTime(), expired, keySource);
                     }
                 }
             }
