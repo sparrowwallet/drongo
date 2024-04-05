@@ -30,6 +30,20 @@ public class SeedQR {
         return new DeterministicSeed(words, null, System.currentTimeMillis(), DeterministicSeed.Type.BIP39);
     }
 
+    public static String getSeedQR(DeterministicSeed seed) {
+        if(seed.isEncrypted()) {
+            throw new IllegalStateException("Seed cannot be encrypted");
+        }
+
+        StringBuilder builder = new StringBuilder();
+        for(String word : seed.getMnemonicCode()) {
+            int index = Bip39MnemonicCode.INSTANCE.getWordList().indexOf(word);
+            builder.append(String.format("%04d", index));
+        }
+
+        return builder.toString();
+    }
+
     public static DeterministicSeed getSeed(byte[] compactSeedQr) {
         byte[] seed;
 
