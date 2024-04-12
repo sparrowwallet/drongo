@@ -1461,6 +1461,10 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
         return isValid() && !getSigningNodes(psbt).isEmpty();
     }
 
+    public boolean canSignAllInputs(PSBT psbt) {
+        return isValid() && getSigningNodes(psbt).size() == psbt.getPsbtInputs().size();
+    }
+
     /**
      * Determines which nodes in this wallet can sign which inputs in the provided PSBT
      *
