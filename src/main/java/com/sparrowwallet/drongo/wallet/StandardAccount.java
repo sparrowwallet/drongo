@@ -42,7 +42,7 @@ public enum StandardAccount {
     WHIRLPOOL_BADBANK("Badbank", new ChildNumber(2147483644, true), ScriptType.P2WPKH, null);
 
     public static final List<StandardAccount> DISCOVERY_ACCOUNTS = List.of(ACCOUNT_0, ACCOUNT_1, ACCOUNT_2, ACCOUNT_3, ACCOUNT_4, ACCOUNT_5, ACCOUNT_6, ACCOUNT_7, ACCOUNT_8, ACCOUNT_9, WHIRLPOOL_PREMIX, WHIRLPOOL_POSTMIX, WHIRLPOOL_BADBANK);
-    public static final List<StandardAccount> MIXABLE_ACCOUNTS = List.of(ACCOUNT_0, WHIRLPOOL_BADBANK);
+    public static final List<StandardAccount> MIXABLE_ACCOUNTS = List.of(ACCOUNT_0, WHIRLPOOL_POSTMIX, WHIRLPOOL_BADBANK);
     public static final List<StandardAccount> WHIRLPOOL_ACCOUNTS = List.of(WHIRLPOOL_PREMIX, WHIRLPOOL_POSTMIX, WHIRLPOOL_BADBANK);
     public static final List<StandardAccount> WHIRLPOOL_MIX_ACCOUNTS = List.of(WHIRLPOOL_PREMIX, WHIRLPOOL_POSTMIX);
 
