@@ -25,7 +25,7 @@ public class OutputDescriptor {
     private static final Pattern XPUB_PATTERN = Pattern.compile("(\\[[^\\]]+\\])?(.(?:pub|prv)[^/\\,)]{100,112})(/[/\\d*'hH<>;]+)?");
     private static final Pattern PUBKEY_PATTERN = Pattern.compile("(\\[[^\\]]+\\])?(0[23][0-9a-fA-F]{32})");
     private static final Pattern MULTI_PATTERN = Pattern.compile("multi\\(([\\d+])");
-    private static final Pattern KEY_ORIGIN_PATTERN = Pattern.compile("\\[([A-Fa-f0-9]{8})([/\\d'hH]+)\\]");
+    private static final Pattern KEY_ORIGIN_PATTERN = Pattern.compile("\\[([A-Fa-f0-9]{8})?([/\\d'hH]+)\\]");
     private static final Pattern MULTIPATH_PATTERN = Pattern.compile("<([\\d*'hH;]+)>");
     private static final Pattern CHECKSUM_PATTERN = Pattern.compile("#([" + CHECKSUM_CHARSET + "]{8})$");
 
@@ -414,7 +414,7 @@ public class OutputDescriptor {
                 String keyOrigin = matcher.group(1);
                 Matcher keyOriginMatcher = KEY_ORIGIN_PATTERN.matcher(keyOrigin);
                 if(keyOriginMatcher.matches()) {
-                    byte[] masterFingerprintBytes = Utils.hexToBytes(keyOriginMatcher.group(1));
+                    byte[] masterFingerprintBytes = keyOriginMatcher.group(1) != null ? Utils.hexToBytes(keyOriginMatcher.group(1)) : new byte[4];
                     if(masterFingerprintBytes.length != 4) {
                         throw new IllegalArgumentException("Master fingerprint must be 4 bytes: " + Utils.bytesToHex(masterFingerprintBytes));
                     }
