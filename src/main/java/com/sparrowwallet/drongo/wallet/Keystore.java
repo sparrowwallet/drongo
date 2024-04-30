@@ -242,6 +242,24 @@ public class Keystore extends Persistable {
         return getKeyDerivation().extend(keyPurpose.getPathIndex()).extend(new ChildNumber(keyIndex));
     }
 
+    public ECKey getPubKeyForDerivation(KeyDerivation keyDerivation) {
+        if(keyDerivation != null) {
+            List<ChildNumber> derivation = keyDerivation.getDerivation();
+            if(derivation.size() > this.keyDerivation.getDerivation().size()) {
+                List<ChildNumber> xpubDerivation = derivation.subList(0, this.keyDerivation.getDerivation().size());
+                if(xpubDerivation.equals(this.keyDerivation.getDerivation())) {
+                    derivation = derivation.subList(this.keyDerivation.getDerivation().size(), derivation.size());
+                }
+            }
+
+            if(derivation.size() == 2) {
+                return getPubKey(new WalletNode(KeyDerivation.writePath(derivation)));
+            }
+        }
+
+        return null;
+    }
+
     public boolean isValid() {
         try {
             checkKeystore();

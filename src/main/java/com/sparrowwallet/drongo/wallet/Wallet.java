@@ -1490,13 +1490,24 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
         return signingNodes;
     }
 
-    public List<Keystore> getSigningKeystores(PSBT psbt) {
-        List<Keystore> signingKeystores = new ArrayList<>();
+    public Collection<Keystore> getSigningKeystores(PSBT psbt) {
+        Set<Keystore> signingKeystores = new LinkedHashSet<>();
 
         for(Map.Entry<ExtendedKey, KeyDerivation> entry : psbt.getExtendedPublicKeys().entrySet()) {
             for(Keystore keystore : getKeystores()) {
                 if(entry.getKey().equals(keystore.getExtendedPublicKey()) && entry.getValue().equals(keystore.getKeyDerivation())) {
                     signingKeystores.add(keystore);
+                }
+            }
+        }
+
+        for(PSBTInput psbtInput : psbt.getPsbtInputs()) {
+            for(Map.Entry<ECKey, KeyDerivation> entry : psbtInput.getDerivedPublicKeys().entrySet()) {
+                for(Keystore keystore : getKeystores().stream().filter(k -> !signingKeystores.contains(k)).toList()) {
+                    ECKey derivedKey = keystore.getPubKeyForDerivation(entry.getValue());
+                    if(derivedKey != null && Arrays.equals(entry.getKey().getPubKey(), derivedKey.getPubKey())) {
+                        signingKeystores.add(keystore);
+                    }
                 }
             }
         }
