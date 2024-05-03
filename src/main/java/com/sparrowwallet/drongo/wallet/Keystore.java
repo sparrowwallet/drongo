@@ -13,6 +13,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 public class Keystore extends Persistable {
@@ -252,7 +253,7 @@ public class Keystore extends Persistable {
                 }
             }
 
-            if(derivation.size() == 2) {
+            if(derivation.size() == 2 && KeyPurpose.fromChildNumber(derivation.get(0)) != null) {
                 return getPubKey(new WalletNode(KeyDerivation.writePath(derivation)));
             }
         }
