@@ -246,14 +246,16 @@ public class Keystore extends Persistable {
     public ECKey getPubKeyForDerivation(KeyDerivation keyDerivation) {
         if(keyDerivation != null) {
             List<ChildNumber> derivation = keyDerivation.getDerivation();
+            String fingerprint = Utils.bytesToHex(this.extendedPublicKey.getKey().getFingerprint());
             if(derivation.size() > this.keyDerivation.getDerivation().size()) {
                 List<ChildNumber> xpubDerivation = derivation.subList(0, this.keyDerivation.getDerivation().size());
                 if(xpubDerivation.equals(this.keyDerivation.getDerivation())) {
                     derivation = derivation.subList(this.keyDerivation.getDerivation().size(), derivation.size());
+                    fingerprint = this.keyDerivation.getMasterFingerprint();
                 }
             }
 
-            if(derivation.size() == 2 && KeyPurpose.fromChildNumber(derivation.get(0)) != null) {
+            if(derivation.size() == 2 && KeyPurpose.fromChildNumber(derivation.get(0)) != null && fingerprint.equals(keyDerivation.getMasterFingerprint())) {
                 return getPubKey(new WalletNode(KeyDerivation.writePath(derivation)));
             }
         }
