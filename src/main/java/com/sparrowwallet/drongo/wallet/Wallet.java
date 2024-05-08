@@ -32,7 +32,7 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
     private String label;
     private Wallet masterWallet;
     private List<Wallet> childWallets = new ArrayList<>();
-    private Network network = Network.get();
+    private Network network = Network.getCanonical();
     private PolicyType policyType;
     private ScriptType scriptType;
     private Policy defaultPolicy;

@@ -3,15 +3,19 @@ package com.sparrowwallet.drongo;
 import java.util.Locale;
 
 public enum Network {
-    MAINNET("mainnet", 0, "1", 5, "3", "bc", ExtendedKey.Header.xprv, ExtendedKey.Header.xpub, 128, 8332),
-    TESTNET("testnet", 111, "mn", 196, "2", "tb", ExtendedKey.Header.tprv, ExtendedKey.Header.tpub, 239, 18332),
-    REGTEST("regtest", 111, "mn", 196, "2", "bcrt", ExtendedKey.Header.tprv, ExtendedKey.Header.tpub, 239, 18443),
-    SIGNET("signet", 111, "mn", 196, "2", "tb", ExtendedKey.Header.tprv, ExtendedKey.Header.tpub, 239, 38332);
+    MAINNET("mainnet", "Mainnet", "mainnet", 0, "1", 5, "3", "bc", ExtendedKey.Header.xprv, ExtendedKey.Header.xpub, 128, 8332),
+    TESTNET("testnet", "Testnet3", "testnet3", 111, "mn", 196, "2", "tb", ExtendedKey.Header.tprv, ExtendedKey.Header.tpub, 239, 18332),
+    REGTEST("regtest", "Regtest", "regtest", 111, "mn", 196, "2", "bcrt", ExtendedKey.Header.tprv, ExtendedKey.Header.tpub, 239, 18443),
+    SIGNET("signet", "Signet", "signet", 111, "mn", 196, "2", "tb", ExtendedKey.Header.tprv, ExtendedKey.Header.tpub, 239, 38332),
+    TESTNET4("testnet4", "Testnet4", "testnet4", 111, "mn", 196, "2", "tb", ExtendedKey.Header.tprv, ExtendedKey.Header.tpub, 239, 48332);
 
     public static final String BLOCK_HEIGHT_PROPERTY = "com.sparrowwallet.blockHeight";
+    private static final Network[] CANONICAL_VALUES = new Network[]{MAINNET, TESTNET, REGTEST, SIGNET};
 
-    Network(String name, int p2pkhAddressHeader, String p2pkhAddressPrefix, int p2shAddressHeader, String p2shAddressPrefix, String bech32AddressHrp, ExtendedKey.Header xprvHeader, ExtendedKey.Header xpubHeader, int dumpedPrivateKeyHeader, int defaultPort) {
+    Network(String name, String displayName, String home, int p2pkhAddressHeader, String p2pkhAddressPrefix, int p2shAddressHeader, String p2shAddressPrefix, String bech32AddressHrp, ExtendedKey.Header xprvHeader, ExtendedKey.Header xpubHeader, int dumpedPrivateKeyHeader, int defaultPort) {
         this.name = name;
+        this.displayName = displayName;
+        this.home = home;
         this.p2pkhAddressHeader = p2pkhAddressHeader;
         this.p2pkhAddressPrefix = p2pkhAddressPrefix;
         this.p2shAddressHeader = p2shAddressHeader;
@@ -24,6 +28,8 @@ public enum Network {
     }
 
     private final String name;
+    private final String displayName;
+    private final String home;
     private final int p2pkhAddressHeader;
     private final String p2pkhAddressPrefix;
     private final int p2shAddressHeader;
@@ -40,8 +46,16 @@ public enum Network {
         return name;
     }
 
-    public String toDisplayString() {
+    public String getCapitalizedName() {
         return name.substring(0, 1).toUpperCase(Locale.ROOT) + name.substring(1);
+    }
+
+    public String toDisplayString() {
+        return displayName;
+    }
+
+    public String getHome() {
+        return home;
     }
 
     public int getP2PKHAddressHeader() {
@@ -92,6 +106,14 @@ public enum Network {
         }
 
         return currentNetwork;
+    }
+
+    public static Network getCanonical() {
+        return get() == TESTNET4 ? TESTNET : get();
+    }
+
+    public static Network[] canonicalValues() {
+        return CANONICAL_VALUES;
     }
 
     public static void set(Network network) {

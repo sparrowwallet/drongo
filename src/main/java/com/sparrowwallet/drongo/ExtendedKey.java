@@ -80,7 +80,7 @@ public class ExtendedKey {
         int headerInt = buffer.getInt();
         Header header = Header.getHeader(headerInt);
         if(header == null) {
-            throw new IllegalArgumentException("Unknown header bytes for extended key on " + Network.get().getName() + ": " + DeterministicKey.toBase58(serializedKey).substring(0, 4));
+            throw new IllegalArgumentException("Unknown header bytes for extended key on " + Network.getCanonical().getName() + ": " + DeterministicKey.toBase58(serializedKey).substring(0, 4));
         }
 
         int depth = buffer.get() & 0xFF; // convert signed byte to positive int since depth cannot be negative
@@ -206,7 +206,9 @@ public class ExtendedKey {
         }
 
         public static List<Header> getHeaders(Network network) {
-            return Arrays.stream(Header.values()).filter(header -> header.getNetwork() == network || (header.getNetwork() == Network.TESTNET && network == Network.REGTEST) || (header.getNetwork() == Network.TESTNET && network == Network.SIGNET)).collect(Collectors.toList());
+            return Arrays.stream(Header.values())
+                    .filter(header -> header.getNetwork() == network || (header.getNetwork() == Network.TESTNET && network == Network.REGTEST) || (header.getNetwork() == Network.TESTNET && network == Network.SIGNET) || (header.getNetwork() == Network.TESTNET && network == Network.TESTNET4))
+                    .collect(Collectors.toList());
         }
 
         public static Header fromExtendedKey(String xkey) {
@@ -219,12 +221,12 @@ public class ExtendedKey {
             for(Network network : getOtherNetworks(Network.get())) {
                 for(Header otherNetworkKeyHeader : getHeaders(network)) {
                     if(xkey.startsWith(otherNetworkKeyHeader.name)) {
-                        throw new IllegalArgumentException("Provided " + otherNetworkKeyHeader.name + " extended key invalid on configured " + Network.get().getName() + " network. Use a " + network.getName() + " configuration to use this extended key.");
+                        throw new IllegalArgumentException("Provided " + otherNetworkKeyHeader.name + " extended key invalid on configured " + Network.getCanonical().getName() + " network. Use a " + network.getName() + " configuration to use this extended key.");
                     }
                 }
             }
 
-            throw new IllegalArgumentException("Unrecognised extended key header for " + Network.get().getName() + ": " + xkey);
+            throw new IllegalArgumentException("Unrecognised extended key header for " + Network.getCanonical().getName() + ": " + xkey);
         }
 
         public static Header fromScriptType(ScriptType scriptType, boolean privateKey) {
@@ -247,7 +249,7 @@ public class ExtendedKey {
             for(Network otherNetwork : getOtherNetworks(Network.get())) {
                 for(Header otherNetworkKeyHeader : getHeaders(otherNetwork)) {
                     if(header == otherNetworkKeyHeader.header) {
-                        throw new IllegalArgumentException("Provided " + otherNetworkKeyHeader.name + " extended key invalid on configured " + Network.get().getName() + " network. Use a " + otherNetwork.getName() + " configuration to use this extended key.");
+                        throw new IllegalArgumentException("Provided " + otherNetworkKeyHeader.name + " extended key invalid on configured " + Network.getCanonical().getName() + " network. Use a " + otherNetwork.getName() + " configuration to use this extended key.");
                     }
                 }
             }
@@ -256,7 +258,7 @@ public class ExtendedKey {
         }
 
         private static List<Network> getOtherNetworks(Network providedNetwork) {
-            return Arrays.stream(Network.values()).filter(network -> network != providedNetwork).collect(Collectors.toList());
+            return Arrays.stream(Network.canonicalValues()).filter(network -> network != providedNetwork).collect(Collectors.toList());
         }
     }
 }

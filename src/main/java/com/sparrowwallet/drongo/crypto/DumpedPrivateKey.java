@@ -48,7 +48,7 @@ public class DumpedPrivateKey extends VersionedChecksummedBytes {
     private DumpedPrivateKey(String encoded) {
         super(encoded);
         if(version != Network.get().getDumpedPrivateKeyHeader())
-            throw new IllegalArgumentException("Invalid version " + version + " for network " + Network.get());
+            throw new IllegalArgumentException("Invalid version " + version + " for network " + Network.getCanonical());
         if(bytes.length == 33 && bytes[32] == 1) {
             compressed = true;
             bytes = Arrays.copyOf(bytes, 32);  // Chop off the additional marker byte.

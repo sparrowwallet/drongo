@@ -70,11 +70,11 @@ public abstract class Address {
         try {
             return fromString(Network.get(), address);
         } catch(InvalidAddressException e) {
-            for(Network network : Network.values()) {
+            for(Network network : Network.canonicalValues()) {
                 try {
                     fromString(network, address);
-                    if(network != Network.get()) {
-                        throw new InvalidAddressException("Provided " + network.getName() + " address invalid on configured " + Network.get().getName() + " network: " + address + ". Use a " + network.getName() + " configuration to use this address.");
+                    if(network != Network.getCanonical()) {
+                        throw new InvalidAddressException("Provided " + network.getName() + " address invalid on configured " + Network.getCanonical().getName() + " network: " + address + ". Use a " + network.getName() + " configuration to use this address.");
                     }
                 } catch(InvalidAddressException i) {
                     //ignore
