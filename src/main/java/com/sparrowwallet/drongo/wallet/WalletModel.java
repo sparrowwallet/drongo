@@ -115,6 +115,30 @@ public enum WalletModel {
         }
     }
 
+    public boolean showLegacyQR() {
+        if(this == COBO_VAULT) {
+            return true;
+        } else {
+            return false;
+        }
+    }
+
+    public boolean showBbqr() {
+        if(this == COLDCARD || this == SPARROW) {
+            return true;
+        } else {
+            return false;
+        }
+    }
+
+    public boolean selectBbqr() {
+        if(this == COLDCARD) {
+            return true;
+        } else {
+            return false;
+        }
+    }
+
     public static WalletModel fromType(String type) {
         for(WalletModel model : values()) {
             if(model.getType().equalsIgnoreCase(type)) {
