@@ -75,6 +75,11 @@ public enum WalletModel {
         return (this == TAPSIGNER || this == SATSCHIP || this == SATSCARD || this == SATOCHIP);
     }
 
+    public boolean hasUsb() {
+        return (this == TREZOR_1 || this == TREZOR_T || this == TREZOR_SAFE_3 || this == LEDGER_NANO_S || this == LEDGER_NANO_X || this == LEDGER_NANO_S_PLUS ||
+                this == DIGITALBITBOX_01 || this == BITBOX_02 || this == COLDCARD || this == KEEPKEY || this == JADE);
+    }
+
     public int getMinPinLength() {
         if(this == SATOCHIP) {
             return 4;
