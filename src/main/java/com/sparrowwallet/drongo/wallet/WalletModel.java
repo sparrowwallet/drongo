@@ -129,7 +129,7 @@ public enum WalletModel {
     }
 
     public boolean showBbqr() {
-        if(this == COLDCARD || this == SPARROW) {
+        if(this == COLDCARD || this == SPARROW || this == KRUX) {
             return true;
         } else {
             return false;
