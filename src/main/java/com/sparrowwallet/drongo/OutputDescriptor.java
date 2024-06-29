@@ -25,7 +25,7 @@ public class OutputDescriptor {
     private static final Pattern XPUB_PATTERN = Pattern.compile("(\\[[^\\]]+\\])?(.(?:pub|prv)[^/\\,)]{100,112})(/[/\\d*'hH<>;]+)?");
     private static final Pattern PUBKEY_PATTERN = Pattern.compile("(\\[[^\\]]+\\])?(0[23][0-9a-fA-F]{32})");
     private static final Pattern MULTI_PATTERN = Pattern.compile("multi\\((\\d+)");
-    private static final Pattern KEY_ORIGIN_PATTERN = Pattern.compile("\\[([A-Fa-f0-9]{8})?([/\\d'hH]+)\\]");
+    private static final Pattern KEY_ORIGIN_PATTERN = Pattern.compile("\\[([A-Fa-f0-9]{8})([/\\d'hH]+)?\\]");
     private static final Pattern MULTIPATH_PATTERN = Pattern.compile("<([\\d*'hH;]+)>");
     private static final Pattern CHECKSUM_PATTERN = Pattern.compile("#([" + CHECKSUM_CHARSET + "]{8})$");
 
@@ -624,13 +624,12 @@ public class OutputDescriptor {
 
     public static String writeKey(ExtendedKey pubKey, KeyDerivation keyDerivation, String childDerivation, boolean addKeyOrigin, boolean addKey) {
         StringBuilder keyBuilder = new StringBuilder();
-        if(keyDerivation != null && keyDerivation.getDerivationPath() != null && addKeyOrigin) {
+        if(keyDerivation != null && keyDerivation.getMasterFingerprint() != null && keyDerivation.getMasterFingerprint().length() == 8 && Utils.isHex(keyDerivation.getMasterFingerprint()) && addKeyOrigin) {
             keyBuilder.append("[");
-            if(keyDerivation.getMasterFingerprint() != null) {
-                keyBuilder.append(keyDerivation.getMasterFingerprint());
-                keyBuilder.append("/");
+            keyBuilder.append(keyDerivation.getMasterFingerprint());
+            if(!keyDerivation.getDerivation().isEmpty()) {
+                keyBuilder.append(keyDerivation.getDerivationPath().replaceFirst("^m?/", "/").replace('\'', 'h'));
             }
-            keyBuilder.append(keyDerivation.getDerivationPath().replaceFirst("^m?/", "").replace('\'', 'h'));
             keyBuilder.append("]");
         }
 
