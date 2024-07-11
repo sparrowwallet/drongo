@@ -314,6 +314,13 @@ public class PSBTTest {
     }
 
     @Test
+    public void largeKeyType() throws PSBTParseException {
+        String psbt = "cHNidP8BAD8CAAAAAf//////////////////////////////////////////AAAAAAD/////AQAAAAAAAAAAA2oBAAAAAAAF/v//AAAAAAAA";
+        PSBT psbt1 = PSBT.fromString(psbt);
+        Assertions.assertEquals("cHNidP8BAD8CAAAAAf//////////////////////////////////////////AAAAAAD/////AQAAAAAAAAAAA2oBAAAAAAAAAAA=", psbt1.toBase64String());
+    }
+
+    @Test
     public void creatorBip() throws PSBTParseException {
         Transaction transaction = new Transaction();
         transaction.setVersion(2);

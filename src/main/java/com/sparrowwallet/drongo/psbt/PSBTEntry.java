@@ -16,11 +16,11 @@ import java.util.Map;
 
 public class PSBTEntry {
     private final byte[] key;
-    private final byte keyType;
+    private final int keyType;
     private final byte[] keyData;
     private final byte[] data;
 
-    public PSBTEntry(byte[] key, byte keyType, byte[] keyData, byte[] data) {
+    public PSBTEntry(byte[] key, int keyType, byte[] keyData, byte[] data) {
         this.key = key;
         this.keyType = keyType;
         this.keyData = keyData;
@@ -39,12 +39,13 @@ public class PSBTEntry {
             byte[] key = new byte[keyLen];
             psbtByteBuffer.get(key);
 
-            byte keyType = key[0];
+            ByteBuffer keyBuf = ByteBuffer.wrap(key);
+            int keyType = readCompactInt(keyBuf);
 
             byte[] keyData = null;
-            if (key.length > 1) {
-                keyData = new byte[key.length - 1];
-                System.arraycopy(key, 1, keyData, 0, keyData.length);
+            if(keyBuf.hasRemaining()) {
+                keyData = new byte[keyBuf.remaining()];
+                keyBuf.get(keyData);
             }
 
             int dataLen = readCompactInt(psbtByteBuffer);
@@ -143,21 +144,19 @@ public class PSBTEntry {
         return baos.toByteArray();
     }
 
-    static PSBTEntry populateEntry(byte type, byte[] keydata, byte[] data) {
-        return new PSBTEntry(new byte[] {type}, type, keydata, data);
-    }
-
-    void serializeToStream(ByteArrayOutputStream baos) {
-        int keyLen = 1;
-        if(keyData != null) {
-            keyLen += keyData.length;
-        }
-
-        baos.writeBytes(writeCompactInt(keyLen));
-        baos.writeBytes(key);
+    static PSBTEntry populateEntry(int type, byte[] keyData, byte[] data) {
+        ByteArrayOutputStream baos = new ByteArrayOutputStream(1 + (keyData == null ? 0 : keyData.length));
+        baos.writeBytes(writeCompactInt(type));
         if(keyData != null) {
             baos.writeBytes(keyData);
         }
+
+        return new PSBTEntry(baos.toByteArray(), type, keyData, data);
+    }
+
+    void serializeToStream(ByteArrayOutputStream baos) {
+        baos.writeBytes(writeCompactInt(key.length));
+        baos.writeBytes(key);
 
         baos.writeBytes(writeCompactInt(data.length));
         baos.writeBytes(data);
@@ -167,7 +166,7 @@ public class PSBTEntry {
         return key;
     }
 
-    public byte getKeyType() {
+    public int getKeyType() {
         return keyType;
     }
 
