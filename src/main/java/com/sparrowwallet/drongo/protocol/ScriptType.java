@@ -413,7 +413,7 @@ public enum ScriptType {
                 throw new ProtocolException("Provided scriptPubKey is not a " + getName() + " script");
             }
 
-            List<TransactionSignature> signatures = pubKeySignatures.values().stream().filter(Objects::nonNull).collect(Collectors.toList());
+            List<TransactionSignature> signatures = pubKeySignatures.values().stream().filter(Objects::nonNull).limit(threshold).collect(Collectors.toList());
             if(signatures.size() < threshold) {
                 throw new ProtocolException("Only " + signatures.size() + " signatures provided to meet a multisig threshold of " + threshold);
             }
@@ -775,7 +775,7 @@ public enum ScriptType {
         public TransactionInput addMultisigSpendingInput(Transaction transaction, TransactionOutput prevOutput, int threshold, Map<ECKey, TransactionSignature> pubKeySignatures) {
             Script scriptSig = getMultisigScriptSig(prevOutput.getScript(), threshold, pubKeySignatures);
             Script witnessScript = MULTISIG.getOutputScript(threshold, pubKeySignatures.keySet());
-            TransactionWitness witness = new TransactionWitness(transaction, pubKeySignatures.values().stream().filter(Objects::nonNull).collect(Collectors.toList()), witnessScript);
+            TransactionWitness witness = new TransactionWitness(transaction, pubKeySignatures.values().stream().filter(Objects::nonNull).limit(threshold).collect(Collectors.toList()), witnessScript);
             return transaction.addInput(prevOutput.getHash(), prevOutput.getIndex(), scriptSig, witness);
         }
 
@@ -1001,7 +1001,7 @@ public enum ScriptType {
         public TransactionInput addMultisigSpendingInput(Transaction transaction, TransactionOutput prevOutput, int threshold, Map<ECKey, TransactionSignature> pubKeySignatures) {
             Script scriptSig = getMultisigScriptSig(prevOutput.getScript(), threshold, pubKeySignatures);
             Script witnessScript = MULTISIG.getOutputScript(threshold, pubKeySignatures.keySet());
-            TransactionWitness witness = new TransactionWitness(transaction, pubKeySignatures.values().stream().filter(Objects::nonNull).collect(Collectors.toList()), witnessScript);
+            TransactionWitness witness = new TransactionWitness(transaction, pubKeySignatures.values().stream().filter(Objects::nonNull).limit(threshold).collect(Collectors.toList()), witnessScript);
             return transaction.addInput(prevOutput.getHash(), prevOutput.getIndex(), scriptSig, witness);
         }
 
