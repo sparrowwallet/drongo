@@ -5,14 +5,14 @@ import java.util.Locale;
 public enum WalletModel {
     SEED, SPARROW, BITCOIN_CORE, ELECTRUM, TREZOR_1, TREZOR_T, COLDCARD, LEDGER_NANO_S, LEDGER_NANO_X, DIGITALBITBOX_01, KEEPKEY, SPECTER_DESKTOP, COBO_VAULT,
     BITBOX_02, SPECTER_DIY, PASSPORT, BLUE_WALLET, KEYSTONE, SEEDSIGNER, CARAVAN, GORDIAN_SEED_TOOL, JADE, LEDGER_NANO_S_PLUS, EPS, TAPSIGNER, SATSCARD, LABELS,
-    BSMS, KRUX, SATOCHIP, TRANSACTIONS, AIRGAP_VAULT, TREZOR_SAFE_3, SATSCHIP, SAMOURAI;
+    BSMS, KRUX, SATOCHIP, TRANSACTIONS, AIRGAP_VAULT, TREZOR_SAFE_3, SATSCHIP, SAMOURAI, TREZOR_SAFE_5;
 
     public static WalletModel getModel(String model) {
         return valueOf(model.toUpperCase(Locale.ROOT));
     }
 
     public String getType() {
-        if(this == TREZOR_1 || this == TREZOR_T || this == TREZOR_SAFE_3) {
+        if(this == TREZOR_1 || this == TREZOR_T || this == TREZOR_SAFE_3 || this == TREZOR_SAFE_5) {
             return "trezor";
         }
 
@@ -76,7 +76,7 @@ public enum WalletModel {
     }
 
     public boolean hasUsb() {
-        return (this == TREZOR_1 || this == TREZOR_T || this == TREZOR_SAFE_3 || this == LEDGER_NANO_S || this == LEDGER_NANO_X || this == LEDGER_NANO_S_PLUS ||
+        return (this == TREZOR_1 || this == TREZOR_T || this == TREZOR_SAFE_3 || this == TREZOR_SAFE_5 || this == LEDGER_NANO_S || this == LEDGER_NANO_X || this == LEDGER_NANO_S_PLUS ||
                 this == DIGITALBITBOX_01 || this == BITBOX_02 || this == COLDCARD || this == KEEPKEY || this == JADE);
     }
 
