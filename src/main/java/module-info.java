@@ -17,5 +17,6 @@ open module com.sparrowwallet.drongo {
     exports com.sparrowwallet.drongo.policy;
     exports com.sparrowwallet.drongo.uri;
     exports com.sparrowwallet.drongo.bip47;
+    exports com.sparrowwallet.drongo.wallet.slip39;
     exports org.bitcoin;
 }

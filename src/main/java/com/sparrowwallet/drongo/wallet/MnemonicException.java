@@ -1,20 +1,36 @@
 package com.sparrowwallet.drongo.wallet;
 
 public class MnemonicException extends Exception {
+    private final String title;
+
     public MnemonicException() {
         super();
+        this.title = null;
     }
 
-    public MnemonicException(String msg) {
-        super(msg);
+    public MnemonicException(String message) {
+        this(message, message);
+    }
+
+    public MnemonicException(String title, String message) {
+        super(message);
+        this.title = title;
+    }
+
+    public String getTitle() {
+        return title;
     }
 
     /**
      * Thrown when an argument to MnemonicCode is the wrong length.
      */
     public static class MnemonicLengthException extends MnemonicException {
-        public MnemonicLengthException(String msg) {
-            super(msg);
+        public MnemonicLengthException(String message) {
+            super(message);
+        }
+
+        public MnemonicLengthException(String title, String message) {
+            super(title, message);
         }
     }
 
@@ -24,6 +40,10 @@ public class MnemonicException extends Exception {
     public static class MnemonicChecksumException extends MnemonicException {
         public MnemonicChecksumException() {
             super();
+        }
+
+        public MnemonicChecksumException(String title, String message) {
+            super(title, message);
         }
     }
 

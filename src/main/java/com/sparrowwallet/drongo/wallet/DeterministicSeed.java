@@ -3,9 +3,11 @@ package com.sparrowwallet.drongo.wallet;
 import com.sparrowwallet.drongo.SecureString;
 import com.sparrowwallet.drongo.Utils;
 import com.sparrowwallet.drongo.crypto.*;
+import com.sparrowwallet.drongo.wallet.slip39.Slip39MnemonicCode;
 
 import java.security.SecureRandom;
 import java.util.*;
+import java.util.stream.Collectors;
 
 public class DeterministicSeed extends Persistable implements EncryptableItem {
     public static final int DEFAULT_SEED_ENTROPY_BITS = 128;
@@ -30,7 +32,7 @@ public class DeterministicSeed extends Persistable implements EncryptableItem {
     }
 
     public DeterministicSeed(List<String> mnemonic, boolean needsPassphrase, long creationTimeSeconds, Type type) {
-        this.mnemonicCode = mnemonic;
+        this.mnemonicCode = mnemonic.stream().map(type::lengthen).collect(Collectors.toList());
         this.encryptedMnemonicCode = null;
         this.needsPassphrase = needsPassphrase;
         this.creationTimeSeconds = creationTimeSeconds;
@@ -64,6 +66,10 @@ public class DeterministicSeed extends Persistable implements EncryptableItem {
      * @param creationTimeSeconds When the seed was originally created, UNIX time.
      */
     public DeterministicSeed(byte[] entropy, String passphrase, long creationTimeSeconds) {
+        this(entropy, passphrase, creationTimeSeconds, Type.BIP39);
+    }
+
+    public DeterministicSeed(byte[] entropy, String passphrase, long creationTimeSeconds, Type type) {
         if(entropy.length % 4 != 0) {
             throw new IllegalArgumentException("Entropy size in bits not divisible by 32");
         }
@@ -72,13 +78,17 @@ public class DeterministicSeed extends Persistable implements EncryptableItem {
             throw new IllegalArgumentException("Entropy size too small");
         }
 
+        if(entropy.length * 8 > MAX_SEED_ENTROPY_BITS) {
+            throw new IllegalArgumentException("Entropy size too large");
+        }
+
         if(passphrase == null) {
             passphrase = "";
         }
 
         try {
-            this.mnemonicCode = Bip39MnemonicCode.INSTANCE.toMnemonic(entropy);
-        } catch (MnemonicException.MnemonicLengthException e) {
+            this.mnemonicCode = type.getMnemonic(entropy, passphrase);
+        } catch(MnemonicException e) {
             // cannot happen
             throw new RuntimeException(e);
         }
@@ -86,7 +96,7 @@ public class DeterministicSeed extends Persistable implements EncryptableItem {
         this.needsPassphrase = needsPassphrase(passphrase);
         this.passphrase = new SecureString(passphrase);
         this.creationTimeSeconds = creationTimeSeconds;
-        this.type = Type.BIP39;
+        this.type = type;
     }
 
     private static boolean needsPassphrase(String passphrase) {
@@ -191,7 +201,7 @@ public class DeterministicSeed extends Persistable implements EncryptableItem {
     }
 
     private byte[] getMnemonicAsBytes() {
-        SecureString mnemonicString = getMnemonicString();
+        SecureString mnemonicString = getMnemonicString(true);
         if(mnemonicString == null) {
             return null;
         }
@@ -229,6 +239,7 @@ public class DeterministicSeed extends Persistable implements EncryptableItem {
         DeterministicSeed seed = new DeterministicSeed(mnemonic, needsPassphrase, creationTimeSeconds, type);
         seed.setId(getId());
         seed.setPassphrase(passphrase);
+        mnemonic.clear();
 
         return seed;
     }
@@ -289,10 +300,14 @@ public class DeterministicSeed extends Persistable implements EncryptableItem {
 
     /** Get the mnemonic code as string, or null if unknown. */
     public SecureString getMnemonicString() {
+        return getMnemonicString(false);
+    }
+
+    public SecureString getMnemonicString(boolean abbreviated) {
         StringBuilder builder = new StringBuilder();
         if(mnemonicCode != null) {
             for(String word : mnemonicCode) {
-                builder.append(word);
+                builder.append(abbreviated ? type.truncate(word) : word);
                 builder.append(' ');
             }
 
@@ -341,7 +356,7 @@ public class DeterministicSeed extends Persistable implements EncryptableItem {
         if(isEncrypted()) {
             seed = new DeterministicSeed(encryptedMnemonicCode.copy(), needsPassphrase, creationTimeSeconds, type);
         } else {
-            seed = new DeterministicSeed(new ArrayList<>(mnemonicCode), needsPassphrase, creationTimeSeconds, type);
+            seed = new DeterministicSeed(mnemonicCode, needsPassphrase, creationTimeSeconds, type);
         }
 
         seed.setId(getId());
@@ -362,6 +377,11 @@ public class DeterministicSeed extends Persistable implements EncryptableItem {
             public byte[] toSeed(List<String> mnemonicCode, String passphrase) {
                 return Bip39MnemonicCode.toSeed(mnemonicCode, passphrase);
             }
+
+            @Override
+            public List<String> getMnemonic(byte[] entropy, String passphrase) throws MnemonicException {
+                return Bip39MnemonicCode.INSTANCE.toMnemonic(entropy);
+            }
         },
         ELECTRUM("Mnemonic Words (Electrum Seed Version System)") {
             public byte[] getEntropyBytes(List<String> mnemonicCode) throws MnemonicException {
@@ -374,6 +394,39 @@ public class DeterministicSeed extends Persistable implements EncryptableItem {
 
             public byte[] toSeed(List<String> mnemonicCode, String passphrase) {
                 return ElectrumMnemonicCode.toSeed(mnemonicCode, passphrase);
+            }
+
+            @Override
+            public List<String> getMnemonic(byte[] entropy, String passphrase) throws MnemonicException {
+                throw new UnsupportedOperationException("Creation of Electrum seed mnemonics is not supported");
+            }
+        },
+        SLIP39("Mnemonic Words (SLIP39)") {
+            public byte[] getEntropyBytes(List<String> mnemonicCode) throws MnemonicException {
+                return toSeed(mnemonicCode, "");
+            }
+
+            public void check(List<String> mnemonicCode) throws MnemonicException {
+                getEntropyBytes(mnemonicCode);
+            }
+
+            public byte[] toSeed(List<String> mnemonicCode, String passphrase) throws MnemonicException {
+                return Slip39MnemonicCode.INSTANCE.toSeed(mnemonicCode, passphrase);
+            }
+
+            @Override
+            public List<String> getMnemonic(byte[] entropy, String passphrase) throws MnemonicException {
+                return Slip39MnemonicCode.INSTANCE.toSingleShareMnemonic(entropy, passphrase);
+            }
+
+            @Override
+            public String truncate(String word) {
+                return Slip39MnemonicCode.truncate(word);
+            }
+
+            @Override
+            public String lengthen(String abbreviation) {
+                return Slip39MnemonicCode.lengthen(abbreviation);
             }
         };
 
@@ -391,6 +444,16 @@ public class DeterministicSeed extends Persistable implements EncryptableItem {
 
         public abstract void check(List<String> mnemonicCode) throws MnemonicException;
 
-        public abstract byte[] toSeed(List<String> mnemonicCode, String passphrase);
+        public abstract byte[] toSeed(List<String> mnemonicCode, String passphrase) throws MnemonicException;
+
+        public abstract List<String> getMnemonic(byte[] entropy, String passphrase) throws MnemonicException;
+
+        public String truncate(String word) {
+            return word;
+        }
+
+        public String lengthen(String abbreviation) {
+            return abbreviation;
+        }
     }
 }
