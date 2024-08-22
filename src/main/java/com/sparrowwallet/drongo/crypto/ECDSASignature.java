@@ -1,12 +1,13 @@
 package com.sparrowwallet.drongo.crypto;
 
+import com.sparrowwallet.drongo.Utils;
 import com.sparrowwallet.drongo.protocol.SigHash;
 import com.sparrowwallet.drongo.protocol.SignatureDecodeException;
 import com.sparrowwallet.drongo.protocol.TransactionSignature;
 import com.sparrowwallet.drongo.protocol.VerificationException;
+import org.bitcoin.Secp256k1Context;
+import org.bitcoinj.secp.api.*;
 import org.bouncycastle.asn1.*;
-import org.bouncycastle.crypto.params.ECPublicKeyParameters;
-import org.bouncycastle.crypto.signers.ECDSASigner;
 import org.bouncycastle.util.Properties;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -131,15 +132,16 @@ public class ECDSASignature {
      * @param pub       The public key bytes to use.
      */
     public boolean verify(byte[] data, byte[] pub) {
-        ECDSASigner signer = new ECDSASigner();
-        ECPublicKeyParameters params = new ECPublicKeyParameters(CURVE.getCurve().decodePoint(pub), CURVE);
-        signer.init(false, params);
-        try {
-            return signer.verifySignature(data, r, s);
-        } catch (NullPointerException e) {
-            // Bouncy Castle contains a bug that can cause NPEs given specially crafted signatures. Those signatures
-            // are inherently invalid/attack sigs so we just fail them here rather than crash the thread.
-            log.error("Caught NPE inside bouncy castle", e);
+        if(!Secp256k1Context.isEnabled()) {
+            throw new IllegalStateException("libsecp256k1 is not enabled");
+        }
+
+        try(Secp256k1 secp = Secp256k1.get()) {
+            byte[] sigBytes = Utils.concat(Utils.bigIntegerToBytes(r, 32), Utils.bigIntegerToBytes(s, 32));
+            SignatureData sig = secp.ecdsaSignatureParseCompact(() -> sigBytes).get();
+            return secp.ecdsaVerify(sig, data, secp.ecPubKeyParse(() -> pub).get()).get();
+        } catch(Exception e) {
+            log.error("Error verifying ecdsa", e);
             return false;
         }
     }

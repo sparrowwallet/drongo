@@ -2,9 +2,8 @@ package com.sparrowwallet.drongo.crypto;
 
 import com.sparrowwallet.drongo.Utils;
 import com.sparrowwallet.drongo.protocol.*;
-import org.bitcoin.NativeSecp256k1;
-import org.bitcoin.NativeSecp256k1Util;
 import org.bitcoin.Secp256k1Context;
+import org.bitcoinj.secp.api.*;
 import org.bouncycastle.asn1.*;
 import org.bouncycastle.asn1.x9.X9ECParameters;
 import org.bouncycastle.asn1.x9.X9IntegerConverter;
@@ -280,11 +279,11 @@ public class ECKey {
         }
 
         if(Secp256k1Context.isEnabled()) {
-            try {
-                byte[] pubKeyBytes = NativeSecp256k1.computePubkey(Utils.bigIntegerToBytes(privKey, 32), false);
-                LazyECPoint lazyECPoint = new LazyECPoint(CURVE.getCurve(), pubKeyBytes);
+            try(Secp256k1 secp = Secp256k1.get()) {
+                P256k1PubKey pubkey = secp.ecPubKeyCreate(new BigIntegerP256k1PrivKey(privKey));
+                LazyECPoint lazyECPoint = new LazyECPoint(CURVE.getCurve(), pubkey.getCompressed());
                 return lazyECPoint.get();
-            } catch(NativeSecp256k1Util.AssertFailException e) {
+            } catch(Exception e) {
                 log.error("Error computing public key from private", e);
             }
         }
@@ -385,16 +384,34 @@ public class ECKey {
             throw new IllegalArgumentException("Private key cannot be null");
         }
 
-        ECDSASignature signature;
+        if(!Secp256k1Context.isEnabled()) {
+            throw new IllegalStateException("libsecp256k1 is not enabled");
+        }
+
+        ECDSASignature signature = null;
         Integer counter = null;
-        do {
-            ECDSASigner signer = new ECDSASigner(new HMacDSANonceKCalculator(new SHA256Digest(), counter));
-            ECPrivateKeyParameters privKey = new ECPrivateKeyParameters(priv, CURVE);
-            signer.init(true, privKey);
-            BigInteger[] components = signer.generateSignature(input.getBytes());
-            signature = new ECDSASignature(components[0], components[1]).toCanonicalised();
-            counter = (counter == null ? 1 : counter+1);
-        } while(!signature.hasLowR());
+        try(Secp256k1 secp = Secp256k1.get()) {
+            do {
+                ECDSASigner signer = new ECDSASigner(new HMacDSANonceKCalculator(new SHA256Digest(), counter));
+                ECPrivateKeyParameters privKey = new ECPrivateKeyParameters(priv, CURVE);
+                signer.init(true, privKey);
+                BigInteger[] components = signer.generateSignature(input.getBytes());
+                signature = new ECDSASignature(components[0], components[1]).toCanonicalised();
+
+                //No way to specify counter as a parameter while grinding for low R
+                SignatureData sig = secp.ecdsaSign(input.getBytes(), new BigIntegerP256k1PrivKey(priv)).get();
+                CompressedSignatureData serialized_signature = secp.ecdsaSignatureSerializeCompact(sig).get();
+                BigInteger r = new BigInteger(1, Arrays.copyOfRange(serialized_signature.bytes(), 0, 32));
+                BigInteger s = new BigInteger(1, Arrays.copyOfRange(serialized_signature.bytes(),32, 64));
+                ECDSASignature signature2 = new ECDSASignature(r, s);
+                if(!signature.equals(signature2)) {
+                    System.out.println("Signatures not equal " + signature.hasLowR() + " " + signature2.hasLowR() + " " + counter);
+                }
+                counter = (counter == null ? 1 : counter + 1);
+            } while(!signature.hasLowR());
+        } catch(Exception e) {
+            log.error("Error signing ecdsa", e);
+        }
 
         return signature;
     }
@@ -411,10 +428,10 @@ public class ECKey {
             throw new IllegalStateException("libsecp256k1 is not enabled");
         }
 
-        try {
-            byte[] sigBytes = NativeSecp256k1.schnorrSign(input.getBytes(), Utils.bigIntegerToBytes(priv, 32), new byte[32]);
+        try(Secp256k1 secp = Secp256k1.get()) {
+            byte[] sigBytes = secp.schnorrSigSign32(input.getBytes(), secp.ecKeyPairCreate(new BigIntegerP256k1PrivKey(priv)));
             return SchnorrSignature.decode(sigBytes);
-        } catch(NativeSecp256k1Util.AssertFailException e) {
+        } catch(Exception e) {
             log.error("Error signing schnorr", e);
         }
 
@@ -882,5 +899,23 @@ public class ECKey {
 
     public interface ECDSAHashSigner {
         ECDSASignature sign(Sha256Hash hash);
+    }
+
+    private static class BigIntegerP256k1PrivKey implements P256k1PrivKey {
+        private final BigInteger privKey;
+
+        public BigIntegerP256k1PrivKey(BigInteger privKey) {
+            this.privKey = privKey;
+        }
+
+        @Override
+        public byte[] getEncoded() {
+            return Utils.bigIntegerToBytes(privKey, 32);
+        }
+
+        @Override
+        public void destroy() {
+
+        }
     }
 }

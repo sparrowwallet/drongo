@@ -9,17 +9,11 @@ import java.io.IOException;
 public class Secp256k1Context {
 
     private static final boolean enabled; // true if the library is loaded
-    private static final long context; // ref to pointer to context obj
 
     private static final Logger log = LoggerFactory.getLogger(Secp256k1Context.class);
 
     static { // static initializer
         enabled = loadLibrary();
-        if(enabled) {
-            context = secp256k1_init_context();
-        } else {
-            context = -1;
-        }
     }
 
     public static boolean isEnabled() {
@@ -29,7 +23,7 @@ public class Secp256k1Context {
     public static long getContext() {
         if (!enabled)
             return -1; // sanity check
-        return context;
+        throw new UnsupportedOperationException();
     }
 
     private static boolean loadLibrary() {
@@ -55,6 +49,4 @@ public class Secp256k1Context {
 
         return false;
     }
-
-    private static native long secp256k1_init_context();
 }

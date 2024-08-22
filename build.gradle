@@ -24,9 +24,15 @@ if(os.macOsX) {
 
 repositories {
     mavenCentral()
+    flatDir {
+        dirs 'libs'
+    }
 }
 
 dependencies {
+    implementation files('libs/secp-api-0.0.1.jar')
+    implementation files('libs/secp-ffm-0.0.1.jar')
+    implementation ('org.jspecify:jspecify:1.0.0')
     implementation ('com.googlecode.json-simple:json-simple:1.1.1') {
         exclude group: 'junit', module: 'junit'
     }

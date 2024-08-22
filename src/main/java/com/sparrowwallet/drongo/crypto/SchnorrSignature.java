@@ -2,9 +2,10 @@ package com.sparrowwallet.drongo.crypto;
 
 import com.sparrowwallet.drongo.Utils;
 import com.sparrowwallet.drongo.protocol.TransactionSignature;
-import org.bitcoin.NativeSecp256k1;
-import org.bitcoin.NativeSecp256k1Util;
 import org.bitcoin.Secp256k1Context;
+import org.bitcoinj.secp.api.P256K1XOnlyPubKey;
+import org.bitcoinj.secp.api.Result;
+import org.bitcoinj.secp.api.Secp256k1;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -70,9 +71,9 @@ public class SchnorrSignature {
             throw new IllegalStateException("libsecp256k1 is not enabled");
         }
 
-        try {
-            return NativeSecp256k1.schnorrVerify(encode(), data, pub);
-        } catch(NativeSecp256k1Util.AssertFailException e) {
+        try(Secp256k1 secp = Secp256k1.get()) {
+            return secp.schnorrSigVerify(encode(), data, new ByteArrayP256K1XOnlyPubKey(pub)).get();
+        } catch(Exception e) {
             log.error("Error verifying schnorr signature", e);
         }
 
@@ -94,5 +95,23 @@ public class SchnorrSignature {
     @Override
     public int hashCode() {
         return Objects.hash(r, s);
+    }
+
+    private static class ByteArrayP256K1XOnlyPubKey implements P256K1XOnlyPubKey {
+        private final byte[] pub;
+
+        public ByteArrayP256K1XOnlyPubKey(byte[] pub) {
+            this.pub = pub;
+        }
+
+        @Override
+        public BigInteger getX() {
+            return new BigInteger(1, pub);
+        }
+
+        @Override
+        public byte[] getSerialized() {
+            return pub;
+        }
     }
 }

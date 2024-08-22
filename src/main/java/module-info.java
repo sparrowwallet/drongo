@@ -7,6 +7,7 @@ open module com.sparrowwallet.drongo {
     requires ch.qos.logback.core;
     requires ch.qos.logback.classic;
     requires json.simple;
+    requires org.bitcoinj.secp.api;
     exports com.sparrowwallet.drongo;
     exports com.sparrowwallet.drongo.psbt;
     exports com.sparrowwallet.drongo.protocol;
