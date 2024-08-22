@@ -17,9 +17,13 @@ public class KeyDerivation {
     }
 
     public KeyDerivation(String masterFingerprint, String derivationPath) {
+        this(masterFingerprint, derivationPath, false);
+    }
+
+    public KeyDerivation(String masterFingerprint, String derivationPath, boolean rewritePath) {
         this.masterFingerprint = masterFingerprint == null ? null : masterFingerprint.toLowerCase(Locale.ROOT);
-        this.derivationPath = derivationPath;
         this.derivation = parsePath(derivationPath);
+        this.derivationPath = rewritePath ? writePath(derivation) : derivationPath;
     }
 
     public String getMasterFingerprint() {
