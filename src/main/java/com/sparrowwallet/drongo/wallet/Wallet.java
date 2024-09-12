@@ -421,8 +421,10 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
     public synchronized void updateTransactions(Map<Sha256Hash, BlockTransaction> updatedTransactions) {
         for(BlockTransaction blockTx : updatedTransactions.values()) {
             if(!transactions.isEmpty()) {
-                Optional<String> optionalLabel = transactions.values().stream().filter(oldBlTx -> oldBlTx.getHash().equals(blockTx.getHash())).map(BlockTransaction::getLabel).filter(Objects::nonNull).findFirst();
-                optionalLabel.ifPresent(blockTx::setLabel);
+                BlockTransaction oldTx = transactions.get(blockTx.getHash());
+                if(oldTx != null && oldTx.getLabel() != null) {
+                    blockTx.setLabel(oldTx.getLabel());
+                }
             }
 
             if(!detachedLabels.isEmpty()) {
