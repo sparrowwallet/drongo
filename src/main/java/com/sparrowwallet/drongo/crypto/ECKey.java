@@ -326,6 +326,12 @@ public class ECKey {
         return pub.get();
     }
 
+    /** Multiply the public point by the provided private key */
+    public ECKey multiply(BigInteger privKey) {
+        ECPoint point = pub.get().multiply(privKey);
+        return ECKey.fromPublicOnly(point, false);
+    }
+
     /**
      * Gets the private key in the form of an integer field element. The public key is derived by performing EC
      * point addition this number of times (i.e. point multiplying).

@@ -575,7 +575,7 @@ public class OutputDescriptor {
         return builder.toString();
     }
 
-    private List<ExtendedKey> sortExtendedPubKeys(Collection<ExtendedKey> keys) {
+    public List<ExtendedKey> sortExtendedPubKeys(Collection<ExtendedKey> keys) {
         List<ExtendedKey> sortedKeys = new ArrayList<>(keys);
         if(mapChildrenDerivations == null || mapChildrenDerivations.isEmpty() || mapChildrenDerivations.containsKey(null)) {
             return sortedKeys;
