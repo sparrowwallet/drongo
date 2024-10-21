@@ -6,7 +6,7 @@ Drongo is a Java Bitcoin library built mainly to support [Sparrow Wallet](https:
 
 Drongo can be built with
 
-`./gradlew shadowJar`
+`./gradlew jar`
 
 ## License
 
