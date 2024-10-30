@@ -4,6 +4,8 @@ import com.sparrowwallet.drongo.crypto.*;
 import com.sparrowwallet.drongo.protocol.ProtocolException;
 import com.sparrowwallet.drongo.protocol.Ripemd160;
 import com.sparrowwallet.drongo.protocol.Sha256Hash;
+import org.bouncycastle.asn1.pkcs.PrivateKeyInfo;
+import org.bouncycastle.asn1.x509.SubjectPublicKeyInfo;
 import org.bouncycastle.crypto.digests.SHA512Digest;
 import org.bouncycastle.crypto.macs.HMac;
 import org.bouncycastle.crypto.params.KeyParameter;
@@ -15,6 +17,9 @@ import java.math.BigInteger;
 import java.nio.ByteBuffer;
 import java.nio.charset.CharsetDecoder;
 import java.nio.charset.StandardCharsets;
+import java.security.PrivateKey;
+import java.security.PublicKey;
+import java.security.spec.PKCS8EncodedKeySpec;
 import java.util.*;
 
 public class Utils {
@@ -336,6 +341,21 @@ public class Utils {
         buffer.put(msg);
 
         return Sha256Hash.hash(buffer.array());
+    }
+
+    public static byte[] getRawKeyBytesFromPKCS8(PrivateKey pkcs8Key) {
+        try {
+            PKCS8EncodedKeySpec keySpec = new PKCS8EncodedKeySpec(pkcs8Key.getEncoded());
+            PrivateKeyInfo privateKeyInfo = PrivateKeyInfo.getInstance(keySpec.getEncoded());
+            return privateKeyInfo.parsePrivateKey().toASN1Primitive().getEncoded();
+        } catch(IOException e) {
+            throw new IllegalArgumentException("Error parsing private key", e);
+        }
+    }
+
+    public static byte[] getRawKeyBytesFromX509(PublicKey x509Key) {
+        SubjectPublicKeyInfo spki = SubjectPublicKeyInfo.getInstance(x509Key.getEncoded());
+        return spki.getPublicKeyData().getBytes();
     }
 
     public static class LexicographicByteArrayComparator implements Comparator<byte[]> {
