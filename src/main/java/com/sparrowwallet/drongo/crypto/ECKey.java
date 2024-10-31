@@ -332,6 +332,18 @@ public class ECKey {
         return ECKey.fromPublicOnly(point, false);
     }
 
+    /** Add to the public point by the provided public key */
+    public ECKey add(ECKey pubKey) {
+        ECPoint point = pub.get().add(pubKey.getPubKeyPoint());
+        return ECKey.fromPublicOnly(point, false);
+    }
+
+    /** Calculate the value of the public key point modulo the secp256k1 curve order */
+    public BigInteger moduloCurveOrder() {
+        BigInteger xCoordinate = pub.get().normalize().getAffineXCoord().toBigInteger();
+        return xCoordinate.mod(CURVE_PARAMS.getCurve().getOrder());
+    }
+
     /**
      * Gets the private key in the form of an integer field element. The public key is derived by performing EC
      * point addition this number of times (i.e. point multiplying).

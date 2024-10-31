@@ -30,7 +30,7 @@ public class ChildNumber {
         this.i = i;
     }
 
-    private static boolean hasHardenedBit(int a) {
+    public static boolean hasHardenedBit(int a) {
         return (a & HARDENED_BIT) != 0;
     }
 
