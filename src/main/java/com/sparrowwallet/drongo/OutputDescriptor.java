@@ -623,12 +623,17 @@ public class OutputDescriptor {
     }
 
     public static String writeKey(ExtendedKey pubKey, KeyDerivation keyDerivation, String childDerivation, boolean addKeyOrigin, boolean addKey) {
+        return writeKey(pubKey, keyDerivation, childDerivation, addKeyOrigin, addKey, false);
+    }
+
+    public static String writeKey(ExtendedKey pubKey, KeyDerivation keyDerivation, String childDerivation, boolean addKeyOrigin, boolean addKey, boolean useApostrophes) {
         StringBuilder keyBuilder = new StringBuilder();
         if(keyDerivation != null && keyDerivation.getMasterFingerprint() != null && keyDerivation.getMasterFingerprint().length() == 8 && Utils.isHex(keyDerivation.getMasterFingerprint()) && addKeyOrigin) {
             keyBuilder.append("[");
             keyBuilder.append(keyDerivation.getMasterFingerprint());
             if(!keyDerivation.getDerivation().isEmpty()) {
-                keyBuilder.append(keyDerivation.getDerivationPath().replaceFirst("^m?/", "/").replace('\'', 'h'));
+                String path = keyDerivation.getDerivationPath().replaceFirst("^m?/", "/");
+                keyBuilder.append(useApostrophes ? path : path.replace('\'', 'h'));
             }
             keyBuilder.append("]");
         }
