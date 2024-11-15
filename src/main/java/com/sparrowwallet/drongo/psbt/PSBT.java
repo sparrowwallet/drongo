@@ -23,16 +23,21 @@ import static com.sparrowwallet.drongo.wallet.Wallet.addDummySpendingInput;
 public class PSBT {
     public static final byte PSBT_GLOBAL_UNSIGNED_TX = 0x00;
     public static final byte PSBT_GLOBAL_BIP32_PUBKEY = 0x01;
+    public static final byte PSBT_GLOBAL_TX_VERSION = 0x02;
+    public static final byte PSBT_GLOBAL_FALLBACK_LOCKTIME = 0x03;
+    public static final byte PSBT_GLOBAL_INPUT_COUNT = 0x04;
+    public static final byte PSBT_GLOBAL_OUTPUT_COUNT = 0x05;
+    public static final byte PSBT_GLOBAL_TX_MODIFIABLE = 0x06;
     public static final byte PSBT_GLOBAL_VERSION = (byte)0xfb;
     public static final byte PSBT_GLOBAL_PROPRIETARY = (byte)0xfc;
 
     public static final String PSBT_MAGIC_HEX = "70736274";
     public static final int PSBT_MAGIC_INT = 1886610036;
 
-    private static final int STATE_GLOBALS = 1;
-    private static final int STATE_INPUTS = 2;
-    private static final int STATE_OUTPUTS = 3;
-    private static final int STATE_END = 4;
+    public static final int STATE_GLOBALS = 1;
+    public static final int STATE_INPUTS = 2;
+    public static final int STATE_OUTPUTS = 3;
+    public static final int STATE_END = 4;
 
     private int inputs = 0;
     private int outputs = 0;
@@ -44,20 +49,28 @@ public class PSBT {
     private final Map<ExtendedKey, KeyDerivation> extendedPublicKeys = new LinkedHashMap<>();
     private final Map<String, String> globalProprietary = new LinkedHashMap<>();
 
+    //PSBTv2 fields
+    private Long txVersion = null;
+    private Long fallbackLocktime = null;
+    private Long inputCount = null;
+    private Long outputCount = null;
+    private Byte modifiable = null;
+
     private final List<PSBTInput> psbtInputs = new ArrayList<>();
     private final List<PSBTOutput> psbtOutputs = new ArrayList<>();
 
     private static final Logger log = LoggerFactory.getLogger(PSBT.class);
+    private boolean verifyPrevTxids = true;
 
     public PSBT(Transaction transaction) {
         this.transaction = transaction;
 
         for(int i = 0; i < transaction.getInputs().size(); i++) {
-            psbtInputs.add(new PSBTInput(this, transaction, i));
+            psbtInputs.add(new PSBTInput(this, i));
         }
 
         for(int i = 0; i < transaction.getOutputs().size(); i++) {
-            psbtOutputs.add(new PSBTOutput());
+            psbtOutputs.add(new PSBTOutput(this, i));
         }
     }
 
@@ -126,7 +139,7 @@ public class PSBT {
                 }
             }
 
-            PSBTInput psbtInput = new PSBTInput(this, signingWallet.getScriptType(), transaction, inputIndex, utxo, utxoIndex, redeemScript, witnessScript, derivedPublicKeys, Collections.emptyMap(), tapInternalKey, alwaysIncludeWitnessUtxo);
+            PSBTInput psbtInput = new PSBTInput(this, signingWallet.getScriptType(), inputIndex, utxo, utxoIndex, redeemScript, witnessScript, derivedPublicKeys, Collections.emptyMap(), tapInternalKey, alwaysIncludeWitnessUtxo);
             psbtInputs.add(psbtInput);
         }
 
@@ -148,7 +161,7 @@ public class PSBT {
         for(int outputIndex = 0; outputIndex < outputNodes.size(); outputIndex++) {
             WalletNode outputNode = outputNodes.get(outputIndex);
             if(outputNode == null) {
-                PSBTOutput externalRecipientOutput = new PSBTOutput(null, null, null, Collections.emptyMap(), Collections.emptyMap(), null);
+                PSBTOutput externalRecipientOutput = new PSBTOutput(this, outputIndex, null, null, null, Collections.emptyMap(), Collections.emptyMap(), null);
                 psbtOutputs.add(externalRecipientOutput);
             } else {
                 TransactionOutput txOutput = transaction.getOutputs().get(outputIndex);
@@ -179,7 +192,7 @@ public class PSBT {
                     }
                 }
 
-                PSBTOutput walletOutput = new PSBTOutput(recipientWallet.getScriptType(), redeemScript, witnessScript, derivedPublicKeys, Collections.emptyMap(), tapInternalKey);
+                PSBTOutput walletOutput = new PSBTOutput(this, outputIndex, recipientWallet.getScriptType(), redeemScript, witnessScript, derivedPublicKeys, Collections.emptyMap(), tapInternalKey);
                 psbtOutputs.add(walletOutput);
             }
         }
@@ -190,7 +203,12 @@ public class PSBT {
     }
 
     public PSBT(byte[] psbt, boolean verifySignatures) throws PSBTParseException {
+        this(psbt, verifySignatures, true);
+    }
+
+    public PSBT(byte[] psbt, boolean verifySignatures, boolean verifyPrevTxids) throws PSBTParseException {
         this.psbtBytes = psbt;
+        this.verifyPrevTxids = verifyPrevTxids;
         parse(verifySignatures);
     }
 
@@ -235,7 +253,7 @@ public class PSBT {
                         seenInputs++;
                         if (seenInputs == inputs) {
                             currentState = STATE_OUTPUTS;
-                            parseInputEntries(inputEntryLists, verifySignatures);
+                            parseInputEntries(inputEntryLists);
                         }
                         break;
                     case STATE_OUTPUTS:
@@ -265,9 +283,13 @@ public class PSBT {
         }
 
         if(currentState != STATE_END) {
-            if(transaction == null) {
+            if(getPsbtVersion() == 0 && transaction == null) {
                 throw new PSBTParseException("Missing transaction");
             }
+        }
+
+        if(verifySignatures) {
+            verifySignatures(psbtInputs);
         }
 
         if(log.isDebugEnabled()) {
@@ -282,7 +304,7 @@ public class PSBT {
         }
 
         for(PSBTEntry entry : globalEntries) {
-            switch(entry.getKeyType()) {
+            switch((byte)entry.getKeyType()) {
                 case PSBT_GLOBAL_UNSIGNED_TX:
                     entry.checkOneByteKey();
                     Transaction transaction = new Transaction(entry.getData());
@@ -312,6 +334,40 @@ public class PSBT {
                     this.extendedPublicKeys.put(pubKey, keyDerivation);
                     log.debug("Pubkey with master fingerprint " + keyDerivation.getMasterFingerprint() + " at path " + keyDerivation.getDerivationPath() + ": " + pubKey.getExtendedKey());
                     break;
+                case PSBT_GLOBAL_TX_VERSION:
+                    entry.checkOneByteKey();
+                    long txVersion = Utils.readUint32(entry.getData(), 0);
+                    this.txVersion = txVersion;
+                    log.debug("PSBT tx version: " + txVersion);
+                    break;
+                case PSBT_GLOBAL_FALLBACK_LOCKTIME:
+                    entry.checkOneByteKey();
+                    long fallbackLocktime = Utils.readUint32(entry.getData(), 0);
+                    this.fallbackLocktime = fallbackLocktime;
+                    log.debug("PSBT fallback locktime: " + fallbackLocktime);
+                    break;
+                case PSBT_GLOBAL_INPUT_COUNT:
+                    entry.checkOneByteKey();
+                    VarInt varIntInputCount = new VarInt(entry.getData(), 0);
+                    this.inputCount = varIntInputCount.value;
+                    this.inputs = inputCount.intValue();
+                    log.debug("PSBT input count: " + inputCount);
+                    break;
+                case PSBT_GLOBAL_OUTPUT_COUNT:
+                    entry.checkOneByteKey();
+                    VarInt varIntOutputCount = new VarInt(entry.getData(), 0);
+                    this.outputCount = varIntOutputCount.value;
+                    this.outputs = outputCount.intValue();
+                    log.debug("PSBT output count: " + outputCount);
+                    break;
+                case PSBT_GLOBAL_TX_MODIFIABLE:
+                    entry.checkOneByteKey();
+                    if(entry.getData().length != 1) {
+                        throw new PSBTParseException("Tx modifiable field was not a single byte");
+                    }
+                    this.modifiable = entry.getData()[0];
+                    log.debug("PSBT tx modifiable: " + String.format("%8s", Integer.toBinaryString(modifiable & 0xFF)).replace(' ', '0'));
+                    break;
                 case PSBT_GLOBAL_VERSION:
                     entry.checkOneByteKey();
                     int version = (int)Utils.readUint32(entry.getData(), 0);
@@ -326,9 +382,45 @@ public class PSBT {
                     log.warn("PSBT global not recognized key type: " + entry.getKeyType());
             }
         }
+
+        if(getPsbtVersion() == 0) {
+            if(transaction == null) {
+                throw new PSBTParseException("PSBT_GLOBAL_UNSIGNED_TX is required in PSBTv0");
+            }
+            if(txVersion != null) {
+                throw new PSBTParseException("PSBT_GLOBAL_TX_VERSION is not allowed in PSBTv0");
+            }
+            if(fallbackLocktime != null) {
+                throw new PSBTParseException("PSBT_GLOBAL_FALLBACK_LOCKTIME is not allowed in PSBTv0");
+            }
+            if(inputCount != null) {
+                throw new PSBTParseException("PSBT_GLOBAL_INPUT_COUNT is not allowed in PSBTv0");
+            }
+            if(outputCount != null) {
+                throw new PSBTParseException("PSBT_GLOBAL_OUTPUT_COUNT is not allowed in PSBTv0");
+            }
+            if(modifiable != null) {
+                throw new PSBTParseException("PSBT_GLOBAL_TX_MODIFIABLE is not allowed in PSBTv0");
+            }
+        } else if(getPsbtVersion() == 1) {
+            throw new PSBTParseException("There is no PSBTv1");
+        } else if(getPsbtVersion() >= 2) {
+            if(transaction != null) {
+                throw new PSBTParseException("PSBT_GLOBAL_UNSIGNED_TX is not allowed in PSBTv2");
+            }
+            if(txVersion == null) {
+                throw new PSBTParseException("PSBT_GLOBAL_TX_VERSION is required in PSBTv2");
+            }
+            if(inputCount == null) {
+                throw new PSBTParseException("PSBT_GLOBAL_INPUT_COUNT is required in PSBTv2");
+            }
+            if(outputCount == null) {
+                throw new PSBTParseException("PSBT_GLOBAL_OUTPUT_COUNT is required in PSBTv2");
+            }
+        }
     }
 
-    private void parseInputEntries(List<List<PSBTEntry>> inputEntryLists, boolean verifySignatures) throws PSBTParseException {
+    private void parseInputEntries(List<List<PSBTEntry>> inputEntryLists) throws PSBTParseException {
         for(List<PSBTEntry> inputEntries : inputEntryLists) {
             PSBTEntry duplicate = findDuplicateKey(inputEntries);
             if(duplicate != null) {
@@ -336,12 +428,34 @@ public class PSBT {
             }
 
             int inputIndex = this.psbtInputs.size();
-            PSBTInput input = new PSBTInput(this, inputEntries, transaction, inputIndex);
-            this.psbtInputs.add(input);
-        }
+            PSBTInput input = new PSBTInput(this, inputEntries, inputIndex);
 
-        if(verifySignatures) {
-            verifySignatures(psbtInputs);
+            if(getPsbtVersion() == 0) {
+                if(input.prevTxid() != null) {
+                    throw new PSBTParseException("PSBT_IN_PREV_TXID is not allowed in PSBTv0");
+                }
+                if(input.prevIndex() != null) {
+                    throw new PSBTParseException("PSBT_IN_OUTPUT_INDEX is not allowed in PSBTv0");
+                }
+                if(input.sequence() != null) {
+                    throw new PSBTParseException("PSBT_IN_SEQUENCE is not allowed in PSBTv0");
+                }
+                if(input.getRequiredTimeLocktime() != null) {
+                    throw new PSBTParseException("PSBT_IN_REQUIRED_TIME_LOCKTIME is not allowed in PSBTv0");
+                }
+                if(input.getRequiredHeightLocktime() != null) {
+                    throw new PSBTParseException("PSBT_IN_REQUIRED_HEIGHT_LOCKTIME is not allowed in PSBTv0");
+                }
+            } else if(getPsbtVersion() >= 2) {
+                if(input.prevTxid() == null) {
+                    throw new PSBTParseException("PSBT_IN_PREV_TXID is required in PSBTv2");
+                }
+                if(input.prevIndex() == null) {
+                    throw new PSBTParseException("PSBT_IN_OUTPUT_INDEX is required in PSBTv2");
+                }
+            }
+
+            this.psbtInputs.add(input);
         }
     }
 
@@ -352,9 +466,31 @@ public class PSBT {
                 throw new PSBTParseException("Found duplicate key for PSBT output: " + Utils.bytesToHex(duplicate.getKey()));
             }
 
-            PSBTOutput output = new PSBTOutput(outputEntries);
+            int outputIndex = this.psbtOutputs.size();
+            PSBTOutput output = new PSBTOutput(this, outputEntries, outputIndex);
+
+            if(getPsbtVersion() == 0) {
+                if(output.amount() != null) {
+                    throw new PSBTParseException("PSBT_OUT_AMOUNT is not allowed in PSBTv0");
+                }
+                if(output.script() != null) {
+                    throw new PSBTParseException("PSBT_OUT_SCRIPT is not allowed in PSBTv0");
+                }
+            } else if(getPsbtVersion() >= 2) {
+                if(output.amount() == null) {
+                    throw new PSBTParseException("PSBT_OUT_AMOUNT is required in PSBTv2");
+                }
+                if(output.script() == null) {
+                    throw new PSBTParseException("PSBT_OUT_SCRIPT is required in PSBTv2");
+                }
+            }
+
             this.psbtOutputs.add(output);
         }
+    }
+
+    int getPsbtVersion() {
+        return version == null ? 0 : version;
     }
 
     private PSBTEntry findDuplicateKey(List<PSBTEntry> entries) {
@@ -382,9 +518,8 @@ public class PSBT {
             }
         }
 
-        for (int i = 0; i < transaction.getOutputs().size(); i++) {
-            TransactionOutput output = transaction.getOutputs().get(i);
-            fee -= output.getValue();
+        for(PSBTOutput output : psbtOutputs) {
+            fee -= output.getAmount();
         }
 
         return fee;
@@ -397,7 +532,7 @@ public class PSBT {
     private void verifySignatures(List<PSBTInput> psbtInputs) throws PSBTSignatureException {
         for(PSBTInput input : psbtInputs) {
             boolean verified = input.verifySignatures();
-            if(!verified && input.getPartialSignatures().size() > 0) {
+            if(!verified && !input.getPartialSignatures().isEmpty()) {
                 throw new PSBTSignatureException("Unverifiable partial signatures provided");
             }
             if(!verified && input.isTaproot() && input.getTapKeyPathSignature() != null) {
@@ -439,12 +574,36 @@ public class PSBT {
     private List<PSBTEntry> getGlobalEntries() {
         List<PSBTEntry> entries = new ArrayList<>();
 
-        if(transaction != null) {
+        if(getPsbtVersion() == 0 && transaction != null) {
             entries.add(populateEntry(PSBT_GLOBAL_UNSIGNED_TX, null, transaction.bitcoinSerialize(false)));
         }
 
         for(Map.Entry<ExtendedKey, KeyDerivation> entry : extendedPublicKeys.entrySet()) {
             entries.add(populateEntry(PSBT_GLOBAL_BIP32_PUBKEY, entry.getKey().getExtendedKeyBytes(), serializeKeyDerivation(entry.getValue())));
+        }
+
+        if(getPsbtVersion() >= 2) {
+            if(txVersion != null) {
+                byte[] txVersionBytes = new byte[4];
+                Utils.uint32ToByteArrayLE(txVersion, txVersionBytes, 0);
+                entries.add(populateEntry(PSBT_GLOBAL_TX_VERSION, null, txVersionBytes));
+            }
+            if(fallbackLocktime != null) {
+                byte[] fallbackLocktimeBytes = new byte[4];
+                Utils.uint32ToByteArrayLE(fallbackLocktime, fallbackLocktimeBytes, 0);
+                entries.add(populateEntry(PSBT_GLOBAL_FALLBACK_LOCKTIME, null, fallbackLocktimeBytes));
+            }
+            if(inputCount != null) {
+                VarInt varIntInputCount = new VarInt(inputCount);
+                entries.add(populateEntry(PSBT_GLOBAL_INPUT_COUNT, null, varIntInputCount.encode()));
+            }
+            if(outputCount != null) {
+                VarInt varIntOutputCount = new VarInt(outputCount);
+                entries.add(populateEntry(PSBT_GLOBAL_OUTPUT_COUNT, null, varIntOutputCount.encode()));
+            }
+            if(modifiable != null) {
+                entries.add(populateEntry(PSBT_GLOBAL_TX_MODIFIABLE, null, new byte[] { modifiable }));
+            }
         }
 
         if(version != null) {
@@ -479,7 +638,7 @@ public class PSBT {
         baos.writeBytes(new byte[] {(byte)0x00});
 
         for(PSBTInput psbtInput : getPsbtInputs()) {
-            List<PSBTEntry> inputEntries = psbtInput.getInputEntries();
+            List<PSBTEntry> inputEntries = psbtInput.getInputEntries(getPsbtVersion());
             for(PSBTEntry entry : inputEntries) {
                 if((includeXpubs || (entry.getKeyType() != PSBT_IN_BIP32_DERIVATION && entry.getKeyType() != PSBT_IN_PROPRIETARY
                         && entry.getKeyType() != PSBT_IN_TAP_INTERNAL_KEY && entry.getKeyType() != PSBT_IN_TAP_BIP32_DERIVATION))
@@ -491,7 +650,7 @@ public class PSBT {
         }
 
         for(PSBTOutput psbtOutput : getPsbtOutputs()) {
-            List<PSBTEntry> outputEntries = psbtOutput.getOutputEntries();
+            List<PSBTEntry> outputEntries = psbtOutput.getOutputEntries(getPsbtVersion());
             for(PSBTEntry entry : outputEntries) {
                 if(includeXpubs || (entry.getKeyType() != PSBT_OUT_REDEEM_SCRIPT && entry.getKeyType() != PSBT_OUT_WITNESS_SCRIPT
                         && entry.getKeyType() != PSBT_OUT_BIP32_DERIVATION && entry.getKeyType() != PSBT_OUT_PROPRIETARY
@@ -512,7 +671,11 @@ public class PSBT {
     }
 
     public void combine(PSBT psbt) {
-        byte[] txBytes = transaction.bitcoinSerialize();
+        if(getPsbtVersion() != psbt.getPsbtVersion()) {
+            psbt.convertVersion(getPsbtVersion());
+        }
+
+        byte[] txBytes = getTransaction().bitcoinSerialize();
         byte[] psbtTxBytes = psbt.getTransaction().bitcoinSerialize();
 
         if(!Arrays.equals(txBytes, psbtTxBytes)) {
@@ -551,7 +714,7 @@ public class PSBT {
             }
         }
 
-        Transaction finalTransaction = new Transaction(transaction.bitcoinSerialize());
+        Transaction finalTransaction = new Transaction(getTransaction().bitcoinSerialize());
 
         if(hasWitness && !finalTransaction.isSegwit()) {
             finalTransaction.setSegwitFlag(Transaction.DEFAULT_SEGWIT_FLAG);
@@ -596,7 +759,7 @@ public class PSBT {
 
     public void moveInput(int fromIndex, int toIndex) {
         moveItem(psbtInputs, fromIndex, toIndex);
-        transaction.moveInput(fromIndex, toIndex);
+        getTransaction().moveInput(fromIndex, toIndex);
         for(int i = 0; i < psbtInputs.size(); i++) {
             psbtInputs.get(i).setIndex(i);
         }
@@ -604,7 +767,10 @@ public class PSBT {
 
     public void moveOutput(int fromIndex, int toIndex) {
         moveItem(psbtOutputs, fromIndex, toIndex);
-        transaction.moveOutput(fromIndex, toIndex);
+        getTransaction().moveOutput(fromIndex, toIndex);
+        for(int i = 0; i < psbtOutputs.size(); i++) {
+            psbtOutputs.get(i).setIndex(i);
+        }
     }
 
     private <T> void moveItem(List<T> list, int fromIndex, int toIndex) {
@@ -625,6 +791,33 @@ public class PSBT {
     }
 
     public Transaction getTransaction() {
+        return getTransaction(true);
+    }
+
+    public Transaction getTransaction(boolean setSequence) {
+        if(getPsbtVersion() >= 2) {
+            Transaction transaction = new Transaction();
+            transaction.setVersion(txVersion);
+            transaction.setLocktime(getLocktime(psbtInputs, fallbackLocktime));
+            for(PSBTInput psbtInput : getPsbtInputs()) {
+                TransactionInput transactionInput = transaction.addInput(psbtInput.getPrevTxid(), psbtInput.getPrevIndex(), new Script(new byte[0]));
+                if(setSequence) {
+                    if(psbtInput.getSequence() == null) {
+                        transactionInput.setSequenceNumber(TransactionInput.SEQUENCE_LOCKTIME_DISABLED);
+                    } else {
+                        transactionInput.setSequenceNumber(psbtInput.getSequence());
+                    }
+                } else {
+                    //Sequence number is set to zero to provide a static txid while updating
+                    transactionInput.setSequenceNumber(0);
+                }
+            }
+            for(PSBTOutput psbtOutput : getPsbtOutputs()) {
+                transaction.addOutput(psbtOutput.getAmount(), psbtOutput.getScript());
+            }
+            return transaction;
+        }
+
         return transaction;
     }
 
@@ -638,6 +831,72 @@ public class PSBT {
 
     public Map<ExtendedKey, KeyDerivation> getExtendedPublicKeys() {
         return extendedPublicKeys;
+    }
+
+    public Long getTxVersion() {
+        if(getPsbtVersion() >= 2) {
+            return txVersion;
+        }
+
+        return getTransaction().getVersion();
+    }
+
+    public Long getFallbackLocktime() {
+        if(getPsbtVersion() >= 2) {
+            return fallbackLocktime;
+        }
+
+        return getTransaction().getLocktime();
+    }
+
+    public Long getInputCount() {
+        if(getPsbtVersion() >= 2) {
+            return inputCount;
+        }
+
+        return (long)getTransaction().getInputs().size();
+    }
+
+    public Long getOutputCount() {
+        if(getPsbtVersion() >= 2) {
+            return outputCount;
+        }
+
+        return (long)getTransaction().getOutputs().size();
+    }
+
+    public Byte getModifiable() {
+        return modifiable;
+    }
+
+    public Boolean isInputsModifiable() {
+        return modifiable == null ? null : (modifiable & (byte)0x01) > 0;
+    }
+
+    public void setInputsModifiable(boolean inputsModifiable) {
+        if(modifiable != null) {
+            modifiable = inputsModifiable ? (byte)(modifiable | (byte)0x01) : (byte)(modifiable & (byte)0xFE);
+        }
+    }
+
+    public Boolean isOutputsModifiable() {
+        return modifiable == null ? null : (modifiable & (byte)0x02) > 0;
+    }
+
+    public void setOutputsModifiable(boolean outputsModifiable) {
+        if(modifiable != null) {
+            modifiable = outputsModifiable ? (byte)(modifiable | (byte)0x02) : (byte)(modifiable & (byte)0xFD);
+        }
+    }
+
+    public Boolean isSigHashSingleSignaturePresent() {
+        return modifiable == null ? null : (modifiable & (byte)0x04) > 0;
+    }
+
+    public void setSigHashSingleSignaturePresent(boolean sigHashSingleSignaturePresent) {
+        if(modifiable != null) {
+            modifiable = sigHashSingleSignaturePresent ? (byte)(modifiable | (byte)0x04) : (byte)(modifiable & (byte)0xFB);
+        }
     }
 
     public Map<String, String> getGlobalProprietary() {
@@ -654,6 +913,93 @@ public class PSBT {
 
     public String toBase64String(boolean includeXpubs) {
         return Base64.toBase64String(serialize(includeXpubs, true));
+    }
+
+    public void convertVersion(int version) {
+        if(version < 0) {
+            throw new IllegalArgumentException("Version must be zero or positive");
+        }
+
+        //Convert from PSBTv2+ to PSBTv0
+        if(getPsbtVersion() >= 2 && version == 0) {
+            this.transaction = getTransaction();
+            this.txVersion = null;
+            this.fallbackLocktime = null;
+            this.inputCount = null;
+            this.outputCount = null;
+            this.modifiable = null;
+
+            for(PSBTInput psbtInput : getPsbtInputs()) {
+                psbtInput.setPrevTxid(null);
+                psbtInput.setPrevIndex(null);
+                psbtInput.setSequence(null);
+                psbtInput.setRequiredTimeLocktime(null);
+                psbtInput.setRequiredHeightLocktime(null);
+            }
+
+            for(PSBTOutput psbtOutput : getPsbtOutputs()) {
+                psbtOutput.setAmount(null);
+                psbtOutput.setScript(null);
+            }
+        }
+
+        //Convert from PSBTv0 to PSBTv2+
+        if(getPsbtVersion() == 0 && version >= 2) {
+            this.txVersion = transaction.getVersion();
+            this.fallbackLocktime = transaction.getLocktime();
+            this.inputCount = (long)transaction.getInputs().size();
+            this.outputCount = (long)transaction.getOutputs().size();
+            this.modifiable = null;
+
+            for(PSBTInput psbtInput : getPsbtInputs()) {
+                psbtInput.setPrevTxid(psbtInput.getPrevTxid());
+                psbtInput.setPrevIndex(psbtInput.getPrevIndex());
+                psbtInput.setSequence(psbtInput.getSequence());
+                psbtInput.setRequiredTimeLocktime(null);
+                psbtInput.setRequiredHeightLocktime(null);
+            }
+
+            for(PSBTOutput psbtOutput : getPsbtOutputs()) {
+                psbtOutput.setAmount(psbtOutput.getAmount());
+                psbtOutput.setScript(psbtOutput.getScript());
+            }
+
+            this.transaction = null;
+        }
+
+        this.version = version;
+    }
+
+    private long getLocktime(List<PSBTInput> psbtInputs, Long fallbackLocktime) {
+        long fallback = (fallbackLocktime != null) ? fallbackLocktime : 0L;
+
+        OptionalLong maxHeightLocktime = psbtInputs.stream().map(PSBTInput::getRequiredHeightLocktime).filter(Objects::nonNull).mapToLong(Long::longValue).max();
+        OptionalLong maxTimeLocktime = psbtInputs.stream().map(PSBTInput::getRequiredTimeLocktime).filter(Objects::nonNull).mapToLong(Long::longValue).max();
+
+        boolean allHeight = psbtInputs.stream().map(PSBTInput::getRequiredHeightLocktime).allMatch(Objects::nonNull);
+        boolean allTime = psbtInputs.stream().map(PSBTInput::getRequiredTimeLocktime).allMatch(Objects::nonNull);
+
+        if(maxHeightLocktime.isEmpty() && maxTimeLocktime.isEmpty()) {
+            return fallback;
+        }
+
+        if(maxHeightLocktime.isPresent() && allHeight) {
+            return maxHeightLocktime.getAsLong();
+        }
+
+        if(maxTimeLocktime.isPresent() && allTime) {
+            return maxTimeLocktime.getAsLong();
+        }
+
+        if(maxHeightLocktime.isPresent() && maxTimeLocktime.isPresent()) {
+            return maxHeightLocktime.getAsLong();
+        }
+
+        return maxHeightLocktime.orElse(maxTimeLocktime.orElse(fallback));
+    }
+
+    boolean isVerifyPrevTxids() {
+        return verifyPrevTxids;
     }
 
     public static boolean isPSBT(byte[] b) {
@@ -687,6 +1033,10 @@ public class PSBT {
     }
 
     public static PSBT fromString(String strPSBT, boolean verifySignatures) throws PSBTParseException {
+        return fromString(strPSBT, verifySignatures, true);
+    }
+
+    static PSBT fromString(String strPSBT, boolean verifySignatures, boolean verifyPrevTxids) throws PSBTParseException {
         if (!isPSBT(strPSBT)) {
             throw new PSBTParseException("Provided string is not a PSBT");
         }
@@ -696,6 +1046,6 @@ public class PSBT {
         }
 
         byte[] psbtBytes = Utils.hexToBytes(strPSBT);
-        return new PSBT(psbtBytes, verifySignatures);
+        return new PSBT(psbtBytes, verifySignatures, verifyPrevTxids);
     }
 }

@@ -27,7 +27,7 @@ public class PSBTEntry {
         this.data = data;
     }
 
-    PSBTEntry(ByteBuffer psbtByteBuffer) throws PSBTParseException {
+    public PSBTEntry(ByteBuffer psbtByteBuffer) throws PSBTParseException {
         int keyLen = readCompactInt(psbtByteBuffer);
 
         if (keyLen == 0x00) {
@@ -257,6 +257,18 @@ public class PSBTEntry {
     public void checkOneBytePlusXOnlyPubKey() throws PSBTParseException {
         if(this.getKey().length != 33) {
             throw new PSBTParseException("PSBT key type must be one byte plus x only pub key");
+        }
+    }
+
+    public void checkOneBytePlusRipe160Key() throws PSBTParseException {
+        if(this.getKey().length != 21) {
+            throw new PSBTParseException("PSBT key type must be one byte plus Ripe160MD hash");
+        }
+    }
+
+    public void checkOneBytePlusSha256Key() throws PSBTParseException {
+        if(this.getKey().length != 33) {
+            throw new PSBTParseException("PSBT key type must be one byte plus SHA256 hash");
         }
     }
 }

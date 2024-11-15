@@ -3,9 +3,7 @@ package com.sparrowwallet.drongo.psbt;
 import com.sparrowwallet.drongo.KeyDerivation;
 import com.sparrowwallet.drongo.Utils;
 import com.sparrowwallet.drongo.crypto.ECKey;
-import com.sparrowwallet.drongo.protocol.Script;
-import com.sparrowwallet.drongo.protocol.ScriptType;
-import com.sparrowwallet.drongo.protocol.Sha256Hash;
+import com.sparrowwallet.drongo.protocol.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -18,6 +16,8 @@ public class PSBTOutput {
     public static final byte PSBT_OUT_REDEEM_SCRIPT = 0x00;
     public static final byte PSBT_OUT_WITNESS_SCRIPT = 0x01;
     public static final byte PSBT_OUT_BIP32_DERIVATION = 0x02;
+    public static final byte PSBT_OUT_AMOUNT = 0x03;
+    public static final byte PSBT_OUT_SCRIPT = 0x04;
     public static final byte PSBT_OUT_TAP_INTERNAL_KEY = 0x05;
     public static final byte PSBT_OUT_TAP_BIP32_DERIVATION = 0x07;
     public static final byte PSBT_OUT_PROPRIETARY = (byte)0xfc;
@@ -29,13 +29,23 @@ public class PSBTOutput {
     private Map<ECKey, Map<KeyDerivation, List<Sha256Hash>>> tapDerivedPublicKeys = new LinkedHashMap<>();
     private ECKey tapInternalKey;
 
+    //PSBTv2 fields
+    private Long amount;
+    private Script script;
+
     private static final Logger log = LoggerFactory.getLogger(PSBTOutput.class);
 
-    PSBTOutput() {
-        //empty constructor
+    private final PSBT psbt;
+    private int index;
+
+    PSBTOutput(PSBT psbt, int index) {
+        this.psbt = psbt;
+        this.index = index;
     }
 
-    PSBTOutput(ScriptType scriptType, Script redeemScript, Script witnessScript, Map<ECKey, KeyDerivation> derivedPublicKeys, Map<String, String> proprietary, ECKey tapInternalKey) {
+    PSBTOutput(PSBT psbt, int index, ScriptType scriptType, Script redeemScript, Script witnessScript, Map<ECKey, KeyDerivation> derivedPublicKeys, Map<String, String> proprietary, ECKey tapInternalKey) {
+        this(psbt, index);
+
         this.redeemScript = redeemScript;
         this.witnessScript = witnessScript;
 
@@ -53,9 +63,10 @@ public class PSBTOutput {
         }
     }
 
-    PSBTOutput(List<PSBTEntry> outputEntries) throws PSBTParseException {
+    PSBTOutput(PSBT psbt, List<PSBTEntry> outputEntries, int index) throws PSBTParseException {
+        this(psbt, index);
         for(PSBTEntry entry : outputEntries) {
-            switch (entry.getKeyType()) {
+            switch((byte)entry.getKeyType()) {
                 case PSBT_OUT_REDEEM_SCRIPT:
                     entry.checkOneByteKey();
                     Script redeemScript = new Script(entry.getData());
@@ -74,6 +85,17 @@ public class PSBTOutput {
                     KeyDerivation keyDerivation = parseKeyDerivation(entry.getData());
                     this.derivedPublicKeys.put(derivedPublicKey, keyDerivation);
                     log.debug("Found output bip32_derivation with master fingerprint " + keyDerivation.getMasterFingerprint() + " at path " + keyDerivation.getDerivationPath() + " public key " + derivedPublicKey);
+                    break;
+                case PSBT_OUT_AMOUNT:
+                    entry.checkOneByteKey();
+                    this.amount = Utils.readInt64(entry.getData(), 0);
+                    log.debug("Found output amount " + this.amount);
+                    break;
+                case PSBT_OUT_SCRIPT:
+                    entry.checkOneByteKey();
+                    Script script = new Script(entry.getData());
+                    this.script = script;
+                    log.debug("Found output script hex " + Utils.bytesToHex(script.getProgram()) + " script " + script);
                     break;
                 case PSBT_OUT_PROPRIETARY:
                     proprietary.put(Utils.bytesToHex(entry.getKeyData()), Utils.bytesToHex(entry.getData()));
@@ -103,7 +125,7 @@ public class PSBTOutput {
         }
     }
 
-    public List<PSBTEntry> getOutputEntries() {
+    public List<PSBTEntry> getOutputEntries(int psbtVersion) {
         List<PSBTEntry> entries = new ArrayList<>();
 
         if(redeemScript != null) {
@@ -116,6 +138,17 @@ public class PSBTOutput {
 
         for(Map.Entry<ECKey, KeyDerivation> entry : derivedPublicKeys.entrySet()) {
             entries.add(populateEntry(PSBT_OUT_BIP32_DERIVATION, entry.getKey().getPubKey(), serializeKeyDerivation(entry.getValue())));
+        }
+
+        if(psbtVersion >= 2) {
+            if(amount != null) {
+                byte[] amountBytes = new byte[64];
+                Utils.int64ToByteArrayLE(amount, amountBytes, 0);
+                entries.add(populateEntry(PSBT_OUT_AMOUNT, null, amountBytes));
+            }
+            if(script != null) {
+                entries.add(populateEntry(PSBT_OUT_SCRIPT, null, script.getProgram()));
+            }
         }
 
         for(Map.Entry<String, String> entry : proprietary.entrySet()) {
@@ -145,6 +178,15 @@ public class PSBTOutput {
         }
 
         derivedPublicKeys.putAll(psbtOutput.derivedPublicKeys);
+
+        if(psbtOutput.amount != null) {
+            amount = psbtOutput.amount;
+        }
+
+        if(psbtOutput.script != null) {
+            script = psbtOutput.script;
+        }
+
         proprietary.putAll(psbtOutput.proprietary);
 
         tapDerivedPublicKeys.putAll(psbtOutput.tapDerivedPublicKeys);
@@ -178,6 +220,38 @@ public class PSBTOutput {
         return derivedPublicKeys;
     }
 
+    public Long getAmount() {
+        if(psbt.getPsbtVersion() >= 2) {
+            return amount;
+        }
+
+        return getOutput().getValue();
+    }
+
+    Long amount() {
+        return amount;
+    }
+
+    public void setAmount(Long amount) {
+        this.amount = amount;
+    }
+
+    public Script getScript() {
+        if(psbt.getPsbtVersion() >= 2) {
+            return script;
+        }
+
+        return getOutput().getScript();
+    }
+
+    Script script() {
+        return script;
+    }
+
+    public void setScript(Script script) {
+        this.script = script;
+    }
+
     public Map<String, String> getProprietary() {
         return proprietary;
     }
@@ -196,6 +270,14 @@ public class PSBTOutput {
 
     public void setTapInternalKey(ECKey tapInternalKey) {
         this.tapInternalKey = tapInternalKey;
+    }
+
+    public TransactionOutput getOutput() {
+        return psbt.getTransaction().getOutputs().get(index);
+    }
+
+    void setIndex(int index) {
+        this.index = index;
     }
 
     public void clearNonFinalFields() {

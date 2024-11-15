@@ -26,6 +26,15 @@ public class PSBTInput {
     public static final byte PSBT_IN_FINAL_SCRIPTSIG = 0x07;
     public static final byte PSBT_IN_FINAL_SCRIPTWITNESS = 0x08;
     public static final byte PSBT_IN_POR_COMMITMENT = 0x09;
+    public static final byte PSBT_IN_RIPEMD160 = 0x0a;
+    public static final byte PSBT_IN_SHA256 = 0x0b;
+    public static final byte PSBT_IN_HASH160 = 0x0c;
+    public static final byte PSBT_IN_HASH256 = 0x0d;
+    public static final byte PSBT_IN_PREVIOUS_TXID = 0x0e;
+    public static final byte PSBT_IN_OUTPUT_INDEX = 0x0f;
+    public static final byte PSBT_IN_SEQUENCE = 0x10;
+    public static final byte PSBT_IN_REQUIRED_TIME_LOCKTIME = 0x11;
+    public static final byte PSBT_IN_REQUIRED_HEIGHT_LOCKTIME = 0x12;
     public static final byte PSBT_IN_PROPRIETARY = (byte)0xfc;
     public static final byte PSBT_IN_TAP_KEY_SIG = 0x13;
     public static final byte PSBT_IN_TAP_BIP32_DERIVATION = 0x16;
@@ -42,24 +51,33 @@ public class PSBTInput {
     private Script finalScriptSig;
     private TransactionWitness finalScriptWitness;
     private String porCommitment;
+    private byte[] ripeMd160Preimage;
+    private byte[] sha256Preimage;
+    private byte[] hash160Preimage;
+    private byte[] hash256Preimage;
     private final Map<String, String> proprietary = new LinkedHashMap<>();
     private TransactionSignature tapKeyPathSignature;
     private Map<ECKey, Map<KeyDerivation, List<Sha256Hash>>> tapDerivedPublicKeys = new LinkedHashMap<>();
     private ECKey tapInternalKey;
 
-    private final Transaction transaction;
+    //PSBTv2 fields
+    private Sha256Hash prevTxid;
+    private Long prevIndex;
+    private Long sequence;
+    private Long requiredTimeLocktime;
+    private Long requiredHeightLocktime;
+
     private int index;
 
     private static final Logger log = LoggerFactory.getLogger(PSBTInput.class);
 
-    PSBTInput(PSBT psbt, Transaction transaction, int index) {
+    PSBTInput(PSBT psbt, int index) {
         this.psbt = psbt;
-        this.transaction = transaction;
         this.index = index;
     }
 
-    PSBTInput(PSBT psbt, ScriptType scriptType, Transaction transaction, int index, Transaction utxo, int utxoIndex, Script redeemScript, Script witnessScript, Map<ECKey, KeyDerivation> derivedPublicKeys, Map<String, String> proprietary, ECKey tapInternalKey, boolean alwaysAddNonWitnessTx) {
-        this(psbt, transaction, index);
+    PSBTInput(PSBT psbt, ScriptType scriptType, int index, Transaction utxo, int utxoIndex, Script redeemScript, Script witnessScript, Map<ECKey, KeyDerivation> derivedPublicKeys, Map<String, String> proprietary, ECKey tapInternalKey, boolean alwaysAddNonWitnessTx) {
+        this(psbt, index);
 
         if(Arrays.asList(ScriptType.WITNESS_TYPES).contains(scriptType)) {
             this.witnessUtxo = utxo.getOutputs().get(utxoIndex);
@@ -91,18 +109,30 @@ public class PSBTInput {
         this.sigHash = getDefaultSigHash();
     }
 
-    PSBTInput(PSBT psbt, List<PSBTEntry> inputEntries, Transaction transaction, int index) throws PSBTParseException {
-        this.psbt = psbt;
-        for(PSBTEntry entry : inputEntries) {
-            switch(entry.getKeyType()) {
+    PSBTInput(PSBT psbt, List<PSBTEntry> inputEntries, int index) throws PSBTParseException {
+        this(psbt, index);
+        List<PSBTEntry> sortedEntries = new ArrayList<>(inputEntries);
+        sortedEntries.sort((o1, o2) -> {
+            int found1 = o1.getKeyType() == PSBT_IN_PREVIOUS_TXID || o1.getKeyType() == PSBT_IN_OUTPUT_INDEX ? 1 : 0;
+            int found2 = o2.getKeyType() == PSBT_IN_PREVIOUS_TXID || o2.getKeyType() == PSBT_IN_OUTPUT_INDEX ? 1 : 0;
+            return found2 - found1;
+        });
+
+        for(PSBTEntry entry : sortedEntries) {
+            switch((byte)entry.getKeyType()) {
                 case PSBT_IN_NON_WITNESS_UTXO:
                     entry.checkOneByteKey();
                     Transaction nonWitnessTx = new Transaction(entry.getData());
                     nonWitnessTx.verify();
-                    Sha256Hash inputHash = nonWitnessTx.calculateTxId(false);
-                    Sha256Hash outpointHash = transaction.getInputs().get(index).getOutpoint().getHash();
-                    if(!outpointHash.equals(inputHash)) {
-                        throw new PSBTParseException("Hash of provided non witness utxo transaction " + inputHash + " does not match transaction input outpoint hash " + outpointHash + " at index " + index);
+                    if(psbt.isVerifyPrevTxids()) {
+                        Sha256Hash inputHash = nonWitnessTx.calculateTxId(false);
+                        Sha256Hash outpointHash = getPrevTxid();
+                        if(outpointHash == null) {
+                            throw new PSBTParseException("Outpoint hash not present for input " + index);
+                        }
+                        if(!outpointHash.equals(inputHash)) {
+                            throw new PSBTParseException("Hash of provided non witness utxo transaction " + inputHash + " does not match transaction input outpoint hash " + outpointHash + " at index " + index);
+                        }
                     }
 
                     this.nonWitnessUtxo = nonWitnessTx;
@@ -151,7 +181,11 @@ public class PSBTInput {
                     Script redeemScript = new Script(entry.getData());
                     Script scriptPubKey = null;
                     if(this.nonWitnessUtxo != null) {
-                        scriptPubKey = this.nonWitnessUtxo.getOutputs().get((int)transaction.getInputs().get(index).getOutpoint().getIndex()).getScript();
+                        Long prevIndex = getPrevIndex();
+                        if(prevIndex == null) {
+                            throw new PSBTParseException("Outpoint index not present for input " + index);
+                        }
+                        scriptPubKey = this.nonWitnessUtxo.getOutputs().get(prevIndex.intValue()).getScript();
                     } else if(this.witnessUtxo != null) {
                         scriptPubKey = this.witnessUtxo.getScript();
                         if(!P2WPKH.isScriptType(redeemScript) && !P2WSH.isScriptType(redeemScript)) { //Witness UTXO should only be provided for P2SH-P2WPKH or P2SH-P2WSH
@@ -214,6 +248,71 @@ public class PSBTInput {
                     this.porCommitment = porMessage;
                     log.debug("Found input POR commitment message " + porMessage);
                     break;
+                case PSBT_IN_RIPEMD160:
+                    entry.checkOneBytePlusRipe160Key();
+                    if(!Arrays.equals(entry.getKeyData(), Ripemd160.getHash(entry.getData()))) {
+                        throw new PSBTParseException("Hash of PSBT_IN_RIPEMD160 preimage did not match provided hash " + Utils.bytesToHex(entry.getKeyData()) + " " + Utils.bytesToHex(entry.getData()));
+                    }
+                    this.ripeMd160Preimage = entry.getData();
+                    log.debug("Found input RIPEMD160 preimage " + Utils.bytesToHex(entry.getData()));
+                    break;
+                case PSBT_IN_SHA256:
+                    entry.checkOneBytePlusSha256Key();
+                    if(!Arrays.equals(entry.getKeyData(), Sha256Hash.hash(entry.getData()))) {
+                        throw new PSBTParseException("Hash of PSBT_IN_SHA256 preimage did not match provided hash " + Utils.bytesToHex(entry.getKeyData()) + " " + Utils.bytesToHex(entry.getData()));
+                    }
+                    this.sha256Preimage = entry.getData();
+                    log.debug("Found input SHA256 preimage " + Utils.bytesToHex(entry.getData()));
+                    break;
+                case PSBT_IN_HASH160:
+                    entry.checkOneBytePlusRipe160Key();
+                    if(!Arrays.equals(entry.getKeyData(), Utils.sha256hash160(entry.getData()))) {
+                        throw new PSBTParseException("Hash of PSBT_IN_HASH160 preimage did not match provided hash " + Utils.bytesToHex(entry.getKeyData()) + " " + Utils.bytesToHex(entry.getData()));
+                    }
+                    this.hash160Preimage = entry.getData();
+                    log.debug("Found input HASH160 preimage " + Utils.bytesToHex(entry.getData()));
+                    break;
+                case PSBT_IN_HASH256:
+                    entry.checkOneBytePlusSha256Key();
+                    if(!Arrays.equals(entry.getKeyData(), Sha256Hash.hashTwice(entry.getData()))) {
+                        throw new PSBTParseException("Hash of PSBT_IN_HASH256 preimage did not match provided hash " + Utils.bytesToHex(entry.getKeyData()) + " " + Utils.bytesToHex(entry.getData()));
+                    }
+                    this.hash256Preimage = entry.getData();
+                    log.debug("Found input HASH256 preimage " + Utils.bytesToHex(entry.getData()));
+                    break;
+                case PSBT_IN_PREVIOUS_TXID:
+                    entry.checkOneByteKey();
+                    this.prevTxid = Sha256Hash.wrap(entry.getData());
+                    log.debug("Found input previous txid " + Utils.bytesToHex(entry.getData()));
+                    break;
+                case PSBT_IN_OUTPUT_INDEX:
+                    entry.checkOneByteKey();
+                    this.prevIndex = Utils.readUint32(entry.getData(), 0);
+                    log.debug("Found input previous output index " + this.prevIndex);
+                    break;
+                case PSBT_IN_SEQUENCE:
+                    entry.checkOneByteKey();
+                    this.sequence = Utils.readUint32(entry.getData(), 0);
+                    log.debug("Found input sequence " + this.sequence);
+                    break;
+                case PSBT_IN_REQUIRED_TIME_LOCKTIME:
+                    entry.checkOneByteKey();
+                    long requiredTimeLocktime = Utils.readUint32(entry.getData(), 0);
+                    if(requiredTimeLocktime < 500000000) {
+                        throw new PSBTParseException("Required time locktime is less than 500000000");
+                    }
+                    this.requiredTimeLocktime = requiredTimeLocktime;
+                    log.debug("Found input required time locktime " + this.requiredTimeLocktime);
+                    break;
+                case PSBT_IN_REQUIRED_HEIGHT_LOCKTIME:
+                    entry.checkOneByteKey();
+                    long requiredHeightLocktime = Utils.readUint32(entry.getData(), 0);
+                    if(requiredHeightLocktime >= 500000000) {
+                        throw new PSBTParseException("Required time locktime is greater than or equal to 500000000");
+                    }
+                    this.requiredHeightLocktime = requiredHeightLocktime;
+                    log.debug("Found input required height locktime " + this.requiredHeightLocktime);
+                    break;
                 case PSBT_IN_PROPRIETARY:
                     this.proprietary.put(Utils.bytesToHex(entry.getKeyData()), Utils.bytesToHex(entry.getData()));
                     log.debug("Found proprietary input " + Utils.bytesToHex(entry.getKeyData()) + ": " + Utils.bytesToHex(entry.getData()));
@@ -245,12 +344,9 @@ public class PSBTInput {
                     log.warn("PSBT input not recognized key type: " + entry.getKeyType());
             }
         }
-
-        this.transaction = transaction;
-        this.index = index;
     }
 
-    public List<PSBTEntry> getInputEntries() {
+    public List<PSBTEntry> getInputEntries(int psbtVersion) {
         List<PSBTEntry> entries = new ArrayList<>();
 
         if(nonWitnessUtxo != null) {
@@ -294,6 +390,32 @@ public class PSBTInput {
 
         if(porCommitment != null) {
             entries.add(populateEntry(PSBT_IN_POR_COMMITMENT, null, porCommitment.getBytes(StandardCharsets.UTF_8)));
+        }
+
+        if(psbtVersion >= 2) {
+            if(prevTxid != null) {
+                entries.add(populateEntry(PSBT_IN_PREVIOUS_TXID, null, prevTxid.getBytes()));
+            }
+            if(prevIndex != null) {
+                byte[] prevIndexBytes = new byte[4];
+                Utils.uint32ToByteArrayLE(prevIndex, prevIndexBytes, 0);
+                entries.add(populateEntry(PSBT_IN_OUTPUT_INDEX, null, prevIndexBytes));
+            }
+            if(sequence != null) {
+                byte[] sequenceBytes = new byte[4];
+                Utils.uint32ToByteArrayLE(sequence, sequenceBytes, 0);
+                entries.add(populateEntry(PSBT_IN_SEQUENCE, null, sequenceBytes));
+            }
+            if(requiredTimeLocktime != null) {
+                byte[] requiredTimeLocktimeBytes = new byte[4];
+                Utils.uint32ToByteArrayLE(requiredTimeLocktime, requiredTimeLocktimeBytes, 0);
+                entries.add(populateEntry(PSBT_IN_REQUIRED_TIME_LOCKTIME, null, requiredTimeLocktimeBytes));
+            }
+            if(requiredHeightLocktime != null) {
+                byte[] requiredHeightLocktimeBytes = new byte[4];
+                Utils.uint32ToByteArrayLE(requiredHeightLocktime, requiredHeightLocktimeBytes, 0);
+                entries.add(populateEntry(PSBT_IN_REQUIRED_HEIGHT_LOCKTIME, null, requiredHeightLocktimeBytes));
+            }
         }
 
         for(Map.Entry<String, String> entry : proprietary.entrySet()) {
@@ -344,6 +466,42 @@ public class PSBTInput {
 
         if(psbtInput.porCommitment != null) {
             porCommitment = psbtInput.porCommitment;
+        }
+
+        if(psbtInput.ripeMd160Preimage != null) {
+            ripeMd160Preimage = psbtInput.ripeMd160Preimage;
+        }
+
+        if(psbtInput.sha256Preimage != null) {
+            sha256Preimage = psbtInput.sha256Preimage;
+        }
+
+        if(psbtInput.hash160Preimage != null) {
+            hash160Preimage = psbtInput.hash160Preimage;
+        }
+
+        if(psbtInput.hash256Preimage != null) {
+            hash256Preimage = psbtInput.hash256Preimage;
+        }
+
+        if(psbtInput.prevTxid != null) {
+            prevTxid = psbtInput.prevTxid;
+        }
+
+        if(psbtInput.prevIndex != null) {
+            prevIndex = psbtInput.prevIndex;
+        }
+
+        if(psbtInput.sequence != null) {
+            sequence = psbtInput.sequence;
+        }
+
+        if(psbtInput.requiredTimeLocktime != null) {
+            requiredTimeLocktime = psbtInput.requiredTimeLocktime;
+        }
+
+        if(psbtInput.requiredHeightLocktime != null) {
+            requiredHeightLocktime = psbtInput.requiredHeightLocktime;
         }
 
         proprietary.putAll(psbtInput.proprietary);
@@ -479,6 +637,102 @@ public class PSBTInput {
 
     public boolean isTaproot() {
         return getUtxo() != null && getScriptType() == P2TR;
+    }
+
+    public byte[] getRipeMd160Preimage() {
+        return ripeMd160Preimage;
+    }
+
+    public void setRipeMd160Preimage(byte[] ripeMd160Preimage) {
+        this.ripeMd160Preimage = ripeMd160Preimage;
+    }
+
+    public byte[] getSha256Preimage() {
+        return sha256Preimage;
+    }
+
+    public void setSha256Preimage(byte[] sha256Preimage) {
+        this.sha256Preimage = sha256Preimage;
+    }
+
+    public byte[] getHash160Preimage() {
+        return hash160Preimage;
+    }
+
+    public void setHash160Preimage(byte[] hash160Preimage) {
+        this.hash160Preimage = hash160Preimage;
+    }
+
+    public byte[] getHash256Preimage() {
+        return hash256Preimage;
+    }
+
+    public void setHash256Preimage(byte[] hash256Preimage) {
+        this.hash256Preimage = hash256Preimage;
+    }
+
+    public Sha256Hash getPrevTxid() {
+        if(psbt.getPsbtVersion() >= 2) {
+            return prevTxid;
+        }
+
+        return getInput().getOutpoint().getHash();
+    }
+
+    Sha256Hash prevTxid() {
+        return prevTxid;
+    }
+
+    public void setPrevTxid(Sha256Hash prevTxid) {
+        this.prevTxid = prevTxid;
+    }
+
+    public Long getPrevIndex() {
+        if(psbt.getPsbtVersion() >= 2) {
+            return prevIndex;
+        }
+
+        return getInput().getOutpoint().getIndex();
+    }
+
+    Long prevIndex() {
+        return prevIndex;
+    }
+
+    public void setPrevIndex(Long prevIndex) {
+        this.prevIndex = prevIndex;
+    }
+
+    public Long getSequence() {
+        if(psbt.getPsbtVersion() >= 2) {
+            return sequence;
+        }
+
+        return getInput().getSequenceNumber();
+    }
+
+    Long sequence() {
+        return sequence;
+    }
+
+    public void setSequence(Long sequence) {
+        this.sequence = sequence;
+    }
+
+    public Long getRequiredTimeLocktime() {
+        return requiredTimeLocktime;
+    }
+
+    public void setRequiredTimeLocktime(Long requiredTimeLocktime) {
+        this.requiredTimeLocktime = requiredTimeLocktime;
+    }
+
+    public Long getRequiredHeightLocktime() {
+        return requiredHeightLocktime;
+    }
+
+    public void setRequiredHeightLocktime(Long requiredHeightLocktime) {
+        this.requiredHeightLocktime = requiredHeightLocktime;
     }
 
     public boolean isSigned() {
@@ -676,7 +930,7 @@ public class PSBTInput {
     }
 
     public TransactionInput getInput() {
-        return transaction.getInputs().get(index);
+        return psbt.getTransaction().getInputs().get(index);
     }
 
     public TransactionOutput getUtxo() {
@@ -705,12 +959,12 @@ public class PSBTInput {
         ScriptType scriptType = getScriptType();
         if(scriptType == ScriptType.P2TR) {
             List<TransactionOutput> spentUtxos = psbt.getPsbtInputs().stream().map(PSBTInput::getUtxo).collect(Collectors.toList());
-            hash = transaction.hashForTaprootSignature(spentUtxos, index, !P2TR.isScriptType(connectedScript), connectedScript, localSigHash, null);
+            hash = psbt.getTransaction().hashForTaprootSignature(spentUtxos, index, !P2TR.isScriptType(connectedScript), connectedScript, localSigHash, null);
         } else if(Arrays.asList(WITNESS_TYPES).contains(scriptType)) {
             long prevValue = getUtxo().getValue();
-            hash = transaction.hashForWitnessSignature(index, connectedScript, prevValue, localSigHash);
+            hash = psbt.getTransaction().hashForWitnessSignature(index, connectedScript, prevValue, localSigHash);
         } else {
-            hash = transaction.hashForLegacySignature(index, connectedScript, localSigHash);
+            hash = psbt.getTransaction().hashForLegacySignature(index, connectedScript, localSigHash);
         }
 
         return hash;
