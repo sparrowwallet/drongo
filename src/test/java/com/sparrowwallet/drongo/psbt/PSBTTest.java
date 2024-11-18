@@ -514,42 +514,42 @@ public class PSBTTest {
     @Test
     public void testPSBTv2MissingPrevTxid() throws PSBTParseException {
         String strPsbt = "cHNidP8BAgQCAAAAAQMEAAAAAAEEAQEBBQECAfsEAgAAAAABAFICAAAAAcGqJW4hS5ahgi+T3kK/87Xz/40FGTBuNRXXUVpegFsSAAAAAAD/////ARjGmjsAAAAAFgAUsKOvFEIIQSaTyn0WaFK1LbCu8G4AAAAAAQEfGMaaOwAAAAAWABSwo68UQghBJpPKfRZoUrUtsK7wbgEPBAAAAAABEAT+////ACICAtYB+EhGpnVfd2vgDj2d6PsQrMk1+4PEX7AWLUytWreSGPadhz5UAACAAQAAgAAAAIAAAAAAKgAAAAEDCAAIry8AAAAAAQQWABTEMPZMR1baMQ29GghVcu8pmSYnLAAiAgLjb7/1PdU0Bwz4/TlmFGgPNXqbhdtzQL8c+nRdKtezQBj2nYc+VAAAgAEAAIAAAACAAQAAAGQAAAABAwiLvesLAAAAAAEEFgAUTdGTrJZKVqwbnhzKhFT+L0dPhRMA";
-        Exception e = Assertions.assertThrows(PSBTParseException.class, () -> PSBT.fromString(strPsbt, true, false));
-        Assertions.assertEquals("PSBT_IN_PREV_TXID is required in PSBTv2", e.getMessage());
+        Exception e = Assertions.assertThrows(PSBTParseException.class, () -> PSBT.fromString(strPsbt));
+        Assertions.assertEquals("Outpoint hash not present for input 0", e.getMessage());
     }
 
     @Test
     public void testPSBTv2MissingOutputIndex() throws PSBTParseException {
         String strPsbt = "cHNidP8BAgQCAAAAAQMEAAAAAAEEAQEBBQECAfsEAgAAAAABAFICAAAAAcGqJW4hS5ahgi+T3kK/87Xz/40FGTBuNRXXUVpegFsSAAAAAAD/////ARjGmjsAAAAAFgAUsKOvFEIIQSaTyn0WaFK1LbCu8G4AAAAAAQEfGMaaOwAAAAAWABSwo68UQghBJpPKfRZoUrUtsK7wbgEOIAsK2SFBnByHGXNdctxzn56p4GONH+TB7vD5lECEgV/IARAE/v///wAiAgLWAfhIRqZ1X3dr4A49nej7EKzJNfuDxF+wFi1MrVq3khj2nYc+VAAAgAEAAIAAAACAAAAAACoAAAABAwgACK8vAAAAAAEEFgAUxDD2TEdW2jENvRoIVXLvKZkmJywAIgIC42+/9T3VNAcM+P05ZhRoDzV6m4Xbc0C/HPp0XSrXs0AY9p2HPlQAAIABAACAAAAAgAEAAABkAAAAAQMIi73rCwAAAAABBBYAFE3Rk6yWSlasG54cyoRU/i9HT4UTAA==";
-        Exception e = Assertions.assertThrows(PSBTParseException.class, () -> PSBT.fromString(strPsbt, true, false));
+        Exception e = Assertions.assertThrows(PSBTParseException.class, () -> PSBT.fromString(strPsbt));
         Assertions.assertEquals("PSBT_IN_OUTPUT_INDEX is required in PSBTv2", e.getMessage());
     }
 
     @Test
     public void testPSBTv2MissingOutputAmount() throws PSBTParseException {
         String strPsbt = "cHNidP8BAgQCAAAAAQMEAAAAAAEEAQEBBQECAfsEAgAAAAABAFICAAAAAcGqJW4hS5ahgi+T3kK/87Xz/40FGTBuNRXXUVpegFsSAAAAAAD/////ARjGmjsAAAAAFgAUsKOvFEIIQSaTyn0WaFK1LbCu8G4AAAAAAQEfGMaaOwAAAAAWABSwo68UQghBJpPKfRZoUrUtsK7wbgEOIAsK2SFBnByHGXNdctxzn56p4GONH+TB7vD5lECEgV/IAQ8EAAAAAAEQBP7///8AIgIC1gH4SEamdV93a+AOPZ3o+xCsyTX7g8RfsBYtTK1at5IY9p2HPlQAAIABAACAAAAAgAAAAAAqAAAAAQQWABTEMPZMR1baMQ29GghVcu8pmSYnLAAiAgLjb7/1PdU0Bwz4/TlmFGgPNXqbhdtzQL8c+nRdKtezQBj2nYc+VAAAgAEAAIAAAACAAQAAAGQAAAABAwiLvesLAAAAAAEEFgAUTdGTrJZKVqwbnhzKhFT+L0dPhRMA";
-        Exception e = Assertions.assertThrows(PSBTParseException.class, () -> PSBT.fromString(strPsbt, true, false));
+        Exception e = Assertions.assertThrows(PSBTParseException.class, () -> PSBT.fromString(strPsbt));
         Assertions.assertEquals("PSBT_OUT_AMOUNT is required in PSBTv2", e.getMessage());
     }
 
     @Test
     public void testPSBTv2MissingOutputScript() throws PSBTParseException {
         String strPsbt = "cHNidP8BAgQCAAAAAQMEAAAAAAEEAQEBBQECAfsEAgAAAAABAFICAAAAAcGqJW4hS5ahgi+T3kK/87Xz/40FGTBuNRXXUVpegFsSAAAAAAD/////ARjGmjsAAAAAFgAUsKOvFEIIQSaTyn0WaFK1LbCu8G4AAAAAAQEfGMaaOwAAAAAWABSwo68UQghBJpPKfRZoUrUtsK7wbgEOIAsK2SFBnByHGXNdctxzn56p4GONH+TB7vD5lECEgV/IAQ8EAAAAAAEQBP7///8AIgIC1gH4SEamdV93a+AOPZ3o+xCsyTX7g8RfsBYtTK1at5IY9p2HPlQAAIABAACAAAAAgAAAAAAqAAAAAQMIAAivLwAAAAAAIgIC42+/9T3VNAcM+P05ZhRoDzV6m4Xbc0C/HPp0XSrXs0AY9p2HPlQAAIABAACAAAAAgAEAAABkAAAAAQMIi73rCwAAAAABBBYAFE3Rk6yWSlasG54cyoRU/i9HT4UTAA==";
-        Exception e = Assertions.assertThrows(PSBTParseException.class, () -> PSBT.fromString(strPsbt, true, false));
+        Exception e = Assertions.assertThrows(PSBTParseException.class, () -> PSBT.fromString(strPsbt));
         Assertions.assertEquals("PSBT_OUT_SCRIPT is required in PSBTv2", e.getMessage());
     }
 
     @Test
     public void testPSBTv2SmallTimeLocktime() throws PSBTParseException {
         String strPsbt = "cHNidP8BAgQCAAAAAQQBAQEFAQIB+wQCAAAAAAEAUgIAAAABwaolbiFLlqGCL5PeQr/ztfP/jQUZMG41FddRWl6AWxIAAAAAAP////8BGMaaOwAAAAAWABSwo68UQghBJpPKfRZoUrUtsK7wbgAAAAABAR8Yxpo7AAAAABYAFLCjrxRCCEEmk8p9FmhStS2wrvBuAQ4gCwrZIUGcHIcZc11y3HOfnqngY40f5MHu8PmUQISBX8gBDwQAAAAAAREE/2TNHQAiAgLWAfhIRqZ1X3dr4A49nej7EKzJNfuDxF+wFi1MrVq3khj2nYc+VAAAgAEAAIAAAACAAAAAACoAAAABAwgACK8vAAAAAAEEFgAUxDD2TEdW2jENvRoIVXLvKZkmJywAIgIC42+/9T3VNAcM+P05ZhRoDzV6m4Xbc0C/HPp0XSrXs0AY9p2HPlQAAIABAACAAAAAgAEAAABkAAAAAQMIi73rCwAAAAABBBYAFE3Rk6yWSlasG54cyoRU/i9HT4UTAA==";
-        Exception e = Assertions.assertThrows(PSBTParseException.class, () -> PSBT.fromString(strPsbt, true, false));
+        Exception e = Assertions.assertThrows(PSBTParseException.class, () -> PSBT.fromString(strPsbt));
         Assertions.assertEquals("Required time locktime is less than 500000000", e.getMessage());
     }
 
     @Test
     public void testPSBTv2LargeHeightLocktime() throws PSBTParseException {
         String strPsbt = "cHNidP8BAgQCAAAAAQQBAQEFAQIB+wQCAAAAAAEAUgIAAAABwaolbiFLlqGCL5PeQr/ztfP/jQUZMG41FddRWl6AWxIAAAAAAP////8BGMaaOwAAAAAWABSwo68UQghBJpPKfRZoUrUtsK7wbgAAAAABAR8Yxpo7AAAAABYAFLCjrxRCCEEmk8p9FmhStS2wrvBuAQ4gCwrZIUGcHIcZc11y3HOfnqngY40f5MHu8PmUQISBX8gBDwQAAAAAARIEAGXNHQAiAgLWAfhIRqZ1X3dr4A49nej7EKzJNfuDxF+wFi1MrVq3khj2nYc+VAAAgAEAAIAAAACAAAAAACoAAAABAwgACK8vAAAAAAEEFgAUxDD2TEdW2jENvRoIVXLvKZkmJywAIgIC42+/9T3VNAcM+P05ZhRoDzV6m4Xbc0C/HPp0XSrXs0AY9p2HPlQAAIABAACAAAAAgAEAAABkAAAAAQMIi73rCwAAAAABBBYAFE3Rk6yWSlasG54cyoRU/i9HT4UTAA==";
-        Exception e = Assertions.assertThrows(PSBTParseException.class, () -> PSBT.fromString(strPsbt, true, false));
+        Exception e = Assertions.assertThrows(PSBTParseException.class, () -> PSBT.fromString(strPsbt));
         Assertions.assertEquals("Required time locktime is greater than or equal to 500000000", e.getMessage());
     }
 
@@ -564,7 +564,7 @@ public class PSBTTest {
     @Test
     public void testPSBTv21Input2OutputsUpdated() throws PSBTParseException {
         String strPsbt = "cHNidP8BAgQCAAAAAQQBAQEFAQIB+wQCAAAAAAEAUgIAAAABwaolbiFLlqGCL5PeQr/ztfP/jQUZMG41FddRWl6AWxIAAAAAAP////8BGMaaOwAAAAAWABSwo68UQghBJpPKfRZoUrUtsK7wbgAAAAABAR8Yxpo7AAAAABYAFLCjrxRCCEEmk8p9FmhStS2wrvBuAQ4gCwrZIUGcHIcZc11y3HOfnqngY40f5MHu8PmUQISBX8gBDwQAAAAAACICAtYB+EhGpnVfd2vgDj2d6PsQrMk1+4PEX7AWLUytWreSGPadhz5UAACAAQAAgAAAAIAAAAAAKgAAAAEDCAAIry8AAAAAAQQWABTEMPZMR1baMQ29GghVcu8pmSYnLAAiAgLjb7/1PdU0Bwz4/TlmFGgPNXqbhdtzQL8c+nRdKtezQBj2nYc+VAAAgAEAAIAAAACAAQAAAGQAAAABAwiLvesLAAAAAAEEFgAUTdGTrJZKVqwbnhzKhFT+L0dPhRMA";
-        PSBT psbt = PSBT.fromString(strPsbt, true, false);
+        PSBT psbt = PSBT.fromString(strPsbt);
         Assertions.assertEquals(1, psbt.getInputCount());
         Assertions.assertEquals(2, psbt.getOutputCount());
     }
@@ -572,7 +572,7 @@ public class PSBTTest {
     @Test
     public void testPSBTv21Input2OutputsSequence() throws PSBTParseException {
         String strPsbt = "cHNidP8BAgQCAAAAAQQBAQEFAQIB+wQCAAAAAAEAUgIAAAABwaolbiFLlqGCL5PeQr/ztfP/jQUZMG41FddRWl6AWxIAAAAAAP////8BGMaaOwAAAAAWABSwo68UQghBJpPKfRZoUrUtsK7wbgAAAAABAR8Yxpo7AAAAABYAFLCjrxRCCEEmk8p9FmhStS2wrvBuAQ4gCwrZIUGcHIcZc11y3HOfnqngY40f5MHu8PmUQISBX8gBDwQAAAAAARAE/v///wAiAgLWAfhIRqZ1X3dr4A49nej7EKzJNfuDxF+wFi1MrVq3khj2nYc+VAAAgAEAAIAAAACAAAAAACoAAAABAwgACK8vAAAAAAEEFgAUxDD2TEdW2jENvRoIVXLvKZkmJywAIgIC42+/9T3VNAcM+P05ZhRoDzV6m4Xbc0C/HPp0XSrXs0AY9p2HPlQAAIABAACAAAAAgAEAAABkAAAAAQMIi73rCwAAAAABBBYAFE3Rk6yWSlasG54cyoRU/i9HT4UTAA==";
-        PSBT psbt = PSBT.fromString(strPsbt, true, false);
+        PSBT psbt = PSBT.fromString(strPsbt);
         Assertions.assertEquals(1, psbt.getInputCount());
         Assertions.assertEquals(2, psbt.getOutputCount());
         Assertions.assertEquals(4294967294L, psbt.getPsbtInputs().get(0).getSequence());
@@ -581,7 +581,7 @@ public class PSBTTest {
     @Test
     public void testPSBTv21Input2OutputsSequenceLocktimes() throws PSBTParseException {
         String strPsbt = "cHNidP8BAgQCAAAAAQMEAAAAAAEEAQEBBQECAfsEAgAAAAABAFICAAAAAcGqJW4hS5ahgi+T3kK/87Xz/40FGTBuNRXXUVpegFsSAAAAAAD/////ARjGmjsAAAAAFgAUsKOvFEIIQSaTyn0WaFK1LbCu8G4AAAAAAQEfGMaaOwAAAAAWABSwo68UQghBJpPKfRZoUrUtsK7wbgEOIAsK2SFBnByHGXNdctxzn56p4GONH+TB7vD5lECEgV/IAQ8EAAAAAAEQBP7///8BEQSMjcRiARIEECcAAAAiAgLWAfhIRqZ1X3dr4A49nej7EKzJNfuDxF+wFi1MrVq3khj2nYc+VAAAgAEAAIAAAACAAAAAACoAAAABAwgACK8vAAAAAAEEFgAUxDD2TEdW2jENvRoIVXLvKZkmJywAIgIC42+/9T3VNAcM+P05ZhRoDzV6m4Xbc0C/HPp0XSrXs0AY9p2HPlQAAIABAACAAAAAgAEAAABkAAAAAQMIi73rCwAAAAABBBYAFE3Rk6yWSlasG54cyoRU/i9HT4UTAA==";
-        PSBT psbt = PSBT.fromString(strPsbt, true, false);
+        PSBT psbt = PSBT.fromString(strPsbt);
         Assertions.assertEquals(1, psbt.getInputCount());
         Assertions.assertEquals(2, psbt.getOutputCount());
         Assertions.assertEquals(4294967294L, psbt.getPsbtInputs().get(0).getSequence());
@@ -592,7 +592,7 @@ public class PSBTTest {
     @Test
     public void testPSBTv21Input2OutputsModifiableBit0() throws PSBTParseException {
         String strPsbt = "cHNidP8BAgQCAAAAAQQBAQEFAQIBBgEBAfsEAgAAAAABAFICAAAAAcGqJW4hS5ahgi+T3kK/87Xz/40FGTBuNRXXUVpegFsSAAAAAAD/////ARjGmjsAAAAAFgAUsKOvFEIIQSaTyn0WaFK1LbCu8G4AAAAAAQEfGMaaOwAAAAAWABSwo68UQghBJpPKfRZoUrUtsK7wbgEOIAsK2SFBnByHGXNdctxzn56p4GONH+TB7vD5lECEgV/IAQ8EAAAAAAAiAgLWAfhIRqZ1X3dr4A49nej7EKzJNfuDxF+wFi1MrVq3khj2nYc+VAAAgAEAAIAAAACAAAAAACoAAAABAwgACK8vAAAAAAEEFgAUxDD2TEdW2jENvRoIVXLvKZkmJywAIgIC42+/9T3VNAcM+P05ZhRoDzV6m4Xbc0C/HPp0XSrXs0AY9p2HPlQAAIABAACAAAAAgAEAAABkAAAAAQMIi73rCwAAAAABBBYAFE3Rk6yWSlasG54cyoRU/i9HT4UTAA==";
-        PSBT psbt = PSBT.fromString(strPsbt, true, false);
+        PSBT psbt = PSBT.fromString(strPsbt);
         Assertions.assertEquals(1, psbt.getInputCount());
         Assertions.assertEquals(2, psbt.getOutputCount());
         Assertions.assertEquals((byte)0x01, psbt.getModifiable());
@@ -601,7 +601,7 @@ public class PSBTTest {
     @Test
     public void testPSBTv21Input2OutputsModifiableBit1() throws PSBTParseException {
         String strPsbt = "cHNidP8BAgQCAAAAAQQBAQEFAQIBBgECAfsEAgAAAAABAFICAAAAAcGqJW4hS5ahgi+T3kK/87Xz/40FGTBuNRXXUVpegFsSAAAAAAD/////ARjGmjsAAAAAFgAUsKOvFEIIQSaTyn0WaFK1LbCu8G4AAAAAAQEfGMaaOwAAAAAWABSwo68UQghBJpPKfRZoUrUtsK7wbgEOIAsK2SFBnByHGXNdctxzn56p4GONH+TB7vD5lECEgV/IAQ8EAAAAAAAiAgLWAfhIRqZ1X3dr4A49nej7EKzJNfuDxF+wFi1MrVq3khj2nYc+VAAAgAEAAIAAAACAAAAAACoAAAABAwgACK8vAAAAAAEEFgAUxDD2TEdW2jENvRoIVXLvKZkmJywAIgIC42+/9T3VNAcM+P05ZhRoDzV6m4Xbc0C/HPp0XSrXs0AY9p2HPlQAAIABAACAAAAAgAEAAABkAAAAAQMIi73rCwAAAAABBBYAFE3Rk6yWSlasG54cyoRU/i9HT4UTAA==";
-        PSBT psbt = PSBT.fromString(strPsbt, true, false);
+        PSBT psbt = PSBT.fromString(strPsbt);
         Assertions.assertEquals(1, psbt.getInputCount());
         Assertions.assertEquals(2, psbt.getOutputCount());
         Assertions.assertEquals((byte)0x02, psbt.getModifiable());
@@ -610,7 +610,7 @@ public class PSBTTest {
     @Test
     public void testPSBTv21Input2OutputsModifiableAllBits() throws PSBTParseException {
         String strPsbt = "cHNidP8BAgQCAAAAAQQBAQEFAQIBBgEHAfsEAgAAAAABAFICAAAAAcGqJW4hS5ahgi+T3kK/87Xz/40FGTBuNRXXUVpegFsSAAAAAAD/////ARjGmjsAAAAAFgAUsKOvFEIIQSaTyn0WaFK1LbCu8G4AAAAAAQEfGMaaOwAAAAAWABSwo68UQghBJpPKfRZoUrUtsK7wbgEOIAsK2SFBnByHGXNdctxzn56p4GONH+TB7vD5lECEgV/IAQ8EAAAAAAAiAgLWAfhIRqZ1X3dr4A49nej7EKzJNfuDxF+wFi1MrVq3khj2nYc+VAAAgAEAAIAAAACAAAAAACoAAAABAwgACK8vAAAAAAEEFgAUxDD2TEdW2jENvRoIVXLvKZkmJywAIgIC42+/9T3VNAcM+P05ZhRoDzV6m4Xbc0C/HPp0XSrXs0AY9p2HPlQAAIABAACAAAAAgAEAAABkAAAAAQMIi73rCwAAAAABBBYAFE3Rk6yWSlasG54cyoRU/i9HT4UTAA==";
-        PSBT psbt = PSBT.fromString(strPsbt, true, false);
+        PSBT psbt = PSBT.fromString(strPsbt);
         Assertions.assertEquals(1, psbt.getInputCount());
         Assertions.assertEquals(2, psbt.getOutputCount());
         Assertions.assertEquals((byte)0x07, psbt.getModifiable());
@@ -619,7 +619,7 @@ public class PSBTTest {
     @Test
     public void testPSBTv21Input2OutputsAllFields() throws PSBTParseException {
         String strPsbt = "cHNidP8BAgQCAAAAAQMEAAAAAAEEAQEBBQECAQYBBwH7BAIAAAAAAQBSAgAAAAHBqiVuIUuWoYIvk95Cv/O18/+NBRkwbjUV11FaXoBbEgAAAAAA/////wEYxpo7AAAAABYAFLCjrxRCCEEmk8p9FmhStS2wrvBuAAAAAAEBHxjGmjsAAAAAFgAUsKOvFEIIQSaTyn0WaFK1LbCu8G4BDiALCtkhQZwchxlzXXLcc5+eqeBjjR/kwe7w+ZRAhIFfyAEPBAAAAAABEAT+////AREEjI3EYgESBBAnAAAAIgIC1gH4SEamdV93a+AOPZ3o+xCsyTX7g8RfsBYtTK1at5IY9p2HPlQAAIABAACAAAAAgAAAAAAqAAAAAQMIAAivLwAAAAABBBYAFMQw9kxHVtoxDb0aCFVy7ymZJicsACICAuNvv/U91TQHDPj9OWYUaA81epuF23NAvxz6dF0q17NAGPadhz5UAACAAQAAgAAAAIABAAAAZAAAAAEDCIu96wsAAAAAAQQWABRN0ZOslkpWrBueHMqEVP4vR0+FEwA=";
-        PSBT psbt = PSBT.fromString(strPsbt, true, false);
+        PSBT psbt = PSBT.fromString(strPsbt);
         Assertions.assertEquals(1, psbt.getInputCount());
         Assertions.assertEquals(2, psbt.getOutputCount());
         Assertions.assertEquals((byte)0x07, psbt.getModifiable());
@@ -635,14 +635,14 @@ public class PSBTTest {
     @Test
     public void testPSBTv2NoLocktime() throws PSBTParseException {
         String strPsbt = "cHNidP8BAgQCAAAAAQQBAQEFAQIB+wQCAAAAAAEOIAsK2SFBnByHGXNdctxzn56p4GONH+TB7vD5lECEgV/IAQ8EAAAAAAABAwgACK8vAAAAAAEEFgAUxDD2TEdW2jENvRoIVXLvKZkmJywAAQMIi73rCwAAAAABBBYAFE3Rk6yWSlasG54cyoRU/i9HT4UTAA==";
-        PSBT psbt = PSBT.fromString(strPsbt, true, false);
+        PSBT psbt = PSBT.fromString(strPsbt);
         Assertions.assertEquals(0, psbt.getTransaction().getLocktime());
     }
 
     @Test
     public void testPSBTv2ZeroFallbackLocktime() throws PSBTParseException {
         String strPsbt = "cHNidP8BAgQCAAAAAQMEAAAAAAEEAQIBBQEBAfsEAgAAAAABDiAPdY2/vU2nwWyKMwnDyB4RAPVh6mRttbAXUsSF4b3enwEPBAEAAAAAAQ4gOhs7PIN9ZInqejHY5sfdUDwAG+8+BpWOdXSAjWjKeKUBDwQAAAAAAAEDCE+TNXcAAAAAAQQWABQLE1LKzQPPaqG388jWOIZxs0peEQA=";
-        PSBT psbt = PSBT.fromString(strPsbt, true, false);
+        PSBT psbt = PSBT.fromString(strPsbt);
         Assertions.assertEquals(0, psbt.getFallbackLocktime());
         Assertions.assertEquals(0, psbt.getTransaction().getLocktime());
     }
@@ -650,49 +650,49 @@ public class PSBTTest {
     @Test
     public void testPSBTv21InputLocktime() throws PSBTParseException {
         String strPsbt = "cHNidP8BAgQCAAAAAQMEAAAAAAEEAQIBBQEBAfsEAgAAAAABDiAPdY2/vU2nwWyKMwnDyB4RAPVh6mRttbAXUsSF4b3enwEPBAEAAAABEgQQJwAAAAEOIDobOzyDfWSJ6nox2ObH3VA8ABvvPgaVjnV0gI1oynilAQ8EAAAAAAABAwhPkzV3AAAAAAEEFgAUCxNSys0Dz2qht/PI1jiGcbNKXhEA";
-        PSBT psbt = PSBT.fromString(strPsbt, true, false);
+        PSBT psbt = PSBT.fromString(strPsbt);
         Assertions.assertEquals(10000, psbt.getTransaction().getLocktime());
     }
 
     @Test
     public void testPSBTv22InputsLocktimeHeight() throws PSBTParseException {
         String strPsbt = "cHNidP8BAgQCAAAAAQMEAAAAAAEEAQIBBQEBAfsEAgAAAAABDiAPdY2/vU2nwWyKMwnDyB4RAPVh6mRttbAXUsSF4b3enwEPBAEAAAABEgQQJwAAAAEOIDobOzyDfWSJ6nox2ObH3VA8ABvvPgaVjnV0gI1oynilAQ8EAAAAAAESBCgjAAAAAQMIT5M1dwAAAAABBBYAFAsTUsrNA89qobfzyNY4hnGzSl4RAA==";
-        PSBT psbt = PSBT.fromString(strPsbt, true, false);
+        PSBT psbt = PSBT.fromString(strPsbt);
         Assertions.assertEquals(10000, psbt.getTransaction().getLocktime());
     }
 
     @Test
     public void testPSBTv22InputsLocktimeMixed() throws PSBTParseException {
         String strPsbt = "cHNidP8BAgQCAAAAAQMEAAAAAAEEAQIBBQEBAfsEAgAAAAABDiAPdY2/vU2nwWyKMwnDyB4RAPVh6mRttbAXUsSF4b3enwEPBAEAAAABEgQQJwAAAAEOIDobOzyDfWSJ6nox2ObH3VA8ABvvPgaVjnV0gI1oynilAQ8EAAAAAAERBIyNxGIBEgQoIwAAAAEDCE+TNXcAAAAAAQQWABQLE1LKzQPPaqG388jWOIZxs0peEQA=";
-        PSBT psbt = PSBT.fromString(strPsbt, true, false);
+        PSBT psbt = PSBT.fromString(strPsbt);
         Assertions.assertEquals(10000, psbt.getTransaction().getLocktime());
     }
 
     @Test
     public void testPSBTv22InputsLocktimeMixed2() throws PSBTParseException {
         String strPsbt = "cHNidP8BAgQCAAAAAQMEAAAAAAEEAQIBBQEBAfsEAgAAAAABDiAPdY2/vU2nwWyKMwnDyB4RAPVh6mRttbAXUsSF4b3enwEPBAEAAAABEQSLjcRiARIEECcAAAABDiA6Gzs8g31kiep6Mdjmx91QPAAb7z4GlY51dICNaMp4pQEPBAAAAAABEQSMjcRiARIEKCMAAAABAwhPkzV3AAAAAAEEFgAUCxNSys0Dz2qht/PI1jiGcbNKXhEA";
-        PSBT psbt = PSBT.fromString(strPsbt, true, false);
+        PSBT psbt = PSBT.fromString(strPsbt);
         Assertions.assertEquals(10000, psbt.getTransaction().getLocktime());
     }
 
     @Test
     public void testPSBTv22InputsLocktimeTimeMixed() throws PSBTParseException {
         String strPsbt = "cHNidP8BAgQCAAAAAQMEAAAAAAEEAQIBBQEBAfsEAgAAAAABDiAPdY2/vU2nwWyKMwnDyB4RAPVh6mRttbAXUsSF4b3enwEPBAEAAAABEQSLjcRiAAEOIDobOzyDfWSJ6nox2ObH3VA8ABvvPgaVjnV0gI1oynilAQ8EAAAAAAERBIyNxGIBEgQoIwAAAAEDCE+TNXcAAAAAAQQWABQLE1LKzQPPaqG388jWOIZxs0peEQA=";
-        PSBT psbt = PSBT.fromString(strPsbt, true, false);
+        PSBT psbt = PSBT.fromString(strPsbt);
         Assertions.assertEquals(1657048460, psbt.getTransaction().getLocktime());
     }
 
     @Test
     public void testPSBTv22InputsLocktimeTimeMixed2() throws PSBTParseException {
         String strPsbt = "cHNidP8BAgQCAAAAAQMEAAAAAAEEAQIBBQEBAfsEAgAAAAABDiAPdY2/vU2nwWyKMwnDyB4RAPVh6mRttbAXUsSF4b3enwEPBAEAAAABEQSLjcRiARIEECcAAAABDiA6Gzs8g31kiep6Mdjmx91QPAAb7z4GlY51dICNaMp4pQEPBAAAAAABEQSMjcRiAAEDCE+TNXcAAAAAAQQWABQLE1LKzQPPaqG388jWOIZxs0peEQA=";
-        PSBT psbt = PSBT.fromString(strPsbt, true, false);
+        PSBT psbt = PSBT.fromString(strPsbt);
         Assertions.assertEquals(1657048460, psbt.getTransaction().getLocktime());
     }
 
     @Test
     public void testPSBTv22InputsLocktimeTimeMixed3() throws PSBTParseException {
         String strPsbt = "cHNidP8BAgQCAAAAAQMEAAAAAAEEAQIBBQEBAfsEAgAAAAABDiAPdY2/vU2nwWyKMwnDyB4RAPVh6mRttbAXUsSF4b3enwEPBAEAAAAAAQ4gOhs7PIN9ZInqejHY5sfdUDwAG+8+BpWOdXSAjWjKeKUBDwQAAAAAAREEjI3EYgABAwhPkzV3AAAAAAEEFgAUCxNSys0Dz2qht/PI1jiGcbNKXhEA";
-        PSBT psbt = PSBT.fromString(strPsbt, true, false);
+        PSBT psbt = PSBT.fromString(strPsbt);
         Assertions.assertEquals(1657048460, psbt.getTransaction().getLocktime());
     }
 
@@ -711,10 +711,10 @@ public class PSBTTest {
     public void convertPSBTv2ToPSBTv0() throws PSBTParseException {
         Network.set(Network.TESTNET);
         String strPsbt = "cHNidP8BAgQCAAAAAQMEAAAAAAEEAQEBBQECAQYBBwH7BAIAAAAAAQBSAgAAAAHBqiVuIUuWoYIvk95Cv/O18/+NBRkwbjUV11FaXoBbEgAAAAAA/////wEYxpo7AAAAABYAFLCjrxRCCEEmk8p9FmhStS2wrvBuAAAAAAEBHxjGmjsAAAAAFgAUsKOvFEIIQSaTyn0WaFK1LbCu8G4BDiALCtkhQZwchxlzXXLcc5+eqeBjjR/kwe7w+ZRAhIFfyAEPBAAAAAABEAT+////AREEjI3EYgESBBAnAAAAIgIC1gH4SEamdV93a+AOPZ3o+xCsyTX7g8RfsBYtTK1at5IY9p2HPlQAAIABAACAAAAAgAAAAAAqAAAAAQMIAAivLwAAAAABBBYAFMQw9kxHVtoxDb0aCFVy7ymZJicsACICAuNvv/U91TQHDPj9OWYUaA81epuF23NAvxz6dF0q17NAGPadhz5UAACAAQAAgAAAAIABAAAAZAAAAAEDCIu96wsAAAAAAQQWABRN0ZOslkpWrBueHMqEVP4vR0+FEwA=";
-        PSBT origPsbtv2 = PSBT.fromString(strPsbt, true, false);
-        PSBT psbtv2 = PSBT.fromString(strPsbt, true, false);
+        PSBT origPsbtv2 = PSBT.fromString(strPsbt);
+        PSBT psbtv2 = PSBT.fromString(strPsbt);
         psbtv2.convertVersion(0);
-        PSBT psbtv0 = PSBT.fromString(psbtv2.toBase64String(), true, false);
+        PSBT psbtv0 = PSBT.fromString(psbtv2.toBase64String());
         Assertions.assertEquals(origPsbtv2.getTransaction().getTxId(), psbtv0.getTransaction().getTxId());
     }
 

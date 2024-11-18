@@ -60,7 +60,6 @@ public class PSBT {
     private final List<PSBTOutput> psbtOutputs = new ArrayList<>();
 
     private static final Logger log = LoggerFactory.getLogger(PSBT.class);
-    private boolean verifyPrevTxids = true;
 
     public PSBT(Transaction transaction) {
         this.transaction = transaction;
@@ -203,12 +202,7 @@ public class PSBT {
     }
 
     public PSBT(byte[] psbt, boolean verifySignatures) throws PSBTParseException {
-        this(psbt, verifySignatures, true);
-    }
-
-    public PSBT(byte[] psbt, boolean verifySignatures, boolean verifyPrevTxids) throws PSBTParseException {
         this.psbtBytes = psbt;
-        this.verifyPrevTxids = verifyPrevTxids;
         parse(verifySignatures);
     }
 
@@ -998,10 +992,6 @@ public class PSBT {
         return maxHeightLocktime.orElse(maxTimeLocktime.orElse(fallback));
     }
 
-    boolean isVerifyPrevTxids() {
-        return verifyPrevTxids;
-    }
-
     public static boolean isPSBT(byte[] b) {
         try {
             ByteBuffer buffer = ByteBuffer.wrap(b);
@@ -1033,10 +1023,6 @@ public class PSBT {
     }
 
     public static PSBT fromString(String strPSBT, boolean verifySignatures) throws PSBTParseException {
-        return fromString(strPSBT, verifySignatures, true);
-    }
-
-    static PSBT fromString(String strPSBT, boolean verifySignatures, boolean verifyPrevTxids) throws PSBTParseException {
         if (!isPSBT(strPSBT)) {
             throw new PSBTParseException("Provided string is not a PSBT");
         }
@@ -1046,6 +1032,6 @@ public class PSBT {
         }
 
         byte[] psbtBytes = Utils.hexToBytes(strPSBT);
-        return new PSBT(psbtBytes, verifySignatures, verifyPrevTxids);
+        return new PSBT(psbtBytes, verifySignatures);
     }
 }

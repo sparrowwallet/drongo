@@ -124,17 +124,14 @@ public class PSBTInput {
                     entry.checkOneByteKey();
                     Transaction nonWitnessTx = new Transaction(entry.getData());
                     nonWitnessTx.verify();
-                    if(psbt.isVerifyPrevTxids()) {
-                        Sha256Hash inputHash = nonWitnessTx.calculateTxId(false);
-                        Sha256Hash outpointHash = getPrevTxid();
-                        if(outpointHash == null) {
-                            throw new PSBTParseException("Outpoint hash not present for input " + index);
-                        }
-                        if(!outpointHash.equals(inputHash)) {
-                            throw new PSBTParseException("Hash of provided non witness utxo transaction " + inputHash + " does not match transaction input outpoint hash " + outpointHash + " at index " + index);
-                        }
+                    Sha256Hash inputHash = nonWitnessTx.calculateTxId(false);
+                    Sha256Hash outpointHash = getPrevTxid();
+                    if(outpointHash == null) {
+                        throw new PSBTParseException("Outpoint hash not present for input " + index);
                     }
-
+                    if(!outpointHash.equals(inputHash)) {
+                        throw new PSBTParseException("Hash of provided non witness utxo transaction " + inputHash + " does not match transaction input outpoint hash " + outpointHash + " at index " + index);
+                    }
                     this.nonWitnessUtxo = nonWitnessTx;
                     log.debug("Found input non witness utxo with txid: " + nonWitnessTx.getTxId() + " version " + nonWitnessTx.getVersion() + " size " + nonWitnessTx.getMessageSize() + " locktime " + nonWitnessTx.getLocktime());
                     for(TransactionInput input: nonWitnessTx.getInputs()) {
@@ -282,7 +279,7 @@ public class PSBTInput {
                     break;
                 case PSBT_IN_PREVIOUS_TXID:
                     entry.checkOneByteKey();
-                    this.prevTxid = Sha256Hash.wrap(entry.getData());
+                    this.prevTxid = Sha256Hash.wrap(Utils.reverseBytes(entry.getData()));
                     log.debug("Found input previous txid " + Utils.bytesToHex(entry.getData()));
                     break;
                 case PSBT_IN_OUTPUT_INDEX:
@@ -394,7 +391,7 @@ public class PSBTInput {
 
         if(psbtVersion >= 2) {
             if(prevTxid != null) {
-                entries.add(populateEntry(PSBT_IN_PREVIOUS_TXID, null, prevTxid.getBytes()));
+                entries.add(populateEntry(PSBT_IN_PREVIOUS_TXID, null, Utils.reverseBytes(prevTxid.getBytes())));
             }
             if(prevIndex != null) {
                 byte[] prevIndexBytes = new byte[4];
