@@ -142,7 +142,7 @@ public class PSBTOutput {
 
         if(psbtVersion >= 2) {
             if(amount != null) {
-                byte[] amountBytes = new byte[64];
+                byte[] amountBytes = new byte[8];
                 Utils.int64ToByteArrayLE(amount, amountBytes, 0);
                 entries.add(populateEntry(PSBT_OUT_AMOUNT, null, amountBytes));
             }
