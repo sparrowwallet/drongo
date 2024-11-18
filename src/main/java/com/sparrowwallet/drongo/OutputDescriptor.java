@@ -654,4 +654,21 @@ public class OutputDescriptor {
 
         return keyBuilder.toString();
     }
+
+    @Override
+    public final boolean equals(Object o) {
+        if(this == o) {
+            return true;
+        }
+        if(!(o instanceof OutputDescriptor that)) {
+            return false;
+        }
+
+        return toString().equals(that.toString());
+    }
+
+    @Override
+    public int hashCode() {
+        return toString().hashCode();
+    }
 }
