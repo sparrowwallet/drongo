@@ -73,12 +73,20 @@ public class OutputDescriptor {
         return Collections.unmodifiableSet(extendedPublicKeys.keySet());
     }
 
+    public Map<ExtendedKey, KeyDerivation> getExtendedPublicKeysMap() {
+        return Collections.unmodifiableMap(extendedPublicKeys);
+    }
+
     public KeyDerivation getKeyDerivation(ExtendedKey extendedPublicKey) {
         return extendedPublicKeys.get(extendedPublicKey);
     }
 
     public int getMultisigThreshold() {
         return multisigThreshold;
+    }
+
+    public Map<ExtendedKey, String> getChildDerivationsMap() {
+        return Collections.unmodifiableMap(mapChildrenDerivations);
     }
 
     public String getChildDerivationPath(ExtendedKey extendedPublicKey) {
@@ -670,5 +678,10 @@ public class OutputDescriptor {
     @Override
     public int hashCode() {
         return toString().hashCode();
+    }
+
+    public OutputDescriptor copy(boolean includeChildDerivations) {
+        return new OutputDescriptor(scriptType, multisigThreshold, extendedPublicKeys,
+                includeChildDerivations ? mapChildrenDerivations : Collections.emptyMap(), mapExtendedPublicKeyLabels, extendedMasterPrivateKeys);
     }
 }
