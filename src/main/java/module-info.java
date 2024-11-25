@@ -6,7 +6,6 @@ open module com.sparrowwallet.drongo {
     requires org.slf4j;
     requires ch.qos.logback.core;
     requires ch.qos.logback.classic;
-    requires json.simple;
     exports com.sparrowwallet.drongo;
     exports com.sparrowwallet.drongo.psbt;
     exports com.sparrowwallet.drongo.protocol;
