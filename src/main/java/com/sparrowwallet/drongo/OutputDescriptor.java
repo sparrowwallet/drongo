@@ -15,6 +15,7 @@ import java.math.BigInteger;
 import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 import static com.sparrowwallet.drongo.KeyDerivation.parsePath;
 
@@ -681,7 +682,19 @@ public class OutputDescriptor {
     }
 
     public OutputDescriptor copy(boolean includeChildDerivations) {
-        return new OutputDescriptor(scriptType, multisigThreshold, extendedPublicKeys,
-                includeChildDerivations ? mapChildrenDerivations : Collections.emptyMap(), mapExtendedPublicKeyLabels, extendedMasterPrivateKeys);
+        Map<ExtendedKey, KeyDerivation> copyExtendedPublicKeys = new LinkedHashMap<>(extendedPublicKeys);
+        Map<ExtendedKey, String> copyChildDerivations = new LinkedHashMap<>(mapChildrenDerivations);
+        Map<ExtendedKey, String> copyExtendedPublicKeyLabels = new LinkedHashMap<>(mapExtendedPublicKeyLabels);
+        Map<ExtendedKey, ExtendedKey> copyExtendedMasterPrivateKeys = new LinkedHashMap<>(extendedMasterPrivateKeys);
+
+        if(!includeChildDerivations) {
+            //Ensure consistent xpub order by sorting on the first receive address
+            Map<ExtendedKey, String> childDerivations = copyExtendedPublicKeys.entrySet().stream().collect(Collectors.toMap(Map.Entry::getKey, _ -> "/0/0"));
+            OutputDescriptor copyFirstReceive = new OutputDescriptor(scriptType, multisigThreshold, copyExtendedPublicKeys, childDerivations);
+            OutputDescriptor copySortedXpubs = OutputDescriptor.getOutputDescriptor(copyFirstReceive.toString());
+            return new OutputDescriptor(scriptType, multisigThreshold, copySortedXpubs.extendedPublicKeys, Collections.emptyMap(), copyExtendedPublicKeyLabels, copyExtendedMasterPrivateKeys);
+        }
+
+        return new OutputDescriptor(scriptType, multisigThreshold, copyExtendedPublicKeys, copyChildDerivations, copyExtendedPublicKeyLabels, copyExtendedMasterPrivateKeys);
     }
 }
