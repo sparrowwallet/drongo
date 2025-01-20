@@ -14,7 +14,7 @@ import static com.sparrowwallet.drongo.Utils.uint32ToByteStreamLE;
 import static com.sparrowwallet.drongo.Utils.uint64ToByteStreamLE;
 
 public class Transaction extends ChildMessage {
-    public static final int MAX_BLOCK_SIZE = 1000 * 1000;
+    public static final int MAX_BLOCK_SIZE_VBYTES = 1000 * 1000;
     public static final long MAX_BITCOIN = 21 * 1000 * 1000L;
     public static final long SATOSHIS_PER_BITCOIN = 100 * 1000 * 1000L;
     public static final long MAX_BLOCK_LOCKTIME = 500000000L;
@@ -395,7 +395,7 @@ public class Transaction extends ChildMessage {
     public void verify() throws VerificationException {
         if (inputs.size() == 0 || outputs.size() == 0)
             throw new VerificationException.EmptyInputsOrOutputs();
-        if (this.getMessageSize() > MAX_BLOCK_SIZE)
+        if (this.getMessageSize() > (MAX_BLOCK_SIZE_VBYTES * WITNESS_SCALE_FACTOR))
             throw new VerificationException.LargerThanMaxBlockSize();
 
         HashSet<TransactionOutPoint> outpoints = new HashSet<>();
@@ -437,11 +437,18 @@ public class Transaction extends ChildMessage {
 
     public static boolean isTransaction(byte[] bytes) {
         //Incomplete quick test
-        if(bytes.length == 0) {
+        if(bytes.length <= 5 || bytes.length > (MAX_BLOCK_SIZE_VBYTES * WITNESS_SCALE_FACTOR)) {
             return false;
         }
         long version = Utils.readUint32(bytes, 0);
-        return version > 0 && version < 5;
+        if(version <= 0) {
+            return false;
+        }
+        boolean segwit = (bytes[4] == 0);
+        if(segwit && bytes[5] == 0) {
+            return false;
+        }
+        return true;
     }
 
     public Sha256Hash hashForLegacySignature(int inputIndex, Script redeemScript, SigHash sigHash) {
