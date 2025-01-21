@@ -884,6 +884,8 @@ public class PSBTInput {
             return p2sh ? P2SH_P2WPKH : P2WPKH;
         } else if(P2WSH.isScriptType(signingScript)) {
             return p2sh ? P2SH_P2WSH : P2WSH;
+        } else if(MULTISIG.isScriptType(signingScript)) {
+            return p2sh ? P2SH : MULTISIG;
         }
 
         return ScriptType.getType(signingScript);
