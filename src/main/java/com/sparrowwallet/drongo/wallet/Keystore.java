@@ -28,6 +28,7 @@ public class Keystore extends Persistable {
     private KeyDerivation keyDerivation;
     private ExtendedKey extendedPublicKey;
     private PaymentCode externalPaymentCode;
+    private byte[] deviceRegistration;
     private MasterPrivateExtendedKey masterPrivateExtendedKey;
     private DeterministicSeed seed;
 
@@ -100,6 +101,14 @@ public class Keystore extends Persistable {
 
     public void setExternalPaymentCode(PaymentCode paymentCode) {
         this.externalPaymentCode = paymentCode;
+    }
+
+    public byte[] getDeviceRegistration() {
+        return deviceRegistration;
+    }
+
+    public void setDeviceRegistration(byte[] deviceRegistration) {
+        this.deviceRegistration = deviceRegistration;
     }
 
     public boolean hasMasterPrivateExtendedKey() {
