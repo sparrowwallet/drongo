@@ -1,6 +1,5 @@
 package com.sparrowwallet.drongo.crypto;
 
-import com.sparrowwallet.drongo.Utils;
 import org.bouncycastle.asn1.ASN1ObjectIdentifier;
 import org.bouncycastle.asn1.x509.AlgorithmIdentifier;
 import org.bouncycastle.asn1.x509.SubjectPublicKeyInfo;
@@ -16,21 +15,20 @@ import java.security.spec.AlgorithmParameterSpec;
 import java.util.Optional;
 
 public class X25519Key {
-    private KeyPair keyPair;
+    private final KeyPair keyPair;
     private final AlgorithmParameterSpec ecSpec;
 
     public X25519Key() {
+        this(generatePrivateKey());
+    }
+
+    public X25519Key(byte[] priv) {
         try {
             final KeyPairGenerator keyPairGenerator = KeyPairGenerator.getInstance("X25519");
-            this.keyPair = keyPairGenerator.generateKeyPair();
             this.ecSpec = keyPairGenerator.generateKeyPair().getPrivate().getParams();
         } catch(NoSuchAlgorithmException e) {
             throw new RuntimeException(e);
         }
-    }
-
-    public X25519Key(byte[] priv) {
-        this();
 
         X25519PrivateKeyParameters privateKeyParams = new X25519PrivateKeyParameters(priv, 0);
         X25519PublicKeyParameters publicKeyParams = privateKeyParams.generatePublicKey();
@@ -45,11 +43,14 @@ public class X25519Key {
     }
 
     public byte[] getRawPrivateKeyBytes() {
-        return Utils.getRawKeyBytesFromPKCS8(keyPair.getPrivate());
+        return keyPair.getPrivate().getEncoded();
     }
 
-    public byte[] getRawPublicKeyBytes() {
-        return Utils.getRawKeyBytesFromX509(keyPair.getPublic());
+    private static byte[] generatePrivateKey() {
+        SecureRandom secureRandom = new SecureRandom();
+        byte[] privateKey = new byte[32];
+        secureRandom.nextBytes(privateKey);
+        return privateKey;
     }
 
     public class BouncyCastlePrivateKey implements XECPrivateKey {
