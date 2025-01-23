@@ -109,7 +109,8 @@ public class PSBT {
             WalletNode walletNode = utxoEntry.getValue();
             Wallet signingWallet = walletNode.getWallet();
 
-            boolean alwaysIncludeWitnessUtxo = signingWallet.getKeystores().stream().anyMatch(keystore -> keystore.getWalletModel().alwaysIncludeNonWitnessUtxo());
+            boolean alwaysIncludeNonWitnessTx = signingWallet.getKeystores().stream().anyMatch(keystore -> keystore.getWalletModel().alwaysIncludeNonWitnessUtxo())
+                    && !ScriptType.P2TR.equals(signingWallet.getScriptType());
 
             Transaction utxo = signingWallet.getTransactions().get(utxoEntry.getKey().getHash()).getTransaction();
             int utxoIndex = (int)utxoEntry.getKey().getIndex();
@@ -138,7 +139,7 @@ public class PSBT {
                 }
             }
 
-            PSBTInput psbtInput = new PSBTInput(this, signingWallet.getScriptType(), inputIndex, utxo, utxoIndex, redeemScript, witnessScript, derivedPublicKeys, Collections.emptyMap(), tapInternalKey, alwaysIncludeWitnessUtxo);
+            PSBTInput psbtInput = new PSBTInput(this, signingWallet.getScriptType(), inputIndex, utxo, utxoIndex, redeemScript, witnessScript, derivedPublicKeys, Collections.emptyMap(), tapInternalKey, alwaysIncludeNonWitnessTx);
             psbtInputs.add(psbtInput);
         }
 

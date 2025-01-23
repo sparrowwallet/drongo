@@ -86,7 +86,7 @@ public class PSBTInput {
         }
 
         if(alwaysAddNonWitnessTx) {
-            //Add non-witness UTXO to segwit types to handle Trezor, Bitbox and Ledger requirements
+            //Add non-witness UTXO to segwit v0 types to handle Trezor, Bitbox and Ledger requirements
             this.nonWitnessUtxo = utxo;
         }
 
