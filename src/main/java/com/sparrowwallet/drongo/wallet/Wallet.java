@@ -41,6 +41,7 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
     private final Map<Sha256Hash, BlockTransaction> transactions = new HashMap<>();
     private final Map<String, String> detachedLabels = new HashMap<>();
     private WalletConfig walletConfig;
+    private final Map<TableType, WalletTable> walletTables = new HashMap<>();
     private MixConfig mixConfig;
     private final Map<Sha256Hash, UtxoMixData> utxoMixes = new HashMap<>();
     private Integer storedBlockHeight;
@@ -464,6 +465,14 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
 
     public void setWalletConfig(WalletConfig walletConfig) {
         this.walletConfig = walletConfig;
+    }
+
+    public Map<TableType, WalletTable> getWalletTables() {
+        return walletTables;
+    }
+
+    public WalletTable getWalletTable(TableType tableType) {
+        return walletTables.get(tableType);
     }
 
     public MixConfig getMixConfig() {
