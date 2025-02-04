@@ -11,6 +11,7 @@ public class Version implements Comparable<Version> {
         if(version == null) {
             throw new IllegalArgumentException("Version can not be null");
         }
+        version = version.replaceAll("[^0-9.].*", "");
         if(!version.matches("[0-9]+(\\.[0-9]+)*")) {
             throw new IllegalArgumentException("Invalid version format");
         }
