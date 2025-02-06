@@ -52,6 +52,34 @@ public class Utils {
         }
     }
 
+    public static boolean isHex(byte[] bytes) {
+        if(bytes == null || bytes.length == 0) {
+            return false;
+        }
+
+        for(byte b : bytes) {
+            if(!((b >= '0' && b <= '9') || (b >= 'A' && b <= 'F') || (b >= 'a' && b <= 'f'))) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    public static boolean isBase64(byte[] bytes) {
+        if(bytes == null || bytes.length == 0) {
+            return false;
+        }
+
+        for(byte b : bytes) {
+            if(!((b >= '0' && b <= '9') || (b >= 'A' && b <= 'Z') || (b >= 'a' && b <= 'z') || (b == '+') || (b == '/') || (b == '='))) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
     public static String bytesToHex(byte[] bytes) {
         char[] hexChars = new char[bytes.length * 2];
         for ( int j = 0; j < bytes.length; j++ ) {
