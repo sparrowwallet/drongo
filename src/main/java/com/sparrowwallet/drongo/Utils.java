@@ -57,7 +57,7 @@ public class Utils {
             return false;
         }
 
-        for(byte b : bytes) {
+        for(byte b : trim(bytes)) {
             if(!((b >= '0' && b <= '9') || (b >= 'A' && b <= 'F') || (b >= 'a' && b <= 'f'))) {
                 return false;
             }
@@ -71,13 +71,26 @@ public class Utils {
             return false;
         }
 
-        for(byte b : bytes) {
+        for(byte b : trim(bytes)) {
             if(!((b >= '0' && b <= '9') || (b >= 'A' && b <= 'Z') || (b >= 'a' && b <= 'z') || (b == '+') || (b == '/') || (b == '='))) {
                 return false;
             }
         }
 
         return true;
+    }
+
+    private static byte[] trim(byte[] bytes) {
+        int len = bytes.length;
+        int st = 0;
+        while ((st < len) && Character.isWhitespace((bytes[st] & 0xff))) {
+            st++;
+        }
+        while ((st < len) && Character.isWhitespace((bytes[len - 1] & 0xff))) {
+            len--;
+        }
+
+        return ((st > 0) || (len < bytes.length)) ? Arrays.copyOfRange(bytes, st, len) : bytes;
     }
 
     public static String bytesToHex(byte[] bytes) {
