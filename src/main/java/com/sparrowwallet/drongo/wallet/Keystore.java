@@ -51,6 +51,9 @@ public class Keystore extends Persistable {
     }
 
     public String getBaseLabel() {
+        if(walletModel != null && label.startsWith(walletModel.toDisplayString()) && label.substring(walletModel.toDisplayString().length()).matches("( \\d*)?$")) {
+            return walletModel.toDisplayString();
+        }
         return label.replaceAll(" \\d*$", "");
     }
 

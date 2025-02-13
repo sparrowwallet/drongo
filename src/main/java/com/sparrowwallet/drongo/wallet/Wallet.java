@@ -1851,22 +1851,28 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
         return !keystores.stream().map(Keystore::getExtendedPublicKey).allMatch(new HashSet<>()::add);
     }
 
-    public void makeLabelsUnique(Keystore newKeystore) {
+    public List<Keystore> makeLabelsUnique(Keystore newKeystore) {
+        List<Keystore> changedKeystores = new ArrayList<>();
         Set<String> labels = getKeystores().stream().map(Keystore::getBaseLabel).collect(Collectors.toSet());
         if(!labels.add(newKeystore.getBaseLabel())) {
-            makeLabelsUnique(newKeystore, false);
+            makeLabelsUnique(newKeystore, false, changedKeystores);
         }
+        return changedKeystores;
     }
 
-    private int makeLabelsUnique(Keystore newKeystore, boolean duplicateFound) {
+    private int makeLabelsUnique(Keystore newKeystore, boolean duplicateFound, List<Keystore> changedKeystores) {
         int max = 0;
         for(Keystore keystore : getKeystores()) {
             String newKeystoreLabel = newKeystore.getLabel().equals(Keystore.DEFAULT_LABEL) ? Keystore.DEFAULT_LABEL.substring(0, Keystore.DEFAULT_LABEL.length() - 2) : newKeystore.getLabel();
             if(newKeystore != keystore && keystore.getLabel().startsWith(newKeystoreLabel)) {
                 duplicateFound = true;
                 String remainder = keystore.getLabel().substring(newKeystoreLabel.length());
-                if(remainder.length() == 0) {
-                    max = makeLabelsUnique(keystore, true);
+                if(remainder.isEmpty()) {
+                    String existingLabel = keystore.getLabel();
+                    max = makeLabelsUnique(keystore, true, changedKeystores);
+                    if(!keystore.getLabel().equals(existingLabel)) {
+                        changedKeystores.add(keystore);
+                    }
                 } else {
                     try {
                         int count = Integer.parseInt(remainder.trim());
