@@ -17,6 +17,7 @@ import org.junit.jupiter.api.Test;
 import java.security.InvalidKeyException;
 import java.security.NoSuchAlgorithmException;
 import java.security.NoSuchProviderException;
+import java.security.SecureRandom;
 import java.security.spec.InvalidKeySpecException;
 import java.util.List;
 
@@ -78,6 +79,59 @@ public class PaymentCodeTest {
 
         PaymentCode unblindedPaymentCode2 = PaymentCode.getPaymentCode(transaction, bobKeystore);
         Assertions.assertEquals(alicePaymentCode, unblindedPaymentCode2);
+    }
+
+    @Test
+    public void testLinking() throws MnemonicException, InvalidKeySpecException, NoSuchAlgorithmException, InvalidKeyException, NoSuchProviderException, InvalidPaymentCodeException {
+        SecureRandom secureRandom = new SecureRandom();
+        Bip39MnemonicCode bip39MnemonicCode = new Bip39MnemonicCode();
+
+        for(int i = 0; i < 10; i++) {
+            byte[] receiveEntropy = new byte[128];
+            secureRandom.nextBytes(receiveEntropy);
+            List<String> receiveWords = bip39MnemonicCode.toMnemonic(receiveEntropy);
+            DeterministicSeed receiveSeed = new DeterministicSeed(receiveWords, "", 0, DeterministicSeed.Type.BIP39);
+            Wallet receiveWallet = new Wallet();
+            receiveWallet.setPolicyType(PolicyType.SINGLE);
+            receiveWallet.setScriptType(ScriptType.P2WPKH);
+            Keystore receiveKeystore = Keystore.fromSeed(receiveSeed, receiveWallet.getScriptType().getDefaultDerivation());
+            receiveWallet.getKeystores().add(receiveKeystore);
+            receiveWallet.setDefaultPolicy(Policy.getPolicy(PolicyType.SINGLE, ScriptType.P2WPKH, receiveWallet.getKeystores(), 1));
+
+            byte[] sendEntropy = new byte[128];
+            secureRandom.nextBytes(sendEntropy);
+            List<String> sendWords = bip39MnemonicCode.toMnemonic(sendEntropy);
+            DeterministicSeed sendSeed = new DeterministicSeed(sendWords, "pp", 0, DeterministicSeed.Type.BIP39);
+            Wallet sendWallet = new Wallet();
+            sendWallet.setPolicyType(PolicyType.SINGLE);
+            sendWallet.setScriptType(ScriptType.P2WPKH);
+            Keystore sendKeystore = Keystore.fromSeed(sendSeed, sendWallet.getScriptType().getDefaultDerivation());
+            sendWallet.getKeystores().add(sendKeystore);
+            sendWallet.setDefaultPolicy(Policy.getPolicy(PolicyType.SINGLE, ScriptType.P2WPKH, sendWallet.getKeystores(), 1));
+
+            PaymentCode paymentCode = sendWallet.getPaymentCode();
+            PaymentCode externalPaymentCode = receiveWallet.getPaymentCode();
+
+            WalletNode input0Node = sendWallet.getNode(KeyPurpose.RECEIVE).getChildren().iterator().next();
+            Keystore keystore = sendWallet.getKeystores().getFirst();
+            ECKey input0Key = keystore.getKey(input0Node);
+            TransactionOutPoint input0Outpoint = new TransactionOutPoint(Sha256Hash.wrapReversed(Utils.hexToBytes("7bac25892e87fa41dcbef00d93c7b1c0b20999e85604d2ff8c87a3df4d6541cd")), 0);
+            SecretPoint secretPoint = new SecretPoint(input0Key.getPrivKeyBytes(), externalPaymentCode.getNotificationKey().getPubKey());
+            byte[] blindingMask = PaymentCode.getMask(secretPoint.ECDHSecretAsBytes(), input0Outpoint.bitcoinSerialize());
+            byte[] blindedPaymentCode = PaymentCode.blind(paymentCode.getPayload(), blindingMask);
+
+            Transaction transaction = new Transaction();
+            transaction.setSegwitFlag(Transaction.DEFAULT_SEGWIT_FLAG);
+            TransactionWitness witness = new TransactionWitness(transaction, input0Key, TransactionSignature.decodeFromBitcoin(Utils.hexToBytes("304402203e8cb5c4e988fe82afc406aab47e03c2836aaf949b75f1e627d79095e8a835ac02201275882e1ed436d2e133f1207b12fdd6f76a53b35ee7cc785ed0d6de88f4108001"), false));
+            transaction.addInput(input0Outpoint.getHash(), input0Outpoint.getIndex(), new Script(new byte[0]), witness);
+            transaction.addOutput(10000, externalPaymentCode.getNotificationAddress());
+            List<ScriptChunk> opReturnChunks = List.of(ScriptChunk.fromOpcode(ScriptOpCodes.OP_RETURN), ScriptChunk.fromData(blindedPaymentCode));
+            transaction.addOutput(10000, new Script(opReturnChunks));
+
+            Wallet receiveNotificationWallet = receiveWallet.getNotificationWallet();
+            PaymentCode recoveredPaymentCode = PaymentCode.getPaymentCode(transaction, receiveNotificationWallet.getKeystores().getFirst());
+            Assertions.assertEquals(paymentCode, recoveredPaymentCode);
+        }
     }
 
     @Test
