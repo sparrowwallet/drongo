@@ -5,7 +5,7 @@ import java.util.Locale;
 public enum WalletModel {
     SEED, SPARROW, BITCOIN_CORE, ELECTRUM, TREZOR_1, TREZOR_T, COLDCARD, LEDGER_NANO_S, LEDGER_NANO_X, DIGITALBITBOX_01, KEEPKEY, SPECTER_DESKTOP, COBO_VAULT,
     BITBOX_02, SPECTER_DIY, PASSPORT, BLUE_WALLET, KEYSTONE, SEEDSIGNER, CARAVAN, GORDIAN_SEED_TOOL, JADE, LEDGER_NANO_S_PLUS, EPS, TAPSIGNER, SATSCARD, LABELS,
-    BSMS, KRUX, SATOCHIP, TRANSACTIONS, AIRGAP_VAULT, TREZOR_SAFE_3, SATSCHIP, SAMOURAI, TREZOR_SAFE_5, LEDGER_STAX, LEDGER_FLEX, ONEKEY_CLASSIC, ONEKEY_PRO;
+    BSMS, KRUX, SATOCHIP, TRANSACTIONS, AIRGAP_VAULT, TREZOR_SAFE_3, SATSCHIP, SAMOURAI, TREZOR_SAFE_5, LEDGER_STAX, LEDGER_FLEX, ONEKEY_CLASSIC_1S, ONEKEY_PRO;
 
     public static WalletModel getModel(String model) {
         return valueOf(model.toUpperCase(Locale.ROOT));
@@ -52,7 +52,7 @@ public enum WalletModel {
             return "airgapvault";
         }
 
-        if(this == ONEKEY_CLASSIC || this == ONEKEY_PRO) {
+        if(this == ONEKEY_CLASSIC_1S || this == ONEKEY_PRO) {
             return "onekey";
         }
 
@@ -69,11 +69,11 @@ public enum WalletModel {
     }
 
     public boolean requiresPinPrompt() {
-        return (this == TREZOR_1 || this == KEEPKEY || this == ONEKEY_CLASSIC);
+        return (this == TREZOR_1 || this == KEEPKEY || this == ONEKEY_CLASSIC_1S);
     }
 
     public boolean externalPassphraseEntry() {
-        return (this == TREZOR_1 || this == KEEPKEY || this == ONEKEY_CLASSIC);
+        return (this == TREZOR_1 || this == KEEPKEY || this == ONEKEY_CLASSIC_1S);
     }
 
     public boolean isCard() {
@@ -82,7 +82,7 @@ public enum WalletModel {
 
     public boolean hasUsb() {
         return (this == TREZOR_1 || this == TREZOR_T || this == TREZOR_SAFE_3 || this == TREZOR_SAFE_5 || this == LEDGER_NANO_S || this == LEDGER_NANO_X || this == LEDGER_NANO_S_PLUS ||
-                this == LEDGER_STAX || this == LEDGER_FLEX || this == DIGITALBITBOX_01 || this == BITBOX_02 || this == COLDCARD || this == KEEPKEY || this == JADE || this == ONEKEY_CLASSIC || this == ONEKEY_PRO);
+                this == LEDGER_STAX || this == LEDGER_FLEX || this == DIGITALBITBOX_01 || this == BITBOX_02 || this == COLDCARD || this == KEEPKEY || this == JADE || this == ONEKEY_CLASSIC_1S || this == ONEKEY_PRO);
     }
 
     public int getMinPinLength() {
