@@ -166,6 +166,12 @@ public enum WalletModel {
         for(String word : words) {
             if(word.equals("1")) {
                 word = "one";
+            } else if(Character.isDigit(word.charAt(0))) {
+                word = word.toUpperCase(Locale.ROOT);
+            } else if(BITBOX_02.getType().startsWith(word)) {
+                word = "BitBox";
+            } else if(word.equals(ONEKEY_PRO.getType())) {
+                word = "OneKey";
             }
             builder.append(Character.toUpperCase(word.charAt(0)));
             builder.append(word.substring(1));
