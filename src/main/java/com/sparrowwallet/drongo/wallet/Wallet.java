@@ -1812,15 +1812,19 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
     }
 
     public boolean derivationMatchesAnotherScriptType(String derivationPath) {
+        return getOtherScriptTypeMatchingDerivation(derivationPath).isPresent();
+    }
+
+    public Optional<ScriptType> getOtherScriptTypeMatchingDerivation(String derivationPath) {
         if(Boolean.TRUE.toString().equals(System.getProperty(ALLOW_DERIVATIONS_MATCHING_OTHER_SCRIPT_TYPES_PROPERTY))) {
-            return false;
+            return Optional.empty();
         }
 
         if(scriptType != null && scriptType.getAccount(derivationPath) > -1) {
-            return false;
+            return Optional.empty();
         }
 
-        return Arrays.stream(ScriptType.values()).anyMatch(scriptType -> !scriptType.equals(this.scriptType) && scriptType.getAccount(derivationPath, true) > -1);
+        return Arrays.stream(ScriptType.values()).filter(scriptType -> !scriptType.equals(this.scriptType) && scriptType.getAccount(derivationPath, true) > -1).findFirst();
     }
 
     public boolean derivationMatchesAnotherNetwork(String derivationPath) {

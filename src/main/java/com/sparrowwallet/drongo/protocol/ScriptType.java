@@ -1154,6 +1154,10 @@ public enum ScriptType {
         return description;
     }
 
+    public String getDescription(boolean includePolicyType) {
+        return includePolicyType && !getAllowedPolicyTypes().isEmpty() ? getAllowedPolicyTypes().getFirst().getName().toLowerCase(Locale.ROOT) + " " + description : description;
+    }
+
     public String getDefaultDerivationPath() {
         return Network.get() != Network.MAINNET ? defaultDerivationPath.replace("/0'/0'", "/1'/0'") : defaultDerivationPath;
     }
