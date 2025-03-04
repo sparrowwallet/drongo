@@ -1,5 +1,6 @@
 package com.sparrowwallet.drongo.pgp;
 
+import com.sparrowwallet.drongo.IOUtils;
 import org.bouncycastle.bcpg.ArmoredInputStream;
 import org.bouncycastle.gpg.keybox.KeyBlob;
 import org.bouncycastle.gpg.keybox.PublicKeyRingBlob;
@@ -22,14 +23,11 @@ import java.io.InputStream;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
-import java.util.ArrayList;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Locale;
+import java.util.*;
 
 public class PGPUtils {
     private static final Logger log = LoggerFactory.getLogger(PGPUtils.class);
-    public static final String APPLICATION_KEYRING = "/gpg/pubkeys.asc";
+    public static final String APPLICATION_KEYRING_DIR = "gpg/";
     public static final String PUBRING_GPG = "pubring.gpg";
     public static final String PUBRING_KBX = "pubring.kbx";
 
@@ -53,9 +51,7 @@ public class PGPUtils {
             if(userPgpPublicKeyRingCollection != null) {
                 options.addVerificationCerts(userPgpPublicKeyRingCollection);
             }
-            if(appPgpPublicKeyRingCollection != null) {
-                options.addVerificationCerts(appPgpPublicKeyRingCollection);
-            }
+            options.addVerificationCerts(appPgpPublicKeyRingCollection);
             if(detachedSignatureStream != null) {
                 options.addVerificationOfDetachedSignatures(detachedSignatureStream);
             }
@@ -80,8 +76,7 @@ public class PGPUtils {
                             signedByKey = publicKeyRing.getPublicKey(primaryKeyId);
                             keySource = PGPKeySource.USER;
                             log.debug("Signed using provided public key");
-                        } else if(appPgpPublicKeyRingCollection != null && appPgpPublicKeyRingCollection.getPublicKey(primaryKeyId) != null
-                                && !isExpired(appPgpPublicKeyRingCollection.getPublicKey(primaryKeyId))) {
+                        } else if(appPgpPublicKeyRingCollection.getPublicKey(primaryKeyId) != null && !isExpired(appPgpPublicKeyRingCollection.getPublicKey(primaryKeyId))) {
                             signedByKey = appPgpPublicKeyRingCollection.getPublicKey(primaryKeyId);
                             keySource = PGPKeySource.APPLICATION;
                             log.debug("Signed using application public key");
@@ -89,7 +84,7 @@ public class PGPUtils {
                             signedByKey = userPgpPublicKeyRingCollection.getPublicKey(primaryKeyId);
                             keySource = PGPKeySource.GPG;
                             log.debug("Signed using user public key");
-                        } else if(appPgpPublicKeyRingCollection != null && appPgpPublicKeyRingCollection.getPublicKey(primaryKeyId) != null) {
+                        } else if(appPgpPublicKeyRingCollection.getPublicKey(primaryKeyId) != null) {
                             signedByKey = appPgpPublicKeyRingCollection.getPublicKey(primaryKeyId);
                             keySource = PGPKeySource.APPLICATION;
                             log.debug("Signed using expired application public key");
@@ -115,9 +110,9 @@ public class PGPUtils {
             }
 
             if(!result.getRejectedDetachedSignatures().isEmpty()) {
-                throw new PGPVerificationException(result.getRejectedDetachedSignatures().get(0).getValidationException().getMessage());
+                throw new PGPVerificationException(result.getRejectedDetachedSignatures().getFirst().getValidationException().getMessage());
             } else if(!result.getRejectedInlineSignatures().isEmpty()) {
-                throw new PGPVerificationException(result.getRejectedInlineSignatures().get(0).getValidationException().getMessage());
+                throw new PGPVerificationException(result.getRejectedInlineSignatures().getFirst().getValidationException().getMessage());
             }
 
             throw new PGPVerificationException("No signatures found");
@@ -127,16 +122,22 @@ public class PGPUtils {
         }
     }
 
-    private static PGPPublicKeyRingCollection getApplicationKeyRingCollection() throws IOException {
-        try(InputStream pubKeyStream = PGPUtils.class.getResourceAsStream(APPLICATION_KEYRING)) {
-            if(pubKeyStream != null) {
-                return PGPainless.readKeyRing().publicKeyRingCollection(pubKeyStream);
+    private static PGPPublicKeyRingCollection getApplicationKeyRingCollection() {
+        List<PGPPublicKeyRing> rings = new ArrayList<>();
+        try {
+            String[] keyFiles = IOUtils.getResourceListing(PGPUtils.class, APPLICATION_KEYRING_DIR);
+            for(String keyFile : keyFiles) {
+                try(InputStream pubkeyStream = PGPUtils.class.getResourceAsStream("/" + APPLICATION_KEYRING_DIR + keyFile)) {
+                    if(pubkeyStream != null) {
+                        rings.add(PGPainless.readKeyRing().publicKeyRing(pubkeyStream));
+                    }
+                }
             }
         } catch(Exception e) {
             log.warn("Error loading application key rings", e);
         }
 
-        return null;
+        return new PGPPublicKeyRingCollection(rings);
     }
 
     private static PGPPublicKeyRingCollection getUserKeyRingCollection() {
