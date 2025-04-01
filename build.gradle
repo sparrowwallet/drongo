@@ -18,13 +18,15 @@ repositories {
 }
 
 dependencies {
-    implementation ('org.bouncycastle:bcprov-jdk18on:1.77')
-    implementation('org.pgpainless:pgpainless-core:1.6.7')
+    implementation ('org.bouncycastle:bcprov-jdk18on:1.80')
+    implementation('org.pgpainless:pgpainless-core:1.7.5') {
+        exclude group: 'org.jetbrains.kotlin', module: 'kotlin-stdlib-common'
+    }
     implementation ('de.mkammerer:argon2-jvm:2.11') {
         exclude group: 'net.java.dev.jna', module: 'jna'
     }
     implementation ('net.java.dev.jna:jna:5.13.0')
-    implementation ('ch.qos.logback:logback-classic:1.4.14') {
+    implementation ('ch.qos.logback:logback-classic:1.5.18') {
         exclude group: 'org.slf4j'
     }
     implementation ('org.slf4j:slf4j-api:2.0.12')
