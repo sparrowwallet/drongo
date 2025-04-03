@@ -75,10 +75,14 @@ public class ExtendedKey {
     }
 
     public static ExtendedKey fromDescriptor(String descriptor) {
+        return fromDescriptor(descriptor, false);
+    }
+
+    public static ExtendedKey fromDescriptor(String descriptor, boolean ignoreNetwork) {
         byte[] serializedKey = Base58.decodeChecked(descriptor);
         ByteBuffer buffer = ByteBuffer.wrap(serializedKey);
         int headerInt = buffer.getInt();
-        Header header = Header.getHeader(headerInt);
+        Header header = Header.getHeader(headerInt, ignoreNetwork);
         if(header == null) {
             throw new IllegalArgumentException("Unknown header bytes for extended key on " + Network.getCanonical().getName() + ": " + DeterministicKey.toBase58(serializedKey).substring(0, 4));
         }
@@ -239,7 +243,7 @@ public class ExtendedKey {
             return Network.get().getXpubHeader();
         }
 
-        private static Header getHeader(int header) {
+        private static Header getHeader(int header, boolean ignoreNetwork) {
             for(Header extendedKeyHeader : getHeaders(Network.get())) {
                 if(header == extendedKeyHeader.header) {
                     return extendedKeyHeader;
@@ -249,6 +253,9 @@ public class ExtendedKey {
             for(Network otherNetwork : getOtherNetworks(Network.get())) {
                 for(Header otherNetworkKeyHeader : getHeaders(otherNetwork)) {
                     if(header == otherNetworkKeyHeader.header) {
+                        if(ignoreNetwork) {
+                            return otherNetworkKeyHeader;
+                        }
                         throw new IllegalArgumentException("Provided " + otherNetworkKeyHeader.name + " extended key invalid on configured " + Network.getCanonical().getName() + " network. Use a " + otherNetwork.getName() + " configuration to use this extended key.");
                     }
                 }
