@@ -134,6 +134,8 @@ public abstract class Address {
                             byte[] witnessProgram = Bech32.convertBits(convertedProgram, 0, convertedProgram.length, 5, 8, false);
                             if(witnessProgram.length == 32) {
                                 return new P2TRAddress(witnessProgram);
+                            } else if(Arrays.equals(witnessProgram, ScriptType.ANCHOR_WITNESS_PROGRAM)) {
+                                return new P2AAddress(witnessProgram);
                             }
                         }
                     }

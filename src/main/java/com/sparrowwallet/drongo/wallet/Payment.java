@@ -1,6 +1,7 @@
 package com.sparrowwallet.drongo.wallet;
 
 import com.sparrowwallet.drongo.address.Address;
+import com.sparrowwallet.drongo.address.P2AAddress;
 
 public class Payment {
     private Address address;
@@ -15,10 +16,10 @@ public class Payment {
 
     public Payment(Address address, String label, long amount, boolean sendMax, Type type) {
         this.address = address;
-        this.label = label;
+        this.label = label == null && address instanceof P2AAddress ? address.getOutputScriptDataType() : label;
         this.amount = amount;
         this.sendMax = sendMax;
-        this.type = type;
+        this.type = type == Type.DEFAULT && address instanceof P2AAddress ? Type.ANCHOR : type;
     }
 
     public Address getAddress() {
@@ -62,6 +63,6 @@ public class Payment {
     }
 
     public enum Type {
-        DEFAULT, WHIRLPOOL_FEE, FAKE_MIX, MIX;
+        DEFAULT, WHIRLPOOL_FEE, FAKE_MIX, MIX, ANCHOR;
     }
 }

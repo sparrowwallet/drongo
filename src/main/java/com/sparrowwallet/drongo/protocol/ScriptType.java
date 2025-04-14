@@ -1134,6 +1134,122 @@ public enum ScriptType {
         public List<PolicyType> getAllowedPolicyTypes() {
             return List.of(SINGLE);
         }
+    },
+    P2A("P2A", "Anchor (P2A)", "m/86'/0'/0'") {
+        @Override
+        public Address getAddress(byte[] data) {
+            return new P2AAddress(data);
+        }
+
+        @Override
+        public Address getAddress(ECKey derivedKey) {
+            throw new ProtocolException("Cannot create a anchor address with a key");
+        }
+
+        @Override
+        public Address getAddress(Script script) {
+            throw new ProtocolException("Cannot create a anchor address with a script");
+        }
+
+        @Override
+        public Script getOutputScript(byte[] data) {
+            List<ScriptChunk> chunks = new ArrayList<>();
+            chunks.add(new ScriptChunk(OP_1, null));
+            chunks.add(new ScriptChunk(data.length, data));
+
+            return new Script(chunks);
+        }
+
+        @Override
+        public Script getOutputScript(ECKey derivedKey) {
+            throw new ProtocolException("Cannot create an anchor output script with a key");
+        }
+
+        @Override
+        public Script getOutputScript(Script script) {
+            throw new ProtocolException("Cannot create an anchor output script with a script");
+        }
+
+        @Override
+        public String getOutputDescriptor(ECKey derivedKey) {
+            throw new ProtocolException("Cannot create an anchor output descriptor with a key");
+        }
+
+        @Override
+        public String getOutputDescriptor(Script script) {
+            throw new ProtocolException("Cannot create an anchor output descriptor with a script");
+        }
+
+        @Override
+        public String getDescriptor() {
+            return "addr(";
+        }
+
+        @Override
+        public boolean isScriptType(Script script) {
+            List<ScriptChunk> chunks = script.chunks;
+            if (chunks.size() != 2)
+                return false;
+            if (!chunks.get(0).equalsOpCode(OP_1))
+                return false;
+            byte[] chunk1data = chunks.get(1).data;
+            if (chunk1data == null)
+                return false;
+            if (!Arrays.equals(chunk1data, ANCHOR_WITNESS_PROGRAM)) {
+                return false;
+            }
+            return true;
+        }
+
+        @Override
+        public byte[] getDataFromScript(Script script) {
+            return script.chunks.get(1).data;
+        }
+
+        @Override
+        public byte[] getHashFromScript(Script script) {
+            throw new ProtocolException("P2A does not contain a hash");
+        }
+
+        @Override
+        public ECKey getPublicKeyFromScript(Script script) {
+            throw new ProtocolException("P2A does not contain a key");
+        }
+
+        @Override
+        public Script getScriptSig(Script scriptPubKey, ECKey pubKey, TransactionSignature signature) {
+            if(!isScriptType(scriptPubKey)) {
+                throw new ProtocolException("Provided scriptPubKey is not a " + getName() + " script");
+            }
+
+            return new Script(new byte[0]);
+        }
+
+        @Override
+        public TransactionInput addSpendingInput(Transaction transaction, TransactionOutput prevOutput, ECKey pubKey, TransactionSignature signature) {
+            Script scriptSig = getScriptSig(prevOutput.getScript(), pubKey, signature);
+            return transaction.addInput(prevOutput.getHash(), prevOutput.getIndex(), scriptSig);
+        }
+
+        @Override
+        public Script getMultisigScriptSig(Script scriptPubKey, int threshold, Map<ECKey, TransactionSignature> pubKeySignatures) {
+            throw new UnsupportedOperationException("Constructing Taproot inputs is not yet supported");
+        }
+
+        @Override
+        public TransactionInput addMultisigSpendingInput(Transaction transaction, TransactionOutput prevOutput, int threshold, Map<ECKey, TransactionSignature> pubKeySignatures) {
+            throw new UnsupportedOperationException("Constructing Taproot inputs is not yet supported");
+        }
+
+        @Override
+        public TransactionSignature.Type getSignatureType() {
+            return TransactionSignature.Type.SCHNORR;
+        };
+
+        @Override
+        public List<PolicyType> getAllowedPolicyTypes() {
+            return Collections.emptyList();
+        }
     };
 
     private final String name;
@@ -1250,6 +1366,10 @@ public enum ScriptType {
 
     public abstract boolean isScriptType(Script script);
 
+    public byte[] getDataFromScript(Script script) {
+        throw new ProtocolException("Script type " + this + " does not contain data");
+    }
+
     public abstract byte[] getHashFromScript(Script script);
 
     public Address[] getAddresses(Script script) {
@@ -1282,11 +1402,13 @@ public enum ScriptType {
 
     public static final ScriptType[] SINGLE_HASH_TYPES = {P2PKH, P2SH, P2SH_P2WPKH, P2SH_P2WSH, P2WPKH, P2WSH};
 
-    public static final ScriptType[] ADDRESSABLE_TYPES = {P2PKH, P2SH, P2SH_P2WPKH, P2SH_P2WSH, P2WPKH, P2WSH, P2TR};
+    public static final ScriptType[] ADDRESSABLE_TYPES = {P2PKH, P2SH, P2SH_P2WPKH, P2SH_P2WSH, P2WPKH, P2WSH, P2TR, P2A};
 
     public static final ScriptType[] NON_WITNESS_TYPES = {P2PK, P2PKH, P2SH};
 
-    public static final ScriptType[] WITNESS_TYPES = {P2SH_P2WPKH, P2SH_P2WSH, P2WPKH, P2WSH, P2TR};
+    public static final ScriptType[] WITNESS_TYPES = {P2SH_P2WPKH, P2SH_P2WSH, P2WPKH, P2WSH, P2TR, P2A};
+
+    public static final byte[] ANCHOR_WITNESS_PROGRAM = new byte[] {78, 115};
 
     public static List<ScriptType> getScriptTypesForPolicyType(PolicyType policyType) {
         return Arrays.stream(values()).filter(scriptType -> scriptType.isAllowed(policyType)).collect(Collectors.toList());
@@ -1364,6 +1486,8 @@ public enum ScriptType {
         } else if(P2TR.equals(this)) {
             //Assume a default keypath spend
             return (32 + 4 + 1 + ((double)66 / WITNESS_SCALE_FACTOR) + 4);
+        } else if(P2A.equals(this)) {
+            return 32 + 4 + 1 + 4;
         } else if(Arrays.asList(WITNESS_TYPES).contains(this)) {
             //Return length of spending input with 75% discount to script size
             return (32 + 4 + 1 + ((double)107 / WITNESS_SCALE_FACTOR) + 4);

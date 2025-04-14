@@ -212,6 +212,10 @@ public class Script {
             return addresses.toArray(new Address[addresses.size()]);
         }
 
+        if(P2A.isScriptType(this)) {
+            return new Address[] { P2A.getAddress(P2A.getDataFromScript(this)) };
+        }
+
         throw new NonStandardScriptException("Cannot find addresses in non standard script: " + toString());
     }
 
