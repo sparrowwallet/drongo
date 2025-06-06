@@ -440,15 +440,30 @@ public class OutputDescriptor {
             KeyDerivation keyDerivation = new KeyDerivation(masterFingerprint, keyDerivationPath);
             try {
                 ExtendedKey extendedKey = ExtendedKey.fromDescriptor(extKey);
+                if(childDerivationPath != null) {
+                    try {
+                        List<ChildNumber> childPath = KeyDerivation.parsePath(childDerivationPath.replace("<0;1>", "0"));
+                        if(childPath.size() > 2 && (extendedKey.getKey().hasPrivKey() || childPath.stream().noneMatch(ChildNumber::isHardened))) {
+                            childDerivationPath = childDerivationPath.substring(childDerivationPath.lastIndexOf("/", childDerivationPath.lastIndexOf("/") - 1));
+                            childPath = childPath.subList(0, childPath.size() - 2);
+                            keyDerivation = keyDerivation.extend(childPath);
+                            childPath.addFirst(extendedKey.getKeyChildNumber());
+                            DeterministicKey derivedKey = extendedKey.getKey(childPath);
+                            extendedKey = new ExtendedKey(derivedKey, derivedKey.getParentFingerprint(), childPath.getLast());
+                        }
+                    } catch(Exception e) {
+                        //ignore and continue
+                    }
+                }
                 if(extendedKey.getKey().hasPrivKey()) {
                     ExtendedKey privateExtendedKey = extendedKey;
                     List<ChildNumber> derivation = keyDerivation.getDerivation();
-                    int depth = derivation.size() == 0 ? scriptType.getDefaultDerivation().size() : derivation.size();
+                    int depth = derivation.isEmpty() ? scriptType.getDefaultDerivation().size() : derivation.size();
                     DeterministicKey prvKey = extendedKey.getKey();
-                    DeterministicKey pubKey = new DeterministicKey(prvKey.getPath(), prvKey.getChainCode(), prvKey.getPubKey(), depth, extendedKey.getParentFingerprint());
+                    DeterministicKey pubKey = new DeterministicKey(List.of(prvKey.getPath().getLast()), prvKey.getChainCode(), prvKey.getPubKey(), depth, extendedKey.getParentFingerprint());
                     extendedKey = new ExtendedKey(pubKey, pubKey.getParentFingerprint(), extendedKey.getKeyChildNumber());
 
-                    if(derivation.size() == 0) {
+                    if(derivation.isEmpty()) {
                         masterPrivateKeyMap.put(extendedKey, privateExtendedKey);
                     }
                 }
