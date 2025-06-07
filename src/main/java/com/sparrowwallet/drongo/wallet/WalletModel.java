@@ -172,6 +172,8 @@ public enum WalletModel {
                 word = "BitBox";
             } else if(word.equals(ONEKEY_PRO.getType())) {
                 word = "OneKey";
+            } else if(word.equals("diy")) {
+                word = "DIY";
             }
             builder.append(Character.toUpperCase(word.charAt(0)));
             builder.append(word.substring(1));
