@@ -449,7 +449,8 @@ public class OutputDescriptor {
                             keyDerivation = keyDerivation.extend(childPath);
                             childPath.addFirst(extendedKey.getKeyChildNumber());
                             DeterministicKey derivedKey = extendedKey.getKey(childPath);
-                            extendedKey = new ExtendedKey(derivedKey, derivedKey.getParentFingerprint(), childPath.getLast());
+                            DeterministicKey pubKey = new DeterministicKey(List.of(derivedKey.getPath().getLast()), derivedKey.getChainCode(), derivedKey.getPubKey(), derivedKey.getDepth(), derivedKey.getParentFingerprint());
+                            extendedKey = new ExtendedKey(pubKey, pubKey.getParentFingerprint(), childPath.getLast());
                         }
                     } catch(Exception e) {
                         //ignore and continue
