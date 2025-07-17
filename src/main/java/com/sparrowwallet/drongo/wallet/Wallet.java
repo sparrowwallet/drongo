@@ -1002,14 +1002,16 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
         return getFee(changeOutput, feeRate, longTermFeeRate);
     }
 
-    public WalletTransaction createWalletTransaction(List<UtxoSelector> utxoSelectors, List<TxoFilter> txoFilters, List<Payment> payments, List<byte[]> opReturns, Set<WalletNode> excludedChangeNodes, double feeRate, double longTermFeeRate, Long fee, Integer currentBlockHeight, boolean groupByAddress, boolean includeMempoolOutputs) throws InsufficientFundsException {
+    public WalletTransaction createWalletTransaction(List<UtxoSelector> utxoSelectors, List<TxoFilter> txoFilters, List<Payment> payments, List<byte[]> opReturns,
+                                                     Set<WalletNode> excludedChangeNodes, double feeRate, double longTermFeeRate, double minRelayFeeRate, Long fee,
+                                                     Integer currentBlockHeight, boolean groupByAddress, boolean includeMempoolOutputs) throws InsufficientFundsException {
         boolean sendMax = payments.stream().anyMatch(Payment::isSendMax);
         long totalPaymentAmount = payments.stream().map(Payment::getAmount).mapToLong(v -> v).sum();
         Map<BlockTransactionHashIndex, WalletNode> availableTxos = getWalletTxos(txoFilters);
         long totalAvailableValue = availableTxos.keySet().stream().mapToLong(BlockTransactionHashIndex::getValue).sum();
 
-        if(fee != null && feeRate != Transaction.DEFAULT_MIN_RELAY_FEE) {
-            throw new IllegalArgumentException("Use an input fee rate of 1 sat/vB when using a defined fee amount so UTXO selectors overestimate effective value");
+        if(fee != null && feeRate != minRelayFeeRate) {
+            throw new IllegalArgumentException("Use an input fee rate equal to the min relay rate when using a defined fee amount so UTXO selectors overestimate effective value");
         }
 
         long maxSpendableAmt = getMaxSpendable(payments.stream().map(Payment::getAddress).collect(Collectors.toList()), feeRate, availableTxos);
@@ -1075,7 +1077,7 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
             long noChangeFeeRequiredAmt = (fee == null ? (long)Math.floor(feeRate * noChangeVSize) : fee);
 
             //Add 1 satoshi to accommodate longer signatures when feeRate equals default min relay fee to ensure fee is sufficient
-            noChangeFeeRequiredAmt = (fee == null && feeRate == Transaction.DEFAULT_MIN_RELAY_FEE ? noChangeFeeRequiredAmt + 1 : noChangeFeeRequiredAmt);
+            noChangeFeeRequiredAmt = (fee == null && feeRate == minRelayFeeRate && minRelayFeeRate > 0d ? noChangeFeeRequiredAmt + 1 : noChangeFeeRequiredAmt);
 
             //If sending all selected utxos, set the recipient amount to equal to total of those utxos less the no change fee
             long maxSendAmt = totalSelectedAmt - noChangeFeeRequiredAmt;
@@ -1118,7 +1120,7 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
                 TransactionOutput changeOutput = new TransactionOutput(transaction, setChangeAmts.iterator().next(), changeNode.getOutputScript());
                 double changeVSize = noChangeVSize + changeOutput.getLength() * numSets;
                 long changeFeeRequiredAmt = (fee == null ? (long)Math.floor(feeRate * changeVSize) : fee);
-                changeFeeRequiredAmt = (fee == null && feeRate == Transaction.DEFAULT_MIN_RELAY_FEE ? changeFeeRequiredAmt + 1 : changeFeeRequiredAmt);
+                changeFeeRequiredAmt = (fee == null && feeRate == minRelayFeeRate && minRelayFeeRate > 0d ? changeFeeRequiredAmt + 1 : changeFeeRequiredAmt);
                 while(changeFeeRequiredAmt % numSets > 0) {
                     changeFeeRequiredAmt++;
                 }
