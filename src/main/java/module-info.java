@@ -6,6 +6,9 @@ open module com.sparrowwallet.drongo {
     requires org.slf4j;
     requires ch.qos.logback.core;
     requires ch.qos.logback.classic;
+    requires org.dnsjava;
+    requires com.github.benmanes.caffeine;
+    requires org.checkerframework.checker.qual;
     exports com.sparrowwallet.drongo;
     exports com.sparrowwallet.drongo.psbt;
     exports com.sparrowwallet.drongo.protocol;
@@ -16,6 +19,7 @@ open module com.sparrowwallet.drongo {
     exports com.sparrowwallet.drongo.policy;
     exports com.sparrowwallet.drongo.uri;
     exports com.sparrowwallet.drongo.bip47;
+    exports com.sparrowwallet.drongo.dns;
     exports com.sparrowwallet.drongo.wallet.slip39;
     exports org.bitcoin;
 }

@@ -3,10 +3,15 @@ package com.sparrowwallet.drongo.psbt;
 import com.sparrowwallet.drongo.KeyDerivation;
 import com.sparrowwallet.drongo.Utils;
 import com.sparrowwallet.drongo.crypto.ECKey;
+import com.sparrowwallet.drongo.dns.DnsPayment;
+import com.sparrowwallet.drongo.dns.DnsPaymentResolver;
+import com.sparrowwallet.drongo.dns.DnsPaymentValidationException;
 import com.sparrowwallet.drongo.protocol.*;
+import com.sparrowwallet.drongo.uri.BitcoinURIParseException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.IOException;
 import java.util.*;
 
 import static com.sparrowwallet.drongo.protocol.ScriptType.*;
@@ -20,6 +25,7 @@ public class PSBTOutput {
     public static final byte PSBT_OUT_SCRIPT = 0x04;
     public static final byte PSBT_OUT_TAP_INTERNAL_KEY = 0x05;
     public static final byte PSBT_OUT_TAP_BIP32_DERIVATION = 0x07;
+    public static final byte PSBT_OUT_DNSSEC_PROOF = 0x35;
     public static final byte PSBT_OUT_PROPRIETARY = (byte)0xfc;
 
     private Script redeemScript;
@@ -28,6 +34,7 @@ public class PSBTOutput {
     private final Map<String, String> proprietary = new LinkedHashMap<>();
     private Map<ECKey, Map<KeyDerivation, List<Sha256Hash>>> tapDerivedPublicKeys = new LinkedHashMap<>();
     private ECKey tapInternalKey;
+    private Map<String, byte[]> dnssecProof;
 
     //PSBTv2 fields
     private Long amount;
@@ -43,7 +50,8 @@ public class PSBTOutput {
         this.index = index;
     }
 
-    PSBTOutput(PSBT psbt, int index, ScriptType scriptType, Script redeemScript, Script witnessScript, Map<ECKey, KeyDerivation> derivedPublicKeys, Map<String, String> proprietary, ECKey tapInternalKey) {
+    PSBTOutput(PSBT psbt, int index, ScriptType scriptType, Script redeemScript, Script witnessScript, Map<ECKey, KeyDerivation> derivedPublicKeys,
+               Map<String, String> proprietary, ECKey tapInternalKey, Map<String, byte[]> dnssecProof) {
         this(psbt, index);
 
         this.redeemScript = redeemScript;
@@ -61,6 +69,8 @@ public class PSBTOutput {
             KeyDerivation tapKeyDerivation = derivedPublicKeys.values().iterator().next();
             tapDerivedPublicKeys.put(this.tapInternalKey, Map.of(tapKeyDerivation, Collections.emptyList()));
         }
+
+        this.dnssecProof = dnssecProof;
     }
 
     PSBTOutput(PSBT psbt, List<PSBTEntry> outputEntries, int index) throws PSBTParseException {
@@ -119,6 +129,10 @@ public class PSBTOutput {
                         }
                     }
                     break;
+                case PSBT_OUT_DNSSEC_PROOF:
+                    entry.checkOneByteKey();
+                    this.dnssecProof = parseDnssecProof(entry.getData());
+                    break;
                 default:
                     log.warn("PSBT output not recognized key type: " + entry.getKeyType());
             }
@@ -163,6 +177,10 @@ public class PSBTOutput {
 
         if(tapInternalKey != null) {
             entries.add(populateEntry(PSBT_OUT_TAP_INTERNAL_KEY, null, tapInternalKey.getPubKeyXCoord()));
+        }
+
+        if(dnssecProof != null) {
+            entries.add(populateEntry(PSBT_OUT_DNSSEC_PROOF, null, serializeDnssecProof(dnssecProof)));
         }
 
         return entries;
@@ -270,6 +288,24 @@ public class PSBTOutput {
 
     public void setTapInternalKey(ECKey tapInternalKey) {
         this.tapInternalKey = tapInternalKey;
+    }
+
+    public Map<String, byte[]> getDnssecProof() {
+        return dnssecProof;
+    }
+
+    public Optional<DnsPayment> getDnsPayment() throws DnsPaymentValidationException, IOException, BitcoinURIParseException {
+        if(dnssecProof == null || dnssecProof.isEmpty()) {
+            return Optional.empty();
+        }
+
+        String hrn = dnssecProof.keySet().iterator().next();
+        DnsPaymentResolver resolver = new DnsPaymentResolver(hrn);
+        return resolver.resolve(dnssecProof.get(hrn));
+    }
+
+    public void setDnssecProof(Map<String, byte[]> dnssecProof) {
+        this.dnssecProof = dnssecProof;
     }
 
     public TransactionOutput getOutput() {

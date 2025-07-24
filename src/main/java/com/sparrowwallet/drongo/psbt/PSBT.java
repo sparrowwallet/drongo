@@ -144,6 +144,7 @@ public class PSBT {
         }
 
         List<WalletNode> outputNodes = new ArrayList<>();
+        List<Map<String, byte[]>> dnsProofs = new ArrayList<>();
         for(TransactionOutput txOutput : transaction.getOutputs()) {
             try {
                 Address address = txOutput.getScript().getToAddresses()[0];
@@ -152,16 +153,18 @@ public class PSBT {
                 } else if(walletTransaction.getChangeMap().keySet().stream().anyMatch(changeNode -> changeNode.getAddress().equals(address))) {
                     outputNodes.add(walletTransaction.getChangeMap().keySet().stream().filter(changeNode -> changeNode.getAddress().equals(address)).findFirst().orElse(null));
                 }
+                dnsProofs.add(walletTransaction.getAddressDnsProofMap().get(address));
             } catch(NonStandardScriptException e) {
                 //Ignore, likely OP_RETURN output
                 outputNodes.add(null);
+                dnsProofs.add(null);
             }
         }
 
         for(int outputIndex = 0; outputIndex < outputNodes.size(); outputIndex++) {
             WalletNode outputNode = outputNodes.get(outputIndex);
             if(outputNode == null) {
-                PSBTOutput externalRecipientOutput = new PSBTOutput(this, outputIndex, null, null, null, Collections.emptyMap(), Collections.emptyMap(), null);
+                PSBTOutput externalRecipientOutput = new PSBTOutput(this, outputIndex, null, null, null, Collections.emptyMap(), Collections.emptyMap(), null, dnsProofs.get(outputIndex));
                 psbtOutputs.add(externalRecipientOutput);
             } else {
                 TransactionOutput txOutput = transaction.getOutputs().get(outputIndex);
@@ -192,7 +195,7 @@ public class PSBT {
                     }
                 }
 
-                PSBTOutput walletOutput = new PSBTOutput(this, outputIndex, recipientWallet.getScriptType(), redeemScript, witnessScript, derivedPublicKeys, Collections.emptyMap(), tapInternalKey);
+                PSBTOutput walletOutput = new PSBTOutput(this, outputIndex, recipientWallet.getScriptType(), redeemScript, witnessScript, derivedPublicKeys, Collections.emptyMap(), tapInternalKey, null);
                 psbtOutputs.add(walletOutput);
             }
         }

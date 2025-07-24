@@ -1,6 +1,8 @@
 package com.sparrowwallet.drongo.wallet;
 
 import com.sparrowwallet.drongo.address.Address;
+import com.sparrowwallet.drongo.dns.DnsPayment;
+import com.sparrowwallet.drongo.dns.DnsPaymentCache;
 import com.sparrowwallet.drongo.protocol.*;
 import com.sparrowwallet.drongo.psbt.PSBT;
 
@@ -22,6 +24,7 @@ public class WalletTransaction {
     private final List<Output> outputs;
 
     private Map<Wallet, Map<Address, WalletNode>> addressNodeMap = new HashMap<>();
+    private Map<Address, Map<String, byte[]>> addressDnsProofMap = new HashMap<>();
 
     public WalletTransaction(Wallet wallet, Transaction transaction, List<UtxoSelector> utxoSelectors, List<Map<BlockTransactionHashIndex, WalletNode>> selectedUtxoSets, List<Payment> payments, long fee) {
         this(wallet, transaction, utxoSelectors, selectedUtxoSets, payments, Collections.emptyMap(), fee);
@@ -232,6 +235,21 @@ public class WalletTransaction {
         }
 
         return walletAddressNodeMap;
+    }
+
+    public Map<Address, Map<String, byte[]>> getAddressDnsProofMap() {
+        for(Payment payment : payments) {
+            if(addressDnsProofMap.containsKey(payment.getAddress())) {
+                continue;
+            }
+
+            DnsPayment dnsPayment = DnsPaymentCache.getDnsPayment(payment.getAddress());
+            if(dnsPayment != null && dnsPayment.bitcoinURI().getAddress() != null) {
+                addressDnsProofMap.put(dnsPayment.bitcoinURI().getAddress(), Map.of(dnsPayment.hrn(), dnsPayment.proofChain()));
+            }
+        }
+
+        return addressDnsProofMap;
     }
 
     private List<Output> calculateOutputs() {

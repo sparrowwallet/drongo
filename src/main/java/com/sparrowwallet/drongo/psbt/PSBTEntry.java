@@ -9,6 +9,7 @@ import com.sparrowwallet.drongo.protocol.VarInt;
 import java.io.ByteArrayOutputStream;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -141,6 +142,39 @@ public class PSBTEntry {
             baos.writeBytes(indexBytes);
         }
 
+        return baos.toByteArray();
+    }
+
+    public static Map<String, byte[]> parseDnssecProof(byte[] data) throws PSBTParseException {
+        if(data.length == 0) {
+            throw new PSBTParseException("No data provided for DNSSEC proof");
+        }
+
+        ByteBuffer bb = ByteBuffer.wrap(data);
+        int strLen = bb.get();
+        if(data.length < strLen + 1) {
+            throw new PSBTParseException("Invalid string length of " + strLen + " provided for DNSSEC proof");
+        }
+
+        byte[] strBytes = new byte[strLen];
+        bb.get(strBytes);
+        String hrn = new String(strBytes, StandardCharsets.US_ASCII);
+        byte[] proof = new byte[bb.remaining()];
+        bb.get(proof);
+        return Map.of(hrn, proof);
+    }
+
+    public static byte[] serializeDnssecProof(Map<String, byte[]> dnssecProof) {
+        if(dnssecProof.isEmpty()) {
+            throw new IllegalArgumentException("No DNSSEC proof provided");
+        }
+
+        String hrn = dnssecProof.keySet().iterator().next();
+        byte[] proof = dnssecProof.get(hrn);
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        baos.write(hrn.length());
+        baos.writeBytes(hrn.getBytes(StandardCharsets.US_ASCII));
+        baos.writeBytes(proof);
         return baos.toByteArray();
     }
 

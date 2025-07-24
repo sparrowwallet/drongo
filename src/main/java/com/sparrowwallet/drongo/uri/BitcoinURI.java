@@ -75,6 +75,8 @@ public class BitcoinURI {
     public static final DecimalFormat BTC_FORMAT = new DecimalFormat("0", DecimalFormatSymbols.getInstance(Locale.ENGLISH));
     public static final int SMALLEST_UNIT_EXPONENT = 8;
 
+    private final String uriString;
+
     /**
      * Contains all the parameters in the order in which they were processed
      */
@@ -135,9 +137,7 @@ public class BitcoinURI {
             }
         }
 
-        if(addressToken.isEmpty() && getPaymentRequestUrl() == null) {
-            throw new BitcoinURIParseException("No address and no r= parameter found");
-        }
+        this.uriString = input;
     }
 
     /**
@@ -313,6 +313,10 @@ public class BitcoinURI {
         }
         builder.append("]");
         return builder.toString();
+    }
+
+    public String toURIString() {
+        return uriString;
     }
 
     public Payment toPayment() {
