@@ -109,6 +109,14 @@ public enum WalletModel {
         }
     }
 
+    public boolean hasZeroInPin() {
+        if(this == ONEKEY_CLASSIC_1S) {
+            return true;
+        } else {
+            return false;
+        }
+    }
+
     public boolean requiresSeedInitialization() {
         if(this == SATOCHIP) {
             return true;
