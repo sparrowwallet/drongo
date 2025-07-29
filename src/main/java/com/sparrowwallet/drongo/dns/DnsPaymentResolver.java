@@ -1,5 +1,6 @@
 package com.sparrowwallet.drongo.dns;
 
+import com.sparrowwallet.drongo.Utils;
 import com.sparrowwallet.drongo.uri.BitcoinURI;
 import com.sparrowwallet.drongo.uri.BitcoinURIParseException;
 import org.slf4j.Logger;
@@ -7,12 +8,17 @@ import org.slf4j.LoggerFactory;
 import org.xbill.DNS.*;
 import org.xbill.DNS.Record;
 import org.xbill.DNS.dnssec.ValidatingResolver;
+import org.xbill.DNS.lookup.LookupResult;
+import org.xbill.DNS.lookup.LookupSession;
+import org.xbill.DNS.lookup.NoSuchDomainException;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.time.Clock;
 import java.time.Instant;
 import java.util.*;
+import java.util.concurrent.ExecutionException;
 
 import static com.sparrowwallet.drongo.uri.BitcoinURI.BITCOIN_SCHEME;
 
@@ -27,8 +33,13 @@ public class DnsPaymentResolver {
 
     private final String hrn;
     private final String domain;
+    private final Clock clock;
 
     public DnsPaymentResolver(String hrn) {
+        this(hrn, Clock.systemUTC());
+    }
+
+    public DnsPaymentResolver(String hrn, Clock clock) {
         if(!StandardCharsets.US_ASCII.newEncoder().canEncode(hrn)) {
             throw new IllegalArgumentException("Invalid HRN containing non-ASCII characters: " + hrn);
         }
@@ -38,9 +49,10 @@ public class DnsPaymentResolver {
             throw new IllegalArgumentException("Invalid HRN: " + hrn);
         }
         this.domain = parts[0] + ".user._bitcoin-payment." + parts[1];
+        this.clock = clock;
     }
 
-    public Optional<DnsPayment> resolve() throws IOException, DnsPaymentValidationException, BitcoinURIParseException {
+    public Optional<DnsPayment> resolve() throws IOException, DnsPaymentValidationException, BitcoinURIParseException, ExecutionException, InterruptedException {
         return resolve(DEFAULT_RESOLVER_IP_ADDRESS);
     }
 
@@ -53,32 +65,40 @@ public class DnsPaymentResolver {
      * @throws DnsPaymentValidationException Thrown for a DNSSEC or BIP 353 validation failure
      * @throws BitcoinURIParseException Thrown for an invalid BIP 21 URI
      */
-    public Optional<DnsPayment> resolve(String resolverIpAddress) throws IOException, DnsPaymentValidationException, BitcoinURIParseException {
+    public Optional<DnsPayment> resolve(String resolverIpAddress) throws IOException, DnsPaymentValidationException, BitcoinURIParseException, ExecutionException, InterruptedException {
         log.debug("Resolving payment record for: " + domain);
 
         PersistingResolver persistingResolver = new PersistingResolver(resolverIpAddress);
-        ValidatingResolver resolver = new ValidatingResolver(persistingResolver);
-        resolver.loadTrustAnchors(new ByteArrayInputStream(ROOT.getBytes(StandardCharsets.US_ASCII)));
-        resolver.setEDNS(0, 0, ExtendedFlags.DO);
+        ValidatingResolver validatingResolver = new ValidatingResolver(persistingResolver, clock);
+        validatingResolver.loadTrustAnchors(new ByteArrayInputStream(ROOT.getBytes(StandardCharsets.US_ASCII)));
+        validatingResolver.setEDNS(0, 0, ExtendedFlags.DO);
+        AuthenticatingResolver authenticatingResolver = new AuthenticatingResolver(validatingResolver);
 
-        Lookup lookup = new Lookup(domain, Type.TXT);
-        lookup.setResolver(resolver);
+        try {
+            LookupSession lookupSession = LookupSession.builder().resolver(authenticatingResolver).build();
+            LookupResult result = lookupSession.lookupAsync(getName(), Type.TXT, DClass.IN).toCompletableFuture().get();
+            if(result.getRecords().isEmpty()) {
+                return Optional.empty();
+            }
 
-        Message query = getQuery();
-        Message response = resolver.send(query);
-        if(response.getSection(Section.ANSWER).isEmpty()) {
-            return Optional.empty();
+            String strBitcoinUri = getBitcoinURI(result.getRecords());
+            if(strBitcoinUri.isEmpty()) {
+                return Optional.empty();
+            }
+            BitcoinURI bitcoinURI = new BitcoinURI(strBitcoinUri);
+            validateResponse(authenticatingResolver, new ArrayList<>(persistingResolver.getChain()));
+
+            byte[] proofChain = persistingResolver.chainToWire();
+            log.debug("Resolved " + hrn + " with proof " + Utils.bytesToHex(proofChain));
+
+            return Optional.of(new DnsPayment(hrn, bitcoinURI, proofChain));
+        } catch(ExecutionException e) {
+            if(e.getCause() instanceof NoSuchDomainException) {
+                return Optional.empty();
+            } else {
+                throw e;
+            }
         }
-
-        checkResponse(response, new ArrayList<>(persistingResolver.getChain()));
-        String strBitcoinUri = getBitcoinURI(response.getSection(Section.ANSWER));
-        if(strBitcoinUri.isEmpty()) {
-            return Optional.empty();
-        }
-        BitcoinURI bitcoinURI = new BitcoinURI(strBitcoinUri);
-        validateResponse(response, new ArrayList<>(persistingResolver.getChain()));
-
-        return Optional.of(new DnsPayment(hrn, bitcoinURI, persistingResolver.chainToWire()));
     }
 
     /**
@@ -90,12 +110,13 @@ public class DnsPaymentResolver {
      * @throws DnsPaymentValidationException Thrown for a DNSSEC or BIP 353 validation failure
      * @throws BitcoinURIParseException Thrown for an invalid BIP 21 URI
      */
-    public Optional<DnsPayment> resolve(byte[] proofChain) throws IOException, DnsPaymentValidationException, BitcoinURIParseException {
+    public Optional<DnsPayment> resolve(byte[] proofChain) throws IOException, DnsPaymentValidationException, BitcoinURIParseException, ExecutionException, InterruptedException {
         OfflineResolver offlineResolver = new OfflineResolver(proofChain);
-        ValidatingResolver offlineValidatingResolver = new ValidatingResolver(offlineResolver);
+        ValidatingResolver offlineValidatingResolver = new ValidatingResolver(offlineResolver, clock);
         offlineValidatingResolver.loadTrustAnchors(new ByteArrayInputStream(ROOT.getBytes(StandardCharsets.US_ASCII)));
+        AuthenticatingResolver authenticatingResolver = new AuthenticatingResolver(offlineValidatingResolver);
 
-        Instant now = Instant.now();
+        Instant now = clock.instant();
         Instant oneHourAgo = now.minusSeconds(3600);
         for(Record record : offlineResolver.getCachedSigs()) {
             if(record instanceof RRSIGRecord rrsig) {
@@ -107,44 +128,36 @@ public class DnsPaymentResolver {
             }
         }
 
-        Message query = getQuery();
-        Message offlineResponse = offlineValidatingResolver.send(query);
-        if(offlineResponse.getSection(Section.ANSWER).isEmpty()) {
-            return Optional.empty();
-        }
-
-        checkResponse(offlineResponse, offlineResolver.getRecords());
-        String strBitcoinUri = getBitcoinURI(offlineResponse.getSection(Section.ANSWER));
-        if(strBitcoinUri.isEmpty()) {
-            throw new BitcoinURIParseException("The DNS record for " + hrn + " did not contain a Bitcoin URI");
-        }
-        BitcoinURI bitcoinURI = new BitcoinURI(strBitcoinUri);
-        validateResponse(offlineResponse, offlineResolver.getRecords());
-
-        return Optional.of(new DnsPayment(hrn, bitcoinURI, proofChain));
-    }
-
-    private Message getQuery() throws TextParseException {
-        Name queryName = Name.fromString(domain + ".");
-        Record question = Record.newRecord(queryName, Type.TXT, DClass.IN);
-        return Message.newQuery(question);
-    }
-
-    private void checkResponse(Message response, List<Record> records) throws DnsPaymentValidationException {
-        if(response.getRcode() != Rcode.NOERROR) {
-            StringBuilder reason = new StringBuilder();
-            for(RRset set : response.getSectionRRsets(Section.ADDITIONAL)) {
-                if(set.getName().equals(Name.root) && set.getType() == Type.TXT && set.getDClass() == ValidatingResolver.VALIDATION_REASON_QCLASS) {
-                    reason.append(((TXTRecord) set.first()).getStrings().getFirst());
-                }
+        try {
+            LookupSession lookupSession = LookupSession.builder().resolver(authenticatingResolver).build();
+            LookupResult result = lookupSession.lookupAsync(getName(), Type.TXT, DClass.IN).toCompletableFuture().get();
+            if(result.getRecords().isEmpty()) {
+                return Optional.empty();
             }
 
-            throw new DnsPaymentValidationException("DNS query for " + domain + " failed, " + (reason.isEmpty() ? "rcode was " + response.getRcode() : reason.toString()));
+            String strBitcoinUri = getBitcoinURI(result.getRecords());
+            if(strBitcoinUri.isEmpty()) {
+                return Optional.empty();
+            }
+            BitcoinURI bitcoinURI = new BitcoinURI(strBitcoinUri);
+            validateResponse(authenticatingResolver, offlineResolver.getRecords());
+
+            return Optional.of(new DnsPayment(hrn, bitcoinURI, proofChain));
+        } catch(ExecutionException e) {
+            if(e.getCause() instanceof NoSuchDomainException) {
+                return Optional.empty();
+            } else {
+                throw e;
+            }
         }
     }
 
-    private void validateResponse(Message response, List<Record> records) throws DnsPaymentValidationException {
-        boolean isValidated = response.getHeader().getFlag(Flags.AD);
+    private Name getName() throws TextParseException {
+        return Name.fromString(domain + ".");
+    }
+
+    private void validateResponse(AuthenticatingResolver resolver, List<Record> records) throws DnsPaymentValidationException {
+        boolean isValidated = resolver.isAuthenticated();
         if(!isValidated) {
             throw new DnsPaymentValidationException("DNSSEC validation failed, could not authenticate the payment instruction");
         }

@@ -63,4 +63,61 @@ public class RecordUtils {
 
         return warnings;
     }
+
+    /**
+     * Determine by looking at a signed RRset whether the RRset name was the result of a wildcard
+     * expansion. If so, return the name of the generating wildcard.
+     *
+     * @param rrset The rrset to chedck.
+     * @return the wildcard name, if the rrset was synthesized from a wildcard. null if not.
+     */
+    public static Name rrsetWildcard(RRset rrset) {
+        List<RRSIGRecord> sigs = rrset.sigs();
+        RRSIGRecord firstSig = sigs.getFirst();
+
+        // check rest of signatures have identical label count
+        for(int i = 1; i < sigs.size(); i++) {
+            if(sigs.get(i).getLabels() != firstSig.getLabels()) {
+                throw new IllegalArgumentException("Label count mismatch on RRSIGs");
+            }
+        }
+
+        // if the RRSIG label count is shorter than the number of actual labels,
+        // then this rrset was synthesized from a wildcard.
+        // Note that the RRSIG label count doesn't count the root label.
+        Name wn = rrset.getName();
+
+        // skip a leading wildcard label in the dname (RFC4035 2.2)
+        if(rrset.getName().isWild()) {
+            wn = new Name(wn, 1);
+        }
+
+        int labelDiff = (wn.labels() - 1) - firstSig.getLabels();
+        if(labelDiff > 0) {
+            return wn.wild(labelDiff);
+        }
+
+        return null;
+    }
+
+    /**
+     * Finds the longest domain name in common with the given name.
+     *
+     * @param domain1 The first domain to process.
+     * @param domain2 The second domain to process.
+     * @return The longest label in common of domain1 and domain2. The least common name is the root.
+     */
+    public static Name longestCommonName(Name domain1, Name domain2) {
+        int l = Math.min(domain1.labels(), domain2.labels());
+        domain1 = new Name(domain1, domain1.labels() - l);
+        domain2 = new Name(domain2, domain2.labels() - l);
+        for(int i = 0; i < l - 1; i++) {
+            Name ns1 = new Name(domain1, i);
+            if(ns1.equals(new Name(domain2, i))) {
+                return ns1;
+            }
+        }
+
+        return Name.root;
+    }
 }

@@ -13,6 +13,7 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.util.*;
+import java.util.concurrent.ExecutionException;
 
 import static com.sparrowwallet.drongo.protocol.ScriptType.*;
 import static com.sparrowwallet.drongo.psbt.PSBTEntry.*;
@@ -294,7 +295,7 @@ public class PSBTOutput {
         return dnssecProof;
     }
 
-    public Optional<DnsPayment> getDnsPayment() throws DnsPaymentValidationException, IOException, BitcoinURIParseException {
+    public Optional<DnsPayment> getDnsPayment() throws DnsPaymentValidationException, IOException, BitcoinURIParseException, ExecutionException, InterruptedException {
         if(dnssecProof == null || dnssecProof.isEmpty()) {
             return Optional.empty();
         }

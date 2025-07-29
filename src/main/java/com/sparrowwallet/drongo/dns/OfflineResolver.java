@@ -58,32 +58,80 @@ public class OfflineResolver implements Resolver {
 
     @Override
     public CompletionStage<Message> sendAsync(Message query, Executor executor) {
-        Record question = query.getQuestion();
-        List<Record> records = new ArrayList<>();
+        Message response = makeNoErrorResponse(query);
+        addRecords(query.getQuestion(), response);
 
-        for(Record it : cachedRrs) {
-            if(it.getName().equals(question.getName()) && it.getType() == question.getType() && it.getDClass() == question.getDClass()) {
-                records.add(it);
-            }
-        }
-
-        for(RRSIGRecord it : cachedSigs) {
-            if(it.getName().equals(question.getName()) && it.getTypeCovered() == question.getType() && it.getDClass() == question.getDClass()) {
-                records.add(it);
-            }
-        }
-
-        Message response;
-        if(records.isEmpty()) {
-            response = makeEmptyResponse(query);
-        } else {
-            response = makeResponseForRecords(records, query);
+        if(response.getSection(Section.ANSWER).isEmpty() && response.getSection(Section.AUTHORITY).isEmpty()) {
+            response = makeNoDomainResponse(query);
         }
 
         return CompletableFuture.completedFuture(response);
     }
 
-    private Message makeEmptyResponse(Message query) {
+    private void addRecords(Record question, Message response) {
+        Name name = question.getName();
+
+        RRset cnameSet = getRRSet(name, Type.CNAME, question.getDClass());
+        addRRSetToMessage(response, cnameSet);
+
+        if(!cnameSet.rrs().isEmpty() && cnameSet.rrs().getFirst() instanceof CNAMERecord cnameRecord) {
+            name = cnameRecord.getTarget();
+        }
+
+        RRset answerSet = getRRSet(name, question.getType(), question.getDClass());
+        addRRSetToMessage(response, answerSet);
+    }
+
+    private void addRRSetToMessage(Message response, RRset rrset) {
+        rrset.rrs().stream().forEach(it -> response.addRecord(it, Section.ANSWER));
+        rrset.sigs().stream().forEach(it -> response.addRecord(it, Section.ANSWER));
+
+        if(!rrset.sigs().isEmpty()) {
+            Name wildcard = RecordUtils.rrsetWildcard(rrset);
+            if(wildcard != null) {
+                RRset nsecRRset = getNSecRRSetForWildcard(wildcard);
+                nsecRRset.rrs().stream().forEach(it -> response.addRecord(it, Section.AUTHORITY));
+                nsecRRset.sigs().stream().forEach(it -> response.addRecord(it, Section.AUTHORITY));
+            }
+        }
+    }
+
+    private RRset getRRSet(Name name, int type, int dclass) {
+        RRset rrset = new RRset();
+        for(Record it : cachedRrs) {
+            if(it.getName().equals(name) && it.getType() == type && it.getDClass() == dclass) {
+                rrset.addRR(it);
+            }
+        }
+
+        for(RRSIGRecord it : cachedSigs) {
+            if(it.getName().equals(name) && it.getTypeCovered() == type && it.getDClass() == dclass) {
+                rrset.addRR(it);
+            }
+        }
+
+        return rrset;
+    }
+
+    private RRset getNSecRRSetForWildcard(Name wildcard) {
+        RRset rrset = new RRset();
+
+        for(Record it : cachedRrs) {
+            if((it.getType() == Type.NSEC || it.getType() == Type.NSEC3) && RecordUtils.longestCommonName(it.getName(), wildcard) != Name.root) {
+                rrset.addRR(it);
+            }
+        }
+
+        for(RRSIGRecord it : cachedSigs) {
+            if((it.getTypeCovered() == Type.NSEC || it.getTypeCovered() == Type.NSEC3) && RecordUtils.longestCommonName(it.getName(), wildcard) != Name.root) {
+                rrset.addRR(it);
+            }
+        }
+
+        return rrset;
+    }
+
+    private Message makeNoDomainResponse(Message query) {
         Header messageHeader = new Header();
         messageHeader.setID(query.getHeader().getID());
         messageHeader.setRcode(Rcode.NXDOMAIN);
@@ -95,12 +143,14 @@ public class OfflineResolver implements Resolver {
         Message answerMessage = new Message();
         answerMessage.setHeader(messageHeader);
 
+        for(Record record : query.getSection(Section.QUESTION)) {
+            answerMessage.addRecord(record, Section.QUESTION);
+        }
+
         return answerMessage;
     }
 
-    private Message makeResponseForRecords(List<Record> records, Message query) {
-        Message answerMessage = new Message();
-
+    private Message makeNoErrorResponse(Message query) {
         Header messageHeader = new Header();
         messageHeader.setID(query.getHeader().getID());
         messageHeader.setRcode(Rcode.NOERROR);
@@ -108,14 +158,12 @@ public class OfflineResolver implements Resolver {
         messageHeader.setFlag(Flags.CD);
         messageHeader.setFlag(Flags.RD);
         messageHeader.setFlag(Flags.RA);
+
+        Message answerMessage = new Message();
         answerMessage.setHeader(messageHeader);
 
         for(Record record : query.getSection(Section.QUESTION)) {
             answerMessage.addRecord(record, Section.QUESTION);
-        }
-
-        for(Record record : records) {
-            answerMessage.addRecord(record, Section.ANSWER);
         }
 
         return answerMessage;
