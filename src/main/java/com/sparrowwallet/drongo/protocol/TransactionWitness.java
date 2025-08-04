@@ -89,12 +89,8 @@ public class TransactionWitness extends ChildMessage {
         int length = new VarInt(pushes.size()).getSizeInBytes();
         for (int i = 0; i < pushes.size(); i++) {
             byte[] push = pushes.get(i);
-            if(push.length == 1 && push[0] == 0) {
-                length++;
-            } else {
-                length += new VarInt(push.length).getSizeInBytes();
-                length += push.length;
-            }
+            length += new VarInt(push.length).getSizeInBytes();
+            length += push.length;
         }
 
         return length;
@@ -104,12 +100,8 @@ public class TransactionWitness extends ChildMessage {
         stream.write(new VarInt(pushes.size()).encode());
         for(int i = 0; i < pushes.size(); i++) {
             byte[] push = pushes.get(i);
-            if(push.length == 1 && push[0] == 0) {
-                stream.write(push);
-            } else {
-                stream.write(new VarInt(push.length).encode());
-                stream.write(push);
-            }
+            stream.write(new VarInt(push.length).encode());
+            stream.write(push);
         }
     }
 
