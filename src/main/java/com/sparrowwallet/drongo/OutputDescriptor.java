@@ -23,10 +23,10 @@ public class OutputDescriptor {
     private static final String INPUT_CHARSET = "0123456789()[],'/*abcdefgh@:$%{}IJKLMNOPQRSTUVWXYZ&+-.;<=>?!^_|~ijklmnopqrstuvwxyzABCDEFGH`#\"\\ ";
     private static final String CHECKSUM_CHARSET = "qpzry9x8gf2tvdw0s3jn54khce6mua7l";
 
-    public static final Pattern XPUB_PATTERN = Pattern.compile("(\\[[^\\]]+\\])?(.(?:pub|prv)[^/\\,)]{100,112})(/[/\\d*'hH<>;{},]+)?");
+    public static final Pattern XPUB_PATTERN = Pattern.compile("(\\[[^\\]]+\\])?(.(?:pub|prv)[^/\\,)]{100,112})(/[/\\d*'hH<>;]+)?");
     private static final Pattern PUBKEY_PATTERN = Pattern.compile("(\\[[^\\]]+\\])?(0[23][0-9a-fA-F]{32})");
     private static final Pattern MULTI_PATTERN = Pattern.compile("multi\\((\\d+)");
-    private static final Pattern KEY_ORIGIN_PATTERN = Pattern.compile("\\[([A-Fa-f0-9]{8})([/\\d'hH]+)?\\]");
+    public static final Pattern KEY_ORIGIN_PATTERN = Pattern.compile("\\[([A-Fa-f0-9]{8})([/\\d'hH]+)?\\]");
     private static final Pattern MULTIPATH_PATTERN = Pattern.compile("<([\\d*'hH;]+)>");
     private static final Pattern CHECKSUM_PATTERN = Pattern.compile("#([" + CHECKSUM_CHARSET + "]{8})$");
 
@@ -276,7 +276,9 @@ public class OutputDescriptor {
                 ExtendedKey xprv = extendedMasterPrivateKeys.get(xpub);
                 MasterPrivateExtendedKey masterPrivateExtendedKey = new MasterPrivateExtendedKey(xprv.getKey().getPrivKeyBytes(), xprv.getKey().getChainCode());
                 String childDerivation = mapChildrenDerivations.get(xpub) == null ? scriptType.getDefaultDerivationPath() : mapChildrenDerivations.get(xpub);
-                if(childDerivation.endsWith("/0/*") || childDerivation.endsWith("/1/*")) {
+                if(childDerivation.endsWith("/<0;1>/*")) {
+                    childDerivation = childDerivation.substring(0, childDerivation.length() - 8);
+                } else if(childDerivation.endsWith("/0/*") || childDerivation.endsWith("/1/*")) {
                     childDerivation = childDerivation.substring(0, childDerivation.length() - 4);
                 }
                 try {
@@ -446,6 +448,9 @@ public class OutputDescriptor {
                         if(childPath.size() > 2 && (extendedKey.getKey().hasPrivKey() || childPath.stream().noneMatch(ChildNumber::isHardened))) {
                             childDerivationPath = childDerivationPath.substring(childDerivationPath.lastIndexOf("/", childDerivationPath.lastIndexOf("/") - 1));
                             childPath = childPath.subList(0, childPath.size() - 2);
+                            if(masterFingerprint == null) {
+                                keyDerivation = new KeyDerivation(Utils.bytesToHex(extendedKey.getKey().getFingerprint()), keyDerivationPath);
+                            }
                             keyDerivation = keyDerivation.extend(childPath);
                             childPath.addFirst(extendedKey.getKeyChildNumber());
                             DeterministicKey derivedKey = extendedKey.getKey(childPath);
