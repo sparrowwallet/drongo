@@ -161,7 +161,7 @@ public class OutputDescriptorTest {
         OutputDescriptor outputDescriptor = OutputDescriptor.getOutputDescriptor(desc);
         Wallet wallet = outputDescriptor.toWallet();
         Assertions.assertEquals("fe05631b", wallet.getKeystores().get(0).getKeyDerivation().getMasterFingerprint());
-        Assertions.assertEquals("m/84'/1'/0'/3/0", wallet.getKeystores().get(0).getKeyDerivation().getDerivationPath());
-        Assertions.assertEquals("xpub6FmRnopYz7J3zbEmKVnrxkuqQUqoL6wbAffNQJrDeXF29nJaTzUruDWbwG4Q3UR7MWpw3GfbqVnt65GbHsYJitzQpTCLkv8oh8dtcW9bNmr", wallet.getKeystores().get(0).getExtendedPublicKey().toString());
+        Assertions.assertEquals("m/84'/1'/0'", wallet.getKeystores().get(0).getKeyDerivation().getDerivationPath());
+        Assertions.assertEquals("xpub6BwAZuXFhV4oufDPGLi89BXMWkFSWDY8EGjLN7GReoKcBQC2MV9A6siCKefwMitca3YnvRCWKWp2RJoDeG9djtucWkH2EibPEvpm2fyNLK3", wallet.getKeystores().get(0).getExtendedPublicKey().toString());
     }
 }
