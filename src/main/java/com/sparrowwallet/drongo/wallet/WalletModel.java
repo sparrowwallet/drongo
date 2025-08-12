@@ -185,7 +185,9 @@ public enum WalletModel {
             }
             builder.append(Character.toUpperCase(word.charAt(0)));
             builder.append(word.substring(1));
-            builder.append(" ");
+            if(this != BLUE_WALLET) {
+                builder.append(" ");
+            }
         }
 
         return builder.toString().trim();
