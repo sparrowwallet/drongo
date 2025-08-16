@@ -19,6 +19,10 @@ public class BlockHeader extends Message {
         super(rawheader, 0);
     }
 
+    public BlockHeader(byte[] blockdata, int offset) {
+        super(blockdata, offset);
+    }
+
     public BlockHeader(long version, Sha256Hash prevBlockHash, Sha256Hash merkleRoot, Sha256Hash witnessRoot, long time, long difficultyTarget, long nonce) {
         this.version = version;
         this.prevBlockHash = prevBlockHash;

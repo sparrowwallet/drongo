@@ -53,6 +53,10 @@ public class Transaction extends ChildMessage {
         super(rawtx, 0);
     }
 
+    public Transaction(byte[] blockdata, int offset) {
+        super(blockdata, offset);
+    }
+
     public long getVersion() {
         return version;
     }
