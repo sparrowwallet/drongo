@@ -26,11 +26,7 @@ public class SilentPaymentAddress {
 
     public String getAddress() {
         byte[] keys = Utils.concat(scanAddress.getPubKey(), spendAddress.getPubKey());
-        return Bech32.encode(getHrp(), 0, Bech32.Encoding.BECH32M, keys);
-    }
-
-    private static String getHrp() {
-        return Network.get() == Network.MAINNET ? "sp" : "tsp";
+        return Bech32.encode(Network.get().getSilentPaymentsAddressHrp(), 0, Bech32.Encoding.BECH32M, keys);
     }
 
     public static SilentPaymentAddress from(String address) {
@@ -39,7 +35,7 @@ public class SilentPaymentAddress {
             throw new IllegalArgumentException("Invalid silent payments address encoding");
         }
 
-        if(!getHrp().equals(data.hrp)) {
+        if(!Network.get().getSilentPaymentsAddressHrp().equals(data.hrp)) {
             throw new IllegalArgumentException("Invalid silent payments address hrp");
         }
 

@@ -3,16 +3,16 @@ package com.sparrowwallet.drongo;
 import java.util.Locale;
 
 public enum Network {
-    MAINNET("mainnet", "Mainnet", "mainnet", 0, "1", 5, "3", "bc", ExtendedKey.Header.xprv, ExtendedKey.Header.xpub, 128, 8332),
-    TESTNET("testnet", "Testnet3", "testnet3", 111, "mn", 196, "2", "tb", ExtendedKey.Header.tprv, ExtendedKey.Header.tpub, 239, 18332),
-    REGTEST("regtest", "Regtest", "regtest", 111, "mn", 196, "2", "bcrt", ExtendedKey.Header.tprv, ExtendedKey.Header.tpub, 239, 18443),
-    SIGNET("signet", "Signet", "signet", 111, "mn", 196, "2", "tb", ExtendedKey.Header.tprv, ExtendedKey.Header.tpub, 239, 38332),
-    TESTNET4("testnet4", "Testnet4", "testnet4", 111, "mn", 196, "2", "tb", ExtendedKey.Header.tprv, ExtendedKey.Header.tpub, 239, 48332);
+    MAINNET("mainnet", "Mainnet", "mainnet", 0, "1", 5, "3", "bc", "sp", ExtendedKey.Header.xprv, ExtendedKey.Header.xpub, 128, 8332),
+    TESTNET("testnet", "Testnet3", "testnet3", 111, "mn", 196, "2", "tb", "tsp", ExtendedKey.Header.tprv, ExtendedKey.Header.tpub, 239, 18332),
+    REGTEST("regtest", "Regtest", "regtest", 111, "mn", 196, "2", "bcrt", "sprt", ExtendedKey.Header.tprv, ExtendedKey.Header.tpub, 239, 18443),
+    SIGNET("signet", "Signet", "signet", 111, "mn", 196, "2", "tb", "tsp", ExtendedKey.Header.tprv, ExtendedKey.Header.tpub, 239, 38332),
+    TESTNET4("testnet4", "Testnet4", "testnet4", 111, "mn", 196, "2", "tb", "tsp", ExtendedKey.Header.tprv, ExtendedKey.Header.tpub, 239, 48332);
 
     public static final String BLOCK_HEIGHT_PROPERTY = "com.sparrowwallet.blockHeight";
     private static final Network[] CANONICAL_VALUES = new Network[]{MAINNET, TESTNET, REGTEST, SIGNET};
 
-    Network(String name, String displayName, String home, int p2pkhAddressHeader, String p2pkhAddressPrefix, int p2shAddressHeader, String p2shAddressPrefix, String bech32AddressHrp, ExtendedKey.Header xprvHeader, ExtendedKey.Header xpubHeader, int dumpedPrivateKeyHeader, int defaultPort) {
+    Network(String name, String displayName, String home, int p2pkhAddressHeader, String p2pkhAddressPrefix, int p2shAddressHeader, String p2shAddressPrefix, String bech32AddressHrp, String spAddressHrp, ExtendedKey.Header xprvHeader, ExtendedKey.Header xpubHeader, int dumpedPrivateKeyHeader, int defaultPort) {
         this.name = name;
         this.displayName = displayName;
         this.home = home;
@@ -21,6 +21,7 @@ public enum Network {
         this.p2shAddressHeader = p2shAddressHeader;
         this.p2shAddressPrefix = p2shAddressPrefix;
         this.bech32AddressHrp = bech32AddressHrp;
+        this.spAddressHrp = spAddressHrp;
         this.xprvHeader = xprvHeader;
         this.xpubHeader = xpubHeader;
         this.dumpedPrivateKeyHeader = dumpedPrivateKeyHeader;
@@ -35,6 +36,7 @@ public enum Network {
     private final int p2shAddressHeader;
     private final String p2shAddressPrefix;
     private final String bech32AddressHrp;
+    private final String spAddressHrp;
     private final ExtendedKey.Header xprvHeader;
     private final ExtendedKey.Header xpubHeader;
     private final int dumpedPrivateKeyHeader;
@@ -68,6 +70,10 @@ public enum Network {
 
     public String getBech32AddressHRP() {
         return bech32AddressHrp;
+    }
+
+    public String getSilentPaymentsAddressHrp() {
+        return spAddressHrp;
     }
 
     public ExtendedKey.Header getXprvHeader() {
