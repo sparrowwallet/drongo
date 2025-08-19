@@ -121,6 +121,11 @@ public class Bech32 {
     /** Encode a Bech32 string. */
     public static String encode(String hrp, int version, final byte[] values) {
         Encoding encoding = (version == 0 ? Encoding.BECH32 : Encoding.BECH32M);
+        return encode(hrp, version, encoding, values);
+    }
+
+    /** Encode a Bech32 string. */
+    public static String encode(String hrp, int version, Encoding encoding, final byte[] values) {
         return encode(hrp, encoding, encode(version, values));
     }
 

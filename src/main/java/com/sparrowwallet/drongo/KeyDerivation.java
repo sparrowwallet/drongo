@@ -104,6 +104,10 @@ public class KeyDerivation {
         return List.of(new ChildNumber(47, true), new ChildNumber(Network.get() == Network.MAINNET ? 0 : 1, true), new ChildNumber(Math.max(0, account), true));
     }
 
+    public static List<ChildNumber> getBip352Derivation(int account) {
+        return List.of(new ChildNumber(352, true), new ChildNumber(Network.get() == Network.MAINNET ? 0 : 1, true), new ChildNumber(Math.max(0, account), true));
+    }
+
     public KeyDerivation copy() {
         return new KeyDerivation(masterFingerprint, derivationPath);
     }
