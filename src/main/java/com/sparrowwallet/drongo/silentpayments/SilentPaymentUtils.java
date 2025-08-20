@@ -46,17 +46,20 @@ public class SilentPaymentUtils {
                 if(scriptType.isScriptType(output.getScript())) {
                     switch(scriptType) {
                         case P2TR:
-                            keys.add(output.getScript().getPubKey());
+                            keys.add(ScriptType.P2TR.getPublicKeyFromScript(output.getScript()));
                             break;
                         case P2WPKH:
                         case P2SH_P2WPKH:
                             if(input.getWitness() != null && input.getWitness().getPushCount() == 2) {
-                                keys.add(ECKey.fromPublicOnly(input.getWitness().getPushes().get(input.getWitness().getPushCount() - 1)));
+                                byte[] pubKey = input.getWitness().getPushes().get(input.getWitness().getPushCount() - 1);
+                                if(pubKey != null && pubKey.length == 33) {
+                                    keys.add(ECKey.fromPublicOnly(pubKey));
+                                }
                             }
                             break;
                         case P2PKH:
                             for(ScriptChunk scriptChunk : input.getScriptSig().getChunks()) {
-                                if(scriptChunk.isPubKey()) {
+                                if(scriptChunk.isPubKey() && scriptChunk.getData().length == 33) {
                                     keys.add(scriptChunk.getPubKey());
                                 }
                             }
