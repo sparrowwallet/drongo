@@ -18,35 +18,35 @@ public class SilentPaymentUtils {
 
     private static final List<ScriptType> SCRIPT_TYPES = List.of(ScriptType.P2TR, ScriptType.P2WPKH, ScriptType.P2SH_P2WPKH, ScriptType.P2PKH);
 
-    public static boolean isEligible(Transaction tx, Map<HashIndex, TransactionOutput> spentOutputs) {
+    public static boolean isEligible(Transaction tx, Map<HashIndex, Script> spentScriptPubKeys) {
         if(!containsTaprootOutput(tx)) {
             return false;
         }
 
-        if(getInputPubKeys(tx, spentOutputs).isEmpty()) {
+        if(getInputPubKeys(tx, spentScriptPubKeys).isEmpty()) {
             return false;
         }
 
-        if(spendsInvalidSegwitOutput(tx, spentOutputs)) {
+        if(spendsInvalidSegwitOutput(tx, spentScriptPubKeys)) {
             return false;
         }
 
         return true;
     }
 
-    public static List<ECKey> getInputPubKeys(Transaction tx, Map<HashIndex, TransactionOutput> spentOutputs) {
+    public static List<ECKey> getInputPubKeys(Transaction tx, Map<HashIndex, Script> spentScriptPubKeys) {
         List<ECKey> keys = new ArrayList<>();
         for(TransactionInput input : tx.getInputs()) {
             HashIndex hashIndex = new HashIndex(input.getOutpoint().getHash(), input.getOutpoint().getIndex());
-            TransactionOutput output = spentOutputs.get(hashIndex);
-            if(output == null) {
-                throw new IllegalStateException("No output found for input " + input.getOutpoint());
+            Script scriptPubKey = spentScriptPubKeys.get(hashIndex);
+            if(scriptPubKey == null) {
+                throw new IllegalStateException("No scriptPubKey found for input " + input.getOutpoint().getHash() + ":" + input.getOutpoint().getIndex());
             }
             for(ScriptType scriptType : SCRIPT_TYPES) {
-                if(scriptType.isScriptType(output.getScript())) {
+                if(scriptType.isScriptType(scriptPubKey)) {
                     switch(scriptType) {
                         case P2TR:
-                            keys.add(ScriptType.P2TR.getPublicKeyFromScript(output.getScript()));
+                            keys.add(ScriptType.P2TR.getPublicKeyFromScript(scriptPubKey));
                             break;
                         case P2WPKH:
                         case P2SH_P2WPKH:
@@ -84,10 +84,13 @@ public class SilentPaymentUtils {
         return false;
     }
 
-    public static boolean spendsInvalidSegwitOutput(Transaction tx, Map<HashIndex, TransactionOutput> spentOutputs) {
+    public static boolean spendsInvalidSegwitOutput(Transaction tx, Map<HashIndex, Script> spentScriptPubKeys) {
         for(TransactionInput input : tx.getInputs()) {
             HashIndex hashIndex = new HashIndex(input.getOutpoint().getHash(), input.getOutpoint().getIndex());
-            Script scriptPubKey = spentOutputs.get(hashIndex).getScript();
+            Script scriptPubKey = spentScriptPubKeys.get(hashIndex);
+            if(scriptPubKey == null) {
+                throw new IllegalStateException("No scriptPubKey found for input " + input.getOutpoint().getHash() + ":" + input.getOutpoint().getIndex());
+            }
             List<ScriptChunk> chunks = scriptPubKey.getChunks();
             if(chunks.size() == 2 && chunks.getFirst().isOpCode() && chunks.get(1).getData() != null
                     && chunks.getFirst().getOpcode() >= ScriptOpCodes.OP_2 && chunks.getFirst().getOpcode() <= ScriptOpCodes.OP_16) {
@@ -98,16 +101,16 @@ public class SilentPaymentUtils {
         return false;
     }
 
-    public static byte[] getTweak(Transaction tx, Map<HashIndex, TransactionOutput> spentOutputs) {
+    public static byte[] getTweak(Transaction tx, Map<HashIndex, Script> spentScriptPubKeys) {
         if(tx.getOutputs().stream().noneMatch(output -> ScriptType.P2TR.isScriptType(output.getScript()))) {
             return null;
         }
 
-        if(spendsInvalidSegwitOutput(tx, spentOutputs)) {
+        if(spendsInvalidSegwitOutput(tx, spentScriptPubKeys)) {
             return null;
         }
 
-        List<ECKey> inputKeys = getInputPubKeys(tx, spentOutputs);
+        List<ECKey> inputKeys = getInputPubKeys(tx, spentScriptPubKeys);
         if(inputKeys.isEmpty()) {
             return null;
         }
