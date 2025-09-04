@@ -56,4 +56,26 @@ public class SilentPaymentAddress {
 
         return new SilentPaymentAddress(scanPubKey, spendPubKey);
     }
+
+    @Override
+    public String toString() {
+        return getAddress();
+    }
+
+    @Override
+    public final boolean equals(Object o) {
+        if(this == o) {
+            return true;
+        }
+        if(!(o instanceof SilentPaymentAddress that)) {
+            return false;
+        }
+
+        return getAddress().equals(that.getAddress());
+    }
+
+    @Override
+    public int hashCode() {
+        return getAddress().hashCode();
+    }
 }
