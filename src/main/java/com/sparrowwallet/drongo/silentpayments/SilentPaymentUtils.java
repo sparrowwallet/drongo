@@ -3,16 +3,21 @@ package com.sparrowwallet.drongo.silentpayments;
 import com.sparrowwallet.drongo.Utils;
 import com.sparrowwallet.drongo.crypto.ECKey;
 import com.sparrowwallet.drongo.protocol.*;
+import com.sparrowwallet.drongo.wallet.BlockTransactionHashIndex;
+import com.sparrowwallet.drongo.wallet.MnemonicException;
+import com.sparrowwallet.drongo.wallet.WalletNode;
 import org.bitcoin.NativeSecp256k1;
 import org.bitcoin.NativeSecp256k1Util;
 import org.bitcoin.Secp256k1Context;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Map;
+import java.math.BigInteger;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
+import java.util.*;
+
+import static com.sparrowwallet.drongo.protocol.ScriptType.P2TR;
 
 public class SilentPaymentUtils {
     private static final Logger log = LoggerFactory.getLogger(SilentPaymentUtils.class);
@@ -25,6 +30,10 @@ public class SilentPaymentUtils {
             (byte) 0x35, (byte) 0xe9, (byte) 0x7a, (byte) 0x5e, (byte) 0x07, (byte) 0x8a, (byte) 0x5a, (byte) 0x0f, (byte) 0x28, (byte) 0xec, (byte) 0x96, (byte) 0xd5,
             (byte) 0x47, (byte) 0xbf, (byte) 0xee, (byte) 0x9a, (byte) 0xce, (byte) 0x80, (byte) 0x3a, (byte) 0xc0
     };
+
+    public static final String BIP_0352_INPUTS_TAG = "BIP0352/Inputs";
+    public static final String BIP_0352_SHARED_SECRET_TAG = "BIP0352/SharedSecret";
+    public static final String BIP_0352_LABEL_TAG = "BIP0352/Label";
 
     public static boolean isEligible(Transaction tx, Map<HashIndex, Script> spentScriptPubKeys) {
         if(!containsTaprootOutput(tx)) {
@@ -169,12 +178,101 @@ public class SilentPaymentUtils {
             byte[] combinedPubKey = NativeSecp256k1.pubKeyCombine(inputPubKeys, true);
             byte[] smallestOutpoint = tx.getInputs().stream().map(input -> input.getOutpoint().bitcoinSerialize()).min(new Utils.LexicographicByteArrayComparator()).orElseThrow();
 
-            byte[] inputHash = Utils.taggedHash("BIP0352/Inputs", Utils.concat(smallestOutpoint, combinedPubKey));
+            byte[] inputHash = Utils.taggedHash(BIP_0352_INPUTS_TAG, Utils.concat(smallestOutpoint, combinedPubKey));
             return NativeSecp256k1.pubKeyTweakMul(combinedPubKey, inputHash, true);
         } catch(NativeSecp256k1Util.AssertFailException e) {
             log.error("Error computing tweak", e);
         }
 
         return null;
+    }
+
+    public static void updateSilentPayments(List<SilentPayment> silentPayments, Map<BlockTransactionHashIndex, WalletNode> utxos) {
+        ECKey summedPrivateKey = getSummedPrivateKey(utxos.values());
+        BigInteger inputHash = getInputHash(utxos.keySet(), summedPrivateKey);
+        Map<ECKey, List<SilentPayment>> scanKeyGroups = getScanKeyGroups(silentPayments);
+        for(Map.Entry<ECKey, List<SilentPayment>> scanKeyGroup : scanKeyGroups.entrySet()) {
+            ECKey scanKey = scanKeyGroup.getKey();
+            ECKey sharedSecret = scanKey.multiply(inputHash).multiply(summedPrivateKey.getPrivKey(), true);
+            int k = 0;
+            for(SilentPayment silentPayment : scanKeyGroup.getValue()) {
+                BigInteger tk = new BigInteger(1, Utils.taggedHash(BIP_0352_SHARED_SECRET_TAG,
+                        Utils.concat(sharedSecret.getPubKey(), ByteBuffer.allocate(4).order(ByteOrder.BIG_ENDIAN).putInt(k).array())));
+                if(tk.equals(BigInteger.ZERO) || tk.compareTo(ECKey.CURVE.getCurve().getOrder()) >= 0) {
+                    throw new IllegalArgumentException("The tk value is invalid for the eligible silent payments inputs");
+                }
+                ECKey spendKey = silentPayment.getSilentPaymentAddress().getSpendKey();
+                ECKey pkm = spendKey.add(ECKey.fromPublicOnly(ECKey.publicPointFromPrivate(tk).getEncoded(true)), true);
+                silentPayment.setAddress(P2TR.getAddress(pkm.getPubKeyXCoord()));
+                k++;
+            }
+        }
+    }
+
+    public static Map<ECKey, List<SilentPayment>> getScanKeyGroups(Collection<SilentPayment> silentPayments) {
+        Map<ECKey, List<SilentPayment>> scanKeyGroups = new LinkedHashMap<>();
+        for(SilentPayment silentPayment : silentPayments) {
+            SilentPaymentAddress address = silentPayment.getSilentPaymentAddress();
+            List<SilentPayment> scanKeyGroup = scanKeyGroups.computeIfAbsent(address.getScanKey(), _ -> new ArrayList<>());
+            scanKeyGroup.add(silentPayment);
+        }
+
+        return scanKeyGroups;
+    }
+
+    public static BigInteger getInputHash(Set<BlockTransactionHashIndex> outpoints, ECKey summedPrivateKey) {
+        byte[] smallestOutpoint = getSmallestOutpoint(outpoints);
+        byte[] concat = Utils.concat(smallestOutpoint, summedPrivateKey.getPubKey());
+        BigInteger inputHash = new BigInteger(1, Utils.taggedHash(BIP_0352_INPUTS_TAG, concat));
+        if(inputHash.equals(BigInteger.ZERO) || inputHash.compareTo(ECKey.CURVE.getCurve().getOrder()) >= 0) {
+            throw new IllegalArgumentException("The input hash is invalid for the eligible silent payments inputs");
+        }
+
+        return inputHash;
+    }
+
+    public static ECKey getSummedPrivateKey(Collection<WalletNode> walletNodes) {
+        ECKey summedPrivateKey = null;
+        for(WalletNode walletNode : walletNodes) {
+            if(!walletNode.getWallet().canSendSilentPayments()) {
+                continue;
+            }
+
+            try {
+                ECKey privateKey = walletNode.getWallet().getKeystores().getFirst().getKey(walletNode);
+                if(walletNode.getWallet().getScriptType() == P2TR && !privateKey.getPubKeyPoint().getYCoord().toBigInteger().mod(BigInteger.TWO).equals(BigInteger.ZERO)) {
+                    privateKey = privateKey.negate();
+                }
+                if(summedPrivateKey == null) {
+                    summedPrivateKey = privateKey;
+                } else {
+                    summedPrivateKey = summedPrivateKey.addPrivate(privateKey);
+                }
+            } catch(MnemonicException e) {
+                throw new IllegalArgumentException("Invalid wallet mnemonic for sending silent payment", e);
+            }
+        }
+
+        if(summedPrivateKey == null) {
+            throw new IllegalArgumentException("There are no eligible inputs to derive a silent payments shared secret");
+        }
+
+        if(summedPrivateKey.getPrivKey().equals(BigInteger.ZERO)) {
+            throw new IllegalArgumentException("The summed private key is zero for the eligible silent payments inputs");
+        }
+
+        return summedPrivateKey;
+    }
+
+    public static byte[] getSmallestOutpoint(Set<BlockTransactionHashIndex> outpoints) {
+        return outpoints.stream().map(outpoint -> new TransactionOutPoint(outpoint.getHash(), outpoint.getIndex())).map(TransactionOutPoint::bitcoinSerialize)
+                .sorted(new Utils.LexicographicByteArrayComparator())
+                .findFirst().orElseThrow(() -> new IllegalArgumentException("No inputs provided to calculate silent payments input hash"));
+    }
+
+    public static ECKey getLabelledSpendKey(ECKey scanPrivateKey, ECKey spendPublicKey, int labelIndex) {
+        BigInteger labelTweak = new BigInteger(1, Utils.taggedHash(BIP_0352_LABEL_TAG,
+                Utils.concat(scanPrivateKey.getPrivKeyBytes(), ByteBuffer.allocate(4).order(ByteOrder.BIG_ENDIAN).putInt(labelIndex).array())));
+        return spendPublicKey.add(ECKey.fromPublicOnly(ECKey.publicPointFromPrivate(labelTweak).getEncoded(true)), true);
     }
 }

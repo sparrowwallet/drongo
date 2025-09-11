@@ -37,6 +37,18 @@ public class SilentPaymentScanAddressTest {
         Assertions.assertEquals("tsp1qqgksl44sjwjkedsmrfmf2xqsnyt2njtjp5plk2kzjlnd9el2n76awqe5j974lvkf2utv7nrg0eaug55z86n6n3v4e9alnftdzgqk6pqmm5dphvxn", silentPaymentScanAddress.getAddress());
     }
 
+    @Test
+    public void testLabels() {
+        ECKey scanPrivateKey = ECKey.fromPrivate(Utils.hexToBytes("0f694e068028a717f8af6b9411f9a133dd3565258714cc226594b34db90c1f2c"));
+        ECKey spendPrivateKey = ECKey.fromPrivate(Utils.hexToBytes("9d6ad855ce3417ef84e836892e5a56392bfba05fa5d97ccea30e266f540e08b3"));
+
+        SilentPaymentScanAddress unlabelled = SilentPaymentScanAddress.from(scanPrivateKey, ECKey.fromPublicOnly(spendPrivateKey));
+        Assertions.assertEquals("sp1qqgste7k9hx0qftg6qmwlkqtwuy6cycyavzmzj85c6qdfhjdpdjtdgqjuexzk6murw56suy3e0rd2cgqvycxttddwsvgxe2usfpxumr70xc9pkqwv", unlabelled.getAddress());
+        Assertions.assertEquals("sp1qqgste7k9hx0qftg6qmwlkqtwuy6cycyavzmzj85c6qdfhjdpdjtdgqjex54dmqmmv6rw353tsuqhs99ydvadxzrsy9nuvk74epvee55drs734pqq", unlabelled.getLabelledAddress(2).getAddress());
+        Assertions.assertEquals("sp1qqgste7k9hx0qftg6qmwlkqtwuy6cycyavzmzj85c6qdfhjdpdjtdgqsg59z2rppn4qlkx0yz9sdltmjv3j8zgcqadjn4ug98m3t6plujsq9qvu5n", unlabelled.getLabelledAddress(3).getAddress());
+        Assertions.assertEquals("sp1qqgste7k9hx0qftg6qmwlkqtwuy6cycyavzmzj85c6qdfhjdpdjtdgq7c2zfthc6x3a5yecwc52nxa0kfd20xuz08zyrjpfw4l2j257yq6qgnkdh5", unlabelled.getLabelledAddress(1001337).getAddress());
+    }
+
     @AfterEach
     public void tearDown() {
         Network.set(null);

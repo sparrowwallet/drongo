@@ -16,6 +16,15 @@ public class SilentPaymentScanAddress extends SilentPaymentAddress {
         }
     }
 
+    public SilentPaymentScanAddress getChangeAddress() {
+        return getLabelledAddress(0);
+    }
+
+    public SilentPaymentScanAddress getLabelledAddress(int labelIndex) {
+        ECKey labelledSpendKey = SilentPaymentUtils.getLabelledSpendKey(getScanKey(), getSpendKey(), labelIndex);
+        return new SilentPaymentScanAddress(getScanKey(), labelledSpendKey);
+    }
+
     public static SilentPaymentScanAddress from(DeterministicSeed deterministicSeed, int account) throws MnemonicException {
         Wallet spWallet = new Wallet();
         spWallet.setPolicyType(PolicyType.SINGLE);

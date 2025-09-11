@@ -2,12 +2,17 @@ package com.sparrowwallet.drongo.silentpayments;
 
 import com.sparrowwallet.drongo.Utils;
 import com.sparrowwallet.drongo.crypto.ECKey;
+import com.sparrowwallet.drongo.policy.Policy;
+import com.sparrowwallet.drongo.policy.PolicyType;
 import com.sparrowwallet.drongo.protocol.*;
+import com.sparrowwallet.drongo.wallet.BlockTransactionHashIndex;
+import com.sparrowwallet.drongo.wallet.Keystore;
+import com.sparrowwallet.drongo.wallet.Wallet;
+import com.sparrowwallet.drongo.wallet.WalletNode;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
-import java.util.HashMap;
-import java.util.Map;
+import java.util.*;
 
 public class SilentPaymentUtilsTest {
     @Test
@@ -58,5 +63,438 @@ public class SilentPaymentUtilsTest {
         transaction.addOutput(1000L, ScriptType.P2WPKH.getOutputScript(ECKey.fromPublicOnly(Utils.hexToBytes("3e9fce73d4e77a4809908e3c3a2e54ee147b9312dc5044a193d1fc85de46e3c1"))));
 
         Assertions.assertFalse(SilentPaymentUtils.containsTaprootOutput(transaction));
+    }
+
+    @Test
+    public void testSimpleSendTwoInputs() {
+        Wallet sendWallet = new Wallet();
+        sendWallet.setPolicyType(PolicyType.SINGLE);
+        sendWallet.setScriptType(ScriptType.P2WPKH);
+        Map<BlockTransactionHashIndex, WalletNode> utxos = new LinkedHashMap<>();
+        Map<WalletNode, ECKey> privateKeys = new LinkedHashMap<>();
+
+        WalletNode walletNode0 = new WalletNode(sendWallet, "/0/0");
+        BlockTransactionHashIndex ref0 = new BlockTransactionHashIndex(Sha256Hash.wrap("f4184fc596403b9d638783cf57adfe4c75c605f6356fbc91338530e9831e9e16"), 0, null, null, 0, 0);
+        ECKey privKey0 = ECKey.fromPrivate(Utils.hexToBytes("eadc78165ff1f8ea94ad7cfdc54990738a4c53f6e0507b42154201b8e5dff3b1"));
+        utxos.put(ref0, walletNode0);
+        privateKeys.put(walletNode0, privKey0);
+
+        WalletNode walletNode1 = new WalletNode(sendWallet, "/0/1");
+        BlockTransactionHashIndex ref1 = new BlockTransactionHashIndex(Sha256Hash.wrap("a1075db55d416d3ca199f55b6084e2115b9345e16c5cf302fc80e9d5fbf5d48d"), 0, null, null, 0, 0);
+        ECKey privKey1 = ECKey.fromPrivate(Utils.hexToBytes("93f5ed907ad5b2bdbbdcb5d9116ebc0a4e1f92f910d5260237fa45a9408aad16"));
+        utxos.put(ref1, walletNode1);
+        privateKeys.put(walletNode1, privKey1);
+
+        TestKeystore sendKeystore = new TestKeystore(privateKeys);
+        sendWallet.getKeystores().add(sendKeystore);
+        sendWallet.setDefaultPolicy(Policy.getPolicy(PolicyType.SINGLE, ScriptType.P2WPKH, sendWallet.getKeystores(), 1));
+
+        SilentPaymentAddress silentPaymentAddress = SilentPaymentAddress.from("sp1qqgste7k9hx0qftg6qmwlkqtwuy6cycyavzmzj85c6qdfhjdpdjtdgqjuexzk6murw56suy3e0rd2cgqvycxttddwsvgxe2usfpxumr70xc9pkqwv");
+        List<SilentPayment> silentPayments = List.of(new SilentPayment(silentPaymentAddress, "", 0, false));
+
+        SilentPaymentUtils.updateSilentPayments(silentPayments, utxos);
+        Assertions.assertEquals(1, silentPayments.size());
+        Assertions.assertEquals("3e9fce73d4e77a4809908e3c3a2e54ee147b9312dc5044a193d1fc85de46e3c1", Utils.bytesToHex(silentPayments.getFirst().getAddress().getData()));
+    }
+
+    @Test
+    public void testSimpleSendTwoInputsReversed() {
+        Wallet sendWallet = new Wallet();
+        sendWallet.setPolicyType(PolicyType.SINGLE);
+        sendWallet.setScriptType(ScriptType.P2WPKH);
+        Map<BlockTransactionHashIndex, WalletNode> utxos = new LinkedHashMap<>();
+        Map<WalletNode, ECKey> privateKeys = new LinkedHashMap<>();
+
+        WalletNode walletNode0 = new WalletNode(sendWallet, "/0/0");
+        BlockTransactionHashIndex ref0 = new BlockTransactionHashIndex(Sha256Hash.wrap("a1075db55d416d3ca199f55b6084e2115b9345e16c5cf302fc80e9d5fbf5d48d"), 0, null, null, 0, 0);
+        ECKey privKey0 = ECKey.fromPrivate(Utils.hexToBytes("eadc78165ff1f8ea94ad7cfdc54990738a4c53f6e0507b42154201b8e5dff3b1"));
+        utxos.put(ref0, walletNode0);
+        privateKeys.put(walletNode0, privKey0);
+
+        WalletNode walletNode1 = new WalletNode(sendWallet, "/0/1");
+        BlockTransactionHashIndex ref1 = new BlockTransactionHashIndex(Sha256Hash.wrap("f4184fc596403b9d638783cf57adfe4c75c605f6356fbc91338530e9831e9e16"), 0, null, null, 0, 0);
+        ECKey privKey1 = ECKey.fromPrivate(Utils.hexToBytes("93f5ed907ad5b2bdbbdcb5d9116ebc0a4e1f92f910d5260237fa45a9408aad16"));
+        utxos.put(ref1, walletNode1);
+        privateKeys.put(walletNode1, privKey1);
+
+        TestKeystore sendKeystore = new TestKeystore(privateKeys);
+        sendWallet.getKeystores().add(sendKeystore);
+        sendWallet.setDefaultPolicy(Policy.getPolicy(PolicyType.SINGLE, ScriptType.P2WPKH, sendWallet.getKeystores(), 1));
+
+        SilentPaymentAddress silentPaymentAddress = SilentPaymentAddress.from("sp1qqgste7k9hx0qftg6qmwlkqtwuy6cycyavzmzj85c6qdfhjdpdjtdgqjuexzk6murw56suy3e0rd2cgqvycxttddwsvgxe2usfpxumr70xc9pkqwv");
+        List<SilentPayment> silentPayments = List.of(new SilentPayment(silentPaymentAddress, "", 0, false));
+
+        SilentPaymentUtils.updateSilentPayments(silentPayments, utxos);
+        Assertions.assertEquals(1, silentPayments.size());
+        Assertions.assertEquals("3e9fce73d4e77a4809908e3c3a2e54ee147b9312dc5044a193d1fc85de46e3c1", Utils.bytesToHex(silentPayments.getFirst().getAddress().getData()));
+    }
+
+    @Test
+    public void testSimpleSendTwoInputsSameTransaction() {
+        Wallet sendWallet = new Wallet();
+        sendWallet.setPolicyType(PolicyType.SINGLE);
+        sendWallet.setScriptType(ScriptType.P2WPKH);
+        Map<BlockTransactionHashIndex, WalletNode> utxos = new LinkedHashMap<>();
+        Map<WalletNode, ECKey> privateKeys = new LinkedHashMap<>();
+
+        WalletNode walletNode0 = new WalletNode(sendWallet, "/0/0");
+        BlockTransactionHashIndex ref0 = new BlockTransactionHashIndex(Sha256Hash.wrap("f4184fc596403b9d638783cf57adfe4c75c605f6356fbc91338530e9831e9e16"), 0, null, null, 3, 0);
+        ECKey privKey0 = ECKey.fromPrivate(Utils.hexToBytes("eadc78165ff1f8ea94ad7cfdc54990738a4c53f6e0507b42154201b8e5dff3b1"));
+        utxos.put(ref0, walletNode0);
+        privateKeys.put(walletNode0, privKey0);
+
+        WalletNode walletNode1 = new WalletNode(sendWallet, "/0/1");
+        BlockTransactionHashIndex ref1 = new BlockTransactionHashIndex(Sha256Hash.wrap("f4184fc596403b9d638783cf57adfe4c75c605f6356fbc91338530e9831e9e16"), 0, null, null, 7, 0);
+        ECKey privKey1 = ECKey.fromPrivate(Utils.hexToBytes("93f5ed907ad5b2bdbbdcb5d9116ebc0a4e1f92f910d5260237fa45a9408aad16"));
+        utxos.put(ref1, walletNode1);
+        privateKeys.put(walletNode1, privKey1);
+
+        TestKeystore sendKeystore = new TestKeystore(privateKeys);
+        sendWallet.getKeystores().add(sendKeystore);
+        sendWallet.setDefaultPolicy(Policy.getPolicy(PolicyType.SINGLE, ScriptType.P2WPKH, sendWallet.getKeystores(), 1));
+
+        SilentPaymentAddress silentPaymentAddress = SilentPaymentAddress.from("sp1qqgste7k9hx0qftg6qmwlkqtwuy6cycyavzmzj85c6qdfhjdpdjtdgqjuexzk6murw56suy3e0rd2cgqvycxttddwsvgxe2usfpxumr70xc9pkqwv");
+        List<SilentPayment> silentPayments = List.of(new SilentPayment(silentPaymentAddress, "", 0, false));
+
+        SilentPaymentUtils.updateSilentPayments(silentPayments, utxos);
+        Assertions.assertEquals(1, silentPayments.size());
+        Assertions.assertEquals("79e71baa2ba3fc66396de3a04f168c7bf24d6870ec88ca877754790c1db357b6", Utils.bytesToHex(silentPayments.getFirst().getAddress().getData()));
+    }
+
+    @Test
+    public void testSimpleSendTwoInputsSameTransactionReversed() {
+        Wallet sendWallet = new Wallet();
+        sendWallet.setPolicyType(PolicyType.SINGLE);
+        sendWallet.setScriptType(ScriptType.P2WPKH);
+        Map<BlockTransactionHashIndex, WalletNode> utxos = new LinkedHashMap<>();
+        Map<WalletNode, ECKey> privateKeys = new LinkedHashMap<>();
+
+        WalletNode walletNode0 = new WalletNode(sendWallet, "/0/0");
+        BlockTransactionHashIndex ref0 = new BlockTransactionHashIndex(Sha256Hash.wrap("a1075db55d416d3ca199f55b6084e2115b9345e16c5cf302fc80e9d5fbf5d48d"), 0, null, null, 7, 0);
+        ECKey privKey0 = ECKey.fromPrivate(Utils.hexToBytes("eadc78165ff1f8ea94ad7cfdc54990738a4c53f6e0507b42154201b8e5dff3b1"));
+        utxos.put(ref0, walletNode0);
+        privateKeys.put(walletNode0, privKey0);
+
+        WalletNode walletNode1 = new WalletNode(sendWallet, "/0/1");
+        BlockTransactionHashIndex ref1 = new BlockTransactionHashIndex(Sha256Hash.wrap("a1075db55d416d3ca199f55b6084e2115b9345e16c5cf302fc80e9d5fbf5d48d"), 0, null, null, 3, 0);
+        ECKey privKey1 = ECKey.fromPrivate(Utils.hexToBytes("93f5ed907ad5b2bdbbdcb5d9116ebc0a4e1f92f910d5260237fa45a9408aad16"));
+        utxos.put(ref1, walletNode1);
+        privateKeys.put(walletNode1, privKey1);
+
+        TestKeystore sendKeystore = new TestKeystore(privateKeys);
+        sendWallet.getKeystores().add(sendKeystore);
+        sendWallet.setDefaultPolicy(Policy.getPolicy(PolicyType.SINGLE, ScriptType.P2WPKH, sendWallet.getKeystores(), 1));
+
+        SilentPaymentAddress silentPaymentAddress = SilentPaymentAddress.from("sp1qqgste7k9hx0qftg6qmwlkqtwuy6cycyavzmzj85c6qdfhjdpdjtdgqjuexzk6murw56suy3e0rd2cgqvycxttddwsvgxe2usfpxumr70xc9pkqwv");
+        List<SilentPayment> silentPayments = List.of(new SilentPayment(silentPaymentAddress, "", 0, false));
+
+        SilentPaymentUtils.updateSilentPayments(silentPayments, utxos);
+        Assertions.assertEquals(1, silentPayments.size());
+        Assertions.assertEquals("f4c2da807f89cb1501f1a77322a895acfb93c28e08ed2724d2beb8e44539ba38", Utils.bytesToHex(silentPayments.getFirst().getAddress().getData()));
+    }
+
+    @Test
+    public void testOutpointOrderingIndex() {
+        Wallet sendWallet = new Wallet();
+        sendWallet.setPolicyType(PolicyType.SINGLE);
+        sendWallet.setScriptType(ScriptType.P2WPKH);
+        Map<BlockTransactionHashIndex, WalletNode> utxos = new LinkedHashMap<>();
+        Map<WalletNode, ECKey> privateKeys = new LinkedHashMap<>();
+
+        WalletNode walletNode0 = new WalletNode(sendWallet, "/0/0");
+        BlockTransactionHashIndex ref0 = new BlockTransactionHashIndex(Sha256Hash.wrap("f4184fc596403b9d638783cf57adfe4c75c605f6356fbc91338530e9831e9e16"), 0, null, null, 1, 0);
+        ECKey privKey0 = ECKey.fromPrivate(Utils.hexToBytes("eadc78165ff1f8ea94ad7cfdc54990738a4c53f6e0507b42154201b8e5dff3b1"));
+        utxos.put(ref0, walletNode0);
+        privateKeys.put(walletNode0, privKey0);
+
+        WalletNode walletNode1 = new WalletNode(sendWallet, "/0/1");
+        BlockTransactionHashIndex ref1 = new BlockTransactionHashIndex(Sha256Hash.wrap("f4184fc596403b9d638783cf57adfe4c75c605f6356fbc91338530e9831e9e16"), 0, null, null, 256, 0);
+        ECKey privKey1 = ECKey.fromPrivate(Utils.hexToBytes("93f5ed907ad5b2bdbbdcb5d9116ebc0a4e1f92f910d5260237fa45a9408aad16"));
+        utxos.put(ref1, walletNode1);
+        privateKeys.put(walletNode1, privKey1);
+
+        TestKeystore sendKeystore = new TestKeystore(privateKeys);
+        sendWallet.getKeystores().add(sendKeystore);
+        sendWallet.setDefaultPolicy(Policy.getPolicy(PolicyType.SINGLE, ScriptType.P2WPKH, sendWallet.getKeystores(), 1));
+
+        SilentPaymentAddress silentPaymentAddress = SilentPaymentAddress.from("sp1qqgste7k9hx0qftg6qmwlkqtwuy6cycyavzmzj85c6qdfhjdpdjtdgqjuexzk6murw56suy3e0rd2cgqvycxttddwsvgxe2usfpxumr70xc9pkqwv");
+        List<SilentPayment> silentPayments = List.of(new SilentPayment(silentPaymentAddress, "", 0, false));
+
+        SilentPaymentUtils.updateSilentPayments(silentPayments, utxos);
+        Assertions.assertEquals(1, silentPayments.size());
+        Assertions.assertEquals("a85ef8701394b517a4b35217c4bd37ac01ebeed4b008f8d0879f9e09ba95319c", Utils.bytesToHex(silentPayments.getFirst().getAddress().getData()));
+    }
+
+    @Test
+    public void testSingleRecipientSamePubKey() {
+        Wallet sendWallet = new Wallet();
+        sendWallet.setPolicyType(PolicyType.SINGLE);
+        sendWallet.setScriptType(ScriptType.P2WPKH);
+        Map<BlockTransactionHashIndex, WalletNode> utxos = new LinkedHashMap<>();
+        Map<WalletNode, ECKey> privateKeys = new LinkedHashMap<>();
+
+        WalletNode walletNode0 = new WalletNode(sendWallet, "/0/0");
+        BlockTransactionHashIndex ref0 = new BlockTransactionHashIndex(Sha256Hash.wrap("f4184fc596403b9d638783cf57adfe4c75c605f6356fbc91338530e9831e9e16"), 0, null, null, 0, 0);
+        ECKey privKey0 = ECKey.fromPrivate(Utils.hexToBytes("eadc78165ff1f8ea94ad7cfdc54990738a4c53f6e0507b42154201b8e5dff3b1"));
+        utxos.put(ref0, walletNode0);
+        privateKeys.put(walletNode0, privKey0);
+
+        WalletNode walletNode1 = new WalletNode(sendWallet, "/0/1");
+        BlockTransactionHashIndex ref1 = new BlockTransactionHashIndex(Sha256Hash.wrap("a1075db55d416d3ca199f55b6084e2115b9345e16c5cf302fc80e9d5fbf5d48d"), 0, null, null, 0, 0);
+        ECKey privKey1 = ECKey.fromPrivate(Utils.hexToBytes("eadc78165ff1f8ea94ad7cfdc54990738a4c53f6e0507b42154201b8e5dff3b1"));
+        utxos.put(ref1, walletNode1);
+        privateKeys.put(walletNode1, privKey1);
+
+        TestKeystore sendKeystore = new TestKeystore(privateKeys);
+        sendWallet.getKeystores().add(sendKeystore);
+        sendWallet.setDefaultPolicy(Policy.getPolicy(PolicyType.SINGLE, ScriptType.P2WPKH, sendWallet.getKeystores(), 1));
+
+        SilentPaymentAddress silentPaymentAddress = SilentPaymentAddress.from("sp1qqgste7k9hx0qftg6qmwlkqtwuy6cycyavzmzj85c6qdfhjdpdjtdgqjuexzk6murw56suy3e0rd2cgqvycxttddwsvgxe2usfpxumr70xc9pkqwv");
+        List<SilentPayment> silentPayments = List.of(new SilentPayment(silentPaymentAddress, "", 0, false));
+
+        SilentPaymentUtils.updateSilentPayments(silentPayments, utxos);
+        Assertions.assertEquals(1, silentPayments.size());
+        Assertions.assertEquals("548ae55c8eec1e736e8d3e520f011f1f42a56d166116ad210b3937599f87f566", Utils.bytesToHex(silentPayments.getFirst().getAddress().getData()));
+    }
+
+    @Test
+    public void testSingleRecipientTaprootOnlyEvenY() {
+        Wallet sendWallet = new Wallet();
+        sendWallet.setPolicyType(PolicyType.SINGLE);
+        sendWallet.setScriptType(ScriptType.P2TR);
+        Map<BlockTransactionHashIndex, WalletNode> utxos = new LinkedHashMap<>();
+        Map<WalletNode, ECKey> privateKeys = new LinkedHashMap<>();
+
+        WalletNode walletNode0 = new WalletNode(sendWallet, "/0/0");
+        BlockTransactionHashIndex ref0 = new BlockTransactionHashIndex(Sha256Hash.wrap("f4184fc596403b9d638783cf57adfe4c75c605f6356fbc91338530e9831e9e16"), 0, null, null, 0, 0);
+        ECKey privKey0 = ECKey.fromPrivate(Utils.hexToBytes("eadc78165ff1f8ea94ad7cfdc54990738a4c53f6e0507b42154201b8e5dff3b1"));
+        utxos.put(ref0, walletNode0);
+        privateKeys.put(walletNode0, privKey0);
+
+        WalletNode walletNode1 = new WalletNode(sendWallet, "/0/1");
+        BlockTransactionHashIndex ref1 = new BlockTransactionHashIndex(Sha256Hash.wrap("a1075db55d416d3ca199f55b6084e2115b9345e16c5cf302fc80e9d5fbf5d48d"), 0, null, null, 0, 0);
+        ECKey privKey1 = ECKey.fromPrivate(Utils.hexToBytes("fc8716a97a48ba9a05a98ae47b5cd201a25a7fd5d8b73c203c5f7b6b6b3b6ad7"));
+        utxos.put(ref1, walletNode1);
+        privateKeys.put(walletNode1, privKey1);
+
+        TestKeystore sendKeystore = new TestKeystore(privateKeys);
+        sendWallet.getKeystores().add(sendKeystore);
+        sendWallet.setDefaultPolicy(Policy.getPolicy(PolicyType.SINGLE, ScriptType.P2WPKH, sendWallet.getKeystores(), 1));
+
+        SilentPaymentAddress silentPaymentAddress = SilentPaymentAddress.from("sp1qqgste7k9hx0qftg6qmwlkqtwuy6cycyavzmzj85c6qdfhjdpdjtdgqjuexzk6murw56suy3e0rd2cgqvycxttddwsvgxe2usfpxumr70xc9pkqwv");
+        List<SilentPayment> silentPayments = List.of(new SilentPayment(silentPaymentAddress, "", 0, false));
+
+        SilentPaymentUtils.updateSilentPayments(silentPayments, utxos);
+        Assertions.assertEquals(1, silentPayments.size());
+        Assertions.assertEquals("de88bea8e7ffc9ce1af30d1132f910323c505185aec8eae361670421e749a1fb", Utils.bytesToHex(silentPayments.getFirst().getAddress().getData()));
+    }
+
+    @Test
+    public void testSingleRecipientTaprootOnlyMixedY() {
+        Wallet sendWallet = new Wallet();
+        sendWallet.setPolicyType(PolicyType.SINGLE);
+        sendWallet.setScriptType(ScriptType.P2TR);
+        Map<BlockTransactionHashIndex, WalletNode> utxos = new LinkedHashMap<>();
+        Map<WalletNode, ECKey> privateKeys = new LinkedHashMap<>();
+
+        WalletNode walletNode0 = new WalletNode(sendWallet, "/0/0");
+        BlockTransactionHashIndex ref0 = new BlockTransactionHashIndex(Sha256Hash.wrap("f4184fc596403b9d638783cf57adfe4c75c605f6356fbc91338530e9831e9e16"), 0, null, null, 0, 0);
+        ECKey privKey0 = ECKey.fromPrivate(Utils.hexToBytes("eadc78165ff1f8ea94ad7cfdc54990738a4c53f6e0507b42154201b8e5dff3b1"));
+        utxos.put(ref0, walletNode0);
+        privateKeys.put(walletNode0, privKey0);
+
+        WalletNode walletNode1 = new WalletNode(sendWallet, "/0/1");
+        BlockTransactionHashIndex ref1 = new BlockTransactionHashIndex(Sha256Hash.wrap("a1075db55d416d3ca199f55b6084e2115b9345e16c5cf302fc80e9d5fbf5d48d"), 0, null, null, 0, 0);
+        ECKey privKey1 = ECKey.fromPrivate(Utils.hexToBytes("1d37787c2b7116ee983e9f9c13269df29091b391c04db94239e0d2bc2182c3bf"));
+        utxos.put(ref1, walletNode1);
+        privateKeys.put(walletNode1, privKey1);
+
+        TestKeystore sendKeystore = new TestKeystore(privateKeys);
+        sendWallet.getKeystores().add(sendKeystore);
+        sendWallet.setDefaultPolicy(Policy.getPolicy(PolicyType.SINGLE, ScriptType.P2WPKH, sendWallet.getKeystores(), 1));
+
+        SilentPaymentAddress silentPaymentAddress = SilentPaymentAddress.from("sp1qqgste7k9hx0qftg6qmwlkqtwuy6cycyavzmzj85c6qdfhjdpdjtdgqjuexzk6murw56suy3e0rd2cgqvycxttddwsvgxe2usfpxumr70xc9pkqwv");
+        List<SilentPayment> silentPayments = List.of(new SilentPayment(silentPaymentAddress, "", 0, false));
+
+        SilentPaymentUtils.updateSilentPayments(silentPayments, utxos);
+        Assertions.assertEquals(1, silentPayments.size());
+        Assertions.assertEquals("77cab7dd12b10259ee82c6ea4b509774e33e7078e7138f568092241bf26b99f1", Utils.bytesToHex(silentPayments.getFirst().getAddress().getData()));
+    }
+
+    @Test
+    public void testSingleRecipientTaprootEvenYAndNonTaproot() {
+        Wallet taprootWallet = new Wallet();
+        taprootWallet.setPolicyType(PolicyType.SINGLE);
+        taprootWallet.setScriptType(ScriptType.P2TR);
+        Map<WalletNode, ECKey> taprootPrivateKeys = new LinkedHashMap<>();
+
+        Wallet segwitWallet = new Wallet();
+        segwitWallet.setPolicyType(PolicyType.SINGLE);
+        segwitWallet.setScriptType(ScriptType.P2WPKH);
+        Map<WalletNode, ECKey> segwitPrivateKeys = new LinkedHashMap<>();
+
+        Map<BlockTransactionHashIndex, WalletNode> utxos = new LinkedHashMap<>();
+
+        WalletNode walletNode0 = new WalletNode(taprootWallet, "/0/0");
+        BlockTransactionHashIndex ref0 = new BlockTransactionHashIndex(Sha256Hash.wrap("f4184fc596403b9d638783cf57adfe4c75c605f6356fbc91338530e9831e9e16"), 0, null, null, 0, 0);
+        ECKey privKey0 = ECKey.fromPrivate(Utils.hexToBytes("eadc78165ff1f8ea94ad7cfdc54990738a4c53f6e0507b42154201b8e5dff3b1"));
+        utxos.put(ref0, walletNode0);
+        taprootPrivateKeys.put(walletNode0, privKey0);
+
+        WalletNode walletNode1 = new WalletNode(segwitWallet, "/0/1");
+        BlockTransactionHashIndex ref1 = new BlockTransactionHashIndex(Sha256Hash.wrap("a1075db55d416d3ca199f55b6084e2115b9345e16c5cf302fc80e9d5fbf5d48d"), 0, null, null, 0, 0);
+        ECKey privKey1 = ECKey.fromPrivate(Utils.hexToBytes("8d4751f6e8a3586880fb66c19ae277969bd5aa06f61c4ee2f1e2486efdf666d3"));
+        utxos.put(ref1, walletNode1);
+        segwitPrivateKeys.put(walletNode1, privKey1);
+
+        TestKeystore taprootKeystore = new TestKeystore(taprootPrivateKeys);
+        taprootWallet.getKeystores().add(taprootKeystore);
+        taprootWallet.setDefaultPolicy(Policy.getPolicy(PolicyType.SINGLE, ScriptType.P2WPKH, taprootWallet.getKeystores(), 1));
+
+        TestKeystore segwitKeystore = new TestKeystore(segwitPrivateKeys);
+        segwitWallet.getKeystores().add(segwitKeystore);
+        segwitWallet.setDefaultPolicy(Policy.getPolicy(PolicyType.SINGLE, ScriptType.P2WPKH, segwitWallet.getKeystores(), 1));
+
+        SilentPaymentAddress silentPaymentAddress = SilentPaymentAddress.from("sp1qqgste7k9hx0qftg6qmwlkqtwuy6cycyavzmzj85c6qdfhjdpdjtdgqjuexzk6murw56suy3e0rd2cgqvycxttddwsvgxe2usfpxumr70xc9pkqwv");
+        List<SilentPayment> silentPayments = List.of(new SilentPayment(silentPaymentAddress, "", 0, false));
+
+        SilentPaymentUtils.updateSilentPayments(silentPayments, utxos);
+        Assertions.assertEquals(1, silentPayments.size());
+        Assertions.assertEquals("30523cca96b2a9ae3c98beb5e60f7d190ec5bc79b2d11a0b2d4d09a608c448f0", Utils.bytesToHex(silentPayments.getFirst().getAddress().getData()));
+    }
+
+    @Test
+    public void testSingleRecipientTaprootOddYAndNonTaproot() {
+        Wallet taprootWallet = new Wallet();
+        taprootWallet.setPolicyType(PolicyType.SINGLE);
+        taprootWallet.setScriptType(ScriptType.P2TR);
+        Map<WalletNode, ECKey> taprootPrivateKeys = new LinkedHashMap<>();
+
+        Wallet segwitWallet = new Wallet();
+        segwitWallet.setPolicyType(PolicyType.SINGLE);
+        segwitWallet.setScriptType(ScriptType.P2WPKH);
+        Map<WalletNode, ECKey> segwitPrivateKeys = new LinkedHashMap<>();
+
+        Map<BlockTransactionHashIndex, WalletNode> utxos = new LinkedHashMap<>();
+
+        WalletNode walletNode0 = new WalletNode(taprootWallet, "/0/0");
+        BlockTransactionHashIndex ref0 = new BlockTransactionHashIndex(Sha256Hash.wrap("f4184fc596403b9d638783cf57adfe4c75c605f6356fbc91338530e9831e9e16"), 0, null, null, 0, 0);
+        ECKey privKey0 = ECKey.fromPrivate(Utils.hexToBytes("1d37787c2b7116ee983e9f9c13269df29091b391c04db94239e0d2bc2182c3bf"));
+        utxos.put(ref0, walletNode0);
+        taprootPrivateKeys.put(walletNode0, privKey0);
+
+        WalletNode walletNode1 = new WalletNode(segwitWallet, "/0/1");
+        BlockTransactionHashIndex ref1 = new BlockTransactionHashIndex(Sha256Hash.wrap("a1075db55d416d3ca199f55b6084e2115b9345e16c5cf302fc80e9d5fbf5d48d"), 0, null, null, 0, 0);
+        ECKey privKey1 = ECKey.fromPrivate(Utils.hexToBytes("8d4751f6e8a3586880fb66c19ae277969bd5aa06f61c4ee2f1e2486efdf666d3"));
+        utxos.put(ref1, walletNode1);
+        segwitPrivateKeys.put(walletNode1, privKey1);
+
+        TestKeystore taprootKeystore = new TestKeystore(taprootPrivateKeys);
+        taprootWallet.getKeystores().add(taprootKeystore);
+        taprootWallet.setDefaultPolicy(Policy.getPolicy(PolicyType.SINGLE, ScriptType.P2WPKH, taprootWallet.getKeystores(), 1));
+
+        TestKeystore segwitKeystore = new TestKeystore(segwitPrivateKeys);
+        segwitWallet.getKeystores().add(segwitKeystore);
+        segwitWallet.setDefaultPolicy(Policy.getPolicy(PolicyType.SINGLE, ScriptType.P2WPKH, segwitWallet.getKeystores(), 1));
+
+        SilentPaymentAddress silentPaymentAddress = SilentPaymentAddress.from("sp1qqgste7k9hx0qftg6qmwlkqtwuy6cycyavzmzj85c6qdfhjdpdjtdgqjuexzk6murw56suy3e0rd2cgqvycxttddwsvgxe2usfpxumr70xc9pkqwv");
+        List<SilentPayment> silentPayments = List.of(new SilentPayment(silentPaymentAddress, "", 0, false));
+
+        SilentPaymentUtils.updateSilentPayments(silentPayments, utxos);
+        Assertions.assertEquals(1, silentPayments.size());
+        Assertions.assertEquals("359358f59ee9e9eec3f00bdf4882570fd5c182e451aa2650b788544aff012a3a", Utils.bytesToHex(silentPayments.getFirst().getAddress().getData()));
+    }
+
+    @Test
+    public void testMultipleOutputsSameRecipient() {
+        Wallet sendWallet = new Wallet();
+        sendWallet.setPolicyType(PolicyType.SINGLE);
+        sendWallet.setScriptType(ScriptType.P2WPKH);
+        Map<BlockTransactionHashIndex, WalletNode> utxos = new LinkedHashMap<>();
+        Map<WalletNode, ECKey> privateKeys = new LinkedHashMap<>();
+
+        WalletNode walletNode0 = new WalletNode(sendWallet, "/0/0");
+        BlockTransactionHashIndex ref0 = new BlockTransactionHashIndex(Sha256Hash.wrap("f4184fc596403b9d638783cf57adfe4c75c605f6356fbc91338530e9831e9e16"), 0, null, null, 0, 0);
+        ECKey privKey0 = ECKey.fromPrivate(Utils.hexToBytes("eadc78165ff1f8ea94ad7cfdc54990738a4c53f6e0507b42154201b8e5dff3b1"));
+        utxos.put(ref0, walletNode0);
+        privateKeys.put(walletNode0, privKey0);
+
+        WalletNode walletNode1 = new WalletNode(sendWallet, "/0/1");
+        BlockTransactionHashIndex ref1 = new BlockTransactionHashIndex(Sha256Hash.wrap("a1075db55d416d3ca199f55b6084e2115b9345e16c5cf302fc80e9d5fbf5d48d"), 0, null, null, 0, 0);
+        ECKey privKey1 = ECKey.fromPrivate(Utils.hexToBytes("0378e95685b74565fa56751b84a32dfd18545d10d691641b8372e32164fad66a"));
+        utxos.put(ref1, walletNode1);
+        privateKeys.put(walletNode1, privKey1);
+
+        TestKeystore sendKeystore = new TestKeystore(privateKeys);
+        sendWallet.getKeystores().add(sendKeystore);
+        sendWallet.setDefaultPolicy(Policy.getPolicy(PolicyType.SINGLE, ScriptType.P2WPKH, sendWallet.getKeystores(), 1));
+
+        SilentPaymentAddress silentPaymentAddress0 = SilentPaymentAddress.from("sp1qqgste7k9hx0qftg6qmwlkqtwuy6cycyavzmzj85c6qdfhjdpdjtdgqjuexzk6murw56suy3e0rd2cgqvycxttddwsvgxe2usfpxumr70xc9pkqwv");
+        SilentPaymentAddress silentPaymentAddress1 = SilentPaymentAddress.from("sp1qqgste7k9hx0qftg6qmwlkqtwuy6cycyavzmzj85c6qdfhjdpdjtdgqjuexzk6murw56suy3e0rd2cgqvycxttddwsvgxe2usfpxumr70xc9pkqwv");
+        List<SilentPayment> silentPayments = List.of(new SilentPayment(silentPaymentAddress0, "First", 0, false), new SilentPayment(silentPaymentAddress1, "Second", 0, false));
+
+        SilentPaymentUtils.updateSilentPayments(silentPayments, utxos);
+        Assertions.assertEquals(2, silentPayments.size());
+        Assertions.assertEquals("First", silentPayments.getFirst().getLabel());
+        Assertions.assertEquals("f207162b1a7abc51c42017bef055e9ec1efc3d3567cb720357e2b84325db33ac", Utils.bytesToHex(silentPayments.getFirst().getAddress().getData()));
+        Assertions.assertEquals("Second", silentPayments.getLast().getLabel());
+        Assertions.assertEquals("e976a58fbd38aeb4e6093d4df02e9c1de0c4513ae0c588cef68cda5b2f8834ca", Utils.bytesToHex(silentPayments.getLast().getAddress().getData()));
+    }
+
+    @Test
+    public void testMultipleOutputsMultipleRecipients() {
+        Wallet sendWallet = new Wallet();
+        sendWallet.setPolicyType(PolicyType.SINGLE);
+        sendWallet.setScriptType(ScriptType.P2WPKH);
+        Map<BlockTransactionHashIndex, WalletNode> utxos = new LinkedHashMap<>();
+        Map<WalletNode, ECKey> privateKeys = new LinkedHashMap<>();
+
+        WalletNode walletNode0 = new WalletNode(sendWallet, "/0/0");
+        BlockTransactionHashIndex ref0 = new BlockTransactionHashIndex(Sha256Hash.wrap("f4184fc596403b9d638783cf57adfe4c75c605f6356fbc91338530e9831e9e16"), 0, null, null, 0, 0);
+        ECKey privKey0 = ECKey.fromPrivate(Utils.hexToBytes("eadc78165ff1f8ea94ad7cfdc54990738a4c53f6e0507b42154201b8e5dff3b1"));
+        utxos.put(ref0, walletNode0);
+        privateKeys.put(walletNode0, privKey0);
+
+        WalletNode walletNode1 = new WalletNode(sendWallet, "/0/1");
+        BlockTransactionHashIndex ref1 = new BlockTransactionHashIndex(Sha256Hash.wrap("a1075db55d416d3ca199f55b6084e2115b9345e16c5cf302fc80e9d5fbf5d48d"), 0, null, null, 0, 0);
+        ECKey privKey1 = ECKey.fromPrivate(Utils.hexToBytes("0378e95685b74565fa56751b84a32dfd18545d10d691641b8372e32164fad66a"));
+        utxos.put(ref1, walletNode1);
+        privateKeys.put(walletNode1, privKey1);
+
+        TestKeystore sendKeystore = new TestKeystore(privateKeys);
+        sendWallet.getKeystores().add(sendKeystore);
+        sendWallet.setDefaultPolicy(Policy.getPolicy(PolicyType.SINGLE, ScriptType.P2WPKH, sendWallet.getKeystores(), 1));
+
+        SilentPaymentAddress silentPaymentAddress0 = SilentPaymentAddress.from("sp1qqgste7k9hx0qftg6qmwlkqtwuy6cycyavzmzj85c6qdfhjdpdjtdgqjuexzk6murw56suy3e0rd2cgqvycxttddwsvgxe2usfpxumr70xc9pkqwv");
+        SilentPaymentAddress silentPaymentAddress1 = SilentPaymentAddress.from("sp1qqgrz6j0lcqnc04vxccydl0kpsj4frfje0ktmgcl2t346hkw30226xqupawdf48k8882j0strrvcmgg2kdawz53a54dd376ngdhak364hzcmynqtn");
+        SilentPaymentAddress silentPaymentAddress2 = SilentPaymentAddress.from("sp1qqgrz6j0lcqnc04vxccydl0kpsj4frfje0ktmgcl2t346hkw30226xqupawdf48k8882j0strrvcmgg2kdawz53a54dd376ngdhak364hzcmynqtn");
+        List<SilentPayment> silentPayments = List.of(new SilentPayment(silentPaymentAddress0, "First", 0, false), new SilentPayment(silentPaymentAddress1, "Second", 0, false), new SilentPayment(silentPaymentAddress2, "Third", 0, false));
+
+        SilentPaymentUtils.updateSilentPayments(silentPayments, utxos);
+        Assertions.assertEquals(3, silentPayments.size());
+        Assertions.assertEquals("First", silentPayments.getFirst().getLabel());
+        Assertions.assertEquals("f207162b1a7abc51c42017bef055e9ec1efc3d3567cb720357e2b84325db33ac", Utils.bytesToHex(silentPayments.getFirst().getAddress().getData()));
+        Assertions.assertEquals("Second", silentPayments.get(1).getLabel());
+        Assertions.assertEquals("841792c33c9dc6193e76744134125d40add8f2f4a96475f28ba150be032d64e8", Utils.bytesToHex(silentPayments.get(1).getAddress().getData()));
+        Assertions.assertEquals("Third", silentPayments.getLast().getLabel());
+        Assertions.assertEquals("2e847bb01d1b491da512ddd760b8509617ee38057003d6115d00ba562451323a", Utils.bytesToHex(silentPayments.getLast().getAddress().getData()));
+    }
+
+    private static class TestKeystore extends Keystore {
+        private final Map<WalletNode, ECKey> privateKeys;
+
+        private TestKeystore(Map<WalletNode, ECKey> privateKeys) {
+            this.privateKeys = privateKeys;
+        }
+
+        @Override
+        public ECKey getKey(WalletNode walletNode) {
+            return privateKeys.get(walletNode);
+        }
+
+        @Override
+        public boolean hasPrivateKey() {
+            return true;
+        }
     }
 }

@@ -328,14 +328,43 @@ public class ECKey {
 
     /** Multiply the public point by the provided private key */
     public ECKey multiply(BigInteger privKey) {
+        return multiply(privKey, false);
+    }
+
+    /** Multiply the public point by the provided private key */
+    public ECKey multiply(BigInteger privKey, boolean compressed) {
         ECPoint point = pub.get().multiply(privKey);
-        return ECKey.fromPublicOnly(point, false);
+        return ECKey.fromPublicOnly(point, compressed);
     }
 
     /** Add to the public point by the provided public key */
     public ECKey add(ECKey pubKey) {
+        return add(pubKey, false);
+    }
+
+    /** Add to the public point by the provided public key */
+    public ECKey add(ECKey pubKey, boolean compressed) {
         ECPoint point = pub.get().add(pubKey.getPubKeyPoint());
-        return ECKey.fromPublicOnly(point, false);
+        return ECKey.fromPublicOnly(point, compressed);
+    }
+
+    /** Add to the private key by the provided private key using modular arithmetic */
+    public ECKey addPrivate(ECKey privKey) {
+        if(this.priv == null || privKey.priv == null) {
+            throw new IllegalStateException("Key did not contain a private key");
+        }
+
+        return ECKey.fromPrivate(this.priv.add(privKey.priv).mod(CURVE.getN()), true);
+    }
+
+    /** Negate the provided private key */
+    public ECKey negate() {
+        if(priv == null) {
+            throw new IllegalStateException("Key did not contain a private key");
+        }
+
+        BigInteger negatedPrivKey = CURVE.getN().subtract(priv);
+        return ECKey.fromPrivate(negatedPrivKey, isCompressed());
     }
 
     /** Calculate the value of the public key point modulo the secp256k1 curve order */

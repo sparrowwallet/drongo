@@ -13,6 +13,8 @@ import com.sparrowwallet.drongo.protocol.*;
 import com.sparrowwallet.drongo.psbt.PSBT;
 import com.sparrowwallet.drongo.psbt.PSBTInput;
 import com.sparrowwallet.drongo.psbt.PSBTOutput;
+import com.sparrowwallet.drongo.silentpayments.SilentPayment;
+import com.sparrowwallet.drongo.silentpayments.SilentPaymentUtils;
 
 import java.nio.charset.StandardCharsets;
 import java.util.*;
@@ -317,6 +319,11 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
 
     public boolean isBip47() {
         return !isMasterWallet() && getKeystores().size() == 1 && getKeystores().get(0).getSource() == KeystoreSource.SW_PAYMENT_CODE;
+    }
+
+    public boolean canSendSilentPayments() {
+        return getKeystores().size() == 1 && getKeystores().getFirst().hasPrivateKey() && policyType == PolicyType.SINGLE
+                && SilentPayment.VALID_INPUT_SCRIPT_TYPES.contains(scriptType);
     }
 
     public StandardAccount getStandardAccountType() {
@@ -1061,6 +1068,12 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
                 Payment fakeMixPayment = new Payment(mixNode.getAddress(), ".." + mixNode + " (Fake Mix)", totalPaymentAmount, false);
                 fakeMixPayment.setType(Payment.Type.FAKE_MIX);
                 txPayments.add(fakeMixPayment);
+            }
+
+            List<SilentPayment> silentPayments = payments.stream().filter(payment -> payment instanceof SilentPayment)
+                    .map(payment -> (SilentPayment)payment).collect(Collectors.toList());
+            if(!silentPayments.isEmpty()) {
+                SilentPaymentUtils.updateSilentPayments(silentPayments, selectedUtxos);
             }
 
             //Add recipient outputs
