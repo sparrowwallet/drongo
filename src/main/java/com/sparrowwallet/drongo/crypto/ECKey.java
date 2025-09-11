@@ -348,6 +348,11 @@ public class ECKey {
         return ECKey.fromPublicOnly(point, compressed);
     }
 
+    /** Negate the provided public key */
+    public ECKey negate() {
+        return ECKey.fromPublicOnly(getPubKeyPoint().negate().normalize(), isCompressed());
+    }
+
     /** Add to the private key by the provided private key using modular arithmetic */
     public ECKey addPrivate(ECKey privKey) {
         if(this.priv == null || privKey.priv == null) {
@@ -358,7 +363,7 @@ public class ECKey {
     }
 
     /** Negate the provided private key */
-    public ECKey negate() {
+    public ECKey negatePrivate() {
         if(priv == null) {
             throw new IllegalStateException("Key did not contain a private key");
         }

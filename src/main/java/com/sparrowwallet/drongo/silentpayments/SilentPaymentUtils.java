@@ -241,7 +241,7 @@ public class SilentPaymentUtils {
             try {
                 ECKey privateKey = walletNode.getWallet().getKeystores().getFirst().getKey(walletNode);
                 if(walletNode.getWallet().getScriptType() == P2TR && !privateKey.getPubKeyPoint().getYCoord().toBigInteger().mod(BigInteger.TWO).equals(BigInteger.ZERO)) {
-                    privateKey = privateKey.negate();
+                    privateKey = privateKey.negatePrivate();
                 }
                 if(summedPrivateKey == null) {
                     summedPrivateKey = privateKey;
@@ -266,8 +266,7 @@ public class SilentPaymentUtils {
 
     public static byte[] getSmallestOutpoint(Set<BlockTransactionHashIndex> outpoints) {
         return outpoints.stream().map(outpoint -> new TransactionOutPoint(outpoint.getHash(), outpoint.getIndex())).map(TransactionOutPoint::bitcoinSerialize)
-                .sorted(new Utils.LexicographicByteArrayComparator())
-                .findFirst().orElseThrow(() -> new IllegalArgumentException("No inputs provided to calculate silent payments input hash"));
+                .min(new Utils.LexicographicByteArrayComparator()).orElseThrow(() -> new IllegalArgumentException("No inputs provided to calculate silent payments input hash"));
     }
 
     public static ECKey getLabelledSpendKey(ECKey scanPrivateKey, ECKey spendPublicKey, int labelIndex) {
