@@ -89,7 +89,7 @@ public class SilentPaymentUtils {
                             break;
                         case P2SH:
                             Script redeemScript = input.getScriptSig().getFirstNestedScript();
-                            if(ScriptType.P2WPKH.isScriptType(redeemScript)) {
+                            if(redeemScript != null && ScriptType.P2WPKH.isScriptType(redeemScript)) {
                                 if(input.getWitness() != null && input.getWitness().getPushCount() == 2) {
                                     byte[] pubKey = input.getWitness().getPushes().getLast();
                                     if(pubKey != null && pubKey.length == 33) {
@@ -270,8 +270,12 @@ public class SilentPaymentUtils {
     }
 
     public static ECKey getLabelledSpendKey(ECKey scanPrivateKey, ECKey spendPublicKey, int labelIndex) {
+        return spendPublicKey.add(getLabelledTweakKey(scanPrivateKey, labelIndex), true);
+    }
+
+    public static ECKey getLabelledTweakKey(ECKey scanPrivateKey, int labelIndex) {
         BigInteger labelTweak = new BigInteger(1, Utils.taggedHash(BIP_0352_LABEL_TAG,
                 Utils.concat(scanPrivateKey.getPrivKeyBytes(), ByteBuffer.allocate(4).order(ByteOrder.BIG_ENDIAN).putInt(labelIndex).array())));
-        return spendPublicKey.add(ECKey.fromPublicOnly(ECKey.publicPointFromPrivate(labelTweak).getEncoded(true)), true);
+        return ECKey.fromPublicOnly(ECKey.publicPointFromPrivate(labelTweak).getEncoded(true));
     }
 }

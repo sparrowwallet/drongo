@@ -16,6 +16,14 @@ public class SilentPaymentScanAddress extends SilentPaymentAddress {
         }
     }
 
+    public ECKey getChangeTweakKey() {
+        return SilentPaymentUtils.getLabelledTweakKey(getScanKey(), 0);
+    }
+
+    public ECKey getLabelledTweakKey(int labelIndex) {
+        return SilentPaymentUtils.getLabelledTweakKey(getScanKey(), labelIndex);
+    }
+
     public SilentPaymentScanAddress getChangeAddress() {
         return getLabelledAddress(0);
     }
