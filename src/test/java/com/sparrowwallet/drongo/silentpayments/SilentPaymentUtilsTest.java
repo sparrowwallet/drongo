@@ -56,6 +56,26 @@ public class SilentPaymentUtilsTest {
     }
 
     @Test
+    public void testTweakChange() {
+        Transaction transaction = new Transaction();
+        transaction.addInput(Sha256Hash.wrap("f4184fc596403b9d638783cf57adfe4c75c605f6356fbc91338530e9831e9e16"), 0, new Script(Utils.hexToBytes("483046022100ad79e6801dd9a8727f342f31c71c4912866f59dc6e7981878e92c5844a0ce929022100fb0d2393e813968648b9753b7e9871d90ab3d815ebf91820d704b19f4ed224d621025a1e61f898173040e20616d43e9f496fba90338a39faa1ed98fcbaeee4dd9be5")));
+        transaction.addInput(Sha256Hash.wrap("a1075db55d416d3ca199f55b6084e2115b9345e16c5cf302fc80e9d5fbf5d48d"), 0, new Script(Utils.hexToBytes("473045022100a8c61b2d470e393279d1ba54f254b7c237de299580b7fa01ffcc940442ecec4502201afba952f4e4661c40acde7acc0341589031ba103a307b886eb867b23b850b972103782eeb913431ca6e9b8c2fd80a5f72ed2024ef72a3c6fb10263c379937323338")));
+        transaction.addOutput(1000L, ScriptType.P2TR.getOutputScript(ECKey.fromPublicOnly(Utils.hexToBytes("be368e28979d950245d742891ae6064020ba548c1e2e65a639a8bb0675d95cff"))));
+
+        Map<HashIndex, Script> spentScriptPubKeys = new HashMap<>();
+        HashIndex hashIndex0 = new HashIndex(transaction.getInputs().getFirst().getOutpoint().getHash(), transaction.getInputs().getFirst().getOutpoint().getIndex());
+        Script spentScriptPubKey0 = new Script(Utils.hexToBytes("76a91419c2f3ae0ca3b642bd3e49598b8da89f50c1416188ac"));
+        HashIndex hashIndex1 = new HashIndex(transaction.getInputs().getLast().getOutpoint().getHash(), transaction.getInputs().getLast().getOutpoint().getIndex());
+        Script spentScriptPubKey1 = new Script(Utils.hexToBytes("76a9147cdd63cc408564188e8e472640e921c7c90e651d88ac"));
+        spentScriptPubKeys.put(hashIndex0, spentScriptPubKey0);
+        spentScriptPubKeys.put(hashIndex1, spentScriptPubKey1);
+
+        byte[] tweak = SilentPaymentUtils.getTweak(transaction, spentScriptPubKeys);
+        Assertions.assertNotNull(tweak);
+        Assertions.assertEquals("0314bec14463d6c0181083d607fecfba67bb83f95915f6f247975ec566d5642ee8", Utils.bytesToHex(tweak));
+    }
+
+    @Test
     public void testInvalidOutput() {
         Transaction transaction = new Transaction();
         transaction.addInput(Sha256Hash.wrap("a1075db55d416d3ca199f55b6084e2115b9345e16c5cf302fc80e9d5fbf5d48d"), 0, new Script(Utils.hexToBytes("483046022100ad79e6801dd9a8727f342f31c71c4912866f59dc6e7981878e92c5844a0ce929022100fb0d2393e813968648b9753b7e9871d90ab3d815ebf91820d704b19f4ed224d621025a1e61f898173040e20616d43e9f496fba90338a39faa1ed98fcbaeee4dd9be5")));
