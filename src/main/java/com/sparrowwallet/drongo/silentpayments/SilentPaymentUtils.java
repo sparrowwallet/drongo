@@ -153,6 +153,10 @@ public class SilentPaymentUtils {
     }
 
     public static byte[] getTweak(Transaction tx, Map<HashIndex, Script> spentScriptPubKeys) {
+        return getTweak(tx, spentScriptPubKeys, true);
+    }
+
+    public static byte[] getTweak(Transaction tx, Map<HashIndex, Script> spentScriptPubKeys, boolean compressed) {
         if(tx.getOutputs().stream().noneMatch(output -> ScriptType.P2TR.isScriptType(output.getScript()))) {
             return null;
         }
@@ -179,7 +183,7 @@ public class SilentPaymentUtils {
             byte[] smallestOutpoint = tx.getInputs().stream().map(input -> input.getOutpoint().bitcoinSerialize()).min(new Utils.LexicographicByteArrayComparator()).orElseThrow();
 
             byte[] inputHash = Utils.taggedHash(BIP_0352_INPUTS_TAG, Utils.concat(smallestOutpoint, combinedPubKey));
-            return NativeSecp256k1.pubKeyTweakMul(combinedPubKey, inputHash, true);
+            return NativeSecp256k1.pubKeyTweakMul(combinedPubKey, inputHash, compressed);
         } catch(NativeSecp256k1Util.AssertFailException e) {
             log.error("Error computing tweak", e);
         }
@@ -277,5 +281,16 @@ public class SilentPaymentUtils {
         BigInteger labelTweak = new BigInteger(1, Utils.taggedHash(BIP_0352_LABEL_TAG,
                 Utils.concat(scanPrivateKey.getPrivKeyBytes(), ByteBuffer.allocate(4).order(ByteOrder.BIG_ENDIAN).putInt(labelIndex).array())));
         return ECKey.fromPublicOnly(ECKey.publicPointFromPrivate(labelTweak).getEncoded(true));
+    }
+
+    public static byte[] getSecp256k1PubKey(ECKey ecKey) {
+        return getSecp256k1PubKey(ecKey.getPubKey(false));
+    }
+
+    public static byte[] getSecp256k1PubKey(byte[] uncompressedKey) {
+        byte[] key = new byte[64];
+        System.arraycopy(uncompressedKey, 1, key, 32, 32);
+        System.arraycopy(uncompressedKey, 33, key, 0, 32);
+        return Utils.reverseBytes(key);
     }
 }
