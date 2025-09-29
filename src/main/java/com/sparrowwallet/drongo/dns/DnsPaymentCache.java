@@ -51,6 +51,16 @@ public class DnsPaymentCache {
         }
     }
 
+    public static DnsPayment getDnsPayment(String hrn) {
+        for(DnsPayment dnsPayment : dnsPayments.asMap().values()) {
+            if(dnsPayment.hrn().equals(hrn)) {
+                return dnsPayment;
+            }
+        }
+
+        return null;
+    }
+
     public static void putDnsPayment(Address address, DnsPayment dnsPayment) {
         dnsPayments.put(new DnsAddress(address), dnsPayment);
     }

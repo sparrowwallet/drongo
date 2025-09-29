@@ -4,6 +4,9 @@ import com.sparrowwallet.drongo.uri.BitcoinURI;
 import org.xbill.DNS.*;
 import org.xbill.DNS.Record;
 
+import java.nio.charset.StandardCharsets;
+import java.util.Optional;
+
 import static com.sparrowwallet.drongo.dns.RecordUtils.fromWire;
 
 public record DnsPayment(String hrn, BitcoinURI bitcoinURI, byte[] proofChain) {
@@ -32,5 +35,24 @@ public record DnsPayment(String hrn, BitcoinURI bitcoinURI, byte[] proofChain) {
 
     public boolean hasSilentPaymentAddress() {
         return bitcoinURI.getSilentPaymentAddress() != null;
+    }
+
+    public static Optional<String> getHrn(String value) {
+        String hrn = value;
+        if(value.endsWith(".")) {
+            return Optional.empty();
+        }
+
+        if(hrn.startsWith("₿")) {
+            hrn = hrn.substring(1);
+        }
+
+        String[] addressParts = hrn.split("@");
+        if(addressParts.length == 2 && addressParts[1].indexOf('.') > -1 && addressParts[1].substring(addressParts[1].indexOf('.') + 1).length() > 1 &&
+                StandardCharsets.US_ASCII.newEncoder().canEncode(hrn)) {
+            return Optional.of(hrn);
+        }
+
+        return Optional.empty();
     }
 }
