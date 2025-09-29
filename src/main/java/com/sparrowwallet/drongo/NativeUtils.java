@@ -5,6 +5,10 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.*;
+import java.nio.file.attribute.PosixFilePermission;
+import java.nio.file.attribute.PosixFilePermissions;
+import java.util.EnumSet;
+import java.util.Set;
 
 /**
  * A simple library class which helps with loading dynamic libraries stored in the
@@ -110,9 +114,33 @@ public class NativeUtils {
         String tempDir = System.getProperty("java.io.tmpdir");
         File generatedDir = new File(tempDir, prefix + System.nanoTime());
 
-        if (!generatedDir.mkdir())
+        if(!createOwnerOnlyDirectory(generatedDir)) {
             throw new IOException("Failed to create temp directory " + generatedDir.getName());
+        }
 
         return generatedDir;
+    }
+
+    public static boolean createOwnerOnlyDirectory(File directory) throws IOException {
+        try {
+            if(OsType.getCurrent() == OsType.WINDOWS) {
+                Files.createDirectories(directory.toPath());
+                return true;
+            }
+
+            Files.createDirectories(directory.toPath(), PosixFilePermissions.asFileAttribute(getDirectoryOwnerOnlyPosixFilePermissions()));
+            return true;
+        } catch(UnsupportedOperationException e) {
+            return directory.mkdirs();
+        }
+    }
+
+    private static Set<PosixFilePermission> getDirectoryOwnerOnlyPosixFilePermissions() {
+        Set<PosixFilePermission> ownerOnly = EnumSet.noneOf(PosixFilePermission.class);
+        ownerOnly.add(PosixFilePermission.OWNER_READ);
+        ownerOnly.add(PosixFilePermission.OWNER_WRITE);
+        ownerOnly.add(PosixFilePermission.OWNER_EXECUTE);
+
+        return ownerOnly;
     }
 }
