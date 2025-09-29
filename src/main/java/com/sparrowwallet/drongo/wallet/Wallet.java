@@ -13,8 +13,7 @@ import com.sparrowwallet.drongo.protocol.*;
 import com.sparrowwallet.drongo.psbt.PSBT;
 import com.sparrowwallet.drongo.psbt.PSBTInput;
 import com.sparrowwallet.drongo.psbt.PSBTOutput;
-import com.sparrowwallet.drongo.silentpayments.SilentPayment;
-import com.sparrowwallet.drongo.silentpayments.SilentPaymentUtils;
+import com.sparrowwallet.drongo.silentpayments.*;
 
 import java.nio.charset.StandardCharsets;
 import java.util.*;
@@ -44,6 +43,7 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
     private final Map<String, String> detachedLabels = new HashMap<>();
     private WalletConfig walletConfig;
     private final Map<TableType, WalletTable> walletTables = new HashMap<>();
+    private final Map<Address, SilentPaymentAddress> silentPaymentAddresses = new HashMap<>();
     private MixConfig mixConfig;
     private final Map<Sha256Hash, UtxoMixData> utxoMixes = new HashMap<>();
     private Integer storedBlockHeight;
@@ -480,6 +480,31 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
 
     public WalletTable getWalletTable(TableType tableType) {
         return walletTables.get(tableType);
+    }
+
+    public SilentPaymentAddress getSilentPaymentAddress(Address address) {
+        return silentPaymentAddresses.get(address);
+    }
+
+    private void addSilentPaymentAddress(Address address, SilentPaymentAddress silentPaymentAddress) {
+        silentPaymentAddresses.put(address, silentPaymentAddress);
+    }
+
+    public void clearSilentPaymentAddress(Address address) {
+        silentPaymentAddresses.remove(address);
+    }
+
+    public boolean isSilentPaymentsTransaction(BlockTransaction blockTransaction) {
+        Wallet wallet = isNested() ? getMasterWallet() : this;
+        return blockTransaction.getTransaction().getOutputs().stream().map(output -> output.getScript().getToAddress())
+                .filter(Objects::nonNull).anyMatch(address -> wallet.getSilentPaymentAddress(address) != null);
+    }
+
+    public boolean isSafeToAddInputsOrOutputs(BlockTransaction blockTransaction) {
+        //Silent payments transactions should always signal RBF disabled as adding inputs or other silent payments outputs in the replacement tx can ~burn coins
+        //If we are ignoring the RBF flag due to mempoolfullrbf, determine if it's safe to add inputs or outputs
+        return blockTransaction.getTransaction().isReplaceByFee() || isSilentPaymentsTransaction(blockTransaction) || !canSendSilentPayments()
+                || !SilentPaymentUtils.containsTaprootOutput(blockTransaction.getTransaction());
     }
 
     public MixConfig getMixConfig() {
@@ -1011,7 +1036,7 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
 
     public WalletTransaction createWalletTransaction(List<UtxoSelector> utxoSelectors, List<TxoFilter> txoFilters, List<Payment> payments, List<byte[]> opReturns,
                                                      Set<WalletNode> excludedChangeNodes, double feeRate, double longTermFeeRate, double minRelayFeeRate, Long fee,
-                                                     Integer currentBlockHeight, boolean groupByAddress, boolean includeMempoolOutputs) throws InsufficientFundsException {
+                                                     Integer currentBlockHeight, boolean groupByAddress, boolean includeMempoolOutputs, boolean allowRbf) throws InsufficientFundsException {
         boolean sendMax = payments.stream().anyMatch(Payment::isSendMax);
         long totalPaymentAmount = payments.stream().map(Payment::getAmount).mapToLong(v -> v).sum();
         Map<BlockTransactionHashIndex, WalletNode> availableTxos = getWalletTxos(txoFilters);
@@ -1040,7 +1065,9 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
             long totalSelectedAmt = selectedUtxos.keySet().stream().mapToLong(BlockTransactionHashIndex::getValue).sum();
             int numSets = selectedUtxoSets.size();
             List<Payment> txPayments = new ArrayList<>(payments);
+            List<WalletTransaction.Output> outputs = new ArrayList<>();
             Set<WalletNode> txExcludedChangeNodes = new HashSet<>(excludedChangeNodes);
+            long sequence = allowRbf ? TransactionInput.SEQUENCE_RBF_ENABLED : TransactionInput.SEQUENCE_RBF_DISABLED;
 
             Transaction transaction = new Transaction();
             transaction.setVersion(2);
@@ -1053,12 +1080,10 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
                 Transaction prevTx = getWalletTransaction(selectedUtxo.getKey().getHash()).getTransaction();
                 TransactionOutput prevTxOut = prevTx.getOutputs().get((int)selectedUtxo.getKey().getIndex());
                 TransactionInput txInput = addDummySpendingInput(transaction, selectedUtxo.getValue(), prevTxOut);
-
-                //Enable opt-in RBF by default, matching Bitcoin Core and Electrum
-                txInput.setSequenceNumber(TransactionInput.SEQUENCE_RBF_ENABLED);
+                txInput.setSequenceNumber(sequence);
             }
 
-            if(getScriptType() == P2TR && currentBlockHeight != null) {
+            if(getScriptType() == P2TR && currentBlockHeight != null && sequence != TransactionInput.SEQUENCE_RBF_DISABLED) {
                 applySequenceAntiFeeSniping(transaction, selectedUtxos, currentBlockHeight);
             }
 
@@ -1070,20 +1095,21 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
                 txPayments.add(fakeMixPayment);
             }
 
-            List<SilentPayment> silentPayments = payments.stream().filter(payment -> payment instanceof SilentPayment)
-                    .map(payment -> (SilentPayment)payment).collect(Collectors.toList());
-            if(!silentPayments.isEmpty()) {
-                SilentPaymentUtils.updateSilentPayments(silentPayments, selectedUtxos);
-            }
-
             //Add recipient outputs
             for(Payment payment : txPayments) {
-                transaction.addOutput(payment.getAmount(), payment.getAddress());
+                if(payment instanceof SilentPayment silentPayment) {
+                    TransactionOutput output = transaction.addOutput(payment.getAmount(), new Script(new byte[0]));
+                    outputs.add(new WalletTransaction.SilentPaymentOutput(output, silentPayment));
+                } else {
+                    TransactionOutput output = transaction.addOutput(payment.getAmount(), payment.getAddress());
+                    outputs.add(new WalletTransaction.PaymentOutput(output, payment));
+                }
             }
 
             //Add OP_RETURNs
             for(byte[] opReturn : opReturns) {
-                transaction.addOutput(0L, new Script(List.of(ScriptChunk.fromOpcode(ScriptOpCodes.OP_RETURN), ScriptChunk.fromData(opReturn))));
+                TransactionOutput output = transaction.addOutput(0L, new Script(List.of(ScriptChunk.fromOpcode(ScriptOpCodes.OP_RETURN), ScriptChunk.fromData(opReturn))));
+                outputs.add(new WalletTransaction.NonAddressOutput(output));
             }
 
             double noChangeVSize = transaction.getVirtualSize();
@@ -1142,7 +1168,8 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
                 Map<WalletNode, Long> changeMap = new LinkedHashMap<>();
                 setChangeAmts = getSetChangeAmounts(selectedUtxoSets, totalPaymentAmount, changeFeeRequiredAmt);
                 for(Long setChangeAmt : setChangeAmts) {
-                    transaction.addOutput(setChangeAmt, changeNode.getOutputScript());
+                    TransactionOutput output = transaction.addOutput(setChangeAmt, changeNode.getOutputScript());
+                    outputs.add(new WalletTransaction.ChangeOutput(output, changeNode, setChangeAmt));
                     changeMap.put(changeNode, setChangeAmt);
                     changeNode = getFreshNode(getChangeKeyPurpose(), changeNode);
                 }
@@ -1151,7 +1178,7 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
                     //The new fee has meant that one of the change outputs is now dust. We pay too high a fee without change, but change is dust when added.
                     if(numSets > 1 && differenceAmt / transaction.getVirtualSize() < noChangeFeeRate * 2) {
                         //Maximize privacy. Pay a higher fee to keep multiple output sets.
-                        return new WalletTransaction(this, transaction, utxoSelectors, selectedUtxoSets, txPayments, differenceAmt);
+                        return new WalletTransaction(this, transaction, utxoSelectors, selectedUtxoSets, txPayments, outputs, differenceAmt);
                     } else {
                         //Maxmize efficiency. Increase value required from inputs and try again.
                         valueRequiredAmt = totalSelectedAmt + 1;
@@ -1159,10 +1186,10 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
                     }
                 }
 
-                return new WalletTransaction(this, transaction, utxoSelectors, selectedUtxoSets, txPayments, changeMap, changeFeeRequiredAmt);
+                return new WalletTransaction(this, transaction, utxoSelectors, selectedUtxoSets, txPayments, outputs, changeMap, changeFeeRequiredAmt);
             }
 
-            return new WalletTransaction(this, transaction, utxoSelectors, selectedUtxoSets, txPayments, differenceAmt);
+            return new WalletTransaction(this, transaction, utxoSelectors, selectedUtxoSets, txPayments, outputs, differenceAmt);
         }
     }
 
@@ -1601,7 +1628,10 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
     }
 
     public void sign(PSBT psbt) throws MnemonicException {
-        Map<PSBTInput, WalletNode> signingNodes = getSigningNodes(psbt);
+        sign(getSigningNodes(psbt));
+    }
+
+    public void sign(Map<PSBTInput, WalletNode> signingNodes) throws MnemonicException {
         for(Map.Entry<PSBTInput, WalletNode> signingEntry : signingNodes.entrySet()) {
             Wallet signingWallet = signingEntry.getValue().getWallet();
             for(Keystore keystore : signingWallet.getKeystores()) {
@@ -1615,6 +1645,37 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
                 }
             }
         }
+    }
+
+    public List<SilentPayment> computeSilentPaymentOutputs(PSBT psbt, Map<PSBTInput, WalletNode> signingNodes) throws InvalidSilentPaymentException {
+        List<PSBTOutput> silentOutputs = psbt.getPsbtOutputs().stream().filter(psbtOutput -> psbtOutput.getSilentPaymentAddress() != null).collect(Collectors.toList());
+        if(!silentOutputs.isEmpty()) {
+            if(psbt.getPsbtInputs().size() != signingNodes.size()) {
+                throw new InvalidSilentPaymentException("All inputs must be from wallet to calculate silent payment addresses");
+            }
+
+            List<SilentPayment> silentPayments = silentOutputs.stream()
+                    .map(psbtOutput -> new SilentPayment(psbtOutput.getSilentPaymentAddress(), null, psbtOutput.getAmount(), false)).collect(Collectors.toList());
+            Map<HashIndex, WalletNode> utxos = signingNodes.keySet().stream()
+                    .collect(Collectors.toMap(psbtInput -> new HashIndex(psbtInput.getPrevTxid(), psbtInput.getPrevIndex()), signingNodes::get));
+            SilentPaymentUtils.computeOutputAddresses(silentPayments, utxos);
+            for(int i = 0; i < silentOutputs.size(); i++) {
+                PSBTOutput silentOutput = silentOutputs.get(i);
+                SilentPayment silentPayment = silentPayments.get(i);
+                if(!silentPayment.isAddressComputed()) {
+                    throw new InvalidSilentPaymentException("Silent payment address was not calculated");
+                }
+
+                Script outputScript = silentPayment.getAddress().getOutputScript();
+                silentOutput.setScript(outputScript);
+                silentOutput.getOutput().setScriptBytes(outputScript.getProgram());
+                addSilentPaymentAddress(silentPayment.getAddress(), silentPayment.getSilentPaymentAddress());
+            }
+
+            return silentPayments;
+        }
+
+        return Collections.emptyList();
     }
 
     public void finalise(PSBT psbt) {

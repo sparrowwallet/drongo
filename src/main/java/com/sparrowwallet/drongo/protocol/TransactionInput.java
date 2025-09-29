@@ -7,6 +7,7 @@ import java.io.OutputStream;
 
 public class TransactionInput extends ChildMessage {
     public static final long SEQUENCE_LOCKTIME_DISABLED = 4294967295L;
+    public static final long SEQUENCE_RBF_DISABLED = 4294967294L;
     public static final long SEQUENCE_RBF_ENABLED = 4294967293L;
     public static final long MAX_RELATIVE_TIMELOCK = 2147483647L;
     public static final long RELATIVE_TIMELOCK_VALUE_MASK = 0xFFFF;

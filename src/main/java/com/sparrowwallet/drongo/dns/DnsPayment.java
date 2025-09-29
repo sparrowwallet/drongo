@@ -25,4 +25,12 @@ public record DnsPayment(String hrn, BitcoinURI bitcoinURI, byte[] proofChain) {
 
         return ttl;
     }
+
+    public boolean hasAddress() {
+        return bitcoinURI.getAddress() != null;
+    }
+
+    public boolean hasSilentPaymentAddress() {
+        return bitcoinURI.getSilentPaymentAddress() != null;
+    }
 }

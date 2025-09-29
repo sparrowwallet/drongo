@@ -2,6 +2,8 @@ package com.sparrowwallet.drongo.wallet;
 
 import com.sparrowwallet.drongo.address.Address;
 import com.sparrowwallet.drongo.address.P2AAddress;
+import com.sparrowwallet.drongo.dns.DnsPayment;
+import com.sparrowwallet.drongo.dns.DnsPaymentCache;
 
 public class Payment {
     private Address address;
@@ -64,5 +66,19 @@ public class Payment {
 
     public enum Type {
         DEFAULT, WHIRLPOOL_FEE, FAKE_MIX, MIX, ANCHOR;
+    }
+
+    public String getDisplayAddress() {
+        return address.toString();
+    }
+
+    @Override
+    public String toString() {
+        DnsPayment dnsPayment = DnsPaymentCache.getDnsPayment(this);
+        if(dnsPayment != null) {
+            return dnsPayment.toString();
+        }
+
+        return getDisplayAddress();
     }
 }

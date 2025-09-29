@@ -373,8 +373,8 @@ public class Transaction extends ChildMessage {
         return Collections.unmodifiableList(outputs);
     }
 
-    public void shuffleOutputs() {
-        Collections.shuffle(outputs);
+    public void swapOutputs(int i, int j) {
+        Collections.swap(outputs, i, j);
     }
 
     public TransactionOutput addOutput(long value, Script script) {

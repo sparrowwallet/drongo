@@ -62,6 +62,11 @@ public class SilentPaymentAddress {
         return getAddress();
     }
 
+    public String toAbbreviatedString() {
+        String address = toString();
+        return address.substring(0, 50) + "...";
+    }
+
     @Override
     public final boolean equals(Object o) {
         if(this == o) {

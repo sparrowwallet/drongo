@@ -3,7 +3,6 @@ package com.sparrowwallet.drongo.psbt;
 import com.sparrowwallet.drongo.ExtendedKey;
 import com.sparrowwallet.drongo.KeyDerivation;
 import com.sparrowwallet.drongo.Utils;
-import com.sparrowwallet.drongo.address.Address;
 import com.sparrowwallet.drongo.crypto.ECKey;
 import com.sparrowwallet.drongo.protocol.*;
 import com.sparrowwallet.drongo.wallet.*;
@@ -81,6 +80,7 @@ public class PSBT {
         Wallet wallet = walletTransaction.getWallet();
 
         transaction = new Transaction(walletTransaction.getTransaction().bitcoinSerialize());
+        List<WalletTransaction.Output> walletTransactionOutputs = new ArrayList<>(walletTransaction.getOutputs());
 
         //Clear segwit marker & flag, scriptSigs and all witness data as per BIP174
         transaction.clearSegwit();
@@ -90,7 +90,12 @@ public class PSBT {
         }
 
         //Shuffle outputs so change outputs are less obvious
-        transaction.shuffleOutputs();
+        Random random = new Random();
+        for(int i = transaction.getOutputs().size() - 1; i > 0; i--) {
+            int j = random.nextInt(i + 1);
+            transaction.swapOutputs(i, j);
+            Collections.swap(walletTransactionOutputs, i, j);
+        }
 
         if(includeGlobalXpubs) {
             for(Keystore keystore : walletTransaction.getWallet().getKeystores()) {
@@ -143,30 +148,15 @@ public class PSBT {
             psbtInputs.add(psbtInput);
         }
 
-        List<WalletNode> outputNodes = new ArrayList<>();
-        List<Map<String, byte[]>> dnsProofs = new ArrayList<>();
-        for(TransactionOutput txOutput : transaction.getOutputs()) {
-            try {
-                Address address = txOutput.getScript().getToAddresses()[0];
-                if(walletTransaction.getAddressNodeMap().containsKey(address)) {
-                    outputNodes.add(walletTransaction.getAddressNodeMap().get(address));
-                } else if(walletTransaction.getChangeMap().keySet().stream().anyMatch(changeNode -> changeNode.getAddress().equals(address))) {
-                    outputNodes.add(walletTransaction.getChangeMap().keySet().stream().filter(changeNode -> changeNode.getAddress().equals(address)).findFirst().orElse(null));
-                }
-                dnsProofs.add(walletTransaction.getAddressDnsProofMap().get(address));
-            } catch(NonStandardScriptException e) {
-                //Ignore, likely OP_RETURN output
-                outputNodes.add(null);
-                dnsProofs.add(null);
-            }
-        }
-
-        for(int outputIndex = 0; outputIndex < outputNodes.size(); outputIndex++) {
-            WalletNode outputNode = outputNodes.get(outputIndex);
-            if(outputNode == null) {
-                PSBTOutput externalRecipientOutput = new PSBTOutput(this, outputIndex, null, null, null, Collections.emptyMap(), Collections.emptyMap(), null, dnsProofs.get(outputIndex));
-                psbtOutputs.add(externalRecipientOutput);
-            } else {
+        for(int outputIndex = 0; outputIndex < walletTransactionOutputs.size(); outputIndex++) {
+            WalletTransaction.Output output = walletTransactionOutputs.get(outputIndex);
+            PSBTOutput psbtOutput;
+            if(output instanceof WalletTransaction.SilentPaymentOutput silentPaymentOutput) {
+                psbtOutput = new PSBTOutput(this, outputIndex, null, null, null, Collections.emptyMap(), Collections.emptyMap(), null, silentPaymentOutput.getSilentPayment().getSilentPaymentAddress(), silentPaymentOutput.getDnsSecProof());
+            } else if(output instanceof WalletTransaction.PaymentOutput paymentOutput) {
+                psbtOutput = new PSBTOutput(this, outputIndex, null, null, null, Collections.emptyMap(), Collections.emptyMap(), null, null, paymentOutput.getDnsSecProof());
+            } else if(output instanceof WalletTransaction.ChangeOutput changeOutput) {
+                WalletNode outputNode = changeOutput.getWalletNode();
                 TransactionOutput txOutput = transaction.getOutputs().get(outputIndex);
                 Wallet recipientWallet = outputNode.getWallet();
 
@@ -195,9 +185,11 @@ public class PSBT {
                     }
                 }
 
-                PSBTOutput walletOutput = new PSBTOutput(this, outputIndex, recipientWallet.getScriptType(), redeemScript, witnessScript, derivedPublicKeys, Collections.emptyMap(), tapInternalKey, null);
-                psbtOutputs.add(walletOutput);
+                psbtOutput = new PSBTOutput(this, outputIndex, recipientWallet.getScriptType(), redeemScript, witnessScript, derivedPublicKeys, Collections.emptyMap(), tapInternalKey, null, null);
+            } else {
+                psbtOutput = new PSBTOutput(this, outputIndex, null, null, null, Collections.emptyMap(), Collections.emptyMap(), null, null, null);
             }
+            psbtOutputs.add(psbtOutput);
         }
     }
 
@@ -478,8 +470,8 @@ public class PSBT {
                 if(output.amount() == null) {
                     throw new PSBTParseException("PSBT_OUT_AMOUNT is required in PSBTv2");
                 }
-                if(output.script() == null) {
-                    throw new PSBTParseException("PSBT_OUT_SCRIPT is required in PSBTv2");
+                if(output.script() == null && output.getSilentPaymentAddress() == null) {
+                    throw new PSBTParseException("Either PSBT_OUT_SCRIPT or PSBT_OUT_SP_V0_INFO is required in PSBTv2");
                 }
             }
 
@@ -811,7 +803,7 @@ public class PSBT {
                 }
             }
             for(PSBTOutput psbtOutput : getPsbtOutputs()) {
-                transaction.addOutput(psbtOutput.getAmount(), psbtOutput.getScript());
+                transaction.addOutput(psbtOutput.getAmount(), psbtOutput.getScript() == null ? new Script(new byte[0]) : psbtOutput.getScript());
             }
             return transaction;
         }
@@ -994,6 +986,29 @@ public class PSBT {
         }
 
         return maxHeightLocktime.orElse(maxTimeLocktime.orElse(fallback));
+    }
+
+    public PSBT getForExport() {
+        //If this PSBT contains silent payment outputs, it must be converted to PSBTv2
+        if(getPsbtOutputs().stream().anyMatch(psbtOutput -> psbtOutput.getSilentPaymentAddress() != null)) {
+            try {
+                PSBT psbt2 = new PSBT(serialize());
+                //PSBTv0 serialized outputs do not contain silent payment info, so copy over
+                for(int i = 0; i < getPsbtOutputs().size(); i++) {
+                    PSBTOutput psbtOutput = getPsbtOutputs().get(i);
+                    PSBTOutput psbtOutput2 = psbt2.getPsbtOutputs().get(i);
+                    psbtOutput2.setSilentPaymentAddress(psbtOutput.getSilentPaymentAddress());
+                }
+                if(psbt2.getVersion() == null || psbt2.getVersion() == 0) {
+                    psbt2.convertVersion(2);
+                    return psbt2;
+                }
+            } catch(PSBTParseException e) {
+                throw new IllegalArgumentException("Could not reparse PSBT", e);
+            }
+        }
+
+        return this;
     }
 
     public static boolean isPSBT(byte[] b) {

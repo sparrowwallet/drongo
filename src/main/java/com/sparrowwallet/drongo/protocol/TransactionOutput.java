@@ -60,6 +60,20 @@ public class TransactionOutput extends ChildMessage {
         return scriptBytes;
     }
 
+    public void setScriptBytes(byte[] scriptBytes) {
+        super.payload = null;
+        this.script = null;
+        int oldLength = length;
+        this.scriptBytes = scriptBytes;
+        // 8 = value
+        int newLength = 8 + (scriptBytes == null ? 1 : VarInt.sizeOf(scriptBytes.length) + scriptBytes.length);
+        adjustLength(newLength - oldLength);
+    }
+
+    public void clearScriptBytes() {
+        setScriptBytes(new byte[0]);
+    }
+
     public Script getScript() {
         if(script == null) {
             script = new Script(scriptBytes);

@@ -5,8 +5,10 @@ import com.sparrowwallet.drongo.dns.DnsPayment;
 import com.sparrowwallet.drongo.dns.DnsPaymentCache;
 import com.sparrowwallet.drongo.protocol.*;
 import com.sparrowwallet.drongo.psbt.PSBT;
+import com.sparrowwallet.drongo.silentpayments.SilentPayment;
 
 import java.util.*;
+import java.util.stream.Collectors;
 
 /**
  * WalletTransaction contains a draft transaction along with associated metadata. The draft transaction has empty signatures but is otherwise complete.
@@ -24,17 +26,20 @@ public class WalletTransaction {
     private final List<Output> outputs;
 
     private Map<Wallet, Map<Address, WalletNode>> addressNodeMap = new HashMap<>();
-    private Map<Address, Map<String, byte[]>> addressDnsProofMap = new HashMap<>();
 
-    public WalletTransaction(Wallet wallet, Transaction transaction, List<UtxoSelector> utxoSelectors, List<Map<BlockTransactionHashIndex, WalletNode>> selectedUtxoSets, List<Payment> payments, long fee) {
-        this(wallet, transaction, utxoSelectors, selectedUtxoSets, payments, Collections.emptyMap(), fee);
+    public WalletTransaction(Wallet wallet, Transaction transaction, List<UtxoSelector> utxoSelectors, List<Map<BlockTransactionHashIndex, WalletNode>> selectedUtxoSets, List<Payment> payments, List<Output> outputs, long fee) {
+        this(wallet, transaction, utxoSelectors, selectedUtxoSets, payments, outputs, Collections.emptyMap(), fee);
     }
 
-    public WalletTransaction(Wallet wallet, Transaction transaction, List<UtxoSelector> utxoSelectors, List<Map<BlockTransactionHashIndex, WalletNode>> selectedUtxoSets, List<Payment> payments, Map<WalletNode, Long> changeMap, long fee) {
-        this(wallet, transaction, utxoSelectors, selectedUtxoSets, payments, changeMap, fee, Collections.emptyMap());
+    public WalletTransaction(Wallet wallet, Transaction transaction, List<UtxoSelector> utxoSelectors, List<Map<BlockTransactionHashIndex, WalletNode>> selectedUtxoSets, List<Payment> payments, List<Output> outputs, Map<WalletNode, Long> changeMap, long fee) {
+        this(wallet, transaction, utxoSelectors, selectedUtxoSets, payments, outputs, changeMap, fee, Collections.emptyMap());
     }
 
-    public WalletTransaction(Wallet wallet, Transaction transaction, List<UtxoSelector> utxoSelectors, List<Map<BlockTransactionHashIndex, WalletNode>> selectedUtxoSets, List<Payment> payments, Map<WalletNode, Long> changeMap, long fee, Map<Sha256Hash, BlockTransaction> inputTransactions) {
+    public WalletTransaction(Wallet wallet, Transaction transaction, List<UtxoSelector> utxoSelectors, List<Map<BlockTransactionHashIndex, WalletNode>> selectedUtxoSets, List<Payment> payments, List<Output> outputs, Map<WalletNode, Long> changeMap, long fee, Map<Sha256Hash, BlockTransaction> inputTransactions) {
+        if(!outputs.stream().map(Output::getTransactionOutput).collect(Collectors.toSet()).containsAll(transaction.getOutputs())) {
+            throw new IllegalArgumentException("Transaction output list does not contain all outputs from the transaction");
+        }
+
         this.wallet = wallet;
         this.transaction = transaction;
         this.utxoSelectors = utxoSelectors;
@@ -43,7 +48,7 @@ public class WalletTransaction {
         this.changeMap = changeMap;
         this.fee = fee;
         this.inputTransactions = inputTransactions;
-        this.outputs = calculateOutputs();
+        this.outputs = outputs;
 
         for(Payment payment : payments) {
             payment.setLabel(getOutputLabel(payment));
@@ -113,7 +118,7 @@ public class WalletTransaction {
     }
 
     public List<Output> getOutputs() {
-        return outputs;
+        return Collections.unmodifiableList(outputs);
     }
 
     /**
@@ -203,7 +208,8 @@ public class WalletTransaction {
     }
 
     public boolean isDuplicateAddress(Payment payment) {
-        return getPayments().stream().filter(p -> payment != p).anyMatch(p -> payment.getAddress() != null && payment.getAddress().equals(p.getAddress()));
+        return getPayments().stream().filter(p -> payment != p && !(payment instanceof SilentPayment))
+                .anyMatch(p -> payment.getAddress() != null && payment.getAddress().equals(p.getAddress()));
     }
 
     public void updateAddressNodeMap(Map<Wallet, Map<Address, WalletNode>> addressNodeMap, Wallet wallet) {
@@ -237,46 +243,6 @@ public class WalletTransaction {
         return walletAddressNodeMap;
     }
 
-    public Map<Address, Map<String, byte[]>> getAddressDnsProofMap() {
-        for(Payment payment : payments) {
-            if(addressDnsProofMap.containsKey(payment.getAddress())) {
-                continue;
-            }
-
-            DnsPayment dnsPayment = DnsPaymentCache.getDnsPayment(payment.getAddress());
-            if(dnsPayment != null && dnsPayment.bitcoinURI().getAddress() != null) {
-                addressDnsProofMap.put(dnsPayment.bitcoinURI().getAddress(), Map.of(dnsPayment.hrn(), dnsPayment.proofChain()));
-            }
-        }
-
-        return addressDnsProofMap;
-    }
-
-    private List<Output> calculateOutputs() {
-        List<Output> outputs = new ArrayList<>();
-
-        for(int i = 0, paymentIndex = 0; i < transaction.getOutputs().size(); i++) {
-            TransactionOutput txOutput = transaction.getOutputs().get(i);
-            Address address = txOutput.getScript().getToAddress();
-            if(address == null) {
-                outputs.add(new NonAddressOutput(txOutput));
-            } else if(paymentIndex < payments.size()) {
-                Payment payment = payments.get(paymentIndex++);
-                outputs.add(new PaymentOutput(txOutput, payment));
-            }
-        }
-
-        Set<Integer> seenIndexes = new HashSet<>();
-        for(Map.Entry<WalletNode, Long> changeEntry : changeMap.entrySet()) {
-            int outputIndex = getOutputIndex(changeEntry.getKey().getAddress(), changeEntry.getValue(), seenIndexes);
-            TransactionOutput txOutput = transaction.getOutputs().get(outputIndex);
-            seenIndexes.add(outputIndex);
-            outputs.add(outputIndex, new ChangeOutput(txOutput, changeEntry.getKey(), changeEntry.getValue()));
-        }
-
-        return outputs;
-    }
-
     public static class Output {
         private final TransactionOutput transactionOutput;
 
@@ -286,6 +252,10 @@ public class WalletTransaction {
 
         public TransactionOutput getTransactionOutput() {
             return transactionOutput;
+        }
+
+        public Map<String, byte[]> getDnsSecProof() {
+            return null;
         }
     }
 
@@ -305,6 +275,29 @@ public class WalletTransaction {
 
         public Payment getPayment() {
             return payment;
+        }
+
+        public Map<String, byte[]> getDnsSecProof() {
+            DnsPayment dnsPayment = DnsPaymentCache.getDnsPayment(payment);
+            if(dnsPayment != null) {
+                if(dnsPayment.hasAddress()) {
+                    return Map.of(dnsPayment.hrn(), dnsPayment.proofChain());
+                } else if(dnsPayment.hasSilentPaymentAddress()) {
+                    return Map.of(dnsPayment.hrn(), dnsPayment.proofChain());
+                }
+            }
+
+            return super.getDnsSecProof();
+        }
+    }
+
+    public static class SilentPaymentOutput extends PaymentOutput {
+        public SilentPaymentOutput(TransactionOutput transactionOutput, SilentPayment silentPayment) {
+            super(transactionOutput, silentPayment);
+        }
+
+        public SilentPayment getSilentPayment() {
+            return (SilentPayment)getPayment();
         }
     }
 

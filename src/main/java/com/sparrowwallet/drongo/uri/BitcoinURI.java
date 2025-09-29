@@ -2,6 +2,8 @@ package com.sparrowwallet.drongo.uri;
 
 import com.sparrowwallet.drongo.address.Address;
 import com.sparrowwallet.drongo.address.InvalidAddressException;
+import com.sparrowwallet.drongo.silentpayments.SilentPayment;
+import com.sparrowwallet.drongo.silentpayments.SilentPaymentAddress;
 import com.sparrowwallet.drongo.wallet.Payment;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -66,6 +68,7 @@ public class BitcoinURI {
     public static final String FIELD_PAYMENT_REQUEST_URL = "r";
     public static final String FIELD_PAYJOIN_URL = "pj";
     public static final String FIELD_PAYJOIN_OUTPUT_SUBSTITUTION = "pjos";
+    public static final String FIELD_SILENT_PAYMENTS_ADDRESS = "sp";
 
     public static final String BITCOIN_SCHEME = "bitcoin";
     private static final String ENCODED_SPACE_CHARACTER = "%20";
@@ -292,6 +295,22 @@ public class BitcoinURI {
     }
 
     /**
+     * @return The silent payments address in the URI, if provided
+     */
+    public final SilentPaymentAddress getSilentPaymentAddress() {
+        String address = (String)parameterMap.get(FIELD_SILENT_PAYMENTS_ADDRESS);
+        if(address != null) {
+            try {
+                return SilentPaymentAddress.from(address);
+            } catch(Exception e) {
+                log.error("Invalid silent payments address provided", e);
+            }
+        }
+
+        return null;
+    }
+
+    /**
      * @param name The name of the parameter
      * @return The parameter value, or null if not present
      */
@@ -321,6 +340,10 @@ public class BitcoinURI {
 
     public Payment toPayment() {
         long amount = getAmount() == null ? -1 : getAmount();
+        SilentPaymentAddress silentPaymentAddress = getSilentPaymentAddress();
+        if(getAddress() == null && silentPaymentAddress != null) {
+            return new SilentPayment(silentPaymentAddress, getLabel(), amount, false);
+        }
         return new Payment(getAddress(), getLabel(), amount, false);
     }
 

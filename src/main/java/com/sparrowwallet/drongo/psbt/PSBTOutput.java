@@ -7,6 +7,7 @@ import com.sparrowwallet.drongo.dns.DnsPayment;
 import com.sparrowwallet.drongo.dns.DnsPaymentResolver;
 import com.sparrowwallet.drongo.dns.DnsPaymentValidationException;
 import com.sparrowwallet.drongo.protocol.*;
+import com.sparrowwallet.drongo.silentpayments.SilentPaymentAddress;
 import com.sparrowwallet.drongo.uri.BitcoinURIParseException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -26,6 +27,7 @@ public class PSBTOutput {
     public static final byte PSBT_OUT_SCRIPT = 0x04;
     public static final byte PSBT_OUT_TAP_INTERNAL_KEY = 0x05;
     public static final byte PSBT_OUT_TAP_BIP32_DERIVATION = 0x07;
+    public static final byte PSBT_OUT_SP_V0_INFO = 0x09;
     public static final byte PSBT_OUT_DNSSEC_PROOF = 0x35;
     public static final byte PSBT_OUT_PROPRIETARY = (byte)0xfc;
 
@@ -40,6 +42,7 @@ public class PSBTOutput {
     //PSBTv2 fields
     private Long amount;
     private Script script;
+    private SilentPaymentAddress silentPaymentAddress;
 
     private static final Logger log = LoggerFactory.getLogger(PSBTOutput.class);
 
@@ -52,7 +55,7 @@ public class PSBTOutput {
     }
 
     PSBTOutput(PSBT psbt, int index, ScriptType scriptType, Script redeemScript, Script witnessScript, Map<ECKey, KeyDerivation> derivedPublicKeys,
-               Map<String, String> proprietary, ECKey tapInternalKey, Map<String, byte[]> dnssecProof) {
+               Map<String, String> proprietary, ECKey tapInternalKey, SilentPaymentAddress silentPaymentAddress, Map<String, byte[]> dnssecProof) {
         this(psbt, index);
 
         this.redeemScript = redeemScript;
@@ -71,6 +74,7 @@ public class PSBTOutput {
             tapDerivedPublicKeys.put(this.tapInternalKey, Map.of(tapKeyDerivation, Collections.emptyList()));
         }
 
+        this.silentPaymentAddress = silentPaymentAddress;
         this.dnssecProof = dnssecProof;
     }
 
@@ -130,6 +134,16 @@ public class PSBTOutput {
                         }
                     }
                     break;
+                case PSBT_OUT_SP_V0_INFO:
+                    entry.checkOneByteKey();
+                    if(entry.getData().length != 66) {
+                        throw new PSBTParseException("PSBT output info data for silent payments address must contain 66 bytes");
+                    }
+                    byte[] scanKey = new byte[33];
+                    System.arraycopy(entry.getData(), 0, scanKey, 0, 33);
+                    byte[] spendKey = new byte[33];
+                    System.arraycopy(entry.getData(), 33, spendKey, 0, 33);
+                    this.silentPaymentAddress = new SilentPaymentAddress(ECKey.fromPublicOnly(scanKey), ECKey.fromPublicOnly(spendKey));
                 case PSBT_OUT_DNSSEC_PROOF:
                     entry.checkOneByteKey();
                     this.dnssecProof = parseDnssecProof(entry.getData());
@@ -163,6 +177,9 @@ public class PSBTOutput {
             }
             if(script != null) {
                 entries.add(populateEntry(PSBT_OUT_SCRIPT, null, script.getProgram()));
+            }
+            if(silentPaymentAddress != null) {
+                entries.add(populateEntry(PSBT_OUT_SP_V0_INFO, null, Utils.concat(silentPaymentAddress.getScanKey().getPubKey(), silentPaymentAddress.getSpendKey().getPubKey())));
             }
         }
 
@@ -289,6 +306,14 @@ public class PSBTOutput {
 
     public void setTapInternalKey(ECKey tapInternalKey) {
         this.tapInternalKey = tapInternalKey;
+    }
+
+    public SilentPaymentAddress getSilentPaymentAddress() {
+        return silentPaymentAddress;
+    }
+
+    public void setSilentPaymentAddress(SilentPaymentAddress silentPaymentAddress) {
+        this.silentPaymentAddress = silentPaymentAddress;
     }
 
     public Map<String, byte[]> getDnssecProof() {

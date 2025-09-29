@@ -1,6 +1,5 @@
 package com.sparrowwallet.drongo.silentpayments;
 
-import com.sparrowwallet.drongo.Utils;
 import com.sparrowwallet.drongo.address.Address;
 import com.sparrowwallet.drongo.address.P2TRAddress;
 import com.sparrowwallet.drongo.protocol.ScriptType;
@@ -14,15 +13,32 @@ public class SilentPayment extends Payment {
     private final SilentPaymentAddress silentPaymentAddress;
 
     public SilentPayment(SilentPaymentAddress silentPaymentAddress, String label, long amount, boolean sendMax) {
-        super(getDummyAddress(), label, amount, sendMax);
+        this(silentPaymentAddress, getDummyAddress(), label, amount, sendMax);
+    }
+
+    public SilentPayment(SilentPaymentAddress silentPaymentAddress, Address address, String label, long amount, boolean sendMax) {
+        super(address == null ? getDummyAddress() : address, label, amount, sendMax, Type.DEFAULT);
         this.silentPaymentAddress = silentPaymentAddress;
     }
 
     public static Address getDummyAddress() {
-        return new P2TRAddress(Utils.hexToBytes("0000000000000000000000000000000000000000000000000000000000000000"));
+        return new P2TRAddress(new byte[32]);
+    }
+
+    public boolean isAddressComputed() {
+        return !getAddress().equals(getDummyAddress());
     }
 
     public SilentPaymentAddress getSilentPaymentAddress() {
         return silentPaymentAddress;
+    }
+
+    @Override
+    public String getDisplayAddress() {
+        if(!isAddressComputed()) {
+            return silentPaymentAddress.toAbbreviatedString();
+        }
+
+        return super.getDisplayAddress();
     }
 }

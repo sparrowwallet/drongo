@@ -3,7 +3,6 @@ package com.sparrowwallet.drongo.silentpayments;
 import com.sparrowwallet.drongo.Utils;
 import com.sparrowwallet.drongo.crypto.ECKey;
 import com.sparrowwallet.drongo.protocol.*;
-import com.sparrowwallet.drongo.wallet.BlockTransactionHashIndex;
 import com.sparrowwallet.drongo.wallet.MnemonicException;
 import com.sparrowwallet.drongo.wallet.WalletNode;
 import org.bitcoin.NativeSecp256k1;
@@ -191,7 +190,7 @@ public class SilentPaymentUtils {
         return null;
     }
 
-    public static void updateSilentPayments(List<SilentPayment> silentPayments, Map<BlockTransactionHashIndex, WalletNode> utxos) {
+    public static void computeOutputAddresses(List<SilentPayment> silentPayments, Map<HashIndex, WalletNode> utxos) throws InvalidSilentPaymentException {
         ECKey summedPrivateKey = getSummedPrivateKey(utxos.values());
         BigInteger inputHash = getInputHash(utxos.keySet(), summedPrivateKey);
         Map<ECKey, List<SilentPayment>> scanKeyGroups = getScanKeyGroups(silentPayments);
@@ -203,7 +202,7 @@ public class SilentPaymentUtils {
                 BigInteger tk = new BigInteger(1, Utils.taggedHash(BIP_0352_SHARED_SECRET_TAG,
                         Utils.concat(sharedSecret.getPubKey(), ByteBuffer.allocate(4).order(ByteOrder.BIG_ENDIAN).putInt(k).array())));
                 if(tk.equals(BigInteger.ZERO) || tk.compareTo(ECKey.CURVE.getCurve().getOrder()) >= 0) {
-                    throw new IllegalArgumentException("The tk value is invalid for the eligible silent payments inputs");
+                    throw new InvalidSilentPaymentException("The tk value is invalid for the eligible silent payments inputs");
                 }
                 ECKey spendKey = silentPayment.getSilentPaymentAddress().getSpendKey();
                 ECKey pkm = spendKey.add(ECKey.fromPublicOnly(ECKey.publicPointFromPrivate(tk).getEncoded(true)), true);
@@ -224,18 +223,18 @@ public class SilentPaymentUtils {
         return scanKeyGroups;
     }
 
-    public static BigInteger getInputHash(Set<BlockTransactionHashIndex> outpoints, ECKey summedPrivateKey) {
+    public static BigInteger getInputHash(Set<HashIndex> outpoints, ECKey summedPrivateKey) throws InvalidSilentPaymentException {
         byte[] smallestOutpoint = getSmallestOutpoint(outpoints);
         byte[] concat = Utils.concat(smallestOutpoint, summedPrivateKey.getPubKey());
         BigInteger inputHash = new BigInteger(1, Utils.taggedHash(BIP_0352_INPUTS_TAG, concat));
         if(inputHash.equals(BigInteger.ZERO) || inputHash.compareTo(ECKey.CURVE.getCurve().getOrder()) >= 0) {
-            throw new IllegalArgumentException("The input hash is invalid for the eligible silent payments inputs");
+            throw new InvalidSilentPaymentException("The input hash is invalid for the eligible silent payments inputs");
         }
 
         return inputHash;
     }
 
-    public static ECKey getSummedPrivateKey(Collection<WalletNode> walletNodes) {
+    public static ECKey getSummedPrivateKey(Collection<WalletNode> walletNodes) throws InvalidSilentPaymentException {
         ECKey summedPrivateKey = null;
         for(WalletNode walletNode : walletNodes) {
             if(!walletNode.getWallet().canSendSilentPayments()) {
@@ -243,8 +242,8 @@ public class SilentPaymentUtils {
             }
 
             try {
-                ECKey privateKey = walletNode.getWallet().getKeystores().getFirst().getKey(walletNode);
-                if(walletNode.getWallet().getScriptType() == P2TR && !privateKey.getPubKeyPoint().getYCoord().toBigInteger().mod(BigInteger.TWO).equals(BigInteger.ZERO)) {
+                ECKey privateKey = walletNode.getWallet().getScriptType().getOutputKey(walletNode.getWallet().getKeystores().getFirst().getKey(walletNode));
+                if(walletNode.getWallet().getScriptType() == P2TR && !privateKey.getPubKeyPoint().normalize().getYCoord().toBigInteger().mod(BigInteger.TWO).equals(BigInteger.ZERO)) {
                     privateKey = privateKey.negatePrivate();
                 }
                 if(summedPrivateKey == null) {
@@ -253,22 +252,22 @@ public class SilentPaymentUtils {
                     summedPrivateKey = summedPrivateKey.addPrivate(privateKey);
                 }
             } catch(MnemonicException e) {
-                throw new IllegalArgumentException("Invalid wallet mnemonic for sending silent payment", e);
+                throw new InvalidSilentPaymentException("Invalid wallet mnemonic for sending silent payment", e);
             }
         }
 
         if(summedPrivateKey == null) {
-            throw new IllegalArgumentException("There are no eligible inputs to derive a silent payments shared secret");
+            throw new InvalidSilentPaymentException("There are no eligible inputs to derive a silent payments shared secret");
         }
 
         if(summedPrivateKey.getPrivKey().equals(BigInteger.ZERO)) {
-            throw new IllegalArgumentException("The summed private key is zero for the eligible silent payments inputs");
+            throw new InvalidSilentPaymentException("The summed private key is zero for the eligible silent payments inputs");
         }
 
         return summedPrivateKey;
     }
 
-    public static byte[] getSmallestOutpoint(Set<BlockTransactionHashIndex> outpoints) {
+    public static byte[] getSmallestOutpoint(Set<HashIndex> outpoints) {
         return outpoints.stream().map(outpoint -> new TransactionOutPoint(outpoint.getHash(), outpoint.getIndex())).map(TransactionOutPoint::bitcoinSerialize)
                 .min(new Utils.LexicographicByteArrayComparator()).orElseThrow(() -> new IllegalArgumentException("No inputs provided to calculate silent payments input hash"));
     }
