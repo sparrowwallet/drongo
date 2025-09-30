@@ -7,7 +7,6 @@ import com.sparrowwallet.drongo.address.Address;
 import com.sparrowwallet.drongo.silentpayments.SilentPayment;
 import com.sparrowwallet.drongo.silentpayments.SilentPaymentAddress;
 import com.sparrowwallet.drongo.wallet.Payment;
-import org.jspecify.annotations.NonNull;
 
 import java.util.concurrent.TimeUnit;
 
@@ -15,19 +14,19 @@ public class DnsPaymentCache {
     public static final long MAX_TTL_SECONDS = 604800L;
     public static final long MIN_TTL_SECONDS = 1800L;
 
-    private static final Cache<@NonNull DnsAddress, @NonNull DnsPayment> dnsPayments = Caffeine.newBuilder().expireAfter(new Expiry<@NonNull DnsAddress, @NonNull DnsPayment>() {
+    private static final Cache<DnsAddress, DnsPayment> dnsPayments = Caffeine.newBuilder().expireAfter(new Expiry<DnsAddress, DnsPayment>() {
         @Override
-        public long expireAfterCreate(@NonNull DnsAddress address, @NonNull DnsPayment dnsPayment, long currentTime) {
+        public long expireAfterCreate(DnsAddress address, DnsPayment dnsPayment, long currentTime) {
             return TimeUnit.SECONDS.toNanos(Math.max(dnsPayment.getTTL(), MIN_TTL_SECONDS));
         }
 
         @Override
-        public long expireAfterUpdate(@NonNull DnsAddress address, @NonNull DnsPayment dnsPayment, long currentTime, long currentDuration) {
+        public long expireAfterUpdate(DnsAddress address, DnsPayment dnsPayment, long currentTime, long currentDuration) {
             return expireAfterCreate(address, dnsPayment, currentTime);
         }
 
         @Override
-        public long expireAfterRead(@NonNull DnsAddress address, @NonNull DnsPayment dnsPayment, long currentTime, long currentDuration) {
+        public long expireAfterRead(DnsAddress address, DnsPayment dnsPayment, long currentTime, long currentDuration) {
             return currentDuration;
         }
     }).build();
