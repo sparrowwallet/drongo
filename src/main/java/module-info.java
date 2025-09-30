@@ -8,7 +8,7 @@ open module com.sparrowwallet.drongo {
     requires ch.qos.logback.classic;
     requires org.dnsjava;
     requires com.github.benmanes.caffeine;
-    requires org.checkerframework.checker.qual;
+    requires org.jspecify;
     exports com.sparrowwallet.drongo;
     exports com.sparrowwallet.drongo.psbt;
     exports com.sparrowwallet.drongo.protocol;

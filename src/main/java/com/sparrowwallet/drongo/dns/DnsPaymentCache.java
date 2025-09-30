@@ -7,8 +7,7 @@ import com.sparrowwallet.drongo.address.Address;
 import com.sparrowwallet.drongo.silentpayments.SilentPayment;
 import com.sparrowwallet.drongo.silentpayments.SilentPaymentAddress;
 import com.sparrowwallet.drongo.wallet.Payment;
-import org.checkerframework.checker.index.qual.NonNegative;
-import org.checkerframework.checker.nullness.qual.NonNull;
+import org.jspecify.annotations.NonNull;
 
 import java.util.concurrent.TimeUnit;
 
@@ -23,12 +22,12 @@ public class DnsPaymentCache {
         }
 
         @Override
-        public long expireAfterUpdate(@NonNull DnsAddress address, @NonNull DnsPayment dnsPayment, long currentTime, @NonNegative long currentDuration) {
+        public long expireAfterUpdate(@NonNull DnsAddress address, @NonNull DnsPayment dnsPayment, long currentTime, long currentDuration) {
             return expireAfterCreate(address, dnsPayment, currentTime);
         }
 
         @Override
-        public long expireAfterRead(@NonNull DnsAddress address, @NonNull DnsPayment dnsPayment, long currentTime, @NonNegative long currentDuration) {
+        public long expireAfterRead(@NonNull DnsAddress address, @NonNull DnsPayment dnsPayment, long currentTime, long currentDuration) {
             return currentDuration;
         }
     }).build();
