@@ -536,7 +536,7 @@ public class PSBTTest {
     public void testPSBTv2MissingOutputScript() throws PSBTParseException {
         String strPsbt = "cHNidP8BAgQCAAAAAQMEAAAAAAEEAQEBBQECAfsEAgAAAAABAFICAAAAAcGqJW4hS5ahgi+T3kK/87Xz/40FGTBuNRXXUVpegFsSAAAAAAD/////ARjGmjsAAAAAFgAUsKOvFEIIQSaTyn0WaFK1LbCu8G4AAAAAAQEfGMaaOwAAAAAWABSwo68UQghBJpPKfRZoUrUtsK7wbgEOIAsK2SFBnByHGXNdctxzn56p4GONH+TB7vD5lECEgV/IAQ8EAAAAAAEQBP7///8AIgIC1gH4SEamdV93a+AOPZ3o+xCsyTX7g8RfsBYtTK1at5IY9p2HPlQAAIABAACAAAAAgAAAAAAqAAAAAQMIAAivLwAAAAAAIgIC42+/9T3VNAcM+P05ZhRoDzV6m4Xbc0C/HPp0XSrXs0AY9p2HPlQAAIABAACAAAAAgAEAAABkAAAAAQMIi73rCwAAAAABBBYAFE3Rk6yWSlasG54cyoRU/i9HT4UTAA==";
         Exception e = Assertions.assertThrows(PSBTParseException.class, () -> PSBT.fromString(strPsbt));
-        Assertions.assertEquals("PSBT_OUT_SCRIPT is required in PSBTv2", e.getMessage());
+        Assertions.assertEquals("Either PSBT_OUT_SCRIPT or PSBT_OUT_SP_V0_INFO is required in PSBTv2", e.getMessage());
     }
 
     @Test
