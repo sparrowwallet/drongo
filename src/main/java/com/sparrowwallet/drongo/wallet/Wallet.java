@@ -1090,7 +1090,7 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
             for(int i = 1; i < numSets; i+=2) {
                 WalletNode mixNode = getFreshNode(getChangeKeyPurpose());
                 txExcludedChangeNodes.add(mixNode);
-                Payment fakeMixPayment = new Payment(mixNode.getAddress(), ".." + mixNode + " (Fake Mix)", totalPaymentAmount, false);
+                Payment fakeMixPayment = new WalletNodePayment(mixNode, ".." + mixNode + " (Fake Mix)", totalPaymentAmount, false);
                 fakeMixPayment.setType(Payment.Type.FAKE_MIX);
                 txPayments.add(fakeMixPayment);
             }
@@ -1100,6 +1100,9 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
                 if(payment instanceof SilentPayment silentPayment) {
                     TransactionOutput output = transaction.addOutput(payment.getAmount(), new Script(new byte[0]));
                     outputs.add(new WalletTransaction.SilentPaymentOutput(output, silentPayment));
+                } else if(payment instanceof WalletNodePayment walletNodePayment) {
+                    TransactionOutput output = transaction.addOutput(payment.getAmount(), payment.getAddress());
+                    outputs.add(new WalletTransaction.ConsolidationOutput(output, walletNodePayment, payment.getAmount()));
                 } else {
                     TransactionOutput output = transaction.addOutput(payment.getAmount(), payment.getAddress());
                     outputs.add(new WalletTransaction.PaymentOutput(output, payment));

@@ -25,8 +25,6 @@ public class WalletTransaction {
     private final Map<Sha256Hash, BlockTransaction> inputTransactions;
     private final List<Output> outputs;
 
-    private Map<Wallet, Map<Address, WalletNode>> addressNodeMap = new HashMap<>();
-
     public WalletTransaction(Wallet wallet, Transaction transaction, List<UtxoSelector> utxoSelectors, List<Map<BlockTransactionHashIndex, WalletNode>> selectedUtxoSets, List<Payment> payments, List<Output> outputs, long fee) {
         this(wallet, transaction, utxoSelectors, selectedUtxoSets, payments, outputs, Collections.emptyMap(), fee);
     }
@@ -137,10 +135,6 @@ public class WalletTransaction {
         return !utxoSelectors.isEmpty() && utxoSelectors.get(0) instanceof StonewallUtxoSelector;
     }
 
-    public boolean isConsolidationSend(Payment payment) {
-        return isWalletSend(getWallet(), payment);
-    }
-
     public boolean isPremixSend(Payment payment) {
         return isWalletSend(StandardAccount.WHIRLPOOL_PREMIX, payment);
     }
@@ -167,7 +161,7 @@ public class WalletTransaction {
             return false;
         }
 
-        return getAddressNodeMap(wallet).get(payment.getAddress()) != null;
+        return wallet.getWalletAddresses().get(payment.getAddress()) != null;
     }
 
     private String getOutputLabel(Payment payment) {
@@ -212,35 +206,12 @@ public class WalletTransaction {
                 .anyMatch(p -> payment.getAddress() != null && payment.getAddress().equals(p.getAddress()));
     }
 
-    public void updateAddressNodeMap(Map<Wallet, Map<Address, WalletNode>> addressNodeMap, Wallet wallet) {
-        this.addressNodeMap = addressNodeMap;
-        getAddressNodeMap(wallet);
+    public List<Payment> getExternalPayments() {
+        return payments.stream().filter(payment -> !(payment instanceof WalletNodePayment)).collect(Collectors.toList());
     }
 
-    public Map<Address, WalletNode> getAddressNodeMap() {
-        return getAddressNodeMap(getWallet());
-    }
-
-    public Map<Address, WalletNode> getAddressNodeMap(Wallet wallet) {
-        Map<Address, WalletNode> walletAddresses = null;
-
-        Map<Address, WalletNode> walletAddressNodeMap = addressNodeMap.computeIfAbsent(wallet, w -> new LinkedHashMap<>());
-        for(Payment payment : payments) {
-            if(walletAddressNodeMap.containsKey(payment.getAddress())) {
-                continue;
-            }
-
-            if(payment.getAddress() != null && wallet != null) {
-                if(walletAddresses == null) {
-                    walletAddresses = wallet.getWalletAddresses();
-                }
-
-                WalletNode walletNode = walletAddresses.get(payment.getAddress());
-                walletAddressNodeMap.put(payment.getAddress(), walletNode);
-            }
-        }
-
-        return walletAddressNodeMap;
+    public List<WalletNodePayment> getWalletNodePayments() {
+        return payments.stream().filter(payment -> payment instanceof WalletNodePayment).map(payment -> (WalletNodePayment)payment).collect(Collectors.toList());
     }
 
     public static class Output {
@@ -301,11 +272,11 @@ public class WalletTransaction {
         }
     }
 
-    public static class ChangeOutput extends Output {
+    public static class WalletNodeOutput extends Output {
         private final WalletNode walletNode;
         private final Long value;
 
-        public ChangeOutput(TransactionOutput transactionOutput, WalletNode walletNode, Long value) {
+        public WalletNodeOutput(TransactionOutput transactionOutput, WalletNode walletNode, Long value) {
             super(transactionOutput);
             this.walletNode = walletNode;
             this.value = value;
@@ -317,6 +288,25 @@ public class WalletTransaction {
 
         public Long getValue() {
             return value;
+        }
+    }
+
+    public static class ConsolidationOutput extends WalletNodeOutput {
+        private final WalletNodePayment walletNodePayment;
+
+        public ConsolidationOutput(TransactionOutput transactionOutput, WalletNodePayment walletNodePayment, Long value) {
+            super(transactionOutput, walletNodePayment.getWalletNode(), value);
+            this.walletNodePayment = walletNodePayment;
+        }
+
+        public WalletNodePayment getWalletNodePayment() {
+            return walletNodePayment;
+        }
+    }
+
+    public static class ChangeOutput extends WalletNodeOutput {
+        public ChangeOutput(TransactionOutput transactionOutput, WalletNode walletNode, Long value) {
+            super(transactionOutput, walletNode, value);
         }
     }
 }

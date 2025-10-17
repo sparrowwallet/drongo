@@ -155,8 +155,8 @@ public class PSBT {
                 psbtOutput = new PSBTOutput(this, outputIndex, null, null, null, Collections.emptyMap(), Collections.emptyMap(), null, silentPaymentOutput.getSilentPayment().getSilentPaymentAddress(), silentPaymentOutput.getDnsSecProof());
             } else if(output instanceof WalletTransaction.PaymentOutput paymentOutput) {
                 psbtOutput = new PSBTOutput(this, outputIndex, null, null, null, Collections.emptyMap(), Collections.emptyMap(), null, null, paymentOutput.getDnsSecProof());
-            } else if(output instanceof WalletTransaction.ChangeOutput changeOutput) {
-                WalletNode outputNode = changeOutput.getWalletNode();
+            } else if(output instanceof WalletTransaction.WalletNodeOutput walletNodeOutput) {
+                WalletNode outputNode = walletNodeOutput.getWalletNode();
                 TransactionOutput txOutput = transaction.getOutputs().get(outputIndex);
                 Wallet recipientWallet = outputNode.getWallet();
 
