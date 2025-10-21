@@ -1118,8 +1118,11 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
             double noChangeVSize = transaction.getVirtualSize();
             long noChangeFeeRequiredAmt = (fee == null ? (long)Math.floor(feeRate * noChangeVSize) : fee);
 
-            //Add 1 satoshi to accommodate longer signatures when feeRate equals default min relay fee to ensure fee is sufficient
-            noChangeFeeRequiredAmt = (fee == null && feeRate == minRelayFeeRate && minRelayFeeRate > 0d ? noChangeFeeRequiredAmt + 1 : noChangeFeeRequiredAmt);
+            //Add 1 satoshi to accommodate longer signatures when feeRate equals the current or common min relay fee to ensure fee is sufficient for maximum "relayability"
+            boolean isMinRelayRate = ((feeRate == minRelayFeeRate && minRelayFeeRate > 0d) || feeRate == Transaction.DEFAULT_MIN_RELAY_FEE) && fee == null;
+            if(isMinRelayRate) {
+                noChangeFeeRequiredAmt++;
+            }
 
             //If sending all selected utxos, set the recipient amount to equal to total of those utxos less the no change fee
             long maxSendAmt = totalSelectedAmt - noChangeFeeRequiredAmt;
@@ -1162,7 +1165,9 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
                 TransactionOutput changeOutput = new TransactionOutput(transaction, setChangeAmts.iterator().next(), changeNode.getOutputScript());
                 double changeVSize = noChangeVSize + changeOutput.getLength() * numSets;
                 long changeFeeRequiredAmt = (fee == null ? (long)Math.floor(feeRate * changeVSize) : fee);
-                changeFeeRequiredAmt = (fee == null && feeRate == minRelayFeeRate && minRelayFeeRate > 0d ? changeFeeRequiredAmt + 1 : changeFeeRequiredAmt);
+                if(isMinRelayRate) {
+                    changeFeeRequiredAmt++;
+                }
                 while(changeFeeRequiredAmt % numSets > 0) {
                     changeFeeRequiredAmt++;
                 }
