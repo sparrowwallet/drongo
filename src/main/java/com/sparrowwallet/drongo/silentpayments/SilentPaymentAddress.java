@@ -5,9 +5,12 @@ import com.sparrowwallet.drongo.Utils;
 import com.sparrowwallet.drongo.crypto.ECKey;
 import com.sparrowwallet.drongo.protocol.Bech32;
 
+import java.nio.ByteBuffer;
 import java.util.Arrays;
 
 public class SilentPaymentAddress {
+    public static final int VERSION = 0;
+
     private final ECKey scanAddress;
     private final ECKey spendAddress;
 
@@ -26,7 +29,7 @@ public class SilentPaymentAddress {
 
     public String getAddress() {
         byte[] keys = Utils.concat(scanAddress.getPubKey(), spendAddress.getPubKey());
-        return Bech32.encode(Network.get().getSilentPaymentsAddressHrp(), 0, Bech32.Encoding.BECH32M, keys);
+        return Bech32.encode(Network.get().getSilentPaymentsAddressHrp(), VERSION, Bech32.Encoding.BECH32M, keys);
     }
 
     public static SilentPaymentAddress from(String address) {
@@ -40,7 +43,7 @@ public class SilentPaymentAddress {
         }
 
         int witnessVersion = data.data[0];
-        if(witnessVersion != 0) {
+        if(witnessVersion != VERSION) {
             throw new UnsupportedOperationException("Unsupported silent payments address witness version");
         }
 
@@ -82,5 +85,13 @@ public class SilentPaymentAddress {
     @Override
     public int hashCode() {
         return getAddress().hashCode();
+    }
+
+    public byte[] serialize() {
+        ByteBuffer buffer = ByteBuffer.allocate(67);
+        buffer.put((byte)VERSION);
+        buffer.put(scanAddress.getPubKey());
+        buffer.put(spendAddress.getPubKey());
+        return buffer.array();
     }
 }

@@ -10,10 +10,7 @@ import java.io.ByteArrayOutputStream;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 public class PSBTEntry {
     private final byte[] key;
@@ -80,6 +77,9 @@ public class PSBTEntry {
     }
 
     public static KeyDerivation parseKeyDerivation(byte[] data) throws PSBTParseException {
+        if(data.length == 0) {
+            return new KeyDerivation(KeyDerivation.DEFAULT_WATCH_ONLY_FINGERPRINT, Collections.emptyList());
+        }
         if(data.length < 4) {
             throw new PSBTParseException("Invalid master fingerprint specified: not enough bytes");
         }

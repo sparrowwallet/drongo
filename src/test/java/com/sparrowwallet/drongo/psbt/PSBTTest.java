@@ -11,6 +11,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -718,8 +719,194 @@ public class PSBTTest {
         Assertions.assertEquals(origPsbtv2.getTransaction().getTxId(), psbtv0.getTransaction().getTxId());
     }
 
+    // BIP-375 Silent Payments Tests
+
+    @Test
+    public void invalidMissingDleqProof() throws PSBTParseException {
+        String psbt = "cHNidP8B+wQCAAAAAQIEAgAAAAEEBAEAAAABBQQBAAAAAQYBAwABDiCrtYht20vGCALx8ZiisSkDZZzJ7nPgIx1FVehBiNyWQAEPBAAAAAABAR+ghgEAAAAAABYAFPja92rYA7DvqV1s/4ruCJHTrxyMARAE/v///yIGA9NX98BxjyR44/2PjMwnKd3YwMyusfArGBpvRNQ7n42NACIdAtAp/5beLLz3gr5DWcSGIOqSvN1r7wMrlRWLkaFpP7T4IQJVFk55JtUNUqCf+ZBkel6Vwdsb/GimFvvC2iE5J/mL/wEDBAEAAAAAAQMIGHMBAAAAAAABBCJRIBe7uqUS4DD7yj7lFPeyOAfhEYMaR0VEcJE0yfm/RrbEAQlCAtAp/5beLLz3gr5DWcSGIOqSvN1r7wMrlRWLkaFpP7T4Ak1Rg1P0vRjXac9o/2LvEGabcIYkawpkA/5XveSSEUSLAA==";
+        PSBT parsed = PSBT.fromString(psbt);
+
+        Map<TransactionInput, ECKey> inputPublicKeys = new LinkedHashMap<>();
+        TransactionInput input0 = parsed.getTransaction().getInputs().get(0);
+        ECKey pubKey0 = ECKey.fromPublicOnly(Hex.decode("03d357f7c0718f2478e3fd8f8ccc2729ddd8c0ccaeb1f02b181a6f44d43b9f8d8d"));
+        inputPublicKeys.put(input0, pubKey0);
+
+        Assertions.assertThrows(PSBTProofException.class, () -> parsed.validateSilentPayments(inputPublicKeys));
+    }
+
+    @Test
+    public void invalidDleqProof() throws PSBTParseException {
+        String psbt = "cHNidP8B+wQCAAAAAQIEAgAAAAEEBAEAAAABBQQBAAAAAQYBAwABDiBJpgB4JAmRsNt6srOq9JqFCEYGmw7mPo8/4lJ2+/nPoAEPBAAAAAABAR+ghgEAAAAAABYAFPja92rYA7DvqV1s/4ruCJHTrxyMARAE/v///yIGA9NX98BxjyR44/2PjMwnKd3YwMyusfArGBpvRNQ7n42NACIdAtAp/5beLLz3gr5DWcSGIOqSvN1r7wMrlRWLkaFpP7T4IQJVFk55JtUNUqCf+ZBkel6Vwdsb/GimFvvC2iE5J/mL/yIeAtAp/5beLLz3gr5DWcSGIOqSvN1r7wMrlRWLkaFpP7T4QIHV1pvvebv/E/qjiAN4whI/xJQnstvRxMFrJvVYN5hmLW7l6QbgreDug7YKivXVjkDvnwa9fLacXS3HUTu7/mEBAwQBAAAAAAEDCBhzAQAAAAAAAQQiUSCy5HLRM5RYz18oPOTQydTDNj9R1Kn1KSQfhJ3O1Ft10AEJQgLQKf+W3iy894K+Q1nEhiDqkrzda+8DK5UVi5GhaT+0+AJNUYNT9L0Y12nPaP9i7xBmm3CGJGsKZAP+V73kkhFEiwA=";
+        PSBT parsed = PSBT.fromString(psbt);
+
+        Map<TransactionInput, ECKey> inputPublicKeys = new LinkedHashMap<>();
+        TransactionInput input0 = parsed.getTransaction().getInputs().get(0);
+        ECKey pubKey0 = ECKey.fromPublicOnly(Hex.decode("03d357f7c0718f2478e3fd8f8ccc2729ddd8c0ccaeb1f02b181a6f44d43b9f8d8d"));
+        inputPublicKeys.put(input0, pubKey0);
+
+        Assertions.assertThrows(PSBTProofException.class, () -> parsed.validateSilentPayments(inputPublicKeys));
+    }
+
+    @Test
+    public void invalidNonSighashAll() throws PSBTParseException {
+        String psbt = "cHNidP8B+wQCAAAAAQIEAgAAAAEEBAEAAAABBQQBAAAAAQYBAwABDiCfF8iU72tyS4+7lJj0TTc8KFCARRz/QDHgOTLIuPm2twEPBAAAAAABAR+ghgEAAAAAABYAFPja92rYA7DvqV1s/4ruCJHTrxyMARAE/v///yIGA9NX98BxjyR44/2PjMwnKd3YwMyusfArGBpvRNQ7n42NAAEDBAIAAAAiHQLQKf+W3iy894K+Q1nEhiDqkrzda+8DK5UVi5GhaT+0+CECVRZOeSbVDVKgn/mQZHpelcHbG/xophb7wtohOSf5i/8iHgLQKf+W3iy894K+Q1nEhiDqkrzda+8DK5UVi5GhaT+0+EB82fZvBIlT42he3KPxdpkVJZi87KRvIU7SuM39pJ22oAePiUtm39mKZwbmhzrySfXfZOzJhETpE3KXfZb62CtDAAEDCBhzAQAAAAAAAQQiUSB0TgmVHxe1gkg8egwIwGJv6sNmaTyE+vOeA0thLejccQEJQgLQKf+W3iy894K+Q1nEhiDqkrzda+8DK5UVi5GhaT+0+AJNUYNT9L0Y12nPaP9i7xBmm3CGJGsKZAP+V73kkhFEiwA=";
+        PSBT parsed = PSBT.fromString(psbt);
+
+        Map<TransactionInput, ECKey> inputPublicKeys = new LinkedHashMap<>();
+        TransactionInput input0 = parsed.getTransaction().getInputs().get(0);
+        ECKey pubKey0 = ECKey.fromPublicOnly(Hex.decode("03d357f7c0718f2478e3fd8f8ccc2729ddd8c0ccaeb1f02b181a6f44d43b9f8d8d"));
+        inputPublicKeys.put(input0, pubKey0);
+
+        Assertions.assertThrows(PSBTProofException.class, () -> parsed.validateSilentPayments(inputPublicKeys));
+    }
+
+    @Test
+    public void invalidMixedSegwitVersions() {
+        String psbt = "cHNidP8B+wQCAAAAAQIEAgAAAAEEBAEAAAABBQQBAAAAAQYBAwABDiCuv6p7LnQnsTi6F7UesBJ3TJOXBoHuPhb2Y3hjUklAJAEPBAAAAAABASughgEAAAAAACJSIIYiz2yIzTx5hSOFG+T1WYNgEYY+sDBYObtzXueh9KPpARAE/v///yIGA9NX98BxjyR44/2PjMwnKd3YwMyusfArGBpvRNQ7n42NAAEDBAEAAAAiHQLQKf+W3iy894K+Q1nEhiDqkrzda+8DK5UVi5GhaT+0+CECVRZOeSbVDVKgn/mQZHpelcHbG/xophb7wtohOSf5i/8iHgLQKf+W3iy894K+Q1nEhiDqkrzda+8DK5UVi5GhaT+0+EDB1n84eIK/gXkV6hWCHWTVs4NcH8BcVYzj2CSSoX2QjBBIfbub3cEIDIwtnBlxsmYIPGkFTiIZPyRBKKxmc35gAAEDCBhzAQAAAAAAAQQiUSAhnr95bXw7ml6Di0tr4pd8dOuNav5vT1iABrPWw2HrfAEJQgLQKf+W3iy894K+Q1nEhiDqkrzda+8DK5UVi5GhaT+0+AJNUYNT9L0Y12nPaP9i7xBmm3CGJGsKZAP+V73kkhFEiwA=";
+        Assertions.assertThrows(PSBTParseException.class, () -> PSBT.fromString(psbt));
+    }
+
+    @Test
+    public void invalidNoEcdhShares() throws PSBTParseException {
+        String psbt = "cHNidP8B+wQCAAAAAQIEAgAAAAEEBAEAAAABBQQBAAAAAQYBAwABDiAkKwMCMdEgYFJ2eRmpLxfpzUNydadt47rD+2VnyyekwwEPBAAAAAABAR+ghgEAAAAAABYAFPja92rYA7DvqV1s/4ruCJHTrxyMARAE/v///yIGA9NX98BxjyR44/2PjMwnKd3YwMyusfArGBpvRNQ7n42NAAEDBAEAAAAAAQMIGHMBAAAAAAABBCJRIATj08VSBMBgg9/eWjaW0ZzOJ28erl5eCzDe6FqZrylWAQlCAtAp/5beLLz3gr5DWcSGIOqSvN1r7wMrlRWLkaFpP7T4Ak1Rg1P0vRjXac9o/2LvEGabcIYkawpkA/5XveSSEUSLAA==";
+        PSBT parsed = PSBT.fromString(psbt);
+
+        Map<TransactionInput, ECKey> inputPublicKeys = new LinkedHashMap<>();
+        TransactionInput input0 = parsed.getTransaction().getInputs().get(0);
+        ECKey pubKey0 = ECKey.fromPublicOnly(Hex.decode("03d357f7c0718f2478e3fd8f8ccc2729ddd8c0ccaeb1f02b181a6f44d43b9f8d8d"));
+        inputPublicKeys.put(input0, pubKey0);
+
+        Assertions.assertThrows(PSBTProofException.class, () -> parsed.validateSilentPayments(inputPublicKeys));
+    }
+
+    @Test
+    public void invalidGlobalEcdhShareWithoutDleq() throws PSBTParseException {
+        String psbt = "cHNidP8B+wQCAAAAAQIEAgAAAAEEBAEAAAABBQQBAAAAAQYBAyIHAtAp/5beLLz3gr5DWcSGIOqSvN1r7wMrlRWLkaFpP7T4IQJVFk55JtUNUqCf+ZBkel6Vwdsb/GimFvvC2iE5J/mL/wABDiD2W3/BmfoPsrzNsfoGEte1D2K0+PqV1WXEoB9MWC6SpAEPBAAAAAABAR+ghgEAAAAAABYAFPja92rYA7DvqV1s/4ruCJHTrxyMARAE/v///yIGA9NX98BxjyR44/2PjMwnKd3YwMyusfArGBpvRNQ7n42NAAEDBAEAAAAAAQMIGHMBAAAAAAABBCJRIIEAAjnkcLtSN9n6vrAZ4nmPxFcueck5C10dXjYbt+AgAQlCAtAp/5beLLz3gr5DWcSGIOqSvN1r7wMrlRWLkaFpP7T4Ak1Rg1P0vRjXac9o/2LvEGabcIYkawpkA/5XveSSEUSLAA==";
+        PSBT parsed = PSBT.fromString(psbt);
+
+        Map<TransactionInput, ECKey> inputPublicKeys = new LinkedHashMap<>();
+        TransactionInput input0 = parsed.getTransaction().getInputs().get(0);
+        ECKey pubKey0 = ECKey.fromPublicOnly(Hex.decode("03d357f7c0718f2478e3fd8f8ccc2729ddd8c0ccaeb1f02b181a6f44d43b9f8d8d"));
+        inputPublicKeys.put(input0, pubKey0);
+
+        Assertions.assertThrows(PSBTProofException.class, () -> parsed.validateSilentPayments(inputPublicKeys));
+    }
+
+    @Test
+    public void invalidWrongSpV0InfoSize() {
+        String psbt = "cHNidP8B+wQCAAAAAQIEAgAAAAEEBAEAAAABBQQBAAAAAQYBAwABDiBhb07a0EqylXgp4bK5tBHX2y2Sc2xQAy4NalHiyZy13gEPBAAAAAABAR+ghgEAAAAAABYAFPja92rYA7DvqV1s/4ruCJHTrxyMARAE/v///yIGA9NX98BxjyR44/2PjMwnKd3YwMyusfArGBpvRNQ7n42NAAEDBAEAAAAiHQLQKf+W3iy894K+Q1nEhiDqkrzda+8DK5UVi5GhaT+0+CECVRZOeSbVDVKgn/mQZHpelcHbG/xophb7wtohOSf5i/8iHgLQKf+W3iy894K+Q1nEhiDqkrzda+8DK5UVi5GhaT+0+EDB1n84eIK/gXkV6hWCHWTVs4NcH8BcVYzj2CSSoX2QjBBIfbub3cEIDIwtnBlxsmYIPGkFTiIZPyRBKKxmc35gAAEDCBhzAQAAAAAAAQQiUSCrH00eEXl4YXYOd4rbbMFm+Wq2HdGvh5nmUfQVMiHskwEJQQLQKf+W3iy894K+Q1nEhiDqkrzda+8DK5UVi5GhaT+0+AJNUYNT9L0Y12nPaP9i7xBmm3CGJGsKZAP+V73kkhFEAA==";
+        Assertions.assertThrows(PSBTParseException.class, () -> PSBT.fromString(psbt));
+    }
+
+    @Test
+    public void invalidWrongEcdhShareSize() throws PSBTParseException {
+        String psbt = "cHNidP8B+wQCAAAAAQIEAgAAAAEEBAEAAAABBQQBAAAAAQYBAwABDiC1ovhHRrNOgzq0ftE7S5hwtBwhRvo0a3NKnEftiiROwwEPBAAAAAABAR+ghgEAAAAAABYAFPja92rYA7DvqV1s/4ruCJHTrxyMARAE/v///yIGA9NX98BxjyR44/2PjMwnKd3YwMyusfArGBpvRNQ7n42NAAEDBAEAAAAiHQLQKf+W3iy894K+Q1nEhiDqkrzda+8DK5UVi5GhaT+0+CACVRZOeSbVDVKgn/mQZHpelcHbG/xophb7wtohOSf5iwABAwgYcwEAAAAAAAEEIlEggDCSSC8mKdKdmFkQsILGjKIHwO1APY2HsBzp079x+AEBCUIC0Cn/lt4svPeCvkNZxIYg6pK83WvvAyuVFYuRoWk/tPgCTVGDU/S9GNdpz2j/Yu8QZptwhiRrCmQD/le95JIRRIsA";
+        Assertions.assertThrows(PSBTParseException.class, () -> PSBT.fromString(psbt));
+    }
+
+    @Test
+    public void invalidWrongDleqSize() throws PSBTParseException {
+        String psbt = "cHNidP8B+wQCAAAAAQIEAgAAAAEEBAEAAAABBQQBAAAAAQYBAwABDiA78BpakVw0yvjzRht09tYBDcMoUSAE43p653aHic5dEwEPBAAAAAABAR+ghgEAAAAAABYAFPja92rYA7DvqV1s/4ruCJHTrxyMARAE/v///yIGA9NX98BxjyR44/2PjMwnKd3YwMyusfArGBpvRNQ7n42NAAEDBAEAAAAiHQLQKf+W3iy894K+Q1nEhiDqkrzda+8DK5UVi5GhaT+0+CECVRZOeSbVDVKgn/mQZHpelcHbG/xophb7wtohOSf5i/8iHgLQKf+W3iy894K+Q1nEhiDqkrzda+8DK5UVi5GhaT+0+D8AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQMIGHMBAAAAAAABBCJRIO10/QbweN3s8W6gOiwTeFJjNgwtIQhX77ERqoAxaa37AQlCAtAp/5beLLz3gr5DWcSGIOqSvN1r7wMrlRWLkaFpP7T4Ak1Rg1P0vRjXac9o/2LvEGabcIYkawpkA/5XveSSEUSLAA==";
+        Assertions.assertThrows(PSBTParseException.class, () -> PSBT.fromString(psbt));
+    }
+
+    @Test
+    public void invalidAddressMismatch() throws PSBTParseException {
+        String psbt = "cHNidP8B+wQCAAAAAQIEAgAAAAEEBAEAAAABBQQBAAAAAQYBAwABDiBumss8ldbK7k1KciUCaeuPPQVy7U+E9Lf8M6mavj46BQEPBAAAAAABAR+ghgEAAAAAABYAFPja92rYA7DvqV1s/4ruCJHTrxyMARAE/v///yIGA9NX98BxjyR44/2PjMwnKd3YwMyusfArGBpvRNQ7n42NAAEDBAEAAAAiHQLQKf+W3iy894K+Q1nEhiDqkrzda+8DK5UVi5GhaT+0+CECVRZOeSbVDVKgn/mQZHpelcHbG/xophb7wtohOSf5i/8iHgLQKf+W3iy894K+Q1nEhiDqkrzda+8DK5UVi5GhaT+0+EDB1n84eIK/gXkV6hWCHWTVs4NcH8BcVYzj2CSSoX2QjBBIfbub3cEIDIwtnBlxsmYIPGkFTiIZPyRBKKxmc35gAAEDCBhzAQAAAAAAAQQiUSDN452LBbSW+PGPILJ9CvmjIzMJ4EciGeCBP/O103h+KQEJQgLQKf+W3iy894K+Q1nEhiDqkrzda+8DK5UVi5GhaT+0+AJNUYNT9L0Y12nPaP9i7xBmm3CGJGsKZAP+V73kkhFEiwA=";
+        PSBT parsed = PSBT.fromString(psbt);
+
+        Map<TransactionInput, ECKey> inputPublicKeys = new LinkedHashMap<>();
+        TransactionInput input0 = parsed.getTransaction().getInputs().get(0);
+        ECKey pubKey0 = ECKey.fromPublicOnly(Hex.decode("03d357f7c0718f2478e3fd8f8ccc2729ddd8c0ccaeb1f02b181a6f44d43b9f8d8d"));
+        inputPublicKeys.put(input0, pubKey0);
+
+        Assertions.assertThrows(PSBTProofException.class, () -> parsed.validateSilentPayments(inputPublicKeys));
+    }
+
+    @Test
+    public void validMixedInputTypes() throws PSBTParseException {
+        String psbt = "cHNidP8B+wQCAAAAAQIEAgAAAAEEBAIAAAABBQQBAAAAAQYBAwABDiApw6Peut1f6dS0XD295x0CWioK+UM7tO+6i0Pv5za0oQEPBAAAAAABAR+ghgEAAAAAABYAFPja92rYA7DvqV1s/4ruCJHTrxyMARAE/v///yIGA9NX98BxjyR44/2PjMwnKd3YwMyusfArGBpvRNQ7n42NACIdAtAp/5beLLz3gr5DWcSGIOqSvN1r7wMrlRWLkaFpP7T4IQJVFk55JtUNUqCf+ZBkel6Vwdsb/GimFvvC2iE5J/mL/yIeAtAp/5beLLz3gr5DWcSGIOqSvN1r7wMrlRWLkaFpP7T4QMHWfzh4gr+BeRXqFYIdZNWzg1wfwFxVjOPYJJKhfZCMEEh9u5vdwQgMjC2cGXGyZgg8aQVOIhk/JEEorGZzfmAAAQ4gtsz2qm3pd5sGLvsbwVMcZaXnsq6QVaZiqwVAbw30R9QBDwQAAAAAARAE/v///wEAUwIAAAAB5D9MfaDZ74MIM0F6Sy1pXgWgdanUwFY3tfzq3xlflbIAAAAAAP////8B8EkCAAAAAAAXqRRjd6+3VLmKdhIZzxZ2/JLCN4RQtocAAAAAAQRHUiECjx0ILWAB+kuomaQD2vmx2wG+klwiUzr2MO5kk7C+n3khAzWJfsWucE/lXY6l1Gewrr2zeZvhDDYEcdm3icgRr947Uq4AAQMIkF8BAAAAAAABBCJRIOwCLPQ2taebtxfBsueBADxLQswPLMCEEteHBizKo0eDAQlCAtAp/5beLLz3gr5DWcSGIOqSvN1r7wMrlRWLkaFpP7T4Ak1Rg1P0vRjXac9o/2LvEGabcIYkawpkA/5XveSSEUSLAA==";
+        PSBT parsed = PSBT.fromString(psbt);
+
+        Map<TransactionInput, ECKey> inputPublicKeys = new LinkedHashMap<>();
+        TransactionInput input0 = parsed.getTransaction().getInputs().get(0);
+        ECKey pubKey0 = ECKey.fromPublicOnly(Hex.decode("03d357f7c0718f2478e3fd8f8ccc2729ddd8c0ccaeb1f02b181a6f44d43b9f8d8d"));
+        inputPublicKeys.put(input0, pubKey0);
+
+        parsed.validateSilentPayments(inputPublicKeys);
+    }
+
+    @Test
+    public void validBothGlobalAndInputEcdh() throws PSBTParseException {
+        String psbt = "cHNidP8B+wQCAAAAAQIEAgAAAAEEBAEAAAABBQQBAAAAAQYBAyIHAtAp/5beLLz3gr5DWcSGIOqSvN1r7wMrlRWLkaFpP7T4IQJVFk55JtUNUqCf+ZBkel6Vwdsb/GimFvvC2iE5J/mL/yIIAtAp/5beLLz3gr5DWcSGIOqSvN1r7wMrlRWLkaFpP7T4QMHWfzh4gr+BeRXqFYIdZNWzg1wfwFxVjOPYJJKhfZCMEEh9u5vdwQgMjC2cGXGyZgg8aQVOIhk/JEEorGZzfmAAAQ4gXPiMRKRM1SJjYb7RB1GUb5+HCVIpEeB3gV9ffweFr2kBDwQAAAAAAQEfoIYBAAAAAAAWABT42vdq2AOw76ldbP+K7giR068cjAEQBP7///8iBgPTV/fAcY8keOP9j4zMJynd2MDMrrHwKxgab0TUO5+NjQABAwQBAAAAIh0C0Cn/lt4svPeCvkNZxIYg6pK83WvvAyuVFYuRoWk/tPghAlUWTnkm1Q1SoJ/5kGR6XpXB2xv8aKYW+8LaITkn+Yv/Ih4C0Cn/lt4svPeCvkNZxIYg6pK83WvvAyuVFYuRoWk/tPhAwdZ/OHiCv4F5FeoVgh1k1bODXB/AXFWM49gkkqF9kIwQSH27m93BCAyMLZwZcbJmCDxpBU4iGT8kQSisZnN+YAABAwgYcwEAAAAAAAEEIlEgS6fi6UvLAo37uSgZaLV+3Cn2cFex/LIX3bRQwxpRxwwBCUIC0Cn/lt4svPeCvkNZxIYg6pK83WvvAyuVFYuRoWk/tPgCTVGDU/S9GNdpz2j/Yu8QZptwhiRrCmQD/le95JIRRIsA";
+        PSBT parsed = PSBT.fromString(psbt);
+
+        Map<TransactionInput, ECKey> inputPublicKeys = new LinkedHashMap<>();
+        TransactionInput input0 = parsed.getTransaction().getInputs().get(0);
+        ECKey pubKey0 = ECKey.fromPublicOnly(Hex.decode("03d357f7c0718f2478e3fd8f8ccc2729ddd8c0ccaeb1f02b181a6f44d43b9f8d8d"));
+        inputPublicKeys.put(input0, pubKey0);
+
+       parsed.validateSilentPayments(inputPublicKeys);
+    }
+
+    @Test
+    public void validSingleSignerGlobalEcdh() throws PSBTParseException {
+        String psbt = "cHNidP8B+wQCAAAAAQIEAgAAAAEEBAEAAAABBQQBAAAAAQYBAyIHAtAp/5beLLz3gr5DWcSGIOqSvN1r7wMrlRWLkaFpP7T4IQJVFk55JtUNUqCf+ZBkel6Vwdsb/GimFvvC2iE5J/mL/yIIAtAp/5beLLz3gr5DWcSGIOqSvN1r7wMrlRWLkaFpP7T4QMHWfzh4gr+BeRXqFYIdZNWzg1wfwFxVjOPYJJKhfZCMEEh9u5vdwQgMjC2cGXGyZgg8aQVOIhk/JEEorGZzfmAAAQ4gbprLPJXWyu5NSnIlAmnrjz0Fcu1PhPS3/DOpmr4+OgUBDwQAAAAAAQEfoIYBAAAAAAAWABT42vdq2AOw76ldbP+K7giR068cjAEQBP7///8iBgPTV/fAcY8keOP9j4zMJynd2MDMrrHwKxgab0TUO5+NjQABAwQBAAAAAAEDCBhzAQAAAAAAAQQiUSCuGfvuJzChqVLX0lmMxwP93zuXKyUUix7Rp5roc51eBwEJQgLQKf+W3iy894K+Q1nEhiDqkrzda+8DK5UVi5GhaT+0+AJNUYNT9L0Y12nPaP9i7xBmm3CGJGsKZAP+V73kkhFEiwA=";
+        PSBT parsed = PSBT.fromString(psbt);
+
+        Map<TransactionInput, ECKey> inputPublicKeys = new LinkedHashMap<>();
+        TransactionInput input0 = parsed.getTransaction().getInputs().get(0);
+        ECKey pubKey0 = ECKey.fromPublicOnly(Hex.decode("03d357f7c0718f2478e3fd8f8ccc2729ddd8c0ccaeb1f02b181a6f44d43b9f8d8d"));
+        inputPublicKeys.put(input0, pubKey0);
+
+        parsed.validateSilentPayments(inputPublicKeys);
+    }
+
+    @Test
+    public void validMultiPartyPerInputEcdh() throws PSBTParseException {
+        String psbt = "cHNidP8B+wQCAAAAAQIEAgAAAAEEBAIAAAABBQQBAAAAAQYBAwABDiBc+IxEpEzVImNhvtEHUZRvn4cJUikR4HeBX19/B4WvaQEPBAAAAAABAR9QwwAAAAAAABYAFPja92rYA7DvqV1s/4ruCJHTrxyMARAE/v///yIGA9NX98BxjyR44/2PjMwnKd3YwMyusfArGBpvRNQ7n42NAAEDBAEAAAAiHQLQKf+W3iy894K+Q1nEhiDqkrzda+8DK5UVi5GhaT+0+CECVRZOeSbVDVKgn/mQZHpelcHbG/xophb7wtohOSf5i/8iHgLQKf+W3iy894K+Q1nEhiDqkrzda+8DK5UVi5GhaT+0+EDB1n84eIK/gXkV6hWCHWTVs4NcH8BcVYzj2CSSoX2QjBBIfbub3cEIDIwtnBlxsmYIPGkFTiIZPyRBKKxmc35gAAEOIBPS7rrZoQmRR0EMhqb+CyDunbdZ2kHP1O6Xks1QEjcVAQ8EAAAAAAEBH1DDAAAAAAAAFgAUQhxxWu35g68OO2dv98SU0QVPzboBEAT+////IgYCjx0ILWAB+kuomaQD2vmx2wG+klwiUzr2MO5kk7C+n3kAAQMEAQAAACIdAtAp/5beLLz3gr5DWcSGIOqSvN1r7wMrlRWLkaFpP7T4IQNb6DQQKcckf6K5ONXUuFs6afvZMXutha9leZJx3LQoASIeAtAp/5beLLz3gr5DWcSGIOqSvN1r7wMrlRWLkaFpP7T4QMD+LMxS37uSW9P/ZUt6ltjsDgMaZ9BBtPmcsOgRSeKHqCvT1RvA/3M6zn0yq2PWEhhlRXeAj7LH+wbSvgb/OrYAAQMIGHMBAAAAAAABBCJRIAvcah2ruHUXZ4wrX33N/yl23F0RNcTdk/ZnI+vvuY4lAQlCAtAp/5beLLz3gr5DWcSGIOqSvN1r7wMrlRWLkaFpP7T4Ak1Rg1P0vRjXac9o/2LvEGabcIYkawpkA/5XveSSEUSLAA==";
+        PSBT parsed = PSBT.fromString(psbt);
+
+        Map<TransactionInput, ECKey> inputPublicKeys = new LinkedHashMap<>();
+        TransactionInput input0 = parsed.getTransaction().getInputs().get(0);
+        ECKey pubKey0 = ECKey.fromPublicOnly(Hex.decode("03d357f7c0718f2478e3fd8f8ccc2729ddd8c0ccaeb1f02b181a6f44d43b9f8d8d"));
+        inputPublicKeys.put(input0, pubKey0);
+
+        TransactionInput input1 = parsed.getTransaction().getInputs().get(1);
+        ECKey pubKey1 = ECKey.fromPublicOnly(Hex.decode("028f1d082d6001fa4ba899a403daf9b1db01be925c22533af630ee6493b0be9f79"));
+        inputPublicKeys.put(input1, pubKey1);
+
+        parsed.validateSilentPayments(inputPublicKeys);
+    }
+
+    @Test
+    public void validSilentPaymentWithChange() throws PSBTParseException {
+        String psbt = "cHNidP8B+wQCAAAAAQIEAgAAAAEEBAEAAAABBQQCAAAAAQYBAwABDiAlbK6m2hWAb7hW7a50mI1EDHqxtcCGHsgR0ZCSdHudHAEPBAAAAAABAR+ghgEAAAAAABYAFPja92rYA7DvqV1s/4ruCJHTrxyMARAE/v///yIGA9NX98BxjyR44/2PjMwnKd3YwMyusfArGBpvRNQ7n42NAAEDBAEAAAAiHQLQKf+W3iy894K+Q1nEhiDqkrzda+8DK5UVi5GhaT+0+CECVRZOeSbVDVKgn/mQZHpelcHbG/xophb7wtohOSf5i/8iHgLQKf+W3iy894K+Q1nEhiDqkrzda+8DK5UVi5GhaT+0+EDB1n84eIK/gXkV6hWCHWTVs4NcH8BcVYzj2CSSoX2QjBBIfbub3cEIDIwtnBlxsmYIPGkFTiIZPyRBKKxmc35gAAEDCFDDAAAAAAAAAQQiUSBVuRZLw33Ib1uJNhaCqjCItbP6U9rbQ+lfG9ETm7HANQEJQgLQKf+W3iy894K+Q1nEhiDqkrzda+8DK5UVi5GhaT+0+AP1JENIUgFlZrxF0fpqXFoYYs3ZM/FchDtCcjgi9SUyNwEKBAEAAAAAAQMIyK8AAAAAAAABBBYAFOPDEMwq86xuYsrkvSPj7lK54clZIgID01f3wHGPJHjj/Y+MzCcp3djAzK6x8CsYGm9E1DufjY0MAAAAAAAAAAAAAAABAA==";
+        PSBT parsed = PSBT.fromString(psbt);
+
+        Map<TransactionInput, ECKey> inputPublicKeys = new LinkedHashMap<>();
+        TransactionInput input0 = parsed.getTransaction().getInputs().get(0);
+        ECKey pubKey0 = ECKey.fromPublicOnly(Hex.decode("03d357f7c0718f2478e3fd8f8ccc2729ddd8c0ccaeb1f02b181a6f44d43b9f8d8d"));
+        inputPublicKeys.put(input0, pubKey0);
+
+        parsed.validateSilentPayments(inputPublicKeys);
+    }
+
+    @Test
+    public void validMultipleOutputsSameScanKey() throws PSBTParseException {
+        String psbt = "cHNidP8B+wQCAAAAAQIEAgAAAAEEBAEAAAABBQQCAAAAAQYBAyIHAtAp/5beLLz3gr5DWcSGIOqSvN1r7wMrlRWLkaFpP7T4IQJVFk55JtUNUqCf+ZBkel6Vwdsb/GimFvvC2iE5J/mL/yIIAtAp/5beLLz3gr5DWcSGIOqSvN1r7wMrlRWLkaFpP7T4QMHWfzh4gr+BeRXqFYIdZNWzg1wfwFxVjOPYJJKhfZCMEEh9u5vdwQgMjC2cGXGyZgg8aQVOIhk/JEEorGZzfmAAAQ4gLHvTL/FQccCuAyc4ZKFDbIpWITVp4RMtz46nPsjDMiIBDwQAAAAAAQEfoIYBAAAAAAAWABT42vdq2AOw76ldbP+K7giR068cjAEQBP7///8iBgPTV/fAcY8keOP9j4zMJynd2MDMrrHwKxgab0TUO5+NjQABAwQBAAAAAAEDCECcAAAAAAAAAQQiUSD7K3E6/VK6JHGBuZhBqk8siFW6332s4usuMFXaE+4rjAEJQgLQKf+W3iy894K+Q1nEhiDqkrzda+8DK5UVi5GhaT+0+AJNUYNT9L0Y12nPaP9i7xBmm3CGJGsKZAP+V73kkhFEiwABAwjY1gAAAAAAAAEEIlEgWaCp4b2YmHQgE1U4YO0LRLcm+8Ug6cVxvEZJXyR59hgBCUIC0Cn/lt4svPeCvkNZxIYg6pK83WvvAyuVFYuRoWk/tPgCTVGDU/S9GNdpz2j/Yu8QZptwhiRrCmQD/le95JIRRIsA";
+        PSBT parsed = PSBT.fromString(psbt);
+
+        Map<TransactionInput, ECKey> inputPublicKeys = new LinkedHashMap<>();
+        TransactionInput input0 = parsed.getTransaction().getInputs().get(0);
+        ECKey pubKey0 = ECKey.fromPublicOnly(Hex.decode("03d357f7c0718f2478e3fd8f8ccc2729ddd8c0ccaeb1f02b181a6f44d43b9f8d8d"));
+        inputPublicKeys.put(input0, pubKey0);
+
+        parsed.validateSilentPayments(inputPublicKeys);
+    }
+
     @AfterEach
-    public void tearDown() throws Exception {
+    public void tearDown() {
         Network.set(null);
     }
 }

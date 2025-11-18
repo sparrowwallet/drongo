@@ -5,14 +5,18 @@ import com.sparrowwallet.drongo.KeyDerivation;
 import com.sparrowwallet.drongo.Utils;
 import com.sparrowwallet.drongo.crypto.ECKey;
 import com.sparrowwallet.drongo.protocol.*;
+import com.sparrowwallet.drongo.silentpayments.InvalidSilentPaymentException;
+import com.sparrowwallet.drongo.silentpayments.SilentPayment;
+import com.sparrowwallet.drongo.silentpayments.SilentPaymentUtils;
+import com.sparrowwallet.drongo.silentpayments.SilentPaymentsDLEQProof;
 import com.sparrowwallet.drongo.wallet.*;
-import org.bouncycastle.util.encoders.Base64;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.*;
 import java.nio.ByteBuffer;
 import java.util.*;
+import java.util.stream.Collectors;
 
 import static com.sparrowwallet.drongo.psbt.PSBTEntry.*;
 import static com.sparrowwallet.drongo.psbt.PSBTInput.*;
@@ -27,6 +31,8 @@ public class PSBT {
     public static final byte PSBT_GLOBAL_INPUT_COUNT = 0x04;
     public static final byte PSBT_GLOBAL_OUTPUT_COUNT = 0x05;
     public static final byte PSBT_GLOBAL_TX_MODIFIABLE = 0x06;
+    public static final byte PSBT_GLOBAL_SP_ECDH_SHARE = 0x07;
+    public static final byte PSBT_GLOBAL_SP_DLEQ = 0x08;
     public static final byte PSBT_GLOBAL_VERSION = (byte)0xfb;
     public static final byte PSBT_GLOBAL_PROPRIETARY = (byte)0xfc;
 
@@ -43,17 +49,21 @@ public class PSBT {
 
     private byte[] psbtBytes;
 
-    private Transaction transaction = null;
     private Integer version = null;
     private final Map<ExtendedKey, KeyDerivation> extendedPublicKeys = new LinkedHashMap<>();
     private final Map<String, String> globalProprietary = new LinkedHashMap<>();
 
-    //PSBTv2 fields
+    //PSBTv0-only fields
+    private Transaction transaction = null;
+
+    //PSBTv2-only fields
     private Long txVersion = null;
     private Long fallbackLocktime = null;
     private Long inputCount = null;
     private Long outputCount = null;
     private Byte modifiable = null;
+    private final Map<ECKey, ECKey> silentPaymentsEcdhShares = new LinkedHashMap<>();
+    private final Map<ECKey, SilentPaymentsDLEQProof> silentPaymentsDLEQProofs = new LinkedHashMap<>();
 
     private final List<PSBTInput> psbtInputs = new ArrayList<>();
     private final List<PSBTOutput> psbtOutputs = new ArrayList<>();
@@ -326,12 +336,18 @@ public class PSBT {
                     break;
                 case PSBT_GLOBAL_TX_VERSION:
                     entry.checkOneByteKey();
+                    if(entry.getData().length != 4) {
+                        throw new PSBTParseException("PSBT global tx version must be 4 bytes");
+                    }
                     long txVersion = Utils.readUint32(entry.getData(), 0);
                     this.txVersion = txVersion;
                     log.debug("PSBT tx version: " + txVersion);
                     break;
                 case PSBT_GLOBAL_FALLBACK_LOCKTIME:
                     entry.checkOneByteKey();
+                    if(entry.getData().length != 4) {
+                        throw new PSBTParseException("PSBT global fallback locktime must be 4 bytes");
+                    }
                     long fallbackLocktime = Utils.readUint32(entry.getData(), 0);
                     this.fallbackLocktime = fallbackLocktime;
                     log.debug("PSBT fallback locktime: " + fallbackLocktime);
@@ -360,9 +376,32 @@ public class PSBT {
                     break;
                 case PSBT_GLOBAL_VERSION:
                     entry.checkOneByteKey();
+                    if(entry.getData().length != 4) {
+                        throw new PSBTParseException("PSBT global version must be 4 bytes");
+                    }
                     int version = (int)Utils.readUint32(entry.getData(), 0);
                     this.version = version;
                     log.debug("PSBT version: " + version);
+                    break;
+                case PSBT_GLOBAL_SP_ECDH_SHARE:
+                    entry.checkOneBytePlusPubKey();
+                    if(entry.getData().length != 33) {
+                        throw new PSBTParseException("PSBT global silent payments ECDH share data must be 33 bytes");
+                    }
+                    ECKey scanKey = ECKey.fromPublicOnly(entry.getKeyData());
+                    ECKey ecdhShare = ECKey.fromPublicOnly(entry.getData());
+                    this.silentPaymentsEcdhShares.put(scanKey, ecdhShare);
+                    log.debug("PSBT global silent payments ECDH share for scan key: " + Utils.bytesToHex(entry.getKeyData()));
+                    break;
+                case PSBT_GLOBAL_SP_DLEQ:
+                    entry.checkOneBytePlusPubKey();
+                    if(entry.getData().length != 64) {
+                        throw new PSBTParseException("PSBT global silent payments DLEQ proof data must be 64 bytes");
+                    }
+                    ECKey proofScanKey = ECKey.fromPublicOnly(entry.getKeyData());
+                    SilentPaymentsDLEQProof dleqProof = SilentPaymentsDLEQProof.fromBytes(entry.getData());
+                    this.silentPaymentsDLEQProofs.put(proofScanKey, dleqProof);
+                    log.debug("PSBT global silent payments DLEQ proof for scan key: " + Utils.bytesToHex(entry.getKeyData()));
                     break;
                 case PSBT_GLOBAL_PROPRIETARY:
                     globalProprietary.put(Utils.bytesToHex(entry.getKeyData()), Utils.bytesToHex(entry.getData()));
@@ -391,6 +430,12 @@ public class PSBT {
             }
             if(modifiable != null) {
                 throw new PSBTParseException("PSBT_GLOBAL_TX_MODIFIABLE is not allowed in PSBTv0");
+            }
+            if(!silentPaymentsEcdhShares.isEmpty()) {
+                throw new PSBTParseException("PSBT_GLOBAL_SP_ECDH_SHARE is not allowed in PSBTv0");
+            }
+            if(!silentPaymentsDLEQProofs.isEmpty()) {
+                throw new PSBTParseException("PSBT_GLOBAL_SP_DLEQ is not allowed in PSBTv0");
             }
         } else if(getPsbtVersion() == 1) {
             throw new PSBTParseException("There is no PSBTv1");
@@ -436,6 +481,12 @@ public class PSBT {
                 if(input.getRequiredHeightLocktime() != null) {
                     throw new PSBTParseException("PSBT_IN_REQUIRED_HEIGHT_LOCKTIME is not allowed in PSBTv0");
                 }
+                if(!input.getSilentPaymentsEcdhShares().isEmpty()) {
+                    throw new PSBTParseException("PSBT_IN_SP_ECDH_SHARE is not allowed in PSBTv0");
+                }
+                if(!input.getSilentPaymentsDLEQProofs().isEmpty()) {
+                    throw new PSBTParseException("PSBT_IN_SP_DLEQ is not allowed in PSBTv0");
+                }
             } else if(getPsbtVersion() >= 2) {
                 if(input.prevTxid() == null) {
                     throw new PSBTParseException("PSBT_IN_PREV_TXID is required in PSBTv2");
@@ -465,6 +516,12 @@ public class PSBT {
                 }
                 if(output.script() != null) {
                     throw new PSBTParseException("PSBT_OUT_SCRIPT is not allowed in PSBTv0");
+                }
+                if(output.getSilentPaymentAddress() != null) {
+                    throw new PSBTParseException("PSBT_OUT_SP_V0_INFO is not allowed in PSBTv0");
+                }
+                if(output.getSilentPaymentLabel() != null) {
+                    throw new PSBTParseException("PSBT_OUT_SP_V0_LABEL is not allowed in PSBTv0");
                 }
             } else if(getPsbtVersion() >= 2) {
                 if(output.amount() == null) {
@@ -531,6 +588,99 @@ public class PSBT {
         }
     }
 
+    /**
+     * Validates silent payment ECDH shares and DLEQ proofs according to BIP-375.
+     *
+     * For each silent payment output, validates that:
+     * 1. Either global or per-input ECDH shares and DLEQ proofs are provided for Taproot inputs
+     * 2. The DLEQ proofs are cryptographically valid
+     * 3. The output scripts match the expected scripts computed from the ECDH shares
+     *
+     * @param inputPublicKeys Map of PSBTInput to their public keys for verification
+     * @throws PSBTProofException if validation fails
+     */
+    public void validateSilentPayments(Map<TransactionInput, ECKey> inputPublicKeys) throws PSBTProofException {
+        Set<ECKey> scanKeys = getPsbtOutputs().stream().filter(output -> output.getSilentPaymentAddress() != null)
+                .map(output -> output.getSilentPaymentAddress().getScanKey()).collect(Collectors.toCollection(LinkedHashSet::new));
+        if(scanKeys.isEmpty()) {
+            return;
+        }
+
+        for(PSBTInput input : getPsbtInputs()) {
+            SigHash sigHash = input.getSigHash();
+            if(sigHash != null && sigHash != SigHash.ALL && sigHash != SigHash.DEFAULT) {
+                throw new PSBTProofException("Silent payment outputs require SIGHASH_ALL signatures only. Input at index " + input.getIndex() + " has sighash type: " + sigHash);
+            }
+        }
+
+        Set<HashIndex> outpoints = inputPublicKeys.keySet().stream()
+                .map(input -> new HashIndex(input.getOutpoint().getHash(), input.getOutpoint().getIndex()))
+                .collect(Collectors.toCollection(LinkedHashSet::new));
+        ECKey summedPublicKey = SilentPaymentUtils.getSummedPublicKey(inputPublicKeys.values());
+        if(summedPublicKey == null) {
+            throw new PSBTProofException("Cannot verify global DLEQ proof without input public keys");
+        }
+
+        for(ECKey scanKey : scanKeys) {
+            List<SilentPayment> silentPayments = getPsbtOutputs().stream()
+                    .filter(output -> output.getSilentPaymentAddress() != null && output.getSilentPaymentAddress().getScanKey().equals(scanKey) && output.getScript() != null)
+                    .map(psbtOutput -> new SilentPayment(psbtOutput.getSilentPaymentAddress(), psbtOutput.getScript().getToAddress(), null, psbtOutput.getAmount(), false))
+                    .collect(Collectors.toList());
+            if(silentPayments.isEmpty()) {
+                continue;
+            }
+
+            boolean hasGlobalEcdhShare = silentPaymentsEcdhShares.containsKey(scanKey);
+            boolean hasGlobalDleqProof = silentPaymentsDLEQProofs.containsKey(scanKey);
+            if(hasGlobalEcdhShare && hasGlobalDleqProof) {
+                ECKey globalEcdhShare = silentPaymentsEcdhShares.get(scanKey);
+                SilentPaymentsDLEQProof globalProof = silentPaymentsDLEQProofs.get(scanKey);
+                if(!globalProof.verify(summedPublicKey, scanKey, globalEcdhShare)) {
+                    throw new PSBTProofException("Global DLEQ proof verification failed for scan key: " + scanKey);
+                }
+
+                try {
+                    SilentPaymentUtils.validateOutputAddresses(silentPayments, globalEcdhShare, summedPublicKey, outpoints);
+                } catch(InvalidSilentPaymentException e) {
+                    throw new PSBTProofException(e);
+                }
+            } else if(hasGlobalEcdhShare || hasGlobalDleqProof) {
+                throw new PSBTProofException("Global ECDH share and DLEQ proof must both be present for scan key: " + scanKey);
+            } else {
+                List<ECKey> inputEcdhShares = new ArrayList<>();
+                for(PSBTInput input : getPsbtInputs()) {
+                    ECKey inputPublicKey = inputPublicKeys.entrySet().stream()
+                            .filter(entry -> entry.getKey().getIndex() == input.getIndex()).map(Map.Entry::getValue).findFirst().orElse(null);
+                    if(inputPublicKey != null) {
+                        boolean hasInputEcdhShare = input.getSilentPaymentsEcdhShares().containsKey(scanKey);
+                        boolean hasInputDleqProof = input.getSilentPaymentsDLEQProofs().containsKey(scanKey);
+                        if(!hasInputEcdhShare || !hasInputDleqProof) {
+                            throw new PSBTProofException("Eligible input at index " + input.getIndex() + " must provide PSBT_IN_SP_ECDH_SHARE and PSBT_IN_SP_DLEQ");
+                        }
+
+                        ECKey inputEcdhShare = input.getSilentPaymentsEcdhShares().get(scanKey);
+                        SilentPaymentsDLEQProof inputProof = input.getSilentPaymentsDLEQProofs().get(scanKey);
+                        if(!inputProof.verify(inputPublicKey, scanKey, inputEcdhShare)) {
+                            throw new PSBTProofException("Input DLEQ proof verification for input at index " + input.getIndex() + " failed for scan key: " + scanKey);
+                        }
+                        inputEcdhShares.add(inputEcdhShare);
+                    }
+                }
+
+                ECKey summedEcdhShare = SilentPaymentUtils.getSummedPublicKey(inputEcdhShares);
+                if(summedEcdhShare == null) {
+                    throw new PSBTProofException("No ECDH shares found for scan key: " + scanKey);
+                }
+
+                try {
+                    SilentPaymentUtils.validateOutputAddresses(silentPayments, summedEcdhShare, summedPublicKey, outpoints);
+                } catch(InvalidSilentPaymentException e) {
+                    throw new PSBTProofException(e);
+                }
+            }
+        }
+    }
+
     public boolean hasSignatures() {
         for(PSBTInput psbtInput : getPsbtInputs()) {
             if(!psbtInput.getPartialSignatures().isEmpty() || psbtInput.getTapKeyPathSignature() != null || psbtInput.getFinalScriptSig() != null || psbtInput.getFinalScriptWitness() != null) {
@@ -593,6 +743,12 @@ public class PSBT {
             }
             if(modifiable != null) {
                 entries.add(populateEntry(PSBT_GLOBAL_TX_MODIFIABLE, null, new byte[] { modifiable }));
+            }
+            for(Map.Entry<ECKey, ECKey> entry : silentPaymentsEcdhShares.entrySet()) {
+                entries.add(populateEntry(PSBT_GLOBAL_SP_ECDH_SHARE, entry.getKey().getPubKey(), entry.getValue().getPubKey()));
+            }
+            for(Map.Entry<ECKey, SilentPaymentsDLEQProof> entry : silentPaymentsDLEQProofs.entrySet()) {
+                entries.add(populateEntry(PSBT_GLOBAL_SP_DLEQ, entry.getKey().getPubKey(), entry.getValue().getBytes()));
             }
         }
 
@@ -681,6 +837,8 @@ public class PSBT {
         }
 
         extendedPublicKeys.putAll(psbt.extendedPublicKeys);
+        silentPaymentsEcdhShares.putAll(psbt.silentPaymentsEcdhShares);
+        silentPaymentsDLEQProofs.putAll(psbt.silentPaymentsDLEQProofs);
         globalProprietary.putAll(psbt.globalProprietary);
 
         for(int i = 0; i < getPsbtInputs().size(); i++) {
@@ -721,6 +879,17 @@ public class PSBT {
                 } else {
                     txInput.setWitness(new TransactionWitness(finalTransaction));
                 }
+            }
+        }
+
+        for(int i = 0; i < finalTransaction.getOutputs().size(); i++) {
+            TransactionOutput txOutput = finalTransaction.getOutputs().get(i);
+            PSBTOutput psbtOutput = getPsbtOutputs().get(i);
+            if(psbtOutput.getSilentPaymentAddress() != null) {
+                if(psbtOutput.script() == null || !ScriptType.P2TR.isScriptType(psbtOutput.script())) {
+                    throw new IllegalStateException("Silent payment output at index " + i + " must provide a valid P2TR PSBT_OUT_SCRIPT");
+                }
+                txOutput.setScriptBytes(psbtOutput.script().getProgram());
             }
         }
 
@@ -803,7 +972,12 @@ public class PSBT {
                 }
             }
             for(PSBTOutput psbtOutput : getPsbtOutputs()) {
-                transaction.addOutput(psbtOutput.getAmount(), psbtOutput.getScript() == null ? new Script(new byte[0]) : psbtOutput.getScript());
+                //For unsigned transactions set the output script to the serialized silent payments address if present as per BIP375
+                if(psbtOutput.getSilentPaymentAddress() != null) {
+                    transaction.addOutput(psbtOutput.getAmount(), new Script(psbtOutput.getSilentPaymentAddress().serialize()));
+                } else {
+                    transaction.addOutput(psbtOutput.getAmount(), psbtOutput.getScript() == null ? new Script(new byte[0]) : psbtOutput.getScript());
+                }
             }
             return transaction;
         }
@@ -889,6 +1063,14 @@ public class PSBT {
         }
     }
 
+    public Map<ECKey, ECKey> getSilentPaymentsEcdhShares() {
+        return silentPaymentsEcdhShares;
+    }
+
+    public Map<ECKey, SilentPaymentsDLEQProof> getSilentPaymentsDLEQProofs() {
+        return silentPaymentsDLEQProofs;
+    }
+
     public Map<String, String> getGlobalProprietary() {
         return globalProprietary;
     }
@@ -902,7 +1084,7 @@ public class PSBT {
     }
 
     public String toBase64String(boolean includeXpubs) {
-        return Base64.toBase64String(serialize(includeXpubs, true));
+        return Base64.getEncoder().encodeToString(serialize(includeXpubs, true));
     }
 
     public void convertVersion(int version) {
@@ -1028,7 +1210,7 @@ public class PSBT {
             if(Utils.isHex(s) && s.startsWith(PSBT_MAGIC_HEX)) {
                 return true;
             } else {
-                return Utils.isBase64(s) && Utils.bytesToHex(Base64.decode(s)).startsWith(PSBT_MAGIC_HEX);
+                return Utils.isBase64(s) && Utils.bytesToHex(Base64.getDecoder().decode(s)).startsWith(PSBT_MAGIC_HEX);
             }
         } catch(Exception e) {
             //ignore
@@ -1047,7 +1229,7 @@ public class PSBT {
         }
 
         if (Utils.isBase64(strPSBT) && !Utils.isHex(strPSBT)) {
-            strPSBT = Utils.bytesToHex(Base64.decode(strPSBT));
+            strPSBT = Utils.bytesToHex(Base64.getDecoder().decode(strPSBT));
         }
 
         byte[] psbtBytes = Utils.hexToBytes(strPSBT);

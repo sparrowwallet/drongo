@@ -1677,7 +1677,6 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
 
                 Script outputScript = silentPayment.getAddress().getOutputScript();
                 silentOutput.setScript(outputScript);
-                silentOutput.getOutput().setScriptBytes(outputScript.getProgram());
                 addSilentPaymentAddress(silentPayment.getAddress(), silentPayment.getSilentPaymentAddress());
             }
 

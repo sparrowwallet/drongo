@@ -4,6 +4,7 @@ import com.sparrowwallet.drongo.KeyDerivation;
 import com.sparrowwallet.drongo.Utils;
 import com.sparrowwallet.drongo.crypto.ECKey;
 import com.sparrowwallet.drongo.protocol.*;
+import com.sparrowwallet.drongo.silentpayments.SilentPaymentsDLEQProof;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -35,10 +36,12 @@ public class PSBTInput {
     public static final byte PSBT_IN_SEQUENCE = 0x10;
     public static final byte PSBT_IN_REQUIRED_TIME_LOCKTIME = 0x11;
     public static final byte PSBT_IN_REQUIRED_HEIGHT_LOCKTIME = 0x12;
-    public static final byte PSBT_IN_PROPRIETARY = (byte)0xfc;
     public static final byte PSBT_IN_TAP_KEY_SIG = 0x13;
     public static final byte PSBT_IN_TAP_BIP32_DERIVATION = 0x16;
     public static final byte PSBT_IN_TAP_INTERNAL_KEY = 0x17;
+    public static final byte PSBT_IN_SP_ECDH_SHARE = 0x1d;
+    public static final byte PSBT_IN_SP_DLEQ = 0x1e;
+    public static final byte PSBT_IN_PROPRIETARY = (byte)0xfc;
 
     private final PSBT psbt;
     private Transaction nonWitnessUtxo;
@@ -60,12 +63,14 @@ public class PSBTInput {
     private Map<ECKey, Map<KeyDerivation, List<Sha256Hash>>> tapDerivedPublicKeys = new LinkedHashMap<>();
     private ECKey tapInternalKey;
 
-    //PSBTv2 fields
+    //PSBTv2-only fields
     private Sha256Hash prevTxid;
     private Long prevIndex;
     private Long sequence;
     private Long requiredTimeLocktime;
     private Long requiredHeightLocktime;
+    private final Map<ECKey, ECKey> silentPaymentsEcdhShares = new LinkedHashMap<>();
+    private final Map<ECKey, SilentPaymentsDLEQProof> silentPaymentsDLEQProofs = new LinkedHashMap<>();
 
     private int index;
 
@@ -168,6 +173,9 @@ public class PSBTInput {
                     break;
                 case PSBT_IN_SIGHASH_TYPE:
                     entry.checkOneByteKey();
+                    if(entry.getData().length != 4) {
+                        throw new PSBTParseException("PSBT input sighash type must be 4 bytes");
+                    }
                     long sighashType = Utils.readUint32(entry.getData(), 0);
                     SigHash sigHash = SigHash.fromByte((byte)sighashType);
                     this.sigHash = sigHash;
@@ -284,16 +292,25 @@ public class PSBTInput {
                     break;
                 case PSBT_IN_OUTPUT_INDEX:
                     entry.checkOneByteKey();
+                    if(entry.getData().length != 4) {
+                        throw new PSBTParseException("PSBT input output index must be 4 bytes");
+                    }
                     this.prevIndex = Utils.readUint32(entry.getData(), 0);
                     log.debug("Found input previous output index " + this.prevIndex);
                     break;
                 case PSBT_IN_SEQUENCE:
                     entry.checkOneByteKey();
+                    if(entry.getData().length != 4) {
+                        throw new PSBTParseException("PSBT input sequence must be 4 bytes");
+                    }
                     this.sequence = Utils.readUint32(entry.getData(), 0);
                     log.debug("Found input sequence " + this.sequence);
                     break;
                 case PSBT_IN_REQUIRED_TIME_LOCKTIME:
                     entry.checkOneByteKey();
+                    if(entry.getData().length != 4) {
+                        throw new PSBTParseException("PSBT input required time locktime must be 4 bytes");
+                    }
                     long requiredTimeLocktime = Utils.readUint32(entry.getData(), 0);
                     if(requiredTimeLocktime < 500000000) {
                         throw new PSBTParseException("Required time locktime is less than 500000000");
@@ -303,12 +320,35 @@ public class PSBTInput {
                     break;
                 case PSBT_IN_REQUIRED_HEIGHT_LOCKTIME:
                     entry.checkOneByteKey();
+                    if(entry.getData().length != 4) {
+                        throw new PSBTParseException("PSBT input required height locktime must be 4 bytes");
+                    }
                     long requiredHeightLocktime = Utils.readUint32(entry.getData(), 0);
                     if(requiredHeightLocktime >= 500000000) {
                         throw new PSBTParseException("Required time locktime is greater than or equal to 500000000");
                     }
                     this.requiredHeightLocktime = requiredHeightLocktime;
                     log.debug("Found input required height locktime " + this.requiredHeightLocktime);
+                    break;
+                case PSBT_IN_SP_ECDH_SHARE:
+                    entry.checkOneBytePlusPubKey();
+                    if(entry.getData().length != 33) {
+                        throw new PSBTParseException("PSBT input silent payments ECDH share data must be 33 bytes");
+                    }
+                    ECKey inputScanKey = ECKey.fromPublicOnly(entry.getKeyData());
+                    ECKey inputEcdhShare = ECKey.fromPublicOnly(entry.getData());
+                    this.silentPaymentsEcdhShares.put(inputScanKey, inputEcdhShare);
+                    log.debug("Found input silent payments ECDH share for scan key: " + Utils.bytesToHex(entry.getKeyData()));
+                    break;
+                case PSBT_IN_SP_DLEQ:
+                    entry.checkOneBytePlusPubKey();
+                    if(entry.getData().length != 64) {
+                        throw new PSBTParseException("PSBT input silent payments DLEQ proof data must be 64 bytes");
+                    }
+                    ECKey inputProofScanKey = ECKey.fromPublicOnly(entry.getKeyData());
+                    SilentPaymentsDLEQProof inputDleqProof = SilentPaymentsDLEQProof.fromBytes(entry.getData());
+                    this.silentPaymentsDLEQProofs.put(inputProofScanKey, inputDleqProof);
+                    log.debug("Found input silent payments DLEQ proof for scan key: " + Utils.bytesToHex(entry.getKeyData()));
                     break;
                 case PSBT_IN_PROPRIETARY:
                     this.proprietary.put(Utils.bytesToHex(entry.getKeyData()), Utils.bytesToHex(entry.getData()));
@@ -413,6 +453,12 @@ public class PSBTInput {
                 Utils.uint32ToByteArrayLE(requiredHeightLocktime, requiredHeightLocktimeBytes, 0);
                 entries.add(populateEntry(PSBT_IN_REQUIRED_HEIGHT_LOCKTIME, null, requiredHeightLocktimeBytes));
             }
+            for(Map.Entry<ECKey, ECKey> entry : silentPaymentsEcdhShares.entrySet()) {
+                entries.add(populateEntry(PSBT_IN_SP_ECDH_SHARE, entry.getKey().getPubKey(), entry.getValue().getPubKey()));
+            }
+            for(Map.Entry<ECKey, SilentPaymentsDLEQProof> entry : silentPaymentsDLEQProofs.entrySet()) {
+                entries.add(populateEntry(PSBT_IN_SP_DLEQ, entry.getKey().getPubKey(), entry.getValue().getBytes()));
+            }
         }
 
         for(Map.Entry<String, String> entry : proprietary.entrySet()) {
@@ -500,6 +546,9 @@ public class PSBTInput {
         if(psbtInput.requiredHeightLocktime != null) {
             requiredHeightLocktime = psbtInput.requiredHeightLocktime;
         }
+
+        silentPaymentsEcdhShares.putAll(psbtInput.silentPaymentsEcdhShares);
+        silentPaymentsDLEQProofs.putAll(psbtInput.silentPaymentsDLEQProofs);
 
         proprietary.putAll(psbtInput.proprietary);
 
@@ -732,6 +781,14 @@ public class PSBTInput {
         this.requiredHeightLocktime = requiredHeightLocktime;
     }
 
+    public Map<ECKey, ECKey> getSilentPaymentsEcdhShares() {
+        return silentPaymentsEcdhShares;
+    }
+
+    public Map<ECKey, SilentPaymentsDLEQProof> getSilentPaymentsDLEQProofs() {
+        return silentPaymentsDLEQProofs;
+    }
+
     public boolean isSigned() {
         if(getTapKeyPathSignature() != null) {
             return true;
@@ -935,6 +992,10 @@ public class PSBTInput {
     public TransactionOutput getUtxo() {
         int vout = (int)getInput().getOutpoint().getIndex();
         return getWitnessUtxo() != null ? getWitnessUtxo() : (getNonWitnessUtxo() != null ?  getNonWitnessUtxo().getOutputs().get(vout) : null);
+    }
+
+    int getIndex() {
+        return index;
     }
 
     void setIndex(int index) {

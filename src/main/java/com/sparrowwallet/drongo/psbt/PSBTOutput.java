@@ -28,6 +28,7 @@ public class PSBTOutput {
     public static final byte PSBT_OUT_TAP_INTERNAL_KEY = 0x05;
     public static final byte PSBT_OUT_TAP_BIP32_DERIVATION = 0x07;
     public static final byte PSBT_OUT_SP_V0_INFO = 0x09;
+    public static final byte PSBT_OUT_SP_V0_LABEL = 0x0a;
     public static final byte PSBT_OUT_DNSSEC_PROOF = 0x35;
     public static final byte PSBT_OUT_PROPRIETARY = (byte)0xfc;
 
@@ -39,10 +40,11 @@ public class PSBTOutput {
     private ECKey tapInternalKey;
     private Map<String, byte[]> dnssecProof;
 
-    //PSBTv2 fields
+    //PSBTv2-only fields
     private Long amount;
     private Script script;
     private SilentPaymentAddress silentPaymentAddress;
+    private Long silentPaymentLabel;
 
     private static final Logger log = LoggerFactory.getLogger(PSBTOutput.class);
 
@@ -103,6 +105,9 @@ public class PSBTOutput {
                     break;
                 case PSBT_OUT_AMOUNT:
                     entry.checkOneByteKey();
+                    if(entry.getData().length != 8) {
+                        throw new PSBTParseException("PSBT output amount must be 8 bytes");
+                    }
                     this.amount = Utils.readInt64(entry.getData(), 0);
                     log.debug("Found output amount " + this.amount);
                     break;
@@ -144,6 +149,16 @@ public class PSBTOutput {
                     byte[] spendKey = new byte[33];
                     System.arraycopy(entry.getData(), 33, spendKey, 0, 33);
                     this.silentPaymentAddress = new SilentPaymentAddress(ECKey.fromPublicOnly(scanKey), ECKey.fromPublicOnly(spendKey));
+                    log.debug("Found output silent payment address " + this.silentPaymentAddress);
+                    break;
+                case PSBT_OUT_SP_V0_LABEL:
+                    entry.checkOneByteKey();
+                    if(entry.getData().length != 4) {
+                        throw new PSBTParseException("PSBT output silent payment label must be 4 bytes");
+                    }
+                    this.silentPaymentLabel = Utils.readUint32(entry.getData(), 0);
+                    log.debug("Found output silent payment label " + this.silentPaymentLabel);
+                    break;
                 case PSBT_OUT_DNSSEC_PROOF:
                     entry.checkOneByteKey();
                     this.dnssecProof = parseDnssecProof(entry.getData());
@@ -180,6 +195,11 @@ public class PSBTOutput {
             }
             if(silentPaymentAddress != null) {
                 entries.add(populateEntry(PSBT_OUT_SP_V0_INFO, null, Utils.concat(silentPaymentAddress.getScanKey().getPubKey(), silentPaymentAddress.getSpendKey().getPubKey())));
+            }
+            if(silentPaymentLabel != null) {
+                byte[] labelBytes = new byte[4];
+                Utils.uint32ToByteArrayLE(silentPaymentLabel, labelBytes, 0);
+                entries.add(populateEntry(PSBT_OUT_SP_V0_LABEL, null, labelBytes));
             }
         }
 
@@ -223,13 +243,21 @@ public class PSBTOutput {
             script = psbtOutput.script;
         }
 
-        proprietary.putAll(psbtOutput.proprietary);
-
         tapDerivedPublicKeys.putAll(psbtOutput.tapDerivedPublicKeys);
 
         if(psbtOutput.tapInternalKey != null) {
             tapInternalKey = psbtOutput.tapInternalKey;
         }
+
+        if(psbtOutput.silentPaymentAddress != null) {
+            silentPaymentAddress = psbtOutput.silentPaymentAddress;
+        }
+
+        if(psbtOutput.silentPaymentLabel != null) {
+            silentPaymentLabel = psbtOutput.silentPaymentLabel;
+        }
+
+        proprietary.putAll(psbtOutput.proprietary);
     }
 
     public Script getRedeemScript() {
@@ -314,6 +342,14 @@ public class PSBTOutput {
 
     public void setSilentPaymentAddress(SilentPaymentAddress silentPaymentAddress) {
         this.silentPaymentAddress = silentPaymentAddress;
+    }
+
+    public Long getSilentPaymentLabel() {
+        return silentPaymentLabel;
+    }
+
+    public void setSilentPaymentLabel(Long silentPaymentLabel) {
+        this.silentPaymentLabel = silentPaymentLabel;
     }
 
     public Map<String, byte[]> getDnssecProof() {

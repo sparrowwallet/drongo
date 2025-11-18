@@ -8,6 +8,8 @@ import java.util.List;
 import java.util.Locale;
 
 public class KeyDerivation {
+    public static final String DEFAULT_WATCH_ONLY_FINGERPRINT = "00000000";
+
     private final String masterFingerprint;
     private final String derivationPath;
     private transient List<ChildNumber> derivation;

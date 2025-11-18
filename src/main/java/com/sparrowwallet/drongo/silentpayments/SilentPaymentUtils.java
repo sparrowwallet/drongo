@@ -1,6 +1,7 @@
 package com.sparrowwallet.drongo.silentpayments;
 
 import com.sparrowwallet.drongo.Utils;
+import com.sparrowwallet.drongo.address.Address;
 import com.sparrowwallet.drongo.crypto.ECKey;
 import com.sparrowwallet.drongo.protocol.*;
 import com.sparrowwallet.drongo.wallet.MnemonicException;
@@ -50,8 +51,8 @@ public class SilentPaymentUtils {
         return true;
     }
 
-    public static List<ECKey> getInputPubKeys(Transaction tx, Map<HashIndex, Script> spentScriptPubKeys) {
-        List<ECKey> keys = new ArrayList<>();
+    public static Map<TransactionInput, ECKey> getInputPubKeys(Transaction tx, Map<HashIndex, Script> spentScriptPubKeys) {
+        Map<TransactionInput, ECKey> inputKeys = new LinkedHashMap<>();
         for(TransactionInput input : tx.getInputs()) {
             HashIndex hashIndex = new HashIndex(input.getOutpoint().getHash(), input.getOutpoint().getIndex());
             Script scriptPubKey = spentScriptPubKeys.get(hashIndex);
@@ -82,7 +83,7 @@ public class SilentPaymentUtils {
 
                                 ECKey pubKey = ScriptType.P2TR.getPublicKeyFromScript(scriptPubKey);
                                 if(pubKey.isCompressed()) {
-                                    keys.add(pubKey);
+                                    inputKeys.put(input, pubKey);
                                 }
                             }
                             break;
@@ -92,7 +93,7 @@ public class SilentPaymentUtils {
                                 if(input.getWitness() != null && input.getWitness().getPushCount() == 2) {
                                     byte[] pubKey = input.getWitness().getPushes().getLast();
                                     if(pubKey != null && pubKey.length == 33) {
-                                        keys.add(ECKey.fromPublicOnly(pubKey));
+                                        inputKeys.put(input, ECKey.fromPublicOnly(pubKey));
                                     }
                                 }
                             }
@@ -101,7 +102,7 @@ public class SilentPaymentUtils {
                             if(input.getWitness() != null && input.getWitness().getPushCount() == 2) {
                                 byte[] pubKey = input.getWitness().getPushes().getLast();
                                 if(pubKey != null && pubKey.length == 33) {
-                                    keys.add(ECKey.fromPublicOnly(pubKey));
+                                    inputKeys.put(input, ECKey.fromPublicOnly(pubKey));
                                 }
                             }
                             break;
@@ -109,7 +110,7 @@ public class SilentPaymentUtils {
                             byte[] spkHash = ScriptType.P2PKH.getHashFromScript(scriptPubKey);
                             for(ScriptChunk scriptChunk : input.getScriptSig().getChunks()) {
                                 if(scriptChunk.isPubKey() && scriptChunk.getData().length == 33 && Arrays.equals(Utils.sha256hash160(scriptChunk.getData()), spkHash)) {
-                                    keys.add(scriptChunk.getPubKey());
+                                    inputKeys.put(input, scriptChunk.getPubKey());
                                     break;
                                 }
                             }
@@ -121,7 +122,7 @@ public class SilentPaymentUtils {
             }
         }
 
-        return keys;
+        return inputKeys;
     }
 
     public static boolean containsTaprootOutput(Transaction tx) {
@@ -164,7 +165,7 @@ public class SilentPaymentUtils {
             return null;
         }
 
-        List<ECKey> inputKeys = getInputPubKeys(tx, spentScriptPubKeys);
+        Map<TransactionInput, ECKey> inputKeys = getInputPubKeys(tx, spentScriptPubKeys);
         if(inputKeys.isEmpty()) {
             return null;
         }
@@ -175,8 +176,9 @@ public class SilentPaymentUtils {
 
         try {
             byte[][] inputPubKeys = new byte[inputKeys.size()][];
-            for(int i = 0; i < inputPubKeys.length; i++) {
-                inputPubKeys[i] = inputKeys.get(i).getPubKey(true);
+            int index = 0;
+            for (ECKey key : inputKeys.values()) {
+                inputPubKeys[index++] = key.getPubKey(true);
             }
             byte[] combinedPubKey = NativeSecp256k1.pubKeyCombine(inputPubKeys, true);
             byte[] smallestOutpoint = tx.getInputs().stream().map(input -> input.getOutpoint().bitcoinSerialize()).min(new Utils.LexicographicByteArrayComparator()).orElseThrow();
@@ -190,6 +192,16 @@ public class SilentPaymentUtils {
         return null;
     }
 
+    /**
+     * Computes the output addresses for a list of silent payments by calculating the shared secret
+     * between scan keys, spend keys, and the summed private key derived from the provided UTXOs.
+     * Updates each silent payment instance with the corresponding address.
+     *
+     * @param silentPayments the list of silent payments containing silent payment addresses and metadata
+     * @param utxos a map of UTXOs (unspent transaction outputs) to wallet nodes, containing information
+     *              about inputs used to derive the summed private key
+     * @throws InvalidSilentPaymentException if the computed shared secrets or addresses are invalid
+     */
     public static void computeOutputAddresses(List<SilentPayment> silentPayments, Map<HashIndex, WalletNode> utxos) throws InvalidSilentPaymentException {
         ECKey summedPrivateKey = getSummedPrivateKey(utxos.values());
         BigInteger inputHash = getInputHash(utxos.keySet(), summedPrivateKey);
@@ -212,6 +224,44 @@ public class SilentPaymentUtils {
         }
     }
 
+    /**
+     * Validates that the output scripts for silent payment outputs match the expected scripts
+     * computed from the ECDH shares. This implements BIP-375 output script verification.
+     *
+     * @param silentPayments  List of silent payments sending to a common scan key
+     * @param ecdhShare       The ECDH share (a * B_scan), either global or summed from per-input
+     * @param summedPublicKey The sum of all eligible input public keys
+     * @param outpoints       Set of outpoints for eligible inputs
+     * @throws InvalidSilentPaymentException if validation fails or scripts don't match
+     */
+    public static void validateOutputAddresses(List<SilentPayment> silentPayments, ECKey ecdhShare, ECKey summedPublicKey, Set<HashIndex> outpoints) throws InvalidSilentPaymentException {
+        BigInteger inputHash = SilentPaymentUtils.getInputHash(outpoints, summedPublicKey);
+        Map<ECKey, List<SilentPayment>> scanKeyGroups = SilentPaymentUtils.getScanKeyGroups(silentPayments);
+        for(Map.Entry<ECKey, List<SilentPayment>> scanKeyGroup : scanKeyGroups.entrySet()) {
+            // Compute shared secret from ECDH share and input hash
+            // Instead of: sharedSecret = scanKey.multiply(inputHash).multiply(summedPrivateKey.getPrivKey())
+            // We use: sharedSecret = ecdhShare.multiply(inputHash)
+            // Because ecdhShare is already (a * B_scan)
+            ECKey sharedSecret = ecdhShare.multiply(inputHash);
+
+            int k = 0;
+            for(SilentPayment silentPayment : scanKeyGroup.getValue()) {
+                BigInteger tk = new BigInteger(1, Utils.taggedHash(SilentPaymentUtils.BIP_0352_SHARED_SECRET_TAG,
+                        Utils.concat(sharedSecret.getPubKey(true), ByteBuffer.allocate(4).order(ByteOrder.BIG_ENDIAN).putInt(k).array())));
+                if(tk.equals(BigInteger.ZERO) || tk.compareTo(ECKey.CURVE.getCurve().getOrder()) >= 0) {
+                    throw new InvalidSilentPaymentException("The tk value is invalid for the eligible silent payments inputs");
+                }
+                ECKey spendKey = silentPayment.getSilentPaymentAddress().getSpendKey();
+                ECKey pkm = spendKey.add(ECKey.fromPublicOnly(ECKey.publicPointFromPrivate(tk).getEncoded(true)), true);
+                Address expectedAddress = ScriptType.P2TR.getAddress(pkm.getPubKeyXCoord());
+                if(!silentPayment.getAddress().equals(expectedAddress)) {
+                    throw new InvalidSilentPaymentException("Silent payment output address mismatch: expected " + expectedAddress + " but got " + silentPayment.getAddress());
+                }
+                k++;
+            }
+        }
+    }
+
     public static Map<ECKey, List<SilentPayment>> getScanKeyGroups(Collection<SilentPayment> silentPayments) {
         Map<ECKey, List<SilentPayment>> scanKeyGroups = new LinkedHashMap<>();
         for(SilentPayment silentPayment : silentPayments) {
@@ -223,9 +273,9 @@ public class SilentPaymentUtils {
         return scanKeyGroups;
     }
 
-    public static BigInteger getInputHash(Set<HashIndex> outpoints, ECKey summedPrivateKey) throws InvalidSilentPaymentException {
+    public static BigInteger getInputHash(Set<HashIndex> outpoints, ECKey summedInputKey) throws InvalidSilentPaymentException {
         byte[] smallestOutpoint = getSmallestOutpoint(outpoints);
-        byte[] concat = Utils.concat(smallestOutpoint, summedPrivateKey.getPubKey());
+        byte[] concat = Utils.concat(smallestOutpoint, summedInputKey.getPubKey(true));
         BigInteger inputHash = new BigInteger(1, Utils.taggedHash(BIP_0352_INPUTS_TAG, concat));
         if(inputHash.equals(BigInteger.ZERO) || inputHash.compareTo(ECKey.CURVE.getCurve().getOrder()) >= 0) {
             throw new InvalidSilentPaymentException("The input hash is invalid for the eligible silent payments inputs");
@@ -265,6 +315,22 @@ public class SilentPaymentUtils {
         }
 
         return summedPrivateKey;
+    }
+
+    public static ECKey getSummedPublicKey(Collection<ECKey> publicKeys) {
+        ECKey summedKey = null;
+
+        for(ECKey publicKey : publicKeys) {
+            if(publicKey != null) {
+                if(summedKey == null) {
+                    summedKey = publicKey;
+                } else {
+                    summedKey = summedKey.add(publicKey, true);
+                }
+            }
+        }
+
+        return summedKey;
     }
 
     public static byte[] getSmallestOutpoint(Set<HashIndex> outpoints) {
