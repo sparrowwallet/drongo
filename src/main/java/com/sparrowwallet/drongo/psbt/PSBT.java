@@ -71,14 +71,28 @@ public class PSBT {
     private static final Logger log = LoggerFactory.getLogger(PSBT.class);
 
     public PSBT(Transaction transaction) {
-        this.transaction = transaction;
+        //Create PSBTv2 by default
+        this.version = 2;
+        this.txVersion = transaction.getVersion();
+        this.fallbackLocktime = transaction.getLocktime();
+        this.inputCount = (long)transaction.getInputs().size();
+        this.outputCount = (long)transaction.getOutputs().size();
 
         for(int i = 0; i < transaction.getInputs().size(); i++) {
-            psbtInputs.add(new PSBTInput(this, i));
+            PSBTInput psbtInput = new PSBTInput(this, i);
+            TransactionInput txInput = transaction.getInputs().get(i);
+            psbtInput.setPrevTxid(txInput.getOutpoint().getHash());
+            psbtInput.setPrevIndex(txInput.getOutpoint().getIndex());
+            psbtInput.setSequence(txInput.getSequenceNumber());
+            psbtInputs.add(psbtInput);
         }
 
         for(int i = 0; i < transaction.getOutputs().size(); i++) {
-            psbtOutputs.add(new PSBTOutput(this, i));
+            PSBTOutput psbtOutput = new PSBTOutput(this, i);
+            TransactionOutput txOutput = transaction.getOutputs().get(i);
+            psbtOutput.setAmount(txOutput.getValue());
+            psbtOutput.setScript(txOutput.getScript());
+            psbtOutputs.add(psbtOutput);
         }
     }
 
@@ -88,6 +102,12 @@ public class PSBT {
 
     public PSBT(WalletTransaction walletTransaction, Integer version, boolean includeGlobalXpubs) {
         Wallet wallet = walletTransaction.getWallet();
+
+        //Default to PSBTv2
+        if(version == null) {
+            version = 2;
+        }
+        this.version = version;
 
         transaction = new Transaction(walletTransaction.getTransaction().bitcoinSerialize());
         List<WalletTransaction.Output> walletTransactionOutputs = new ArrayList<>(walletTransaction.getOutputs());
@@ -111,10 +131,6 @@ public class PSBT {
             for(Keystore keystore : walletTransaction.getWallet().getKeystores()) {
                 extendedPublicKeys.put(keystore.getExtendedPublicKey(), keystore.getKeyDerivation());
             }
-        }
-
-        if(version != null) {
-            this.version = version;
         }
 
         int inputIndex = 0;
@@ -154,20 +170,20 @@ public class PSBT {
                 }
             }
 
-            PSBTInput psbtInput = new PSBTInput(this, signingWallet.getScriptType(), inputIndex, utxo, utxoIndex, redeemScript, witnessScript, derivedPublicKeys, Collections.emptyMap(), tapInternalKey, alwaysIncludeNonWitnessTx);
+            PSBTInput psbtInput = new PSBTInput(this, signingWallet.getScriptType(), inputIndex, utxo, utxoIndex, txInput.getSequenceNumber(), redeemScript, witnessScript, derivedPublicKeys, Collections.emptyMap(), tapInternalKey, alwaysIncludeNonWitnessTx);
             psbtInputs.add(psbtInput);
         }
 
         for(int outputIndex = 0; outputIndex < walletTransactionOutputs.size(); outputIndex++) {
             WalletTransaction.Output output = walletTransactionOutputs.get(outputIndex);
+            TransactionOutput txOutput = transaction.getOutputs().get(outputIndex);
             PSBTOutput psbtOutput;
             if(output instanceof WalletTransaction.SilentPaymentOutput silentPaymentOutput) {
-                psbtOutput = new PSBTOutput(this, outputIndex, null, null, null, Collections.emptyMap(), Collections.emptyMap(), null, silentPaymentOutput.getSilentPayment().getSilentPaymentAddress(), silentPaymentOutput.getDnsSecProof());
+                psbtOutput = new PSBTOutput(this, outputIndex, null, txOutput.getValue(), txOutput.getScript(), null, null, Collections.emptyMap(), Collections.emptyMap(), null, silentPaymentOutput.getSilentPayment().getSilentPaymentAddress(), silentPaymentOutput.getDnsSecProof());
             } else if(output instanceof WalletTransaction.PaymentOutput paymentOutput) {
-                psbtOutput = new PSBTOutput(this, outputIndex, null, null, null, Collections.emptyMap(), Collections.emptyMap(), null, null, paymentOutput.getDnsSecProof());
+                psbtOutput = new PSBTOutput(this, outputIndex, null, txOutput.getValue(), txOutput.getScript(), null, null, Collections.emptyMap(), Collections.emptyMap(), null, null, paymentOutput.getDnsSecProof());
             } else if(output instanceof WalletTransaction.WalletNodeOutput walletNodeOutput) {
                 WalletNode outputNode = walletNodeOutput.getWalletNode();
-                TransactionOutput txOutput = transaction.getOutputs().get(outputIndex);
                 Wallet recipientWallet = outputNode.getWallet();
 
                 //Construct dummy transaction to spend the UTXO created by this wallet's txOutput
@@ -195,11 +211,20 @@ public class PSBT {
                     }
                 }
 
-                psbtOutput = new PSBTOutput(this, outputIndex, recipientWallet.getScriptType(), redeemScript, witnessScript, derivedPublicKeys, Collections.emptyMap(), tapInternalKey, null, null);
+                psbtOutput = new PSBTOutput(this, outputIndex, recipientWallet.getScriptType(), txOutput.getValue(), txOutput.getScript(), redeemScript, witnessScript, derivedPublicKeys, Collections.emptyMap(), tapInternalKey, null, null);
             } else {
-                psbtOutput = new PSBTOutput(this, outputIndex, null, null, null, Collections.emptyMap(), Collections.emptyMap(), null, null, null);
+                psbtOutput = new PSBTOutput(this, outputIndex, null, txOutput.getValue(), txOutput.getScript(), null, null, Collections.emptyMap(), Collections.emptyMap(), null, null, null);
             }
             psbtOutputs.add(psbtOutput);
+        }
+
+        //Convert to PSBTv2 format
+        if(this.version >= 2) {
+            this.txVersion = transaction.getVersion();
+            this.fallbackLocktime = transaction.getLocktime();
+            this.inputCount = (long)transaction.getInputs().size();
+            this.outputCount = (long)transaction.getOutputs().size();
+            this.transaction = null;
         }
     }
 
@@ -825,7 +850,7 @@ public class PSBT {
         byte[] psbtTxBytes = psbt.getTransaction().bitcoinSerialize();
 
         if(!Arrays.equals(txBytes, psbtTxBytes)) {
-            throw new IllegalArgumentException("Provided PSBT does contain a matching global transaction");
+            throw new IllegalArgumentException("Provided PSBT does not contain a matching global transaction");
         }
 
         if(isFinalized() || psbt.isFinalized()) {
@@ -989,6 +1014,10 @@ public class PSBT {
         return version;
     }
 
+    void setVersion(Integer version) {
+        this.version = version;
+    }
+
     public KeyDerivation getKeyDerivation(ExtendedKey publicKey) {
         return extendedPublicKeys.get(publicKey);
     }
@@ -1139,7 +1168,7 @@ public class PSBT {
             this.transaction = null;
         }
 
-        this.version = version;
+        this.version = version == 0 ? null : version;
     }
 
     private long getLocktime(List<PSBTInput> psbtInputs, Long fallbackLocktime) {
@@ -1171,20 +1200,14 @@ public class PSBT {
     }
 
     public PSBT getForExport() {
-        //If this PSBT contains silent payment outputs, it must be converted to PSBTv2
-        if(getPsbtOutputs().stream().anyMatch(psbtOutput -> psbtOutput.getSilentPaymentAddress() != null)) {
+        boolean hasSilentPayments = getPsbtOutputs().stream().anyMatch(psbtOutput -> psbtOutput.getSilentPaymentAddress() != null);
+
+        //Export as PSBTv0 unless silent payments are present
+        if(!hasSilentPayments && getPsbtVersion() >= 2) {
             try {
-                PSBT psbt2 = new PSBT(serialize());
-                //PSBTv0 serialized outputs do not contain silent payment info, so copy over
-                for(int i = 0; i < getPsbtOutputs().size(); i++) {
-                    PSBTOutput psbtOutput = getPsbtOutputs().get(i);
-                    PSBTOutput psbtOutput2 = psbt2.getPsbtOutputs().get(i);
-                    psbtOutput2.setSilentPaymentAddress(psbtOutput.getSilentPaymentAddress());
-                }
-                if(psbt2.getVersion() == null || psbt2.getVersion() == 0) {
-                    psbt2.convertVersion(2);
-                    return psbt2;
-                }
+                PSBT psbt0 = new PSBT(serialize());
+                psbt0.convertVersion(0);
+                return psbt0;
             } catch(PSBTParseException e) {
                 throw new IllegalArgumentException("Could not reparse PSBT", e);
             }

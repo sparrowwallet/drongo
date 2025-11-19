@@ -331,6 +331,7 @@ public class PSBTTest {
         transaction.addInput(Sha256Hash.wrap("1dea7cd05979072a3578cab271c02244ea8a090bbb46aa680a65ecd027048d83"), 1, new Script(new byte[0]));
 
         PSBT psbt = new PSBT(transaction);
+        psbt.convertVersion(0);  // BIP174 test requires PSBTv0 with no PSBT_GLOBAL_VERSION field
         Assertions.assertEquals("70736274ff01009a020000000258e87a21b56daf0c23be8e7070456c336f7cbaa5c8757924f545887bb2abdd750000000000ffffffff838d0427d0ec650a68aa46bb0b098aea4422c071b2ca78352a077959d07cea1d0100000000ffffffff0270aaf00800000000160014d85c2b71d0060b09c9886aeb815e50991dda124d00e1f5050000000016001400aea9a2e5f0f876a588df5546e8742d1d87008f000000000000000000", psbt.toString());
 
         psbt.getPsbtInputs().get(0).setRedeemScript(new Script(Utils.hexToBytes("5221029583bf39ae0a609747ad199addd634fa6108559d6c5cd39b4c2183f1ab96e07f2102dab61ff49a14db6a7d02b0cd1fbb78fc4b18312b5b4e54dae4dba2fbfef536d752ae")));

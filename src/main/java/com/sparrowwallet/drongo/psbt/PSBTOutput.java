@@ -56,7 +56,7 @@ public class PSBTOutput {
         this.index = index;
     }
 
-    PSBTOutput(PSBT psbt, int index, ScriptType scriptType, Script redeemScript, Script witnessScript, Map<ECKey, KeyDerivation> derivedPublicKeys,
+    PSBTOutput(PSBT psbt, int index, ScriptType scriptType, Long amount, Script script, Script redeemScript, Script witnessScript, Map<ECKey, KeyDerivation> derivedPublicKeys,
                Map<String, String> proprietary, ECKey tapInternalKey, SilentPaymentAddress silentPaymentAddress, Map<String, byte[]> dnssecProof) {
         this(psbt, index);
 
@@ -78,6 +78,12 @@ public class PSBTOutput {
 
         this.silentPaymentAddress = silentPaymentAddress;
         this.dnssecProof = dnssecProof;
+
+        //Populate PSBTv2 fields if parent PSBT is v2
+        if(psbt.getPsbtVersion() >= 2) {
+            this.amount = amount;
+            this.script = script;
+        }
     }
 
     PSBTOutput(PSBT psbt, List<PSBTEntry> outputEntries, int index) throws PSBTParseException {

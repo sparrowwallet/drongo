@@ -103,8 +103,8 @@ public class Transaction extends ChildMessage {
     }
 
     public Sha256Hash getTxId() {
-        if (cachedTxId == null) {
-            if (!hasWitnesses() && cachedWTxId != null) {
+        if(cachedTxId == null) {
+            if(!isSegwit() && cachedWTxId != null) {
                 cachedTxId = cachedWTxId;
             } else {
                 cachedTxId = calculateTxId(false);
@@ -114,11 +114,11 @@ public class Transaction extends ChildMessage {
     }
 
     public Sha256Hash getWTxId() {
-        if (cachedWTxId == null) {
-            if (!hasWitnesses() && cachedTxId != null) {
+        if(cachedWTxId == null) {
+            if(!isSegwit() && cachedTxId != null) {
                 cachedWTxId = cachedTxId;
             } else {
-                cachedWTxId = calculateTxId(true);
+                cachedWTxId = calculateTxId(isSegwit());
             }
         }
         return cachedWTxId;

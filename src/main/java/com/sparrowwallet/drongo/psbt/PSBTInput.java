@@ -81,7 +81,7 @@ public class PSBTInput {
         this.index = index;
     }
 
-    PSBTInput(PSBT psbt, ScriptType scriptType, int index, Transaction utxo, int utxoIndex, Script redeemScript, Script witnessScript, Map<ECKey, KeyDerivation> derivedPublicKeys, Map<String, String> proprietary, ECKey tapInternalKey, boolean alwaysAddNonWitnessTx) {
+    PSBTInput(PSBT psbt, ScriptType scriptType, int index, Transaction utxo, int utxoIndex, Long sequence, Script redeemScript, Script witnessScript, Map<ECKey, KeyDerivation> derivedPublicKeys, Map<String, String> proprietary, ECKey tapInternalKey, boolean alwaysAddNonWitnessTx) {
         this(psbt, index);
 
         if(Arrays.asList(ScriptType.WITNESS_TYPES).contains(scriptType)) {
@@ -111,7 +111,14 @@ public class PSBTInput {
             tapDerivedPublicKeys.put(this.tapInternalKey, Map.of(tapKeyDerivation, Collections.emptyList()));
         }
 
-        this.sigHash = getDefaultSigHash();
+        this.sigHash = (scriptType == P2TR ? SigHash.DEFAULT : SigHash.ALL);
+
+        //Populate PSBTv2 fields if parent PSBT is v2
+        if(psbt.getPsbtVersion() >= 2) {
+            this.prevTxid = utxo.getTxId();
+            this.prevIndex = (long)utxoIndex;
+            this.sequence = sequence;
+        }
     }
 
     PSBTInput(PSBT psbt, List<PSBTEntry> inputEntries, int index) throws PSBTParseException {
