@@ -15,6 +15,7 @@ import org.slf4j.LoggerFactory;
 import java.math.BigInteger;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
+import java.security.SecureRandom;
 import java.util.*;
 
 import static com.sparrowwallet.drongo.protocol.ScriptType.P2TR;
@@ -202,17 +203,22 @@ public class SilentPaymentUtils {
      *              about inputs used to derive the summed private key
      * @throws InvalidSilentPaymentException if the computed shared secrets or addresses are invalid
      */
-    public static void computeOutputAddresses(List<SilentPayment> silentPayments, Map<HashIndex, WalletNode> utxos) throws InvalidSilentPaymentException {
+    public static Map<ECKey, EcdhShareAndProof> computeOutputAddresses(List<SilentPayment> silentPayments, Map<HashIndex, WalletNode> utxos) throws InvalidSilentPaymentException {
+        Map<ECKey, EcdhShareAndProof> scanKeyProofs = new LinkedHashMap<>();
+        SecureRandom random = new SecureRandom();
         ECKey summedPrivateKey = getSummedPrivateKey(utxos.values());
         BigInteger inputHash = getInputHash(utxos.keySet(), summedPrivateKey);
         Map<ECKey, List<SilentPayment>> scanKeyGroups = getScanKeyGroups(silentPayments);
         for(Map.Entry<ECKey, List<SilentPayment>> scanKeyGroup : scanKeyGroups.entrySet()) {
             ECKey scanKey = scanKeyGroup.getKey();
-            ECKey sharedSecret = scanKey.multiply(inputHash).multiply(summedPrivateKey.getPrivKey(), true);
+            ECKey ecdhShare = scanKey.multiply(summedPrivateKey.getPrivKey(), true);
+            SilentPaymentsDLEQProof dleqProof = SilentPaymentsDLEQProof.generate(summedPrivateKey.getPrivKey(), scanKey, random);
+            scanKeyProofs.put(scanKey, new EcdhShareAndProof(ecdhShare, dleqProof));
+            ECKey sharedSecret = ecdhShare.multiply(inputHash, true);
             int k = 0;
             for(SilentPayment silentPayment : scanKeyGroup.getValue()) {
                 BigInteger tk = new BigInteger(1, Utils.taggedHash(BIP_0352_SHARED_SECRET_TAG,
-                        Utils.concat(sharedSecret.getPubKey(), ByteBuffer.allocate(4).order(ByteOrder.BIG_ENDIAN).putInt(k).array())));
+                        Utils.concat(sharedSecret.getPubKey(true), ByteBuffer.allocate(4).order(ByteOrder.BIG_ENDIAN).putInt(k).array())));
                 if(tk.equals(BigInteger.ZERO) || tk.compareTo(ECKey.CURVE.getCurve().getOrder()) >= 0) {
                     throw new InvalidSilentPaymentException("The tk value is invalid for the eligible silent payments inputs");
                 }
@@ -222,6 +228,8 @@ public class SilentPaymentUtils {
                 k++;
             }
         }
+
+        return scanKeyProofs;
     }
 
     /**
@@ -358,4 +366,6 @@ public class SilentPaymentUtils {
         System.arraycopy(uncompressedKey, 33, key, 0, 32);
         return Utils.reverseBytes(key);
     }
+
+    public record EcdhShareAndProof(ECKey ecdhShare, SilentPaymentsDLEQProof dleqProof) {}
 }

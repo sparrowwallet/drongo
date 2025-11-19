@@ -4,6 +4,7 @@ import com.sparrowwallet.drongo.crypto.DLEQProof;
 import com.sparrowwallet.drongo.crypto.ECKey;
 
 import java.math.BigInteger;
+import java.security.SecureRandom;
 import java.util.Arrays;
 
 /**
@@ -30,6 +31,12 @@ public class SilentPaymentsDLEQProof {
             throw new IllegalArgumentException("DLEQ proof must be exactly 64 bytes, got " + proofBytes.length);
         }
         this.proof = Arrays.copyOf(proofBytes, proofBytes.length);
+    }
+
+    public static SilentPaymentsDLEQProof generate(BigInteger privateKey, ECKey scanKey, SecureRandom random) throws InvalidSilentPaymentException {
+        byte[] auxRand = new byte[32];
+        random.nextBytes(auxRand);
+        return generate(privateKey, scanKey, auxRand);
     }
 
     /**

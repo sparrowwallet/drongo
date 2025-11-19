@@ -322,8 +322,7 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
     }
 
     public boolean canSendSilentPayments() {
-        return getKeystores().size() == 1 && getKeystores().getFirst().hasPrivateKey() && policyType == PolicyType.SINGLE
-                && SilentPayment.VALID_INPUT_SCRIPT_TYPES.contains(scriptType);
+        return getKeystores().size() == 1 && policyType == PolicyType.SINGLE && SilentPayment.VALID_INPUT_SCRIPT_TYPES.contains(scriptType);
     }
 
     public StandardAccount getStandardAccountType() {
@@ -1667,7 +1666,12 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
                     .map(psbtOutput -> new SilentPayment(psbtOutput.getSilentPaymentAddress(), null, psbtOutput.getAmount(), false)).collect(Collectors.toList());
             Map<HashIndex, WalletNode> utxos = signingNodes.keySet().stream()
                     .collect(Collectors.toMap(psbtInput -> new HashIndex(psbtInput.getPrevTxid(), psbtInput.getPrevIndex()), signingNodes::get));
-            SilentPaymentUtils.computeOutputAddresses(silentPayments, utxos);
+            Map<ECKey, SilentPaymentUtils.EcdhShareAndProof> scanKeyProofs = SilentPaymentUtils.computeOutputAddresses(silentPayments, utxos);
+            scanKeyProofs.forEach((key, ecdhShareAndProof) -> {
+                psbt.getSilentPaymentsEcdhShares().put(key, ecdhShareAndProof.ecdhShare());
+                psbt.getSilentPaymentsDLEQProofs().put(key, ecdhShareAndProof.dleqProof());
+            });
+
             for(int i = 0; i < silentOutputs.size(); i++) {
                 PSBTOutput silentOutput = silentOutputs.get(i);
                 SilentPayment silentPayment = silentPayments.get(i);

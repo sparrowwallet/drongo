@@ -613,6 +613,13 @@ public class PSBT {
         }
     }
 
+    public void validateSilentPayments(Transaction extractedTransaction) throws PSBTProofException {
+        Map<HashIndex, Script> spentScriptPubKeys = getPsbtInputs().stream()
+                .collect(Collectors.toMap(psbtInput -> new HashIndex(psbtInput.getPrevTxid(), psbtInput.getPrevIndex()), psbtInput -> psbtInput.getUtxo().getScript()));
+        Map<TransactionInput, ECKey> inputPublicKeys = SilentPaymentUtils.getInputPubKeys(extractedTransaction, spentScriptPubKeys);
+        validateSilentPayments(inputPublicKeys);
+    }
+
     /**
      * Validates silent payment ECDH shares and DLEQ proofs according to BIP-375.
      *
@@ -667,7 +674,7 @@ public class PSBT {
                 try {
                     SilentPaymentUtils.validateOutputAddresses(silentPayments, globalEcdhShare, summedPublicKey, outpoints);
                 } catch(InvalidSilentPaymentException e) {
-                    throw new PSBTProofException(e);
+                    throw new PSBTProofException(e.getMessage());
                 }
             } else if(hasGlobalEcdhShare || hasGlobalDleqProof) {
                 throw new PSBTProofException("Global ECDH share and DLEQ proof must both be present for scan key: " + scanKey);
@@ -700,7 +707,7 @@ public class PSBT {
                 try {
                     SilentPaymentUtils.validateOutputAddresses(silentPayments, summedEcdhShare, summedPublicKey, outpoints);
                 } catch(InvalidSilentPaymentException e) {
-                    throw new PSBTProofException(e);
+                    throw new PSBTProofException(e.getMessage());
                 }
             }
         }
@@ -879,7 +886,7 @@ public class PSBT {
         }
     }
 
-    public Transaction extractTransaction() {
+    public Transaction extractTransaction() throws PSBTProofException {
         boolean hasWitness = false;
         for(PSBTInput psbtInput : getPsbtInputs()) {
             if(psbtInput.getFinalScriptWitness() != null) {
@@ -916,6 +923,10 @@ public class PSBT {
                 }
                 txOutput.setScriptBytes(psbtOutput.script().getProgram());
             }
+        }
+
+        if(getPsbtOutputs().stream().anyMatch(output -> output.getSilentPaymentAddress() != null)) {
+            validateSilentPayments(finalTransaction);
         }
 
         return finalTransaction;
@@ -999,7 +1010,7 @@ public class PSBT {
             for(PSBTOutput psbtOutput : getPsbtOutputs()) {
                 //For unsigned transactions set the output script to the serialized silent payments address if present as per BIP375
                 if(psbtOutput.getSilentPaymentAddress() != null) {
-                    transaction.addOutput(psbtOutput.getAmount(), new Script(psbtOutput.getSilentPaymentAddress().serialize()));
+                    transaction.addOutput(psbtOutput.getAmount(), new Script(List.of(ScriptChunk.fromData(psbtOutput.getSilentPaymentAddress().serialize()))));
                 } else {
                     transaction.addOutput(psbtOutput.getAmount(), psbtOutput.getScript() == null ? new Script(new byte[0]) : psbtOutput.getScript());
                 }
