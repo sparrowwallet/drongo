@@ -713,6 +713,27 @@ public class PSBT {
         }
     }
 
+    public boolean possibleUnverifiableSilentPaymentsTransaction(Transaction transaction) {
+        if(getPsbtOutputs().stream().anyMatch(output -> output.getSilentPaymentAddress() != null)) {
+            Set<HashIndex> ourInputs = getPsbtInputs().stream().map(input -> new HashIndex(input.getPrevTxid(), input.getPrevIndex())).collect(Collectors.toSet());
+            Set<HashIndex> txInputs = transaction.getInputs().stream().map(input -> new HashIndex(input.getOutpoint().getHash(), input.getOutpoint().getIndex())).collect(Collectors.toSet());
+            List<Long> ourAmounts = getPsbtOutputs().stream().map(PSBTOutput::getAmount).collect(Collectors.toList());
+            List<Long> txAmounts = transaction.getOutputs().stream().map(TransactionOutput::getValue).collect(Collectors.toList());
+
+            if(ourInputs.equals(txInputs) && ourAmounts.equals(txAmounts)) {
+                for(int i = 0; i < getPsbtOutputs().size(); i++) {
+                    PSBTOutput psbtOutput = getPsbtOutputs().get(i);
+                    TransactionOutput txOutput = transaction.getOutputs().get(i);
+                    if(psbtOutput.getSilentPaymentAddress() != null && !psbtOutput.getScript().equals(txOutput.getScript()) && txOutput.getScript().getToAddress() != null) {
+                        return true;
+                    }
+                }
+            }
+        }
+
+        return false;
+    }
+
     public boolean hasSignatures() {
         for(PSBTInput psbtInput : getPsbtInputs()) {
             if(!psbtInput.getPartialSignatures().isEmpty() || psbtInput.getTapKeyPathSignature() != null || psbtInput.getFinalScriptSig() != null || psbtInput.getFinalScriptWitness() != null) {
@@ -741,6 +762,20 @@ public class PSBT {
         }
 
         return true;
+    }
+
+    public void copyFinalizedFields(PSBT finalizedPsbt) {
+        if(!matches(finalizedPsbt)) {
+            throw new IllegalArgumentException("Provided PSBT does not represent a matching transaction");
+        }
+
+        for(int i = 0; i < getPsbtInputs().size(); i++) {
+            PSBTInput input = getPsbtInputs().get(i);
+            PSBTInput finalizedInput = finalizedPsbt.getPsbtInputs().get(i);
+            input.setFinalScriptSig(finalizedInput.getFinalScriptSig());
+            input.setFinalScriptWitness(finalizedInput.getFinalScriptWitness());
+            input.clearNonFinalFields();
+        }
     }
 
     private List<PSBTEntry> getGlobalEntries() {
@@ -842,6 +877,12 @@ public class PSBT {
         return baos.toByteArray();
     }
 
+    public void verifyCombinedSignatures(PSBT psbt) throws PSBTSignatureException {
+        PSBT verificationCopy = this.copy();
+        verificationCopy.combine(psbt);
+        verificationCopy.verifySignatures();
+    }
+
     public void combine(PSBT... psbts) {
         for(PSBT psbt : psbts) {
             combine(psbt);
@@ -853,11 +894,8 @@ public class PSBT {
             psbt.convertVersion(getPsbtVersion());
         }
 
-        byte[] txBytes = getTransaction().bitcoinSerialize();
-        byte[] psbtTxBytes = psbt.getTransaction().bitcoinSerialize();
-
-        if(!Arrays.equals(txBytes, psbtTxBytes)) {
-            throw new IllegalArgumentException("Provided PSBT does not contain a matching global transaction");
+        if(!matches(psbt)) {
+            throw new IllegalArgumentException("Provided PSBT does not represent a matching transaction");
         }
 
         if(isFinalized() || psbt.isFinalized()) {
@@ -919,7 +957,7 @@ public class PSBT {
             PSBTOutput psbtOutput = getPsbtOutputs().get(i);
             if(psbtOutput.getSilentPaymentAddress() != null) {
                 if(psbtOutput.script() == null || !ScriptType.P2TR.isScriptType(psbtOutput.script())) {
-                    throw new IllegalStateException("Silent payment output at index " + i + " must provide a valid P2TR PSBT_OUT_SCRIPT");
+                    throw new PSBTProofException("Silent payment output at index " + i + " must provide a valid Taproot output script");
                 }
                 txOutput.setScriptBytes(psbtOutput.script().getProgram());
             }
@@ -932,24 +970,28 @@ public class PSBT {
         return finalTransaction;
     }
 
-    public PSBT getPublicCopy() {
+    public PSBT copy() {
         try {
-            PSBT publicCopy = new PSBT(serialize());
-            publicCopy.extendedPublicKeys.clear();
-            publicCopy.globalProprietary.clear();
-            for(PSBTInput psbtInput : publicCopy.getPsbtInputs()) {
-                psbtInput.getDerivedPublicKeys().clear();
-                psbtInput.getProprietary().clear();
-            }
-            for(PSBTOutput psbtOutput : publicCopy.getPsbtOutputs()) {
-                psbtOutput.getDerivedPublicKeys().clear();
-                psbtOutput.getProprietary().clear();
-            }
-
-            return publicCopy;
+            return new PSBT(serialize(), false);
         } catch(PSBTParseException e) {
-            throw new IllegalStateException("Could not parse PSBT", e);
+            throw new IllegalStateException("Error copying existing PSBT: " + e.getMessage(), e);
         }
+    }
+
+    public PSBT getPublicCopy() {
+        PSBT publicCopy = this.copy();
+        publicCopy.extendedPublicKeys.clear();
+        publicCopy.globalProprietary.clear();
+        for(PSBTInput psbtInput : publicCopy.getPsbtInputs()) {
+            psbtInput.getDerivedPublicKeys().clear();
+            psbtInput.getProprietary().clear();
+        }
+        for(PSBTOutput psbtOutput : publicCopy.getPsbtOutputs()) {
+            psbtOutput.getDerivedPublicKeys().clear();
+            psbtOutput.getProprietary().clear();
+        }
+
+        return publicCopy;
     }
 
     public void moveInput(int fromIndex, int toIndex) {
@@ -986,30 +1028,24 @@ public class PSBT {
     }
 
     public Transaction getTransaction() {
-        return getTransaction(true);
+        return getTransaction(false);
     }
 
-    public Transaction getTransaction(boolean setSequence) {
+    public Transaction getTransaction(boolean uniqueId) {
         if(getPsbtVersion() >= 2) {
             Transaction transaction = new Transaction();
             transaction.setVersion(txVersion);
             transaction.setLocktime(getLocktime(psbtInputs, fallbackLocktime));
             for(PSBTInput psbtInput : getPsbtInputs()) {
                 TransactionInput transactionInput = transaction.addInput(psbtInput.getPrevTxid(), psbtInput.getPrevIndex(), new Script(new byte[0]));
-                if(setSequence) {
-                    if(psbtInput.getSequence() == null) {
-                        transactionInput.setSequenceNumber(TransactionInput.SEQUENCE_LOCKTIME_DISABLED);
-                    } else {
-                        transactionInput.setSequenceNumber(psbtInput.getSequence());
-                    }
-                } else {
-                    //Sequence number is set to zero to provide a static txid while updating
+                if(uniqueId) {
                     transactionInput.setSequenceNumber(0);
+                } else {
+                    transactionInput.setSequenceNumber(psbtInput.getSequence() == null ? TransactionInput.SEQUENCE_LOCKTIME_DISABLED : psbtInput.getSequence());
                 }
             }
             for(PSBTOutput psbtOutput : getPsbtOutputs()) {
-                //For unsigned transactions set the output script to the serialized silent payments address if present as per BIP375
-                if(psbtOutput.getSilentPaymentAddress() != null) {
+                if(uniqueId && psbtOutput.getSilentPaymentAddress() != null) {
                     transaction.addOutput(psbtOutput.getAmount(), new Script(List.of(ScriptChunk.fromData(psbtOutput.getSilentPaymentAddress().serialize()))));
                 } else {
                     transaction.addOutput(psbtOutput.getAmount(), psbtOutput.getScript() == null ? new Script(new byte[0]) : psbtOutput.getScript());
@@ -1019,6 +1055,22 @@ public class PSBT {
         }
 
         return transaction;
+    }
+
+    /**
+     * Checks if the given PSBT matches the current PSBT by comparing the txids of the transactions they represent.
+     * When comparing two PSBTs of version 2 or higher, it compares the txids using transactions with zero sequence and output scripts set to silent payment addresses.
+     * If either PSBT is an earlier version, compares the txids of their transactions with the old (non-witness) serialization format.
+     *
+     * @param psbt the PSBT instance to compare with the current PSBT
+     * @return true if the global transaction IDs match; false otherwise
+     */
+    public boolean matches(PSBT psbt) {
+        if(getPsbtVersion() >= 2 && psbt.getPsbtVersion() >= 2) {
+            return getTransaction(true).getTxId().equals(psbt.getTransaction(true).getTxId());
+        }
+
+        return getTransaction().getTxId().equals(psbt.getTransaction().getTxId());
     }
 
     public Integer getVersion() {
@@ -1215,13 +1267,9 @@ public class PSBT {
 
         //Export as PSBTv0 unless silent payments are present
         if(!hasSilentPayments && getPsbtVersion() >= 2) {
-            try {
-                PSBT psbt0 = new PSBT(serialize());
-                psbt0.convertVersion(0);
-                return psbt0;
-            } catch(PSBTParseException e) {
-                throw new IllegalArgumentException("Could not reparse PSBT", e);
-            }
+            PSBT psbt0 = this.copy();
+            psbt0.convertVersion(0);
+            return psbt0;
         }
 
         return this;

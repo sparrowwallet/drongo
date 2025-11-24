@@ -82,7 +82,9 @@ public class PSBTOutput {
         //Populate PSBTv2 fields if parent PSBT is v2
         if(psbt.getPsbtVersion() >= 2) {
             this.amount = amount;
-            this.script = script;
+            if(!script.isEmpty() || silentPaymentAddress == null) {
+                this.script = script;
+            }
         }
     }
 
