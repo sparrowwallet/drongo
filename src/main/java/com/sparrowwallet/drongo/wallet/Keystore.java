@@ -203,11 +203,19 @@ public class Keystore extends Persistable {
     }
 
     public ExtendedKey getExtendedPrivateKey() throws MnemonicException {
+        return getExtendedPrivateKey(true);
+    }
+
+    public ExtendedKey getExtendedPrivateKey(boolean resetPathToDerivedDepth) throws MnemonicException {
         List<ChildNumber> derivation = getKeyDerivation().getDerivation();
         DeterministicKey derivedKey = getExtendedMasterPrivateKey().getKey(derivation);
         ExtendedKey xprv = new ExtendedKey(derivedKey, derivedKey.getParentFingerprint(), derivation.isEmpty() ? ChildNumber.ZERO : derivation.get(derivation.size() - 1));
-        //Recreate from xprv string to reset path to single ChildNumber at the derived depth
-        return ExtendedKey.fromDescriptor(xprv.toString());
+        if(resetPathToDerivedDepth) {
+            //Recreate from xprv string to reset path to single ChildNumber at the derived depth
+            return ExtendedKey.fromDescriptor(xprv.toString());
+        } else {
+            return xprv;
+        }
     }
 
     public ECKey getKey(WalletNode walletNode) throws MnemonicException {

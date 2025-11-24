@@ -24,6 +24,12 @@ public class MasterPrivateExtendedKey extends Persistable implements Encryptable
         this.encryptedKey = encryptedKey;
     }
 
+    public MasterPrivateExtendedKey(DeterministicKey key) {
+        this.privateKey = key.getPrivKeyBytes();
+        this.chainCode = key.getChainCode();
+        this.encryptedKey = null;
+    }
+
     public DeterministicKey getPrivateKey() {
         return HDKeyDerivation.createMasterPrivKeyFromBytes(privateKey, chainCode);
     }
