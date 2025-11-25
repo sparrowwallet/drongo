@@ -37,7 +37,7 @@ public class Bech32 {
     };
 
     private static final int BECH32_CHECKSUM_LEN = 6;
-    public static final char BECH32_SEPERATOR = '1';
+    public static final char BECH32_SEPARATOR = '1';
 
     public static class Bech32Data {
         public final String hrp;
@@ -149,7 +149,7 @@ public class Bech32 {
         System.arraycopy(checksum, 0, combined, values.length, checksum.length);
         StringBuilder sb = new StringBuilder(hrp.length() + 1 + combined.length);
         sb.append(hrp);
-        sb.append(BECH32_SEPERATOR);
+        sb.append(BECH32_SEPARATOR);
         for (byte b : combined) {
             sb.append(CHARSET.charAt(b));
         }
@@ -162,7 +162,7 @@ public class Bech32 {
     }
 
     public static Bech32Data decode(final String str, int limit) {
-        final int separatorPos = str.lastIndexOf(BECH32_SEPERATOR);
+        final int separatorPos = str.lastIndexOf(BECH32_SEPARATOR);
         validate(str, limit, separatorPos, BECH32_CHECKSUM_LEN);
         byte[] values = rawDecode(str, separatorPos);
         String hrp = str.substring(0, separatorPos).toLowerCase(Locale.ROOT);
