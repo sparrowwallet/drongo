@@ -22,10 +22,10 @@ import java.util.Locale;
 
 public class Bech32 {
     /** The Bech32 character set for encoding. */
-    private static final String CHARSET = "qpzry9x8gf2tvdw0s3jn54khce6mua7l";
+    public static final String CHARSET = "qpzry9x8gf2tvdw0s3jn54khce6mua7l";
 
     /** The Bech32 character set for decoding. */
-    private static final byte[] CHARSET_REV = {
+    public static final byte[] CHARSET_REV = {
             -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
             -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
             -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
@@ -35,6 +35,9 @@ public class Bech32 {
             -1, 29, -1, 24, 13, 25,  9,  8, 23, -1, 18, 22, 31, 27, 19, -1,
             1,  0,  3, 16, 11, 28, 12, 14,  6,  4,  2, -1, -1, -1, -1, -1
     };
+
+    private static final int BECH32_CHECKSUM_LEN = 6;
+    public static final char BECH32_SEPERATOR = '1';
 
     public static class Bech32Data {
         public final String hrp;
@@ -102,12 +105,12 @@ public class Bech32 {
     /** Create a checksum. */
     private static byte[] createChecksum(final String hrp, Encoding encoding, final byte[] values)  {
         byte[] hrpExpanded = expandHrp(hrp);
-        byte[] enc = new byte[hrpExpanded.length + values.length + 6];
+        byte[] enc = new byte[hrpExpanded.length + values.length + BECH32_CHECKSUM_LEN];
         System.arraycopy(hrpExpanded, 0, enc, 0, hrpExpanded.length);
         System.arraycopy(values, 0, enc, hrpExpanded.length, values.length);
         int mod = polymod(enc) ^ encoding.checksumConstant;
-        byte[] ret = new byte[6];
-        for (int i = 0; i < 6; ++i) {
+        byte[] ret = new byte[BECH32_CHECKSUM_LEN];
+        for (int i = 0; i < BECH32_CHECKSUM_LEN; ++i) {
             ret[i] = (byte) ((mod >>> (5 * (5 - i))) & 31);
         }
         return ret;
@@ -146,7 +149,7 @@ public class Bech32 {
         System.arraycopy(checksum, 0, combined, values.length, checksum.length);
         StringBuilder sb = new StringBuilder(hrp.length() + 1 + combined.length);
         sb.append(hrp);
-        sb.append('1');
+        sb.append(BECH32_SEPERATOR);
         for (byte b : combined) {
             sb.append(CHARSET.charAt(b));
         }
@@ -159,6 +162,21 @@ public class Bech32 {
     }
 
     public static Bech32Data decode(final String str, int limit) {
+        final int separatorPos = str.lastIndexOf(BECH32_SEPERATOR);
+        validate(str, limit, separatorPos, BECH32_CHECKSUM_LEN);
+        byte[] values = rawDecode(str, separatorPos);
+        String hrp = str.substring(0, separatorPos).toLowerCase(Locale.ROOT);
+        Encoding encoding = verifyChecksum(hrp, values);
+        if(encoding == null) {
+            throw new ProtocolException("Invalid checksum");
+        }
+
+        return new Bech32Data(hrp, Arrays.copyOfRange(values, 0, values.length - BECH32_CHECKSUM_LEN), encoding);
+    }
+
+    /** Helper for validating the basic string correctness */
+    public static void validate(final String str, int limit, int separatorPos, int checksumLen) {
+        if (separatorPos < 1) throw new ProtocolException("Missing human-readable part");
         boolean lower = false, upper = false;
         if (str.length() < 8)
             throw new ProtocolException("Input too short: " + str.length());
@@ -178,23 +196,23 @@ public class Bech32 {
                 upper = true;
             }
         }
-        final int pos = str.lastIndexOf('1');
-        if (pos < 1) throw new ProtocolException("Missing human-readable part");
-        final int dataPartLength = str.length() - 1 - pos;
-        if (dataPartLength < 6) throw new ProtocolException("Data part too short: " + dataPartLength);
+        final int dataPartLength = str.length() - 1 - separatorPos;
+        if (dataPartLength < checksumLen) throw new ProtocolException("Data part too short: " + dataPartLength);
+
+        for (int i = 0; i < dataPartLength; ++i) {
+            char c = str.charAt(i + separatorPos + 1);
+            if (CHARSET_REV[c] == -1) throw new ProtocolException("Invalid character " + c + " at position " + i);
+        }
+    }
+
+    public static byte[] rawDecode(final String str, int separator_pos) {
+        final int dataPartLength = str.length() - 1 - separator_pos;
         byte[] values = new byte[dataPartLength];
         for (int i = 0; i < dataPartLength; ++i) {
-            char c = str.charAt(i + pos + 1);
-            if (CHARSET_REV[c] == -1) throw new ProtocolException("Invalid character " + c + " at position " + i);
+            char c = str.charAt(i + separator_pos + 1);
             values[i] = CHARSET_REV[c];
         }
-        String hrp = str.substring(0, pos).toLowerCase(Locale.ROOT);
-        Encoding encoding = verifyChecksum(hrp, values);
-        if(encoding == null) {
-            throw new ProtocolException("Invalid checksum");
-        }
-
-        return new Bech32Data(hrp, Arrays.copyOfRange(values, 0, values.length - 6), encoding);
+        return values;
     }
 
     private static byte[] encode(int witnessVersion, byte[] witnessProgram) {
@@ -209,7 +227,12 @@ public class Bech32 {
      * Helper for re-arranging bits into groups.
      */
     public static byte[] convertBits(final byte[] in, final int inStart, final int inLen, final int fromBits,
-                                      final int toBits, final boolean pad) {
+                                     final int toBits, final boolean pad) {
+        return convertBits(in, inStart, inLen, fromBits,toBits, pad, true);
+    }
+
+    public static byte[] convertBits(final byte[] in, final int inStart, final int inLen, final int fromBits,
+                                      final int toBits, final boolean pad, final boolean enforcePaddingZero) {
         int acc = 0;
         int bits = 0;
         ByteArrayOutputStream out = new ByteArrayOutputStream(64);
@@ -231,7 +254,11 @@ public class Bech32 {
         if (pad) {
             if (bits > 0)
                 out.write((acc << (toBits - bits)) & maxv);
-        } else if (bits >= fromBits || ((acc << (toBits - bits)) & maxv) != 0) {
+        } else if (bits >= fromBits) {
+            // Incomplete group at end must be less than fromBits
+            throw new ProtocolException("Could not convert bits, invalid padding");
+        } else if (enforcePaddingZero && (((acc << (toBits - bits)) & maxv) != 0)) {
+            // Incomplete group at end must be all zeros
             throw new ProtocolException("Could not convert bits, invalid padding");
         }
         return out.toByteArray();
