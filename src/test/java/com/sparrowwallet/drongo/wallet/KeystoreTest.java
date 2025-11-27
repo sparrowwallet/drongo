@@ -4,10 +4,13 @@ import com.sparrowwallet.drongo.KeyDerivation;
 import com.sparrowwallet.drongo.crypto.DeterministicKey;
 import com.sparrowwallet.drongo.crypto.HDKeyDerivation;
 import com.sparrowwallet.drongo.protocol.ScriptType;
+import com.sparrowwallet.drongo.wallet.bip93.Codex32;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
+import java.util.Arrays;
 import java.util.HexFormat;
+import java.util.List;
 
 public class KeystoreTest {
     @Test
@@ -126,5 +129,68 @@ public class KeystoreTest {
         Keystore keystore0h1h = Keystore.fromMasterPrivateExtendedKey(mpek, KeyDerivation.parsePath("m/0H/1H"));
         Assertions.assertEquals("xpub6BJA1jSqiukeaesWfxe6sNK9CCGaujFFSJLomWHprUL9DePQ4JDkM5d88n49sMGJxrhpjazuXYWdMf17C9T5XnxkopaeS7jGk1GyyVziaMt", keystore0h1h.getExtendedPublicKey().toString());
         Assertions.assertEquals("xprv9xJocDuwtYCMNAo3Zw76WENQeAS6WGXQ55RCy7tDJ8oALr4FWkuVoHJeHVAcAqiZLE7Je3vZJHxspZdFHfnBEjHqU5hG1Jaj32dVoS6XLT1", keystore0h1h.getExtendedPrivateKey(false).toString());
+    }
+
+    @Test
+    void bip93TestVectors() throws MnemonicException {
+        // xprv derivation parts of the BIP93 test vectors, rest of the BIP93 tests are in Codex32Test.java
+
+        byte[] testVector1Secret = Codex32.decode("ms10testsxxxxxxxxxxxxxxxxxxxxxxxxxx4nzvca9cmczlw").payloadToBip32Secret();
+        DeterministicKey testVector1Key = HDKeyDerivation.createMasterPrivateKey(testVector1Secret);
+        MasterPrivateExtendedKey testVector1MPEK = new MasterPrivateExtendedKey(testVector1Key);
+        Keystore keystore1 = Keystore.fromMasterPrivateExtendedKey(testVector1MPEK, KeyDerivation.parsePath("m"));
+        Assertions.assertEquals("xprv9s21ZrQH143K3taPNekMd9oV5K6szJ8ND7vVh6fxicRUMDcChr3bFFzuxY8qP3xFFBL6DWc2uEYCfBFZ2nFWbAqKPhtCLRjgv78EZJDEfpL", keystore1.getExtendedMasterPrivateKey().toString());
+
+        byte[] testVector2Secret = Codex32.decode("MS12NAMES6XQGUZTTXKEQNJSJZV4JV3NZ5K3KWGSPHUH6EVW").payloadToBip32Secret();
+        DeterministicKey testVector2Key = HDKeyDerivation.createMasterPrivateKey(testVector2Secret);
+        MasterPrivateExtendedKey testVector2MPEK = new MasterPrivateExtendedKey(testVector2Key);
+        Keystore keystore2 = Keystore.fromMasterPrivateExtendedKey(testVector2MPEK, KeyDerivation.parsePath("m"));
+        Assertions.assertEquals("xprv9s21ZrQH143K2NkobdHxXeyFDqE44nJYvzLFtsriatJNWMNKznGoGgW5UMTL4fyWtajnMYb5gEc2CgaKhmsKeskoi9eTimpRv2N11THhPTU", keystore2.getExtendedMasterPrivateKey().toString());
+
+        List<String> testVector3SecretShares = Arrays.asList(
+                "ms13cashsllhdmn9m42vcsamx24zrxgs3qqjzqud4m0d6nln",
+                "ms13cashsllhdmn9m42vcsamx24zrxgs3qpte35dvzkjpt0r",
+                "ms13cashsllhdmn9m42vcsamx24zrxgs3qzfatvdwq5692k6",
+                "ms13cashsllhdmn9m42vcsamx24zrxgs3qrsx6ydhed97jx2"
+        );
+        for(String secretString : testVector3SecretShares) {
+            byte[] testVector3Secret = Codex32.decode(secretString).payloadToBip32Secret();
+            DeterministicKey testVector3Key = HDKeyDerivation.createMasterPrivateKey(testVector3Secret);
+            MasterPrivateExtendedKey testVector3MPEK = new MasterPrivateExtendedKey(testVector3Key);
+            Keystore keystore3 = Keystore.fromMasterPrivateExtendedKey(testVector3MPEK, KeyDerivation.parsePath("m"));
+            Assertions.assertEquals("xprv9s21ZrQH143K266qUcrDyYJrSG7KA3A7sE5UHndYRkFzsPQ6xwUhEGK1rNuyyA57Vkc1Ma6a8boVqcKqGNximmAe9L65WsYNcNitKRPnABd", keystore3.getExtendedMasterPrivateKey().toString());
+        }
+
+        List<String> testVector4SecretShares = Arrays.asList(
+                "ms10leetsllhdmn9m42vcsamx24zrxgs3qrl7ahwvhw4fnzrhve25gvezzyqqtum9pgv99ycma",
+                "ms10leetsllhdmn9m42vcsamx24zrxgs3qrl7ahwvhw4fnzrhve25gvezzyqpj82dp34u6lqtd",
+                "ms10leetsllhdmn9m42vcsamx24zrxgs3qrl7ahwvhw4fnzrhve25gvezzyqzsrs4pnh7jmpj5",
+                "ms10leetsllhdmn9m42vcsamx24zrxgs3qrl7ahwvhw4fnzrhve25gvezzyqrfcpap2w8dqezy",
+                "ms10leetsllhdmn9m42vcsamx24zrxgs3qrl7ahwvhw4fnzrhve25gvezzyqy5tdvphn6znrf0",
+                "ms10leetsllhdmn9m42vcsamx24zrxgs3qrl7ahwvhw4fnzrhve25gvezzyq9dsuypw2ragmel",
+                "ms10leetsllhdmn9m42vcsamx24zrxgs3qrl7ahwvhw4fnzrhve25gvezzyqx05xupvgp4v6qx",
+                "ms10leetsllhdmn9m42vcsamx24zrxgs3qrl7ahwvhw4fnzrhve25gvezzyq8k0h5p43c2hzsk",
+                "ms10leetsllhdmn9m42vcsamx24zrxgs3qrl7ahwvhw4fnzrhve25gvezzyqgum7hplmjtr8ks",
+                "ms10leetsllhdmn9m42vcsamx24zrxgs3qrl7ahwvhw4fnzrhve25gvezzyqf9q0lpxzt5clxq",
+                "ms10leetsllhdmn9m42vcsamx24zrxgs3qrl7ahwvhw4fnzrhve25gvezzyq28y48pyqfuu7le",
+                "ms10leetsllhdmn9m42vcsamx24zrxgs3qrl7ahwvhw4fnzrhve25gvezzyqt7ly0paesr8x0f",
+                "ms10leetsllhdmn9m42vcsamx24zrxgs3qrl7ahwvhw4fnzrhve25gvezzyqvrvg7pqydv5uyz",
+                "ms10leetsllhdmn9m42vcsamx24zrxgs3qrl7ahwvhw4fnzrhve25gvezzyqd6hekpea5n0y5j",
+                "ms10leetsllhdmn9m42vcsamx24zrxgs3qrl7ahwvhw4fnzrhve25gvezzyqwcnrwpmlkmt9dt",
+                "ms10leetsllhdmn9m42vcsamx24zrxgs3qrl7ahwvhw4fnzrhve25gvezzyq0pgjxpzx0ysaam"
+        );
+        for(String secretString : testVector4SecretShares) {
+            byte[] testVector4Secret = Codex32.decode(secretString).payloadToBip32Secret();
+            DeterministicKey testVector4Key = HDKeyDerivation.createMasterPrivateKey(testVector4Secret);
+            MasterPrivateExtendedKey testVector4MPEK = new MasterPrivateExtendedKey(testVector4Key);
+            Keystore keystore4 = Keystore.fromMasterPrivateExtendedKey(testVector4MPEK, KeyDerivation.parsePath("m"));
+            Assertions.assertEquals("xprv9s21ZrQH143K3s41UCWxXTsU4TRrhkpD1t21QJETan3hjo8DP5LFdFcB5eaFtV8x6Y9aZotQyP8KByUjgLTbXCUjfu2iosTbMv98g8EQoqr", keystore4.getExtendedMasterPrivateKey().toString());
+        }
+
+        byte[] testVector5Secret = Codex32.decode("MS100C8VSM32ZXFGUHPCHTLUPZRY9X8GF2TVDW0S3JN54KHCE6MUA7LQPZYGSFJD6AN074RXVCEMLH8WU3TK925ACDEFGHJKLMNPQRSTUVWXY06FHPV80UNDVARHRAK").payloadToBip32Secret();
+        DeterministicKey testVector5Key = HDKeyDerivation.createMasterPrivateKey(testVector5Secret);
+        MasterPrivateExtendedKey testVector5MPEK = new MasterPrivateExtendedKey(testVector5Key);
+        Keystore keystore5 = Keystore.fromMasterPrivateExtendedKey(testVector5MPEK, KeyDerivation.parsePath("m"));
+        Assertions.assertEquals("xprv9s21ZrQH143K4UYT4rP3TZVKKbmRVmfRqTx9mG2xCy2JYipZbkLV8rwvBXsUbEv9KQiUD7oED1Wyi9evZzUn2rqK9skRgPkNaAzyw3YrpJN", keystore5.getExtendedMasterPrivateKey().toString());
     }
 }
