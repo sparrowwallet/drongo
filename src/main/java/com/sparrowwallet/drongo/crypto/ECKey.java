@@ -326,6 +326,11 @@ public class ECKey {
         return pub.get();
     }
 
+    /** Returns true if the Y coordinate of the public key is odd. */
+    public boolean hasOddYCoord() {
+        return pub.hasOddYCoord();
+    }
+
     /** Multiply the public point by the provided private key */
     public ECKey multiply(BigInteger privKey) {
         return multiply(privKey, false);
@@ -355,11 +360,16 @@ public class ECKey {
 
     /** Add to the private key by the provided private key using modular arithmetic */
     public ECKey addPrivate(ECKey privKey) {
+        return addPrivate(privKey, true);
+    }
+
+    /** Add to the private key by the provided private key using modular arithmetic */
+    public ECKey addPrivate(ECKey privKey, boolean compressed) {
         if(this.priv == null || privKey.priv == null) {
             throw new IllegalStateException("Key did not contain a private key");
         }
 
-        return ECKey.fromPrivate(this.priv.add(privKey.priv).mod(CURVE.getN()), true);
+        return ECKey.fromPrivate(this.priv.add(privKey.priv).mod(CURVE.getN()), compressed);
     }
 
     /** Negate the provided private key */
@@ -487,7 +497,9 @@ public class ECKey {
         return verify(sigHash.getBytes(), signature);
     }
 
-    /** Tweak the key for use as a Taproot output key (without script path) as defined in BIP341 */
+    /**
+     * Tweak the key for use as a Taproot output key (without script path) as defined in BIP341
+     */
     public ECKey getTweakedOutputKey() {
         ECKey key = this;
 
@@ -498,9 +510,8 @@ public class ECKey {
         byte[] tweakHash = Utils.taggedHash("TapTweak", key.getPubKeyXCoord());
         ECKey tweakKey = ECKey.fromPrivate(tweakHash);
 
-        return hasPrivKey() ? key.addPrivate(tweakKey) : key.add(tweakKey, true);
+        return hasPrivKey() ? key.addPrivate(tweakKey, true) : key.add(tweakKey, true);
     }
-
 
     /**
      * Returns true if the given pubkey is canonical, i.e. the correct length taking into account compression.

@@ -301,7 +301,7 @@ public class SilentPaymentUtils {
 
             try {
                 ECKey privateKey = walletNode.getWallet().getScriptType().getOutputKey(walletNode.getWallet().getKeystores().getFirst().getKey(walletNode));
-                if(walletNode.getWallet().getScriptType() == P2TR && !privateKey.getPubKeyPoint().normalize().getYCoord().toBigInteger().mod(BigInteger.TWO).equals(BigInteger.ZERO)) {
+                if(walletNode.getWallet().getScriptType() == P2TR && privateKey.hasOddYCoord()) {
                     privateKey = privateKey.negatePrivate();
                 }
                 if(summedPrivateKey == null) {
