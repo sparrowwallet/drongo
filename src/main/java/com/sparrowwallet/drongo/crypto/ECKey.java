@@ -487,54 +487,20 @@ public class ECKey {
         return verify(sigHash.getBytes(), signature);
     }
 
+    /** Tweak the key for use as a Taproot output key (without script path) as defined in BIP341 */
     public ECKey getTweakedOutputKey() {
-        TaprootPubKey taprootPubKey = liftX(getPubKeyXCoord());
-        ECPoint internalKey = taprootPubKey.ecPoint;
-        byte[] taggedHash = Utils.taggedHash("TapTweak", internalKey.getXCoord().getEncoded());
-        ECKey tweakValue = ECKey.fromPrivate(taggedHash);
-        ECPoint outputKey = internalKey.add(tweakValue.getPubKeyPoint());
+        ECKey key = this;
 
-        if(hasPrivKey()) {
-            BigInteger taprootPriv = priv;
-            BigInteger tweakedPrivKey = taprootPriv.add(tweakValue.getPrivKey()).mod(CURVE_PARAMS.getCurve().getOrder());
-            //TODO: Improve on this hack. How do we know whether to negate the private key before tweaking it?
-            if(!ECKey.fromPrivate(tweakedPrivKey).getPubKeyPoint().equals(outputKey)) {
-                taprootPriv = CURVE_PARAMS.getCurve().getOrder().subtract(priv);
-                tweakedPrivKey = taprootPriv.add(tweakValue.getPrivKey()).mod(CURVE_PARAMS.getCurve().getOrder());
-            }
-
-            return new ECKey(tweakedPrivKey, outputKey, true);
+        if(pub.hasOddYCoord()) {
+            key = hasPrivKey() ? key.negatePrivate() : key.negate();
         }
 
-        return ECKey.fromPublicOnly(outputKey, true);
+        byte[] tweakHash = Utils.taggedHash("TapTweak", key.getPubKeyXCoord());
+        ECKey tweakKey = ECKey.fromPrivate(tweakHash);
+
+        return hasPrivKey() ? key.addPrivate(tweakKey) : key.add(tweakKey, true);
     }
 
-    private static TaprootPubKey liftX(byte[] bytes) {
-        SecP256K1Curve secP256K1Curve = (SecP256K1Curve)CURVE_PARAMS.getCurve();
-        BigInteger x = new BigInteger(1, bytes);
-        BigInteger p = secP256K1Curve.getQ();
-        if(x.compareTo(p) > -1) {
-            throw new IllegalArgumentException("Provided bytes must be less than secp256k1 field size");
-        }
-
-        BigInteger y_sq = x.modPow(BigInteger.valueOf(3), p).add(BigInteger.valueOf(7)).mod(p);
-        BigInteger y = y_sq.modPow(p.add(BigInteger.valueOf(1)).divide(BigInteger.valueOf(4)), p);
-        if(!y.modPow(BigInteger.valueOf(2), p).equals(y_sq)) {
-            throw new IllegalStateException("Calculated invalid y_sq when solving for y co-ordinate");
-        }
-
-        return y.and(BigInteger.ONE).equals(BigInteger.ZERO) ? new TaprootPubKey(secP256K1Curve.createPoint(x, y), false) : new TaprootPubKey(secP256K1Curve.createPoint(x, p.subtract(y)), true);
-    }
-
-    private static class TaprootPubKey {
-        public final ECPoint ecPoint;
-        public final boolean negated;
-
-        public TaprootPubKey(ECPoint ecPoint, boolean negated) {
-            this.ecPoint = ecPoint;
-            this.negated = negated;
-        }
-    }
 
     /**
      * Returns true if the given pubkey is canonical, i.e. the correct length taking into account compression.
