@@ -68,6 +68,10 @@ public class LazyECPoint {
         return xcoord;
     }
 
+    public boolean hasOddYCoord() {
+        return get().normalize().getYCoord().toBigInteger().testBit(0);
+    }
+
     public String toString() {
         return Hex.toHexString(getEncoded());
     }

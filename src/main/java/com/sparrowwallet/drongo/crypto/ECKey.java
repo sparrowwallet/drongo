@@ -487,35 +487,18 @@ public class ECKey {
         return verify(sigHash.getBytes(), signature);
     }
 
+    /** Tweak the key for use as a Taproot output key (without script path) as defined in BIP341 */
     public ECKey getTweakedOutputKey() {
-        BigInteger curveOrderN = CURVE_PARAMS.getCurve().getOrder();
-        ECPoint pubKey = pub.get();  // our internal key’s *actual* public key (before normalization to even y)
+        ECKey key = this;
 
-        boolean yWasOdd = pubKey.getAffineYCoord().toBigInteger().testBit(0);
-        if (yWasOdd) {
-            pubKey = pubKey.negate();
+        if(pub.hasOddYCoord()) {
+            key = hasPrivKey() ? key.negatePrivate() : key.negate();
         }
 
-        // Compute tweak value
-        byte[] tweakHash = Utils.taggedHash("TapTweak", pubKey.getXCoord().getEncoded());
+        byte[] tweakHash = Utils.taggedHash("TapTweak", key.getPubKeyXCoord());
+        ECKey tweakKey = ECKey.fromPrivate(tweakHash);
 
-        // tweak: pubkey
-        ECPoint outputPub = pubKey.add(ECKey.fromPrivate(tweakHash).getPubKeyPoint());
-
-
-        if (hasPrivKey()) {
-            BigInteger privKey = getPrivKey();
-            if (yWasOdd) {
-                // if we negated the pubkey, negate the privkey too
-                privKey = curveOrderN.subtract(privKey);
-            }
-            // tweak private key
-            BigInteger outputPriv = privKey.add(new BigInteger(1, tweakHash)).mod(curveOrderN);
-            return new ECKey(outputPriv, outputPub, true);
-        }
-
-        // public-key-only:
-        return ECKey.fromPublicOnly(outputPub, true);
+        return hasPrivKey() ? key.addPrivate(tweakKey) : key.add(tweakKey, true);
     }
 
 
