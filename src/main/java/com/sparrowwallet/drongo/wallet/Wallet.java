@@ -1044,28 +1044,66 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
 
         long maxSpendableAmt = getMaxSpendable(params.getPaymentAddresses(), params.feeRate(), availableTxos);
         if(maxSpendableAmt < 0) {
-            throw new InsufficientFundsException("Not enough combined value in all available UTXOs to send a transaction to the provided addresses at this fee rate");
+            if(!params.allowInsufficientInputs()) {
+                throw new InsufficientFundsException("Not enough combined value in all available UTXOs to send a transaction to the provided addresses at this fee rate");
+            }
+            //If allowing insufficient inputs, proceed with all available UTXOs
+            maxSpendableAmt = totalAvailableValue;
         }
 
         //When a user fee is set, we can calculate the fees to spend all UTXOs because we assume all UTXOs are spendable at a fee rate of 1 sat/vB
         //We can then add the user set fee less this amount as a "phantom payment amount" to the value required to find (which cannot include transaction fees)
         long valueRequiredAmt = totalPaymentAmount + (params.fee() != null ? params.fee() - (totalAvailableValue - maxSpendableAmt) : 0);
         if(maxSpendableAmt < valueRequiredAmt) {
-            throw new InsufficientFundsException("Not enough combined value in all available UTXOs to send a transaction to send the provided payments at the user set fee" + (params.fee() == null ? " rate" : ""));
+            if(!params.allowInsufficientInputs()) {
+                throw new InsufficientFundsException("Not enough combined value in all available UTXOs to send a transaction to send the provided payments at the user set fee" + (params.fee() == null ? " rate" : ""));
+            }
+            //If allowing insufficient inputs, proceed with whatever is available
+            valueRequiredAmt = maxSpendableAmt;
         }
 
+        int loopCount = 0;
+        long previousTotalSelectedAmt = 0;
+        List<Map<BlockTransactionHashIndex, WalletNode>> selectedUtxoSets = null;
+        List<Payment> txPayments = null;
+        List<WalletTransaction.Output> outputs = null;
+        Transaction transaction = null;
+        long differenceAmt = 0;
+
+        System.err.println("========== createWalletTransaction START ==========");
+        System.err.println("DEBUG: allowInsufficientInputs = " + params.allowInsufficientInputs());
+        System.err.println("DEBUG: utxoSelectors.size = " + params.utxoSelectors().size());
+        if(!params.utxoSelectors().isEmpty()) {
+            System.err.println("DEBUG: First selector class = " + params.utxoSelectors().getFirst().getClass().getName());
+            System.err.println("DEBUG: Is PresetUtxoSelector? = " + (params.utxoSelectors().getFirst() instanceof PresetUtxoSelector));
+        }
+        System.err.println("DEBUG: availableTxos.size = " + availableTxos.size());
+        System.err.println("DEBUG: initial valueRequiredAmt = " + valueRequiredAmt);
+
         while(true) {
-            List<Map<BlockTransactionHashIndex, WalletNode>> selectedUtxoSets = selectInputSets(params, availableTxos, valueRequiredAmt);
+            loopCount++;
+            System.err.println("\n--- Loop iteration " + loopCount + " ---");
+            System.err.println("DEBUG: Calling selectInputSets with valueRequiredAmt = " + valueRequiredAmt);
+            selectedUtxoSets = selectInputSets(params, availableTxos, valueRequiredAmt);
+            System.err.println("DEBUG: selectInputSets returned " + selectedUtxoSets.size() + " sets");
             Map<BlockTransactionHashIndex, WalletNode> selectedUtxos = new LinkedHashMap<>();
             selectedUtxoSets.forEach(selectedUtxos::putAll);
             long totalSelectedAmt = selectedUtxos.keySet().stream().mapToLong(BlockTransactionHashIndex::getValue).sum();
             int numSets = selectedUtxoSets.size();
-            List<Payment> txPayments = new ArrayList<>(params.payments());
-            List<WalletTransaction.Output> outputs = new ArrayList<>();
+            System.err.println("DEBUG: Total selected UTXOs: " + selectedUtxos.size() + " with total amount: " + totalSelectedAmt);
+
+            //Prevent infinite loop when allowing insufficient inputs
+            if(params.allowInsufficientInputs() && loopCount > 2 && totalSelectedAmt == previousTotalSelectedAmt) {
+                //We're stuck in a loop with the same UTXOs, just return what we have
+                break;
+            }
+            previousTotalSelectedAmt = totalSelectedAmt;
+            txPayments = new ArrayList<>(params.payments());
+            outputs = new ArrayList<>();
             Set<WalletNode> txExcludedChangeNodes = new HashSet<>(params.excludedChangeNodes());
             long sequence = params.allowRbf() ? TransactionInput.SEQUENCE_RBF_ENABLED : TransactionInput.SEQUENCE_RBF_DISABLED;
 
-            Transaction transaction = new Transaction();
+            transaction = new Transaction();
             transaction.setVersion(2);
             if(params.currentBlockHeight() != null) {
                 transaction.setLocktime(params.currentBlockHeight().longValue());
@@ -1134,10 +1172,22 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
             }
 
             //Calculate what is left over from selected utxos after paying recipient
-            long differenceAmt = totalSelectedAmt - totalPaymentAmount * numSets;
+            differenceAmt = totalSelectedAmt - totalPaymentAmount * numSets;
+
+            //If allowing insufficient inputs with preset UTXOs, skip fee optimization and return immediately
+            if(params.allowInsufficientInputs() && params.utxoSelectors().size() == 1
+                && params.utxoSelectors().getFirst() instanceof PresetUtxoSelector) {
+                System.err.println("DEBUG: Skipping fee optimization for preset UTXOs with allowInsufficientInputs");
+                return new WalletTransaction(this, transaction, params.utxoSelectors(), selectedUtxoSets, txPayments, outputs, differenceAmt);
+            }
 
             //If insufficient fee, increase value required from inputs to include the fee and try again
             if(differenceAmt < noChangeFeeRequiredAmt) {
+                if(params.allowInsufficientInputs()) {
+                    //Allow insufficient inputs - return what we have instead of trying to add more
+                    System.err.println("DEBUG: Insufficient fee but allowInsufficientInputs=true, returning current transaction");
+                    return new WalletTransaction(this, transaction, params.utxoSelectors(), selectedUtxoSets, txPayments, outputs, differenceAmt);
+                }
                 valueRequiredAmt = totalSelectedAmt + 1;
                 //If we haven't selected all UTXOs yet, don't require more than the max spendable amount
                 if(valueRequiredAmt > maxSpendableAmt && transaction.getInputs().size() < availableTxos.size()) {
@@ -1194,6 +1244,9 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
 
             return new WalletTransaction(this, transaction, params.utxoSelectors(), selectedUtxoSets, txPayments, outputs, differenceAmt);
         }
+
+        //Loop exited due to infinite loop prevention - return transaction with what we have
+        return new WalletTransaction(this, transaction, params.utxoSelectors(), selectedUtxoSets, txPayments, outputs, differenceAmt);
     }
 
     private void applySequenceAntiFeeSniping(Transaction transaction, Map<BlockTransactionHashIndex, WalletNode> selectedUtxos, int currentBlockHeight) {
@@ -1249,6 +1302,13 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
 
     private List<Map<BlockTransactionHashIndex, WalletNode>> selectInputSets(TransactionParameters params, Map<BlockTransactionHashIndex, WalletNode> availableTxos,
                                                                              Long targetValue) throws InsufficientFundsException {
+        System.err.println(">>> selectInputSets CALLED with targetValue = " + targetValue);
+        System.err.println(">>> availableTxos.size = " + availableTxos.size());
+        System.err.println(">>> params.utxoSelectors().size = " + params.utxoSelectors().size());
+        if(!params.utxoSelectors().isEmpty()) {
+            System.err.println(">>> First selector in selectInputSets = " + params.utxoSelectors().getFirst().getClass().getName());
+        }
+
         List<OutputGroup> utxoPool = getGroupedUtxos(params);
 
         List<OutputGroup.Filter> filters = new ArrayList<>();
@@ -1291,7 +1351,44 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
             }
         }
 
-        throw new InsufficientFundsException("Not enough combined value in UTXOs for output value " + targetValue, targetValue);
+        if(!params.allowInsufficientInputs()) {
+            throw new InsufficientFundsException("Not enough combined value in UTXOs for output value " + targetValue, targetValue);
+        }
+
+        //If allowing insufficient inputs, check if user has preset specific UTXOs
+        //If so, use only those UTXOs. Otherwise, return ALL available UTXOs
+        System.err.println("DEBUG: allowInsufficientInputs=true, utxoSelectors.size=" + params.utxoSelectors().size());
+        if(params.utxoSelectors().size() > 0) {
+            System.err.println("DEBUG: First selector class: " + params.utxoSelectors().getFirst().getClass().getName());
+            System.err.println("DEBUG: Is PresetUtxoSelector? " + (params.utxoSelectors().getFirst() instanceof PresetUtxoSelector));
+        }
+
+        if(params.utxoSelectors().size() == 1 && params.utxoSelectors().getFirst() instanceof PresetUtxoSelector) {
+            //User has manually selected specific UTXOs - use only those
+            PresetUtxoSelector presetSelector = (PresetUtxoSelector)params.utxoSelectors().getFirst();
+            Collection<BlockTransactionHashIndex> selectedUtxos = presetSelector.select(targetValue, utxoPool);
+            System.err.println("DEBUG: PresetUtxoSelector found! Selected UTXOs count: " + selectedUtxos.size());
+
+            if(!selectedUtxos.isEmpty()) {
+                Map<BlockTransactionHashIndex, WalletNode> selectedInputsMap = new LinkedHashMap<>();
+                for(BlockTransactionHashIndex utxo : selectedUtxos) {
+                    selectedInputsMap.put(utxo, availableTxos.get(utxo));
+                }
+                System.err.println("DEBUG: Returning preset UTXOs: " + selectedInputsMap.size());
+                return List.of(selectedInputsMap);
+            }
+        }
+
+        //No preset UTXOs - return ALL available UTXOs
+        System.err.println("DEBUG: Returning ALL available UTXOs");
+        return utxoPool.stream()
+            .flatMap(group -> group.getUtxos().stream())
+            .map(utxo -> {
+                Map<BlockTransactionHashIndex, WalletNode> map = new LinkedHashMap<>();
+                map.put(utxo, availableTxos.get(utxo));
+                return map;
+            })
+            .collect(Collectors.toList());
     }
 
     public List<OutputGroup> getGroupedUtxos(TransactionParameters params) {
