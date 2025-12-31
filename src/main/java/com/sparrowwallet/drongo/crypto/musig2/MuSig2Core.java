@@ -84,17 +84,7 @@ public class MuSig2Core {
          * @return 32-byte x-coordinate of Q (with even y)
          */
         public byte[] getXonlyPubkey() {
-            org.bouncycastle.math.ec.ECPoint Q_point = Q.getPubKeyPoint().normalize();
-
-            // BIP-327: with_even_y(Q) - if Q has odd y, negate it
-            if (!Q_point.getAffineYCoord().toBigInteger().testBit(0)) {
-                // y is even
-                return Q_point.getAffineXCoord().getEncoded();
-            } else {
-                // y is odd, return -Q which has even y
-                org.bouncycastle.math.ec.ECPoint Q_even = Q_point.negate().normalize();
-                return Q_even.getAffineXCoord().getEncoded();
-            }
+            return MuSig2Utils.getXonlyPubkey(Q.getPubKeyPoint());
         }
 
         @Override
@@ -304,7 +294,7 @@ public class MuSig2Core {
             // g = -1 if (is_xonly_t AND not has_even_y(Q)), else g = 1
             BigInteger g;
             org.bouncycastle.math.ec.ECPoint Q_point = Q.getPubKeyPoint().normalize();
-            boolean Q_has_odd_y = Q_point.getAffineYCoord().toBigInteger().testBit(0);
+            boolean Q_has_odd_y = !MuSig2Utils.hasEvenY(Q_point);
 
             if (isXOnly && Q_has_odd_y) {
                 // g = -1 when BOTH conditions are true: is_xonly_t AND Q has odd y
@@ -337,7 +327,7 @@ public class MuSig2Core {
 
             // BIP-327: Step 6 - For X-only tweaks, if y(Q') is odd, negate gacc'
             if (isXOnly) {
-                boolean Q_new_has_odd_y = Q_new.getAffineYCoord().toBigInteger().testBit(0);
+                boolean Q_new_has_odd_y = !MuSig2Utils.hasEvenY(Q_new);
                 if (Q_new_has_odd_y) {
                     gacc_new = gacc_new.negate().mod(n);
                     log.debug("Q' has odd y (X-only tweak), negated gacc");

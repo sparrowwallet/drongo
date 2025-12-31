@@ -294,16 +294,11 @@ public class MuSig2 {
 
     /**
      * Encode an EC point as a compressed public key (33 bytes)
+     * @deprecated Use {@link MuSig2Utils#encodeCompressedPoint(ECPoint)} instead
      */
+    @Deprecated
     private static byte[] encodeCompressedPoint(org.bouncycastle.math.ec.ECPoint point) {
-        byte[] xBytes = point.getAffineXCoord().getEncoded();
-        byte y = point.getAffineYCoord().toBigInteger().mod(BigInteger.TWO).byteValue();
-
-        byte[] encoded = new byte[33];
-        encoded[0] = (y == 0) ? (byte) 0x02 : (byte) 0x03;
-        System.arraycopy(xBytes, 0, encoded, 1, 32);
-
-        return encoded;
+        return MuSig2Utils.encodeCompressedPoint(point);
     }
 
     /**
@@ -494,14 +489,8 @@ public class MuSig2 {
             // BIP-327: x(Q) should use GetXonlyPubkey (with_even_y applied)
             ByteArrayOutputStream bInput = new ByteArrayOutputStream();
             bInput.write(aggnonce);
-            // Apply with_even_y: if Q has odd y, use x-coordinate of -Q (which has even y)
-            byte[] Q_xonly_for_b;
-            if (hasEvenY(Q)) {
-                Q_xonly_for_b = Q.getAffineXCoord().getEncoded();
-            } else {
-                org.bouncycastle.math.ec.ECPoint Q_even = Q.negate().normalize();
-                Q_xonly_for_b = Q_even.getAffineXCoord().getEncoded();
-            }
+            // BIP-327: Apply with_even_y to get x-coordinate with even y
+            byte[] Q_xonly_for_b = MuSig2Utils.getXonlyPubkey(Q);
             bInput.write(Q_xonly_for_b);
             bInput.write(message.getBytes());
 
@@ -528,14 +517,8 @@ public class MuSig2 {
             // BIP-327: GetXonlyPubkey applies with_even_y to get x-coordinate with even y
             ByteArrayOutputStream eInput = new ByteArrayOutputStream();
             eInput.write(xR);
-            // Apply with_even_y: if Q has odd y, use x-coordinate of -Q (which has even y)
-            byte[] Q_xonly;
-            if (hasEvenY(Q)) {
-                Q_xonly = Q.getAffineXCoord().getEncoded();
-            } else {
-                org.bouncycastle.math.ec.ECPoint Q_even = Q.negate().normalize();
-                Q_xonly = Q_even.getAffineXCoord().getEncoded();
-            }
+            // BIP-327: Apply with_even_y to get x-coordinate with even y
+            byte[] Q_xonly = MuSig2Utils.getXonlyPubkey(Q);
             eInput.write(Q_xonly);
             eInput.write(message.getBytes());
 
@@ -623,9 +606,13 @@ public class MuSig2 {
     /**
      * Check if an EC point has an even Y coordinate
      */
+    /**
+     * Check if an elliptic curve point has an even y-coordinate.
+     * @deprecated Use {@link MuSig2Utils#hasEvenY(ECPoint)} instead
+     */
+    @Deprecated
     private static boolean hasEvenY(org.bouncycastle.math.ec.ECPoint point) {
-        BigInteger y = point.getAffineYCoord().toBigInteger();
-        return y.mod(BigInteger.TWO).equals(BigInteger.ZERO);
+        return MuSig2Utils.hasEvenY(point);
     }
 
     /**
@@ -807,17 +794,8 @@ public class MuSig2 {
 
             // P (aggregated public key, x-only, 32 bytes)
             // BIP-327 uses x-only public keys with even y (GetXonlyPubkey applies with_even_y)
-            // If Q has odd y, we need to negate it to get the point with even y
             org.bouncycastle.math.ec.ECPoint Q = aggregatedKey.getPubKeyPoint().normalize();
-            byte[] pubKeyBytes;
-            if (!Q.getAffineYCoord().toBigInteger().testBit(0)) {
-                // y is even, use x-coordinate directly
-                pubKeyBytes = Q.getAffineXCoord().getEncoded();
-            } else {
-                // y is odd, negate point to get even y, then use x-coordinate
-                org.bouncycastle.math.ec.ECPoint Q_even = Q.negate().normalize();
-                pubKeyBytes = Q_even.getAffineXCoord().getEncoded();
-            }
+            byte[] pubKeyBytes = MuSig2Utils.getXonlyPubkey(Q);
             challengeInput.write(pubKeyBytes);
 
             // m (message)
@@ -847,17 +825,8 @@ public class MuSig2 {
 
             // P is the aggregated public key point (Q)
             // BIP-340: Public keys are x-only with implicit even y
-            // BIP-327: GetXonlyPubkey applies with_even_y(Q) to get the x-coordinate
-            // We need to apply the same logic here for verification
-            // Q is already defined above (from the challenge computation)
-            org.bouncycastle.math.ec.ECPoint P;
-            if (!Q.getAffineYCoord().toBigInteger().testBit(0)) {
-                // y is even, use Q directly
-                P = Q;
-            } else {
-                // y is odd, negate Q to get point with even y
-                P = Q.negate().normalize();
-            }
+            // BIP-327: GetXonlyPubkey applies with_even_y(Q) to get the point with even y
+            org.bouncycastle.math.ec.ECPoint P = MuSig2Utils.withEvenY(Q);
 
             log.debug("Aggregated key P (after with_even_y): x={}, y parity={}",
                 P.getAffineXCoord().toBigInteger().toString(16).substring(0, 16) + "...",
