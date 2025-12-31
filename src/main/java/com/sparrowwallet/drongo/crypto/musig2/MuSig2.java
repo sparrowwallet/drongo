@@ -852,6 +852,129 @@ public class MuSig2 {
     }
 
     /**
+     * Helper class to hold parsed signature components
+     */
+    private static class ParsedSignature {
+        final BigInteger r;
+        final BigInteger s;
+        final byte[] rBytes;
+
+        ParsedSignature(BigInteger r, BigInteger s, byte[] rBytes) {
+            this.r = r;
+            this.s = s;
+            this.rBytes = rBytes;
+        }
+    }
+
+    /**
+     * BIP-340: Parse and validate signature components
+     *
+     * Extracts r and s from signature and validates that r < p and s < n
+     *
+     * @param signature Schnorr signature
+     * @return ParsedSignature with r, s, and rBytes, or null if invalid
+     */
+    private static ParsedSignature parseSignatureInput(SchnorrSignature signature) {
+        BigInteger r = signature.r;
+        BigInteger s = signature.s;
+
+        // BIP-340: Verify r < p and s < n
+        BigInteger p = new BigInteger("FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2F", 16);
+        if (r.compareTo(p) >= 0 || s.compareTo(ECKey.CURVE.getN()) >= 0) {
+            log.warn("Signature values out of range: r >= p or s >= n");
+            return null;
+        }
+
+        byte[] rBytes = Utils.bigIntegerToBytes(r, 32);
+        return new ParsedSignature(r, s, rBytes);
+    }
+
+    /**
+     * BIP-340: Compute challenge e for verification
+     *
+     * e = int(hash("BIP0340/challenge" || r || P || m)) mod n
+     *
+     * @param rBytes Encoded r value (32 bytes)
+     * @param Q Aggregated public key point
+     * @param message Message that was signed
+     * @return Challenge e
+     */
+    private static BigInteger computeChallengeForVerify(byte[] rBytes, org.bouncycastle.math.ec.ECPoint Q,
+                                                        Sha256Hash message) throws java.io.IOException {
+        // BIP-327: P uses x-only with even y
+        byte[] pubKeyBytes = MuSig2Utils.getXonlyPubkey(Q);
+
+        ByteArrayOutputStream challengeInput = new ByteArrayOutputStream();
+        challengeInput.write(rBytes);
+        challengeInput.write(pubKeyBytes);
+        challengeInput.write(message.getBytes());
+
+        byte[] eBytes = Utils.taggedHash("BIP0340/challenge", challengeInput.toByteArray());
+        BigInteger e = new BigInteger(1, eBytes).mod(ECKey.CURVE.getN());
+
+        log.debug("Challenge e: {}", e.toString(16).substring(0, 8) + "...");
+        log.debug("R (x): {}", Utils.bytesToHex(rBytes).substring(0, 8) + "...");
+        log.debug("P (x): {}", Utils.bytesToHex(pubKeyBytes).substring(0, 16) + "...");
+
+        return e;
+    }
+
+    /**
+     * BIP-340: Verify equation s*G = R + e*P
+     *
+     * @param s Signature s value
+     * @param r Signature r value
+     * @param e Challenge
+     * @param Q Aggregated public key point
+     * @return true if equation holds, false otherwise
+     */
+    private static boolean verifyEquation(BigInteger s, BigInteger r, BigInteger e,
+                                         org.bouncycastle.math.ec.ECPoint Q) {
+        org.bouncycastle.math.ec.ECPoint G = ECKey.CURVE.getG();
+
+        // Left side: s*G
+        org.bouncycastle.math.ec.ECPoint sG = G.multiply(s).normalize();
+
+        // Right side: R + e*P
+        org.bouncycastle.math.ec.ECPoint R_point = lift_x_even_y(r);
+        if (R_point == null) {
+            log.warn("Cannot lift x-coordinate to point");
+            return false;
+        }
+        R_point = R_point.normalize();
+
+        // P is the aggregated public key with even y
+        org.bouncycastle.math.ec.ECPoint P = MuSig2Utils.withEvenY(Q);
+
+        log.debug("Aggregated key P (after with_even_y): x={}, y parity={}",
+            P.getAffineXCoord().toBigInteger().toString(16).substring(0, 16) + "...",
+            P.getAffineYCoord().toBigInteger().mod(BigInteger.TWO).equals(BigInteger.ZERO) ? "EVEN" : "ODD");
+
+        org.bouncycastle.math.ec.ECPoint eP = P.multiply(e).normalize();
+        org.bouncycastle.math.ec.ECPoint rightSide = R_point.add(eP).normalize();
+
+        log.debug("sG (x): {}", sG.getAffineXCoord().toBigInteger().toString(16).substring(0, 8) + "...");
+        log.debug("R+eP (x): {}", rightSide.getAffineXCoord().toBigInteger().toString(16).substring(0, 8) + "...");
+
+        boolean isValid = sG.equals(rightSide);
+
+        if (!isValid) {
+            log.warn("MuSig2: Signature verification FAILED");
+            log.warn("  sG.x      = {}", sG.getAffineXCoord().toBigInteger().toString(16));
+            log.warn("  R+eP.x    = {}", rightSide.getAffineXCoord().toBigInteger().toString(16));
+            log.warn("  R.x       = {}", R_point.getAffineXCoord().toBigInteger().toString(16));
+            log.warn("  P.x       = {}", P.getAffineXCoord().toBigInteger().toString(16));
+            log.warn("  P.y parity = {}", P.getAffineYCoord().toBigInteger().mod(BigInteger.TWO).equals(BigInteger.ZERO) ? "EVEN" : "ODD");
+            log.warn("  e         = {}", e.toString(16));
+            log.warn("  s         = {}", s.toString(16));
+        } else {
+            log.info("MuSig2: Signature verification PASSED");
+        }
+
+        return isValid;
+    }
+
+    /**
      * Verify MuSig2 Signature
      *
      * Verifies that a MuSig2 aggregated signature is valid for the
@@ -875,94 +998,104 @@ public class MuSig2 {
         log.info("MuSig2: Verifying BIP-327 signature (BIP-340)");
 
         try {
-            // Extract signature components
-            BigInteger r = signature.r;
-            BigInteger s = signature.s;
-
-            // BIP-340: Verify r < p and s < n
-            // p is the field size, n is the curve order
-            // For secp256k1: p = 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2F
-            BigInteger p = new BigInteger("FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2F", 16);
-            if (r.compareTo(p) >= 0 || s.compareTo(ECKey.CURVE.getN()) >= 0) {
-                log.warn("Signature values out of range: r >= p or s >= n");
+            // BIP-340: Parse and validate signature components
+            ParsedSignature parsed = parseSignatureInput(signature);
+            if (parsed == null) {
                 return false;
             }
 
-            // BIP-340: Compute challenge e = SHA256("BIP0340/challenge" || R || P || m)
-            ByteArrayOutputStream challengeInput = new ByteArrayOutputStream();
-
-            // R (encoded as x-only coordinate, 32 bytes)
-            byte[] rBytes = Utils.bigIntegerToBytes(r, 32);
-            challengeInput.write(rBytes);
-
-            // P (aggregated public key, x-only, 32 bytes)
-            // BIP-327 uses x-only public keys with even y (GetXonlyPubkey applies with_even_y)
+            // BIP-327: Get aggregated public key point
             org.bouncycastle.math.ec.ECPoint Q = aggregatedKey.getPubKeyPoint().normalize();
-            byte[] pubKeyBytes = MuSig2Utils.getXonlyPubkey(Q);
-            challengeInput.write(pubKeyBytes);
 
-            // m (message)
-            challengeInput.write(message.getBytes());
+            // BIP-340: Compute challenge e
+            BigInteger e = computeChallengeForVerify(parsed.rBytes, Q, message);
 
-            // Compute challenge with BIP-340 tagged hash
-            byte[] eBytes = Utils.taggedHash("BIP0340/challenge", challengeInput.toByteArray());
-            BigInteger e = new BigInteger(1, eBytes).mod(ECKey.CURVE.getN());
+            // BIP-340: Verify equation s*G = R + e*P
+            return verifyEquation(parsed.s, parsed.r, e, Q);
 
-            log.debug("Challenge e: {}", e.toString(16).substring(0, 8) + "...");
-            log.debug("R (x): {}", r.toString(16).substring(0, 8) + "...");
-            log.debug("P (x): {}", Utils.bytesToHex(pubKeyBytes).substring(0, 16) + "...");
-
-            // BIP-340: Verify s*G = R + e*P
-            // Left side: s*G
-            org.bouncycastle.math.ec.ECPoint G = ECKey.CURVE.getG();
-            org.bouncycastle.math.ec.ECPoint sG = G.multiply(s).normalize();
-
-            // Right side: R + e*P
-            // R is the point with x-coordinate r (lift_x finds the point with even y)
-            org.bouncycastle.math.ec.ECPoint R_point = lift_x_even_y(r);
-            if (R_point == null) {
-                log.warn("Cannot lift x-coordinate to point");
-                return false;
-            }
-            R_point = R_point.normalize();
-
-            // P is the aggregated public key point (Q)
-            // BIP-340: Public keys are x-only with implicit even y
-            // BIP-327: GetXonlyPubkey applies with_even_y(Q) to get the point with even y
-            org.bouncycastle.math.ec.ECPoint P = MuSig2Utils.withEvenY(Q);
-
-            log.debug("Aggregated key P (after with_even_y): x={}, y parity={}",
-                P.getAffineXCoord().toBigInteger().toString(16).substring(0, 16) + "...",
-                P.getAffineYCoord().toBigInteger().mod(BigInteger.TWO).equals(BigInteger.ZERO) ? "EVEN" : "ODD");
-
-            org.bouncycastle.math.ec.ECPoint eP = P.multiply(e).normalize();
-            org.bouncycastle.math.ec.ECPoint rightSide = R_point.add(eP).normalize();
-
-            log.debug("sG (x): {}", sG.getAffineXCoord().toBigInteger().toString(16).substring(0, 8) + "...");
-            log.debug("R+eP (x): {}", rightSide.getAffineXCoord().toBigInteger().toString(16).substring(0, 8) + "...");
-
-            // Check if s*G == R + e*P
-            boolean isValid = sG.equals(rightSide);
-
-            if (!isValid) {
-                log.warn("MuSig2: Signature verification FAILED");
-                log.warn("  sG.x      = {}", sG.getAffineXCoord().toBigInteger().toString(16));
-                log.warn("  R+eP.x    = {}", rightSide.getAffineXCoord().toBigInteger().toString(16));
-                log.warn("  R.x       = {}", R_point.getAffineXCoord().toBigInteger().toString(16));
-                log.warn("  P.x       = {}", P.getAffineXCoord().toBigInteger().toString(16));
-                log.warn("  P.y parity = {}", P.getAffineYCoord().toBigInteger().mod(BigInteger.TWO).equals(BigInteger.ZERO) ? "EVEN" : "ODD");
-                log.warn("  e         = {}", e.toString(16));
-                log.warn("  s         = {}", s.toString(16));
-            } else {
-                log.info("MuSig2: Signature verification PASSED");
-            }
-
-            return isValid;
-
-        } catch (Exception e) {
-            log.error("Error verifying BIP-327 signature", e);
+        } catch (Exception ex) {
+            log.error("Error verifying BIP-327 signature", ex);
             return false;
         }
+    }
+
+    /**
+     * BIP-327: Compute original aggregated Q without normalization
+     *
+     * This duplicates the key aggregation logic from MuSig2Core but
+     * returns the raw aggregated point (with potentially odd y).
+     *
+     * @param publicKeys List of all signer public keys
+     * @return Original aggregated point (may have odd y)
+     */
+    private static org.bouncycastle.math.ec.ECPoint computeOriginalQ(List<ECKey> publicKeys) {
+        log.debug("[wasQNegated] Computing original Q. Number of keys: {}", publicKeys.size());
+
+        org.bouncycastle.math.ec.ECPoint aggregatedPoint = null;
+
+        // Precompute L once (consistent for all keys)
+        byte[] L = MuSig2Core.hashKeys(publicKeys);
+        ECKey pk2 = MuSig2Core.getSecondKey(publicKeys);
+
+        if (pk2 != null) {
+            log.debug("[wasQNegated] Second key (pk2): {}",
+                Utils.bytesToHex(pk2.getPubKey()).substring(0, 20) + "...");
+        }
+
+        for (int i = 0; i < publicKeys.size(); i++) {
+            ECKey signerKey = publicKeys.get(i);
+            org.bouncycastle.math.ec.ECPoint P_i = signerKey.getPubKeyPoint();
+
+            // Compute coefficient a_i
+            BigInteger a_i;
+            if (pk2 != null && signerKey.equals(pk2)) {
+                a_i = BigInteger.ONE;
+                log.debug("[wasQNegated]   Key[{}] coefficient: 1 (is second key)", i);
+            } else {
+                byte[] pkBytes = signerKey.getPubKey();
+                byte[] hashInput = new byte[L.length + pkBytes.length];
+                System.arraycopy(L, 0, hashInput, 0, L.length);
+                System.arraycopy(pkBytes, 0, hashInput, L.length, pkBytes.length);
+                byte[] hashBytes = Utils.taggedHash("KeyAgg coefficient", hashInput);
+                a_i = new BigInteger(1, hashBytes).mod(ECKey.CURVE.getN());
+                log.debug("[wasQNegated]   Key[{}] coefficient: {}", i,
+                    a_i.toString(16).substring(0, Math.min(8, a_i.toString(16).length())) + "...");
+            }
+
+            // Multiply point by coefficient
+            org.bouncycastle.math.ec.ECPoint adjustedPoint = P_i.multiply(a_i);
+
+            // Add to aggregate
+            if (aggregatedPoint == null) {
+                aggregatedPoint = adjustedPoint;
+            } else {
+                aggregatedPoint = aggregatedPoint.add(adjustedPoint);
+            }
+        }
+
+        return aggregatedPoint != null ? aggregatedPoint.normalize() : null;
+    }
+
+    /**
+     * BIP-327: Verify Q consistency
+     *
+     * Checks that the recomputed Q matches the normalized Q
+     *
+     * @param originalQ Recomputed original Q
+     * @param normalizedQ The normalized aggregated key Q (with even y)
+     * @return true if x-coordinates match
+     */
+    private static boolean verifyQConsistency(org.bouncycastle.math.ec.ECPoint originalQ,
+                                             org.bouncycastle.math.ec.ECPoint normalizedQ) {
+        boolean x_matches = originalQ.getAffineXCoord().equals(normalizedQ.getAffineXCoord());
+        log.debug("[wasQNegated] Q x-coordinates match: {}", x_matches);
+
+        if (!x_matches) {
+            log.error("[wasQNegated] WARNING: Recomputed Q doesn't match normalized Q!");
+            log.error("[wasQNegated]   This suggests keys are not in the expected order!");
+        }
+
+        return x_matches;
     }
 
     /**
@@ -1015,78 +1148,30 @@ public class MuSig2 {
      */
     private static boolean wasQNegated(List<ECKey> publicKeys, org.bouncycastle.math.ec.ECPoint normalizedQ) {
         try {
-            // DEBUG: Log input key order
+            // Log input key order
             log.debug("[wasQNegated] Checking if Q was negated. Number of keys: {}", publicKeys.size());
             for (int i = 0; i < publicKeys.size(); i++) {
-                log.debug("[wasQNegated]   Key[{}]: {}", i, Utils.bytesToHex(publicKeys.get(i).getPubKey()).substring(0, 20) + "...");
+                log.debug("[wasQNegated]   Key[{}]: {}", i,
+                    Utils.bytesToHex(publicKeys.get(i).getPubKey()).substring(0, 20) + "...");
             }
 
-            // Compute the original Q (without normalization)
-            // This duplicates the logic from MuSig2Core.aggregatePublicKeys()
-            // but WITHOUT the with_even_y normalization
-
-            org.bouncycastle.math.ec.ECPoint aggregatedPoint = null;
-
-            // Precompute L once (consistent for all keys)
-            byte[] L = MuSig2Core.hashKeys(publicKeys);
-            ECKey pk2 = MuSig2Core.getSecondKey(publicKeys);
-
-            if (pk2 != null) {
-                log.debug("[wasQNegated] Second key (pk2): {}", Utils.bytesToHex(pk2.getPubKey()).substring(0, 20) + "...");
-            }
-
-            for (int i = 0; i < publicKeys.size(); i++) {
-                ECKey signerKey = publicKeys.get(i);
-                org.bouncycastle.math.ec.ECPoint P_i = signerKey.getPubKeyPoint();
-
-                // Compute coefficient a_i
-                BigInteger a_i;
-                if (pk2 != null && signerKey.equals(pk2)) {
-                    a_i = BigInteger.ONE;
-                    log.debug("[wasQNegated]   Key[{}] coefficient: 1 (is second key)", i);
-                } else {
-                    byte[] pkBytes = signerKey.getPubKey();
-                    byte[] hashInput = new byte[L.length + pkBytes.length];
-                    System.arraycopy(L, 0, hashInput, 0, L.length);
-                    System.arraycopy(pkBytes, 0, hashInput, L.length, pkBytes.length);
-                    byte[] hashBytes = Utils.taggedHash("KeyAgg coefficient", hashInput);
-                    a_i = new BigInteger(1, hashBytes).mod(ECKey.CURVE.getN());
-                    log.debug("[wasQNegated]   Key[{}] coefficient: {}", i, a_i.toString(16).substring(0, 8) + "...");
-                }
-
-                // Multiply point by coefficient
-                org.bouncycastle.math.ec.ECPoint adjustedPoint = P_i.multiply(a_i);
-
-                // Add to aggregate
-                if (aggregatedPoint == null) {
-                    aggregatedPoint = adjustedPoint;
-                } else {
-                    aggregatedPoint = aggregatedPoint.add(adjustedPoint);
-                }
-            }
-
-            if (aggregatedPoint == null) {
+            // BIP-327: Compute original Q (without normalization)
+            org.bouncycastle.math.ec.ECPoint originalQ = computeOriginalQ(publicKeys);
+            if (originalQ == null) {
                 return false;
             }
 
-            // Normalize the original Q
-            aggregatedPoint = aggregatedPoint.normalize();
-
-            // Check if original Q had odd y (which would cause negation)
-            boolean originalQ_has_odd_y = aggregatedPoint.getAffineYCoord().toBigInteger().testBit(0);
+            // BIP-327: Check if original Q had odd y
+            boolean originalQ_has_odd_y = !MuSig2Utils.hasEvenY(originalQ);
 
             log.debug("[wasQNegated] Original Q y-parity: {}", originalQ_has_odd_y ? "ODD (will negate)" : "EVEN (no negate)");
-            log.debug("[wasQNegated] Normalized Q x: {}", normalizedQ.getAffineXCoord().toBigInteger().toString(16).substring(0, 16) + "...");
-            log.debug("[wasQNegated] Recomputed Q x: {}", aggregatedPoint.getAffineXCoord().toBigInteger().toString(16).substring(0, 16) + "...");
+            log.debug("[wasQNegated] Normalized Q x: {}",
+                normalizedQ.getAffineXCoord().toBigInteger().toString(16).substring(0, 16) + "...");
+            log.debug("[wasQNegated] Recomputed Q x: {}",
+                originalQ.getAffineXCoord().toBigInteger().toString(16).substring(0, 16) + "...");
 
-            // Check if recomputed Q matches normalized Q
-            boolean x_matches = aggregatedPoint.getAffineXCoord().equals(normalizedQ.getAffineXCoord());
-            log.debug("[wasQNegated] Q x-coordinates match: {}", x_matches);
-
-            if (!x_matches) {
-                log.error("[wasQNegated] WARNING: Recomputed Q doesn't match normalized Q!");
-                log.error("[wasQNegated]   This suggests keys are not in the expected order!");
-            }
+            // BIP-327: Verify Q consistency
+            verifyQConsistency(originalQ, normalizedQ);
 
             return originalQ_has_odd_y;
 
