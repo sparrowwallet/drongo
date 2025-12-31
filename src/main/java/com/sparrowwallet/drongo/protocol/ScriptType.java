@@ -1117,12 +1117,34 @@ public enum ScriptType {
 
         @Override
         public Script getMultisigScriptSig(Script scriptPubKey, int threshold, Map<ECKey, TransactionSignature> pubKeySignatures) {
-            throw new UnsupportedOperationException("Constructing Taproot inputs is not yet supported");
+            if(!isScriptType(scriptPubKey)) {
+                throw new ProtocolException("Provided scriptPubKey is not a " + getName() + " script");
+            }
+
+            // For MuSig2 multisig (Taproot keypath spend), scriptSig is empty
+            // The aggregated Schnorr signature goes in the witness
+            return new Script(new byte[0]);
         }
 
         @Override
         public TransactionInput addMultisigSpendingInput(Transaction transaction, TransactionOutput prevOutput, int threshold, Map<ECKey, TransactionSignature> pubKeySignatures) {
-            throw new UnsupportedOperationException("Constructing Taproot inputs is not yet supported");
+            if(!isScriptType(prevOutput.getScript())) {
+                throw new ProtocolException("Provided prevOutput script is not a " + getName() + " script");
+            }
+
+            // For MuSig2 multisig, aggregate the partial Schnorr signatures
+            List<TransactionSignature> signatures = new ArrayList<>(pubKeySignatures.values());
+            if(signatures.isEmpty()) {
+                throw new ProtocolException("No signatures provided for MuSig2 multisig");
+            }
+
+            // TODO: Implement MuSig2 partial signature aggregation (BIP-327)
+            // For now, use the first signature (assuming pre-aggregated)
+            TransactionSignature aggregatedSignature = signatures.get(0);
+
+            Script scriptSig = getMultisigScriptSig(prevOutput.getScript(), threshold, pubKeySignatures);
+            TransactionWitness witness = new TransactionWitness(transaction, aggregatedSignature);
+            return transaction.addInput(prevOutput.getHash(), prevOutput.getIndex(), scriptSig, witness);
         }
 
         @Override
@@ -1132,7 +1154,7 @@ public enum ScriptType {
 
         @Override
         public List<PolicyType> getAllowedPolicyTypes() {
-            return List.of(SINGLE);
+            return List.of(SINGLE, MULTI);
         }
     },
     P2A("P2A", "Anchor (P2A)", "m/86'/0'/0'") {

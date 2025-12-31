@@ -4,6 +4,7 @@ import com.sparrowwallet.drongo.address.*;
 import com.sparrowwallet.drongo.crypto.ChildNumber;
 import com.sparrowwallet.drongo.crypto.DeterministicKey;
 import com.sparrowwallet.drongo.crypto.ECKey;
+import com.sparrowwallet.drongo.crypto.musig2.MuSig2Core;
 import com.sparrowwallet.drongo.policy.Policy;
 import com.sparrowwallet.drongo.policy.PolicyType;
 import com.sparrowwallet.drongo.protocol.ProtocolException;
@@ -26,6 +27,7 @@ public class OutputDescriptor {
     public static final Pattern XPUB_PATTERN = Pattern.compile("(\\[[^\\]]+\\])?(.(?:pub|prv)[^/\\,)]{100,112})(/[/\\d*'hH<>;]+)?");
     private static final Pattern PUBKEY_PATTERN = Pattern.compile("(\\[[^\\]]+\\])?(0[23][0-9a-fA-F]{32})");
     private static final Pattern MULTI_PATTERN = Pattern.compile("multi\\((\\d+)");
+    private static final Pattern MUSIG_PATTERN = Pattern.compile("musig\\s*\\(([^)]+)\\)");
     public static final Pattern KEY_ORIGIN_PATTERN = Pattern.compile("\\[([A-Fa-f0-9]{8})([/\\d'hH]+)?\\]");
     private static final Pattern MULTIPATH_PATTERN = Pattern.compile("<([\\d*'hH;]+)>");
     private static final Pattern CHECKSUM_PATTERN = Pattern.compile("#([" + CHECKSUM_CHARSET + "]{8})$");
@@ -371,12 +373,73 @@ public class OutputDescriptor {
         return new OutputDescriptor(wallet.getScriptType(), wallet.getDefaultPolicy().getNumSignaturesRequired(), extendedKeyDerivationMap, extendedKeyChildDerivationMap);
     }
 
+    /**
+     * Check if the descriptor contains a musig() expression (BIP-390)
+     */
+    public static boolean containsMusig(String descriptor) {
+        return MUSIG_PATTERN.matcher(descriptor).find();
+    }
+
+    /**
+     * Parse a musig() descriptor expression and return the aggregated public key
+     * Format: tr(musig(key1, key2, ...)) or rawtr(musig(key1, key2, ...))
+     */
+    private static ECKey parseMusigExpression(String musigContent, Map<ExtendedKey, String> mapExtendedPublicKeyLabels) {
+        // Extract all keys from musig() expression
+        List<ECKey> publicKeys = new ArrayList<>();
+
+        // Match xpubs with optional key origin and derivation
+        Matcher xpubMatcher = XPUB_PATTERN.matcher(musigContent);
+        while(xpubMatcher.find()) {
+            try {
+                String extKey = xpubMatcher.group(2);
+                ExtendedKey extendedKey = ExtendedKey.fromDescriptor(extKey);
+                publicKeys.add(extendedKey.getKey());
+            } catch(Exception e) {
+                throw new IllegalArgumentException("Invalid extended key in musig(): " + xpubMatcher.group(), e);
+            }
+        }
+
+        // Match plain public keys (hex format starting with 02 or 03)
+        Matcher pubkeyMatcher = PUBKEY_PATTERN.matcher(musigContent);
+        while(pubkeyMatcher.find()) {
+            try {
+                String pubkeyHex = pubkeyMatcher.group(2);
+                ECKey pubKey = ECKey.fromPublicOnly(Utils.hexToBytes(pubkeyHex));
+                publicKeys.add(pubKey);
+            } catch(Exception e) {
+                throw new IllegalArgumentException("Invalid public key in musig(): " + pubkeyMatcher.group(), e);
+            }
+        }
+
+        if(publicKeys.isEmpty()) {
+            throw new IllegalArgumentException("No valid public keys found in musig() expression");
+        }
+
+        // Sort keys lexicographically as per BIP-390
+        Utils.LexicographicByteArrayComparator comparator = new Utils.LexicographicByteArrayComparator();
+        publicKeys.sort((k1, k2) -> comparator.compare(k1.getPubKey(), k2.getPubKey()));
+
+        // Aggregate keys using MuSig2 KeyAgg algorithm (BIP-327)
+        try {
+            MuSig2Core.KeyAggContext keyAggContext = MuSig2Core.aggregatePublicKeys(publicKeys);
+            return keyAggContext.getQ();
+        } catch(Exception e) {
+            throw new IllegalArgumentException("Failed to aggregate keys in musig() expression", e);
+        }
+    }
+
     // See https://github.com/bitcoin/bitcoin/blob/master/doc/descriptors.md
     public static OutputDescriptor getOutputDescriptor(String descriptor) {
         return getOutputDescriptor(descriptor, new LinkedHashMap<>());
     }
 
     public static OutputDescriptor getOutputDescriptor(String descriptor, Map<ExtendedKey, String> mapExtendedPublicKeyLabels) {
+        // Check for musig() expression (BIP-390)
+        if(containsMusig(descriptor)) {
+            return getMusigOutputDescriptor(descriptor, mapExtendedPublicKeyLabels);
+        }
+
         ScriptType scriptType = ScriptType.fromDescriptor(descriptor);
         if(scriptType == null) {
             ExtendedKey.Header header = ExtendedKey.Header.fromExtendedKey(descriptor);
@@ -389,6 +452,57 @@ public class OutputDescriptor {
 
         int threshold = getMultisigThreshold(descriptor);
         return getOutputDescriptorImpl(scriptType, threshold, descriptor, mapExtendedPublicKeyLabels);
+    }
+
+    /**
+     * Parse a musig() descriptor and return the OutputDescriptor
+     * Handles BIP-390 musig() expressions like: tr(musig(key1, key2, ...))
+     */
+    private static OutputDescriptor getMusigOutputDescriptor(String descriptor, Map<ExtendedKey, String> mapExtendedPublicKeyLabels) {
+        Matcher musigMatcher = MUSIG_PATTERN.matcher(descriptor);
+        if(!musigMatcher.find()) {
+            throw new IllegalArgumentException("musig() expression not found in descriptor");
+        }
+
+        String musigContent = musigMatcher.group(1);
+
+        // Parse musig() expression and get aggregated public key
+        ECKey aggregatedKey = parseMusigExpression(musigContent, mapExtendedPublicKeyLabels);
+
+        // Determine script type (should be P2TR for musig())
+        ScriptType scriptType = ScriptType.fromDescriptor(descriptor);
+        if(scriptType == null || scriptType != ScriptType.P2TR) {
+            throw new IllegalArgumentException("musig() can only be used with tr() descriptor (P2TR)");
+        }
+
+        // For aggregated MuSig2 keys, use 0x00000000 as parent fingerprint
+        byte[] parentFingerprint = new byte[4];
+
+        // Create DeterministicKey from ECKey for ExtendedKey
+        List<ChildNumber> path = List.of(new ChildNumber(0));
+        DeterministicKey detKey = new DeterministicKey(
+            path,
+            aggregatedKey.getPubKey(),
+            aggregatedKey.getPrivKeyBytes(),
+            0,  // depth
+            parentFingerprint
+        );
+
+        // Create ExtendedKey from aggregated DeterministicKey
+        ExtendedKey aggregatedExtendedKey = new ExtendedKey(detKey, parentFingerprint, new ChildNumber(0));
+
+        // Compute fingerprint from the aggregated public key (first 4 bytes of hash160)
+        byte[] fingerprintBytes = Utils.sha256hash160(aggregatedKey.getPubKey());
+        String fingerprint = Utils.bytesToHex(Arrays.copyOfRange(fingerprintBytes, 0, 4));
+
+        // Create key derivation map with aggregated key
+        Map<ExtendedKey, KeyDerivation> keyDerivationMap = new LinkedHashMap<>();
+        keyDerivationMap.put(aggregatedExtendedKey, new KeyDerivation(fingerprint, KeyDerivation.writePath(new ArrayList<>())));
+
+        // For musig(), threshold is the number of cosigners (all must sign)
+        int numKeys = musigContent.split(",").length;
+
+        return new OutputDescriptor(scriptType, numKeys, keyDerivationMap);
     }
 
     private static int getMultisigThreshold(String descriptor) {
