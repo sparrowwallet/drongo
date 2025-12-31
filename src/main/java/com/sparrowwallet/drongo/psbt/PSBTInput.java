@@ -3,11 +3,13 @@ package com.sparrowwallet.drongo.psbt;
 import com.sparrowwallet.drongo.KeyDerivation;
 import com.sparrowwallet.drongo.Utils;
 import com.sparrowwallet.drongo.crypto.ECKey;
+import com.sparrowwallet.drongo.crypto.musig2.MuSig2.PartialSignature;
 import com.sparrowwallet.drongo.protocol.*;
 import com.sparrowwallet.drongo.silentpayments.SilentPaymentsDLEQProof;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.math.BigInteger;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -41,6 +43,8 @@ public class PSBTInput {
     public static final byte PSBT_IN_TAP_INTERNAL_KEY = 0x17;
     public static final byte PSBT_IN_SP_ECDH_SHARE = 0x1d;
     public static final byte PSBT_IN_SP_DLEQ = 0x1e;
+    // MuSig2 partial signatures (proprietary key for now, until BIP standardization)
+    public static final byte PSBT_IN_MUSIG_PARTIAL_SIG = (byte)0x20;
     public static final byte PSBT_IN_PROPRIETARY = (byte)0xfc;
 
     private final PSBT psbt;
@@ -62,6 +66,9 @@ public class PSBTInput {
     private TransactionSignature tapKeyPathSignature;
     private Map<ECKey, Map<KeyDerivation, List<Sha256Hash>>> tapDerivedPublicKeys = new LinkedHashMap<>();
     private ECKey tapInternalKey;
+
+    // MuSig2 fields
+    private final Map<ECKey, PartialSignature> musigPartialSigs = new LinkedHashMap<>();
 
     //PSBTv2-only fields
     private Sha256Hash prevTxid;
@@ -384,6 +391,22 @@ public class PSBTInput {
                     this.tapInternalKey = ECKey.fromPublicOnly(entry.getData());
                     log.debug("Found input taproot internal key " + Utils.bytesToHex(entry.getData()));
                     break;
+                case PSBT_IN_MUSIG_PARTIAL_SIG:
+                    entry.checkOneBytePlusPubKey();
+                    ECKey musigPublicKey = ECKey.fromPublicOnly(entry.getKeyData());
+                    if(entry.getData().length == 65) {
+                        // MuSig2 partial signature: R (compressed, 33 bytes) + s (32 bytes) = 65 bytes
+                        byte[] R = new byte[33];
+                        byte[] sBytes = new byte[32];
+                        System.arraycopy(entry.getData(), 0, R, 0, 33);
+                        System.arraycopy(entry.getData(), 33, sBytes, 0, 32);
+                        PartialSignature partialSig = new PartialSignature(R, new BigInteger(1, sBytes));
+                        this.musigPartialSigs.put(musigPublicKey, partialSig);
+                        log.debug("Found MuSig2 partial signature for public key " + musigPublicKey);
+                    } else {
+                        log.warn("Invalid MuSig2 partial signature length: " + entry.getData().length);
+                    }
+                    break;
                 default:
                     log.warn("PSBT input not recognized key type: " + entry.getKeyType());
             }
@@ -486,6 +509,23 @@ public class PSBTInput {
             entries.add(populateEntry(PSBT_IN_TAP_INTERNAL_KEY, null, tapInternalKey.getPubKeyXCoord()));
         }
 
+        // Serialize MuSig2 partial signatures (proprietary format until BIP standardization)
+        for(Map.Entry<ECKey, PartialSignature> entry : musigPartialSigs.entrySet()) {
+            // MuSig2 partial signature: R (compressed, 33 bytes) + s (32 bytes) = 65 bytes
+            byte[] R = entry.getValue().getR();
+            byte[] sBytes = entry.getValue().getS().toByteArray();
+            // Ensure s is exactly 32 bytes (pad or trim as needed)
+            byte[] sBytes32 = new byte[32];
+            int sStart = Math.max(0, sBytes.length - 32);
+            int sCopyLen = Math.min(sBytes.length, 32);
+            System.arraycopy(sBytes, sStart, sBytes32, 32 - sCopyLen, sCopyLen);
+
+            byte[] partialSigBytes = new byte[33 + 32];
+            System.arraycopy(R, 0, partialSigBytes, 0, Math.min(R.length, 33));
+            System.arraycopy(sBytes32, 0, partialSigBytes, 33, 32);
+            entries.add(populateEntry(PSBT_IN_MUSIG_PARTIAL_SIG, entry.getKey().getPubKey(), partialSigBytes));
+        }
+
         return entries;
     }
 
@@ -556,6 +596,8 @@ public class PSBTInput {
 
         silentPaymentsEcdhShares.putAll(psbtInput.silentPaymentsEcdhShares);
         silentPaymentsDLEQProofs.putAll(psbtInput.silentPaymentsDLEQProofs);
+
+        musigPartialSigs.putAll(psbtInput.musigPartialSigs);
 
         proprietary.putAll(psbtInput.proprietary);
 
@@ -794,6 +836,19 @@ public class PSBTInput {
 
     public Map<ECKey, SilentPaymentsDLEQProof> getSilentPaymentsDLEQProofs() {
         return silentPaymentsDLEQProofs;
+    }
+
+    // MuSig2 methods
+    public Map<ECKey, PartialSignature> getMusigPartialSigs() {
+        return musigPartialSigs;
+    }
+
+    public PartialSignature getMusigPartialSig(ECKey publicKey) {
+        return musigPartialSigs.get(publicKey);
+    }
+
+    public void addMuSig2PartialSig(ECKey publicKey, PartialSignature partialSig) {
+        musigPartialSigs.put(publicKey, partialSig);
     }
 
     public boolean isSigned() {
