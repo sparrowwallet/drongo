@@ -9,7 +9,7 @@ import java.util.Set;
 
 public record TransactionParameters(List<UtxoSelector> utxoSelectors, List<TxoFilter> txoFilters, List<Payment> payments, List<byte[]> opReturns,
                                     Set<WalletNode> excludedChangeNodes, double feeRate, double longTermFeeRate, double minRelayFeeRate, Long fee,
-                                    Integer currentBlockHeight, boolean groupByAddress, boolean includeMempoolOutputs, boolean allowRbf) {
+                                    Integer currentBlockHeight, boolean groupByAddress, boolean includeMempoolOutputs, boolean allowRbf, boolean allowInsufficientInputs) {
 
     public boolean containsSendMaxPayment() {
         return payments.stream().anyMatch(Payment::isSendMax);
