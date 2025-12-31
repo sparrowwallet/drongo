@@ -437,6 +437,202 @@ public class MuSig2 {
      * @param message Message to be signed (sighash)
      * @return Partial signature (to be shared with other signers)
      */
+
+    /**
+     * Helper class to hold aggregated nonce data
+     */
+    private static class AggregatedNonces {
+        final org.bouncycastle.math.ec.ECPoint R1_agg;
+        final org.bouncycastle.math.ec.ECPoint R2_agg;
+        final byte[] aggnonce;
+
+        AggregatedNonces(org.bouncycastle.math.ec.ECPoint R1_agg,
+                        org.bouncycastle.math.ec.ECPoint R2_agg,
+                        byte[] aggnonce) {
+            this.R1_agg = R1_agg;
+            this.R2_agg = R2_agg;
+            this.aggnonce = aggnonce;
+        }
+    }
+
+    /**
+     * BIP-327: Aggregate all nonces (R1 and R2)
+     *
+     * @param publicNonces Public nonces from all signers
+     * @return AggregatedNonces containing R1_agg, R2_agg, and encoded aggnonce
+     */
+    private static AggregatedNonces aggregateNonces(List<MuSig2Nonce> publicNonces) {
+        // BIP-327: Aggregate all R1 nonces
+        org.bouncycastle.math.ec.ECPoint R1_agg = null;
+        for (MuSig2Nonce nonce : publicNonces) {
+            org.bouncycastle.math.ec.ECPoint point = ECKey.CURVE.getCurve().decodePoint(nonce.getPublicKey1());
+            R1_agg = (R1_agg == null) ? point : R1_agg.add(point);
+        }
+        R1_agg = R1_agg.normalize();
+
+        // BIP-327: Aggregate all R2 nonces
+        org.bouncycastle.math.ec.ECPoint R2_agg = null;
+        for (MuSig2Nonce nonce : publicNonces) {
+            org.bouncycastle.math.ec.ECPoint point = ECKey.CURVE.getCurve().decodePoint(nonce.getPublicKey2());
+            R2_agg = (R2_agg == null) ? point : R2_agg.add(point);
+        }
+        R2_agg = R2_agg.normalize();
+
+        log.debug("Aggregated R1: {}, R2: {}",
+            Utils.bytesToHex(R1_agg.getAffineXCoord().getEncoded()).substring(0, 16) + "...",
+            Utils.bytesToHex(R2_agg.getAffineXCoord().getEncoded()).substring(0, 16) + "...");
+
+        // BIP-327: Encode aggnonce as R1 || R2 (compressed)
+        byte[] aggnonce = new byte[66];
+        byte[] R1_encoded = MuSig2Utils.encodeCompressedPoint(R1_agg);
+        byte[] R2_encoded = MuSig2Utils.encodeCompressedPoint(R2_agg);
+        System.arraycopy(R1_encoded, 0, aggnonce, 0, 33);
+        System.arraycopy(R2_encoded, 0, aggnonce, 33, 33);
+
+        return new AggregatedNonces(R1_agg, R2_agg, aggnonce);
+    }
+
+    /**
+     * BIP-327: Compute nonce coefficient b
+     *
+     * b = int(hash("MuSig/noncecoef" || aggnonce || x(Q) || m)) mod n
+     *
+     * @param aggnonce Encoded aggregated nonce (66 bytes)
+     * @param Q Aggregated public key point
+     * @param message Message to be signed
+     * @param n Curve order
+     * @return Nonce coefficient b
+     */
+    private static BigInteger computeNonceCoefficient(byte[] aggnonce, org.bouncycastle.math.ec.ECPoint Q,
+                                                      Sha256Hash message, BigInteger n) throws java.io.IOException {
+        ByteArrayOutputStream bInput = new ByteArrayOutputStream();
+        bInput.write(aggnonce, 0, aggnonce.length);
+        // BIP-327: x(Q) should use GetXonlyPubkey (with_even_y applied)
+        byte[] Q_xonly = MuSig2Utils.getXonlyPubkey(Q);
+        bInput.write(Q_xonly);
+        bInput.write(message.getBytes());
+
+        byte[] bBytes = Utils.taggedHash("MuSig/noncecoef", bInput.toByteArray());
+        BigInteger b = new BigInteger(1, bBytes).mod(n);
+
+        log.debug("Nonce coefficient b: {}", b.toString(16).substring(0, Math.min(8, b.toString(16).length())) + "...");
+
+        return b;
+    }
+
+    /**
+     * BIP-327: Compute aggregated nonce point R
+     *
+     * R = R1 + b*R2
+     * If R is infinity, set R = G
+     *
+     * @param aggnonces Aggregated nonce data
+     * @param b Nonce coefficient
+     * @return R point and x-coordinate
+     */
+    private static org.bouncycastle.math.ec.ECPoint computeRpoint(AggregatedNonces aggnonces, BigInteger b) {
+        org.bouncycastle.math.ec.ECPoint G = ECKey.CURVE.getG();
+
+        // BIP-327: R = R1 + b*R2
+        org.bouncycastle.math.ec.ECPoint R = aggnonces.R1_agg.add(aggnonces.R2_agg.multiply(b)).normalize();
+
+        // BIP-327: If R is infinity, set R = G
+        if (R.isInfinity()) {
+            log.warn("R is infinity, using generator G instead");
+            R = G;
+        }
+
+        byte[] xR = R.getAffineXCoord().getEncoded();
+        log.debug("Aggregated nonce R: {}", Utils.bytesToHex(xR).substring(0, 16) + "...");
+
+        return R;
+    }
+
+    /**
+     * BIP-327: Compute challenge e
+     *
+     * e = int(hash("BIP0340/challenge" || x(R) || x(Q) || m)) mod n
+     *
+     * @param R Aggregated nonce point
+     * @param Q Aggregated public key point
+     * @param message Message to be signed
+     * @param n Curve order
+     * @return Challenge e
+     */
+    private static BigInteger computeChallengeForSigning(org.bouncycastle.math.ec.ECPoint R,
+                                                         org.bouncycastle.math.ec.ECPoint Q,
+                                                         Sha256Hash message, BigInteger n) throws java.io.IOException {
+        byte[] xR = R.getAffineXCoord().getEncoded();
+
+        ByteArrayOutputStream eInput = new ByteArrayOutputStream();
+        eInput.write(xR);
+        // BIP-327: GetXonlyPubkey applies with_even_y to get x-coordinate with even y
+        byte[] Q_xonly = MuSig2Utils.getXonlyPubkey(Q);
+        eInput.write(Q_xonly);
+        eInput.write(message.getBytes());
+
+        byte[] eBytes = Utils.taggedHash("BIP0340/challenge", eInput.toByteArray());
+        BigInteger e = new BigInteger(1, eBytes).mod(n);
+
+        log.debug("Challenge e: {}", e.toString(16).substring(0, Math.min(8, e.toString(16).length())) + "...");
+
+        return e;
+    }
+
+    /**
+     * BIP-327: Compute parity adjustment factor g_v
+     *
+     * g_v = 1 if has_even_y(Q), otherwise g_v = -1 mod n
+     *
+     * @param Q Aggregated public key point
+     * @param n Curve order
+     * @return Parity adjustment factor (1 or n-1)
+     */
+    private static BigInteger computeParityFactor(org.bouncycastle.math.ec.ECPoint Q, BigInteger n) {
+        return MuSig2Utils.parityFactor(Q, n);
+    }
+
+    /**
+     * BIP-327: Adjust secret nonces based on R's y-parity
+     *
+     * If R has odd y:
+     *   k1 = n - k1'
+     *   k2 = n - k2'
+     * Otherwise:
+     *   k1 = k1'
+     *   k2 = k2'
+     *
+     * @param R Aggregated nonce point
+     * @param k1_prime Original k1
+     * @param k2_prime Original k2
+     * @param n Curve order
+     * @return Array with [k1, k2]
+     */
+    private static BigInteger[] computeAdjustedSecretNonces(org.bouncycastle.math.ec.ECPoint R,
+                                                             BigInteger k1_prime, BigInteger k2_prime,
+                                                             BigInteger n) {
+        BigInteger k1, k2;
+
+        if (MuSig2Utils.hasEvenY(R)) {
+            // R has even y, use k1', k2' as-is
+            k1 = k1_prime;
+            k2 = k2_prime;
+            log.debug("R has EVEN y, using k1=k1', k2=k2'");
+        } else {
+            // R has odd y, negate: k1 = n - k1', k2 = n - k2'
+            k1 = n.subtract(k1_prime).mod(n);
+            k2 = n.subtract(k2_prime).mod(n);
+            log.debug("R has ODD y, using k1=n-k1', k2=n-k2'");
+        }
+
+        return new BigInteger[] { k1, k2 };
+    }
+
+    /**
+     * BIP-327 Round 2: Create Partial Signature
+     *
+     * Simplified implementation using helper methods.
+     */
     public static PartialSignature signRound2BIP327(ECKey secretKey,
                                                       SecretNonce secretNonce,
                                                       List<ECKey> publicKeys,
@@ -446,160 +642,67 @@ public class MuSig2 {
 
         try {
             BigInteger n = ECKey.CURVE.getN();
-            org.bouncycastle.math.ec.ECPoint G = ECKey.CURVE.getG();
 
-            // BIP-327: Step 1 - Aggregate all R1 nonces
-            org.bouncycastle.math.ec.ECPoint R1_agg = null;
-            for (MuSig2Nonce nonce : publicNonces) {
-                org.bouncycastle.math.ec.ECPoint point = ECKey.CURVE.getCurve().decodePoint(nonce.getPublicKey1());
-                R1_agg = (R1_agg == null) ? point : R1_agg.add(point);
-            }
-            R1_agg = R1_agg.normalize();
+            // BIP-327: Aggregate nonces (R1 and R2)
+            AggregatedNonces aggnonces = aggregateNonces(publicNonces);
 
-            // BIP-327: Step 2 - Aggregate all R2 nonces
-            org.bouncycastle.math.ec.ECPoint R2_agg = null;
-            for (MuSig2Nonce nonce : publicNonces) {
-                org.bouncycastle.math.ec.ECPoint point = ECKey.CURVE.getCurve().decodePoint(nonce.getPublicKey2());
-                R2_agg = (R2_agg == null) ? point : R2_agg.add(point);
-            }
-            R2_agg = R2_agg.normalize();
-
-            log.debug("Aggregated R1: {}, R2: {}",
-                Utils.bytesToHex(R1_agg.getAffineXCoord().getEncoded()).substring(0, 16) + "...",
-                Utils.bytesToHex(R2_agg.getAffineXCoord().getEncoded()).substring(0, 16) + "...");
-
-            // BIP-327: Step 3 - Compute aggregated key Q with full context
-            // We need the KeyAggContext to access gacc (parity accumulator)
+            // BIP-327: Compute aggregated key Q with context
             MuSig2Core.KeyAggContext keyaggCtx = MuSig2Core.aggregatePublicKeys(publicKeys);
             ECKey aggregatedKey = keyaggCtx.getQ();
             org.bouncycastle.math.ec.ECPoint Q = aggregatedKey.getPubKeyPoint().normalize();
-
-            // BIP-327: Get gacc from context (needed for correct d calculation)
             BigInteger gacc = keyaggCtx.getGacc();
 
-            // BIP-327: Step 4 - Compute aggnonce (encoded form of R1 || R2)
-            byte[] aggnonce = new byte[66];
-            byte[] R1_encoded = encodeCompressedPoint(R1_agg);
-            byte[] R2_encoded = encodeCompressedPoint(R2_agg);
-            System.arraycopy(R1_encoded, 0, aggnonce, 0, 33);
-            System.arraycopy(R2_encoded, 0, aggnonce, 33, 33);
+            // BIP-327: Compute nonce coefficient b
+            BigInteger b = computeNonceCoefficient(aggnonces.aggnonce, Q, message, n);
 
-            // BIP-327: Step 5 - Compute nonce coefficient b
-            // b = int(hash("MuSig/noncecoef" || aggnonce || x(Q) || m)) mod n
-            // BIP-327: x(Q) should use GetXonlyPubkey (with_even_y applied)
-            ByteArrayOutputStream bInput = new ByteArrayOutputStream();
-            bInput.write(aggnonce);
-            // BIP-327: Apply with_even_y to get x-coordinate with even y
-            byte[] Q_xonly_for_b = MuSig2Utils.getXonlyPubkey(Q);
-            bInput.write(Q_xonly_for_b);
-            bInput.write(message.getBytes());
-
-            byte[] bBytes = Utils.taggedHash("MuSig/noncecoef", bInput.toByteArray());
-            BigInteger b = new BigInteger(1, bBytes).mod(n);
-
-            log.debug("Nonce coefficient b: {}", b.toString(16).substring(0, Math.min(8, b.toString(16).length())) + "...");
-
-            // BIP-327: Step 6 - Compute R = R1 + b*R2
-            org.bouncycastle.math.ec.ECPoint R = R1_agg.add(R2_agg.multiply(b)).normalize();
-
-            // BIP-327: If R is infinity, set R = G
-            if (R.isInfinity()) {
-                log.warn("R is infinity, using generator G instead");
-                R = G;
-            }
-
+            // BIP-327: Compute aggregated nonce point R
+            org.bouncycastle.math.ec.ECPoint R = computeRpoint(aggnonces, b);
             byte[] xR = R.getAffineXCoord().getEncoded();
 
-            log.debug("Aggregated nonce R: {}", Utils.bytesToHex(xR).substring(0, 16) + "...");
+            // BIP-327: Compute challenge e
+            BigInteger e = computeChallengeForSigning(R, Q, message, n);
 
-            // BIP-327: Step 7 - Compute challenge e
-            // e = int(hash("BIP0340/challenge" || x(R) || x(Q) || m)) mod n
-            // BIP-327: GetXonlyPubkey applies with_even_y to get x-coordinate with even y
-            ByteArrayOutputStream eInput = new ByteArrayOutputStream();
-            eInput.write(xR);
-            // BIP-327: Apply with_even_y to get x-coordinate with even y
-            byte[] Q_xonly = MuSig2Utils.getXonlyPubkey(Q);
-            eInput.write(Q_xonly);
-            eInput.write(message.getBytes());
-
-            byte[] eBytes = Utils.taggedHash("BIP0340/challenge", eInput.toByteArray());
-            BigInteger e = new BigInteger(1, eBytes).mod(n);
-
-            log.debug("Challenge e: {}", e.toString(16).substring(0, Math.min(8, e.toString(16).length())) + "...");
-
-            // BIP-327: Step 8 - Compute key aggregation coefficient a
+            // BIP-327: Compute key aggregation coefficient a
             ECKey myPublicKey = ECKey.fromPublicOnly(secretKey.getPubKey());
             BigInteger a = MuSig2Core.computeKeyAggCoefficient(myPublicKey, publicKeys);
-
             log.debug("Key aggregation coefficient a: {}",
                 a.toString(16).substring(0, Math.min(8, a.toString(16).length())) + "...");
 
-            // BIP-327: Step 9 - Get secret key d' = int(sk)
-            // According to BIP-327 "Negation Of The Secret Key When Signing":
-            // d' is simply the secret key WITHOUT negation, even if Q has odd y
-            // The negation is handled by g_v factor instead
+            // BIP-327: Get secret key d' = int(sk)
             BigInteger d_prime = secretKey.getPrivKey();
-
             log.debug("Secret key d' = int(sk) = {}", d_prime.toString(16).substring(0, 8) + "...");
 
-            // BIP-327: Step 10 - Compute parity adjustment g_v
-            // g_v = 1 if has_even_y(Q), otherwise g_v = -1 mod n
-            // This is based on the FINAL Q (Q_v) after all tweaks
-            BigInteger g_v;
-            if (hasEvenY(Q)) {
-                g_v = BigInteger.ONE;
-            } else {
-                g_v = n.subtract(BigInteger.ONE);  // -1 mod n
-            }
-
+            // BIP-327: Compute parity adjustment g_v
+            BigInteger g_v = computeParityFactor(Q, n);
             log.debug("Parity adjustment g_v: {} (Q has {} y, gacc: {})",
                 g_v.equals(BigInteger.ONE) ? "1" : "n-1",
-                hasEvenY(Q) ? "EVEN" : "ODD",
+                MuSig2Utils.hasEvenY(Q) ? "EVEN" : "ODD",
                 gacc.toString(16).substring(0, Math.min(8, gacc.toString(16).length())) + "...");
 
-            // BIP-327: Step 11 - Compute d = g_v ⋅ gacc ⋅ d' mod n
-            // The g_v factor handles the parity adjustment, so d' is NOT negated
+            // BIP-327: Compute d = g_v ⋅ gacc ⋅ d' mod n
             BigInteger d = g_v.multiply(gacc).mod(n).multiply(d_prime).mod(n);
-
             log.debug("Final secret key factor d = g_v ⋅ gacc ⋅ d' mod n");
 
-            // BIP-327: Step 12 - Compute partial signature
-            // s = k1 + b*k2 + e*a*d mod n
-            // Note: g_v is already incorporated into d, so we don't multiply by it again
-
-            // BIP-327 CRITICAL: Adjust k1, k2 based on R's y-parity
-            // If R has odd y, use k1 = n - k1', k2 = n - k2'
+            // BIP-327: Adjust secret nonces based on R's y-parity
             BigInteger k1_prime = secretNonce.getK1();
             BigInteger k2_prime = secretNonce.getK2();
+            BigInteger[] adjusted = computeAdjustedSecretNonces(R, k1_prime, k2_prime, n);
+            BigInteger k1 = adjusted[0];
+            BigInteger k2 = adjusted[1];
 
-            BigInteger k1, k2;
-            if (hasEvenY(R)) {
-                // R has even y, use k1', k2' as-is
-                k1 = k1_prime;
-                k2 = k2_prime;
-                log.debug("R has EVEN y, using k1=k1', k2=k2'");
-            } else {
-                // R has odd y, negate: k1 = n - k1', k2 = n - k2'
-                k1 = n.subtract(k1_prime).mod(n);
-                k2 = n.subtract(k2_prime).mod(n);
-                log.debug("R has ODD y, using k1=n-k1', k2=n-k2'");
-            }
-
-            // Compute each term
+            // BIP-327: Compute partial signature: s = k1 + b*k2 + e*a*d mod n
             BigInteger term1 = k1;
             BigInteger term2 = b.multiply(k2).mod(n);
             BigInteger term3 = e.multiply(a).mod(n).multiply(d).mod(n);
-
-            // s = (k1 + b*k2 + e*a*d) mod n
             BigInteger s = term1.add(term2).add(term3).mod(n);
 
             log.info("MuSig2: Created partial signature: s={}", s.toString(16).substring(0, 8) + "...");
 
             return new PartialSignature(xR, s);
 
-        } catch (Exception e) {
-            log.error("Error creating partial signature", e);
-            throw new RuntimeException("Failed to create partial signature", e);
+        } catch (Exception ex) {
+            log.error("Error creating partial signature", ex);
+            throw new RuntimeException("Failed to create partial signature", ex);
         }
     }
 
