@@ -38,45 +38,6 @@ public class MuSig2 {
     private static final SecureRandom random = new SecureRandom();
 
     /**
-     * MuSig2 Session State
-     *
-     * Contains the state for a MuSig2 signing session.
-     * In production, this would be serialized for communication between signers.
-     */
-    public static class Session {
-        private final String sessionId;
-        private final ECKey mySecretKey;
-        private final List<ECKey> allPublicKeys;
-        private final ECKey aggregatedKey;
-        private final MuSig2Nonce myNonce;
-        private final List<MuSig2Nonce> receivedNonces;
-        private final Sha256Hash message;
-        private int phase = 0;
-
-        public Session(String sessionId, ECKey mySecretKey, List<ECKey> allPublicKeys,
-                       ECKey aggregatedKey, MuSig2Nonce myNonce,
-                       List<MuSig2Nonce> receivedNonces, Sha256Hash message) {
-            this.sessionId = sessionId;
-            this.mySecretKey = mySecretKey;
-            this.allPublicKeys = allPublicKeys;
-            this.aggregatedKey = aggregatedKey;
-            this.myNonce = myNonce;
-            this.receivedNonces = receivedNonces;
-            this.message = message;
-        }
-
-        public String getSessionId() { return sessionId; }
-        public ECKey getMySecretKey() { return mySecretKey; }
-        public List<ECKey> getAllPublicKeys() { return allPublicKeys; }
-        public ECKey getAggregatedKey() { return aggregatedKey; }
-        public MuSig2Nonce getMyNonce() { return myNonce; }
-        public List<MuSig2Nonce> getReceivedNonces() { return receivedNonces; }
-        public Sha256Hash getMessage() { return message; }
-        public int getPhase() { return phase; }
-        public void setPhase(int phase) { this.phase = phase; }
-    }
-
-    /**
      * MuSig2 Nonce (Round 1 Message)
      *
      * In production, this contains the public nonce (R1, R2) that signers exchange.
@@ -274,8 +235,8 @@ public class MuSig2 {
         org.bouncycastle.math.ec.ECPoint R2_point = G.multiply(k2).normalize();
 
         // Encode as compressed points (33 bytes each: 0x02/0x03 || x-coordinate)
-        byte[] R1 = encodeCompressedPoint(R1_point);
-        byte[] R2 = encodeCompressedPoint(R2_point);
+        byte[] R1 = MuSig2Utils.encodeCompressedPoint(R1_point);
+        byte[] R2 = MuSig2Utils.encodeCompressedPoint(R2_point);
 
         // Create public nonce (for sharing)
         MuSig2Nonce publicNonce = new MuSig2Nonce(R1, R2);
@@ -293,128 +254,7 @@ public class MuSig2 {
     }
 
     /**
-     * Encode an EC point as a compressed public key (33 bytes)
-     * @deprecated Use {@link MuSig2Utils#encodeCompressedPoint(ECPoint)} instead
-     */
-    @Deprecated
-    private static byte[] encodeCompressedPoint(org.bouncycastle.math.ec.ECPoint point) {
-        return MuSig2Utils.encodeCompressedPoint(point);
-    }
-
-    /**
-     * STEP 3: Round 2 - Create Partial Signature
-     *
-     * After receiving Round 1 nonces from all other signers, each signer
-     * creates their partial signature.
-     *
-     * BIP-327 Section: Round 2
-     *
-     * Algorithm:
-     * 1. Aggregate all nonces: R = R_1 + R_2 + ... + R_n
-     * 2. Compute challenge: b = SHA256(R || aggregated_pubkey || m)
-     * 3. Compute key aggregation coefficient: mu
-     * 4. Compute partial signature: s = (b * secret_key + mu * nonce_secret) mod n
-     *
-     * @param secretKey Signer's secret key
-     * @param publicKeys List of all participant public keys
-     * @param myNonce My Round 1 nonce (secret)
-     * @param receivedNonces Nonces from all other signers
-     * @param message Message to be signed (sighash)
-     * @return Partial signature (to be shared with other signers)
-     */
-    public static PartialSignature signRound2(ECKey secretKey,
-                                                List<ECKey> publicKeys,
-                                                MuSig2Nonce myNonce,
-                                                List<MuSig2Nonce> receivedNonces,
-                                                Sha256Hash message) {
-        log.info("MuSig2: Creating Round 2 partial signature (BIP-327)");
-
-        try {
-            // BIP-327: Step 1 - Aggregate all nonces
-            // Combine my nonce with all received nonces
-            List<ECKey> allNonces = new ArrayList<>();
-
-            // Add my nonce (convert MuSig2Nonce to ECKey)
-            ECKey myNonceKey = ECKey.fromPublicOnly(myNonce.getPublicKey1());
-            allNonces.add(myNonceKey);
-
-            // Add received nonces
-            for (MuSig2Nonce nonce : receivedNonces) {
-                ECKey nonceKey = ECKey.fromPublicOnly(nonce.getPublicKey1());
-                allNonces.add(nonceKey);
-            }
-
-            // Aggregate nonces: R = R_1 + R_2 + ... + R_n
-            ECKey aggregatedNonce = MuSig2Core.aggregateNonces(allNonces);
-            byte[] R = aggregatedNonce.getPubKeyXCoord();
-
-            log.debug("Aggregated nonce R: {}...",
-                Utils.bytesToHex(R).substring(0, 16) + "...");
-
-            // BIP-327: Step 2 - Compute the aggregated public key
-            ECKey aggregatedKey = aggregateKeys(publicKeys);
-
-            // BIP-327: Step 3 - Compute challenge b
-            // b = SHA256(R || aggregated_pubkey || m)
-            ByteArrayOutputStream challengeInput = new ByteArrayOutputStream();
-            challengeInput.write(R);
-            challengeInput.write(aggregatedKey.getPubKey());
-            challengeInput.write(message.getBytes());
-
-            byte[] challengeBytes = Sha256Hash.twiceOf(challengeInput.toByteArray()).getBytes();
-            BigInteger b = new BigInteger(1, challengeBytes).mod(ECKey.CURVE.getN());
-
-            log.debug("Challenge b: {}", b.toString(16).substring(0, Math.min(8, b.toString(16).length())) + "...");
-
-            // BIP-327: Step 4 - Compute key aggregation coefficient mu
-            // This is the coefficient for this signer in the key aggregation
-            ECKey myPublicKey = ECKey.fromPublicOnly(secretKey.getPubKey());
-            BigInteger mu = MuSig2Core.computeKeyAggCoefficient(myPublicKey, publicKeys);
-
-            log.debug("Key aggregation coefficient mu: {}",
-                mu.toString(16).substring(0, Math.min(8, mu.toString(16).length())) + "...");
-
-            // BIP-327: Step 5 - Compute partial signature
-            // s = (b * secret_key + mu * nonce_secret) mod n
-            //
-            // Note: In the current implementation, we use the public nonce point.
-            // In production with proper nonce generation, we'd have the secret nonce.
-            // For now, we use a simplified approach.
-
-            BigInteger secretKeyScalar = secretKey.getPrivKey();
-
-            // s = (b * x + mu * r) mod n
-            // where x is the secret key and r is the nonce secret
-            //
-            // Since we're using deterministic nonce generation, the nonce is derived
-            // from the secret key, so we can compute it:
-            ECKey secretNonce = MuSig2Core.generateDeterministicNonce(
-                secretKey, aggregatedKey, message, null);
-            BigInteger nonceSecret = secretNonce.getPrivKey();
-
-            // Compute: s = (b * x + mu * r) mod n
-            BigInteger term1 = b.multiply(secretKeyScalar);
-            BigInteger term2 = mu.multiply(nonceSecret);
-            BigInteger s = term1.add(term2).mod(ECKey.CURVE.getN());
-
-            log.debug("Partial signature s: {}", s.toString(16).substring(0, 8) + "...");
-
-            // Create partial signature (R is the aggregated nonce public key)
-            PartialSignature partialSig = new PartialSignature(R, s);
-
-            log.info("MuSig2: Created BIP-327 partial signature: {}...",
-                partialSig.serialize().substring(0, 16));
-
-            return partialSig;
-
-        } catch (Exception e) {
-            log.error("Error creating BIP-327 partial signature", e);
-            throw new RuntimeException("Failed to create partial signature: " + e.getMessage(), e);
-        }
-    }
-
-    /**
-     * STEP 3: Round 2 - Create Partial Signature (BIP-327 Compliant)
+     * BIP-327 Round 2: Create Partial Signature (BIP-327 Compliant)
      *
      * After receiving Round 1 nonces from all other signers, each signer
      * creates their partial signature using the BIP-327 algorithm.
@@ -704,18 +544,6 @@ public class MuSig2 {
             log.error("Error creating partial signature", ex);
             throw new RuntimeException("Failed to create partial signature", ex);
         }
-    }
-
-    /**
-     * Check if an EC point has an even Y coordinate
-     */
-    /**
-     * Check if an elliptic curve point has an even y-coordinate.
-     * @deprecated Use {@link MuSig2Utils#hasEvenY(ECPoint)} instead
-     */
-    @Deprecated
-    private static boolean hasEvenY(org.bouncycastle.math.ec.ECPoint point) {
-        return MuSig2Utils.hasEvenY(point);
     }
 
     /**
