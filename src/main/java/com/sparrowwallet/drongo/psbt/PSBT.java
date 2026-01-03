@@ -597,6 +597,37 @@ public class PSBT {
         return fee;
     }
 
+    public void addKeyPathInformation(Wallet signingWallet) {
+        List<PSBTInput> missingKeyPathInputs = new ArrayList<>();
+        for(PSBTInput psbtInput : getPsbtInputs()) {
+            ScriptType scriptType = psbtInput.getScriptType();
+            if((scriptType == ScriptType.P2TR && psbtInput.getTapDerivedPublicKeys().isEmpty()) ||
+                    (scriptType != null && scriptType != ScriptType.P2TR && psbtInput.getDerivedPublicKeys().isEmpty())) {
+                missingKeyPathInputs.add(psbtInput);
+            }
+        }
+
+        if(!missingKeyPathInputs.isEmpty() && signingWallet != null) {
+            Map<PSBTInput, WalletNode> signingNodes = signingWallet.getSigningNodes(this);
+            for(PSBTInput psbtInput : missingKeyPathInputs) {
+                WalletNode walletNode = signingNodes.get(psbtInput);
+                if(walletNode != null && walletNode.getWallet() != null) {
+                    for(Keystore keystore : signingWallet.getKeystores()) {
+                        ScriptType scriptType = walletNode.getWallet().getScriptType();
+                        ECKey pubKey = keystore.getPubKey(walletNode);
+                        KeyDerivation keyDerivation = keystore.getKeyDerivation().extend(walletNode.getDerivation());
+                        if(scriptType == ScriptType.P2TR) {
+                            psbtInput.setTapInternalKey(ECKey.fromPublicOnly(pubKey.getPubKeyXCoord()));
+                            psbtInput.getTapDerivedPublicKeys().put(psbtInput.getTapInternalKey(), Map.of(keyDerivation, Collections.emptyList()));
+                        } else {
+                            psbtInput.getDerivedPublicKeys().put(scriptType.getOutputKey(pubKey), keyDerivation);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     public void verifySignatures() throws PSBTSignatureException {
         verifySignatures(getPsbtInputs());
     }
