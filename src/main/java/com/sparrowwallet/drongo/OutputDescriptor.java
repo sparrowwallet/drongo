@@ -662,8 +662,8 @@ public class OutputDescriptor {
             keyBuilder.append("[");
             keyBuilder.append(keyDerivation.getMasterFingerprint());
             if(!keyDerivation.getDerivation().isEmpty()) {
-                String path = keyDerivation.getDerivationPath().replaceFirst("^m?/", "/");
-                keyBuilder.append(useApostrophes ? path : path.replace('\'', 'h'));
+                String path = KeyDerivation.writePath(KeyDerivation.parsePath(keyDerivation.getDerivationPath()), useApostrophes).substring(1);
+                keyBuilder.append(path);
             }
             keyBuilder.append("]");
         }
