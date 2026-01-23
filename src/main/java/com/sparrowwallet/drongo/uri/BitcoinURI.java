@@ -1,5 +1,6 @@
 package com.sparrowwallet.drongo.uri;
 
+import com.sparrowwallet.drongo.Network;
 import com.sparrowwallet.drongo.address.Address;
 import com.sparrowwallet.drongo.address.InvalidAddressException;
 import com.sparrowwallet.drongo.silentpayments.SilentPayment;
@@ -68,7 +69,7 @@ public class BitcoinURI {
     public static final String FIELD_PAYMENT_REQUEST_URL = "r";
     public static final String FIELD_PAYJOIN_URL = "pj";
     public static final String FIELD_PAYJOIN_OUTPUT_SUBSTITUTION = "pjos";
-    public static final String FIELD_SILENT_PAYMENTS_ADDRESS = "sp";
+    public static final String FIELD_SILENT_PAYMENTS_ADDRESS = Network.get().getSilentPaymentsAddressHrp();
 
     public static final String BITCOIN_SCHEME = "bitcoin";
     private static final String ENCODED_SPACE_CHARACTER = "%20";
