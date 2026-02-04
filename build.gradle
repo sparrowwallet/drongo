@@ -39,6 +39,7 @@ dependencies {
 
 test {
     useJUnitPlatform()
+    jvmArgs = ["--enable-native-access=ALL-UNNAMED"]
 }
 
 processResources {
