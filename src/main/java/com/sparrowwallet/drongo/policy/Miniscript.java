@@ -1,5 +1,6 @@
 package com.sparrowwallet.drongo.policy;
 
+import java.util.Objects;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -49,5 +50,18 @@ public class Miniscript {
     @Override
     public String toString() {
         return getScript();
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if(this == o) return true;
+        if(o == null || getClass() != o.getClass()) return false;
+        Miniscript that = (Miniscript) o;
+        return Objects.equals(script, that.script);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(script);
     }
 }
