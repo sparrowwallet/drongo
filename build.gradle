@@ -26,7 +26,7 @@ dependencies {
         exclude group: 'net.java.dev.jna', module: 'jna'
     }
     implementation('dnsjava:dnsjava:3.6.4')
-    implementation('com.github.ben-manes.caffeine:caffeine:3.2.2')
+    implementation('com.github.ben-manes.caffeine:caffeine:3.2.3')
     implementation ('net.java.dev.jna:jna:5.18.1')
     implementation ('ch.qos.logback:logback-classic:1.5.32') {
         exclude group: 'org.slf4j'
