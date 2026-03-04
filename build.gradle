@@ -22,7 +22,7 @@ dependencies {
     implementation('org.pgpainless:pgpainless-core:1.7.5') {
         exclude group: 'org.jetbrains.kotlin', module: 'kotlin-stdlib-common'
     }
-    implementation ('de.mkammerer:argon2-jvm:2.11') {
+    implementation ('de.mkammerer:argon2-jvm:2.12') {
         exclude group: 'net.java.dev.jna', module: 'jna'
     }
     implementation('dnsjava:dnsjava:3.6.3')
