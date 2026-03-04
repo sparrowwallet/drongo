@@ -18,8 +18,8 @@ repositories {
 }
 
 dependencies {
-    implementation ('org.bouncycastle:bcprov-jdk18on:1.80')
-    implementation('org.pgpainless:pgpainless-core:1.7.5') {
+    implementation ('org.bouncycastle:bcprov-jdk18on:1.82')
+    implementation('org.pgpainless:pgpainless-core:1.7.7') {
         exclude group: 'org.jetbrains.kotlin', module: 'kotlin-stdlib-common'
     }
     implementation ('de.mkammerer:argon2-jvm:2.12') {
