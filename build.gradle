@@ -28,10 +28,10 @@ dependencies {
     implementation('dnsjava:dnsjava:3.6.3')
     implementation('com.github.ben-manes.caffeine:caffeine:3.2.2')
     implementation ('net.java.dev.jna:jna:5.16.0')
-    implementation ('ch.qos.logback:logback-classic:1.5.18') {
+    implementation ('ch.qos.logback:logback-classic:1.5.32') {
         exclude group: 'org.slf4j'
     }
-    implementation ('org.slf4j:slf4j-api:2.0.12')
+    implementation ('org.slf4j:slf4j-api:2.0.17')
     testImplementation('org.junit.jupiter:junit-jupiter-api:5.10.0')
     testRuntimeOnly('org.junit.jupiter:junit-jupiter-engine:5.10.0')
     testRuntimeOnly('org.junit.platform:junit-platform-launcher')
