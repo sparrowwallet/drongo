@@ -4,6 +4,9 @@ import com.sparrowwallet.drongo.Utils;
 import com.sparrowwallet.drongo.address.Address;
 import com.sparrowwallet.drongo.address.InvalidAddressException;
 import com.sparrowwallet.drongo.protocol.ScriptType;
+import com.sparrowwallet.drongo.protocol.SigHash;
+import com.sparrowwallet.drongo.psbt.PSBT;
+import com.sparrowwallet.drongo.psbt.PSBTInput;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -98,6 +101,69 @@ public class Bip322Test {
         String signature1 = "AkcwRAIgHx821fcP3D4R6RsXHF8kXza4d/SqpKGaGu++AEQjJz0CIH9cN5XGDkgkqqF9OMTbYvhgI7Yp9NoHXEgLstjqDOqDASECx/EgAxlkQpQ9hYjgGu6EBCPMVPwVIVJqO4XCsMvViHI=";
 
         Assertions.assertThrows(UnsupportedOperationException.class, () -> Bip322.verifyMessageBip322(ScriptType.P2SH_P2WPKH, address, message1, signature1));
+    }
+
+    @Test
+    public void getBip322Psbt() {
+        ECKey privKey = DumpedPrivateKey.fromBase58("L3VFeEujGtevx9w18HD1fhRbCH67Az2dpCymeRE1SoPK6XQtaN2k").getKey();
+        Address address = ScriptType.P2WPKH.getAddress(privKey);
+
+        PSBT psbt = Bip322.getBip322Psbt(ScriptType.P2WPKH, address, "Hello World");
+        Assertions.assertEquals(1, psbt.getPsbtInputs().size());
+        PSBTInput psbtInput = psbt.getPsbtInputs().get(0);
+        Assertions.assertNotNull(psbtInput.getWitnessUtxo());
+        Assertions.assertEquals(SigHash.ALL, psbtInput.getSigHash());
+        Assertions.assertEquals(0, psbt.getTransaction().getVersion());
+    }
+
+    @Test
+    public void getBip322PsbtTaproot() {
+        ECKey privKey = DumpedPrivateKey.fromBase58("L3VFeEujGtevx9w18HD1fhRbCH67Az2dpCymeRE1SoPK6XQtaN2k").getKey();
+        Address address = ScriptType.P2TR.getAddress(privKey);
+
+        PSBT psbt = Bip322.getBip322Psbt(ScriptType.P2TR, address, "Hello World");
+        Assertions.assertEquals(1, psbt.getPsbtInputs().size());
+        PSBTInput psbtInput = psbt.getPsbtInputs().get(0);
+        Assertions.assertNotNull(psbtInput.getWitnessUtxo());
+        Assertions.assertEquals(SigHash.ALL, psbtInput.getSigHash());
+    }
+
+    @Test
+    public void getBip322SignatureFromPsbt() {
+        ECKey privKey = DumpedPrivateKey.fromBase58("L3VFeEujGtevx9w18HD1fhRbCH67Az2dpCymeRE1SoPK6XQtaN2k").getKey();
+        ECKey pubKey = ECKey.fromPublicOnly(privKey);
+        Address address = ScriptType.P2WPKH.getAddress(privKey);
+
+        PSBT psbt = Bip322.getBip322Psbt(ScriptType.P2WPKH, address, "Hello World");
+        psbt.getPsbtInputs().get(0).sign(ScriptType.P2WPKH.getOutputKey(privKey));
+
+        String sigFromPsbt = Bip322.getBip322SignatureFromPsbt(ScriptType.P2WPKH, psbt, pubKey);
+        String sigDirect = Bip322.signMessageBip322(ScriptType.P2WPKH, "Hello World", privKey);
+        Assertions.assertEquals(sigDirect, sigFromPsbt);
+    }
+
+    @Test
+    public void getBip322SignatureFromPsbtTaproot() {
+        ECKey privKey = DumpedPrivateKey.fromBase58("L3VFeEujGtevx9w18HD1fhRbCH67Az2dpCymeRE1SoPK6XQtaN2k").getKey();
+        ECKey pubKey = ECKey.fromPublicOnly(privKey);
+        Address address = ScriptType.P2TR.getAddress(privKey);
+
+        PSBT psbt = Bip322.getBip322Psbt(ScriptType.P2TR, address, "Hello World");
+        psbt.getPsbtInputs().get(0).sign(ScriptType.P2TR.getOutputKey(privKey));
+
+        String sigFromPsbt = Bip322.getBip322SignatureFromPsbt(ScriptType.P2TR, psbt, pubKey);
+        String sigDirect = Bip322.signMessageBip322(ScriptType.P2TR, "Hello World", privKey);
+        Assertions.assertEquals(sigDirect, sigFromPsbt);
+    }
+
+    @Test
+    public void getBip322SignatureFromUnsignedPsbt() {
+        ECKey privKey = DumpedPrivateKey.fromBase58("L3VFeEujGtevx9w18HD1fhRbCH67Az2dpCymeRE1SoPK6XQtaN2k").getKey();
+        ECKey pubKey = ECKey.fromPublicOnly(privKey);
+        Address address = ScriptType.P2WPKH.getAddress(privKey);
+
+        PSBT psbt = Bip322.getBip322Psbt(ScriptType.P2WPKH, address, "Hello World");
+        Assertions.assertThrows(IllegalArgumentException.class, () -> Bip322.getBip322SignatureFromPsbt(ScriptType.P2WPKH, psbt, pubKey));
     }
 
     @Test

@@ -6,7 +6,6 @@ import com.sparrowwallet.drongo.policy.PolicyType;
 import com.sparrowwallet.drongo.protocol.*;
 import com.sparrowwallet.drongo.psbt.PSBT;
 import com.sparrowwallet.drongo.psbt.PSBTInput;
-import com.sparrowwallet.drongo.psbt.PSBTInputSigner;
 import com.sparrowwallet.drongo.psbt.PSBTSignatureException;
 
 import java.nio.charset.StandardCharsets;
@@ -22,19 +21,39 @@ public class Bip322 {
         ECKey pubKey = ECKey.fromPublicOnly(privKey);
         Address address = scriptType.getAddress(pubKey);
 
-        Transaction toSpend = getBip322ToSpend(address, message);
-        Transaction toSign = getBip322ToSign(toSpend);
-
-        TransactionOutput utxoOutput = toSpend.getOutputs().get(0);
-
-        PSBT psbt = new PSBT(toSign);
-        PSBTInput psbtInput = psbt.getPsbtInputs().get(0);
-        psbtInput.setWitnessUtxo(utxoOutput);
-        psbtInput.setSigHash(SigHash.ALL);
+        PSBT psbt = getBip322Psbt(scriptType, address, message);
+        PSBTInput psbtInput = psbt.getPsbtInputs().getFirst();
         psbtInput.sign(scriptType.getOutputKey(privKey));
 
+        return getBip322SignatureFromPsbt(scriptType, psbt, pubKey);
+    }
+
+    public static PSBT getBip322Psbt(ScriptType scriptType, Address address, String message) {
+        checkScriptType(scriptType);
+
+        Transaction toSpend = getBip322ToSpend(address, message);
+        Transaction toSign = getBip322ToSign(toSpend);
+        TransactionOutput utxoOutput = toSpend.getOutputs().getFirst();
+
+        PSBT psbt = new PSBT(toSign);
+        PSBTInput psbtInput = psbt.getPsbtInputs().getFirst();
+        psbtInput.setWitnessUtxo(utxoOutput);
+        psbtInput.setSigHash(SigHash.ALL);
+
+        return psbt;
+    }
+
+    public static String getBip322SignatureFromPsbt(ScriptType scriptType, PSBT signedPsbt, ECKey pubKey) {
+        checkScriptType(scriptType);
+
+        PSBTInput psbtInput = signedPsbt.getPsbtInputs().getFirst();
         TransactionSignature signature = psbtInput.isTaproot() ? psbtInput.getTapKeyPathSignature() : psbtInput.getPartialSignature(pubKey);
 
+        if(signature == null) {
+            throw new IllegalArgumentException("PSBT does not contain a signature");
+        }
+
+        TransactionOutput utxoOutput = psbtInput.getWitnessUtxo();
         Transaction finalizeTransaction = new Transaction();
         TransactionInput finalizedTxInput = scriptType.addSpendingInput(finalizeTransaction, utxoOutput, pubKey, signature);
 
@@ -74,7 +93,7 @@ public class Bip322 {
         }
 
         if(scriptType == ScriptType.P2WPKH) {
-            signature = witness.getSignatures().get(0);
+            signature = witness.getSignatures().getFirst();
             if(witness.getPushes().size() <= 1) {
                 throw new SignatureException("BIP322 simple signature for P2WPKH script type does not contain a pubkey.");
             }
@@ -84,7 +103,7 @@ public class Bip322 {
                 throw new SignatureException("Provided address does not match pubkey in signature");
             }
         } else if(scriptType == ScriptType.P2TR) {
-            signature = witness.getSignatures().get(0);
+            signature = witness.getSignatures().getFirst();
             pubKey = P2TR.getPublicKeyFromScript(address.getOutputScript());
         } else {
             throw new SignatureException(scriptType + " addresses are not supported");
@@ -94,8 +113,8 @@ public class Bip322 {
         Transaction toSign = getBip322ToSign(toSpend);
 
         PSBT psbt = new PSBT(toSign);
-        PSBTInput psbtInput = psbt.getPsbtInputs().get(0);
-        psbtInput.setWitnessUtxo(toSpend.getOutputs().get(0));
+        PSBTInput psbtInput = psbt.getPsbtInputs().getFirst();
+        psbtInput.setWitnessUtxo(toSpend.getOutputs().getFirst());
         psbtInput.setSigHash(SigHash.ALL);
 
         if(scriptType == ScriptType.P2TR) {
@@ -141,7 +160,7 @@ public class Bip322 {
         scriptSigChunks.add(ScriptChunk.fromData(getBip322MessageHash(message)));
         Script scriptSig = new Script(scriptSigChunks);
         toSpend.addInput(Sha256Hash.ZERO_HASH, 0xFFFFFFFFL, scriptSig, new TransactionWitness(toSpend, Collections.emptyList()));
-        toSpend.getInputs().get(0).setSequenceNumber(0L);
+        toSpend.getInputs().getFirst().setSequenceNumber(0L);
         toSpend.addOutput(0L, address.getOutputScript());
 
         return toSpend;
@@ -154,7 +173,7 @@ public class Bip322 {
 
         TransactionWitness witness = new TransactionWitness(toSign);
         toSign.addInput(toSpend.getTxId(), 0L, new Script(new byte[0]), witness);
-        toSign.getInputs().get(0).setSequenceNumber(0L);
+        toSign.getInputs().getFirst().setSequenceNumber(0L);
         toSign.addOutput(0, new Script(List.of(ScriptChunk.fromOpcode(ScriptOpCodes.OP_RETURN))));
 
         return toSign;
