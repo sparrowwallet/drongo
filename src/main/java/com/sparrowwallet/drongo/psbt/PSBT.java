@@ -1128,12 +1128,20 @@ public class PSBT {
         return getTransaction().getVersion();
     }
 
+    public void setTxVersion(Long txVersion) {
+        this.txVersion = txVersion;
+    }
+
     public Long getFallbackLocktime() {
         if(getPsbtVersion() >= 2) {
             return fallbackLocktime;
         }
 
         return getTransaction().getLocktime();
+    }
+
+    public void setFallbackLocktime(Long fallbackLocktime) {
+        this.fallbackLocktime = fallbackLocktime;
     }
 
     public Long getInputCount() {
