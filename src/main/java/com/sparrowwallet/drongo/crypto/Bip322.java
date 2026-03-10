@@ -55,7 +55,9 @@ public class Bip322 {
 
         TransactionOutput utxoOutput = psbtInput.getWitnessUtxo();
         Transaction finalizeTransaction = new Transaction();
-        TransactionInput finalizedTxInput = scriptType.addSpendingInput(finalizeTransaction, utxoOutput, pubKey, signature);
+        Script scriptSig = scriptType.getScriptSig(utxoOutput.getScript(), pubKey, signature);
+        TransactionWitness witness = psbtInput.isTaproot() ? new TransactionWitness(finalizeTransaction, signature) : new TransactionWitness(finalizeTransaction, pubKey, signature);
+        TransactionInput finalizedTxInput = finalizeTransaction.addInput(Sha256Hash.ZERO_HASH, 0, scriptSig, witness);
 
         return Base64.getEncoder().encodeToString(finalizedTxInput.getWitness().toByteArray());
     }
