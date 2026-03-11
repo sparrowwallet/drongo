@@ -848,8 +848,11 @@ public class ECKey {
             if(mag != null) {
                 Arrays.fill(mag, 0);
             }
+            Field sigField = BigInteger.class.getDeclaredField("signum");
+            sigField.setAccessible(true);
+            sigField.setInt(priv, 0);
         } catch(NoSuchFieldException | IllegalAccessException e) {
-            // Best-effort: reflection may be blocked by module system
+            log.warn("Could not zero private key via reflection; add --add-opens java.base/java.math=ALL-UNNAMED to JVM args");
         }
     }
 
