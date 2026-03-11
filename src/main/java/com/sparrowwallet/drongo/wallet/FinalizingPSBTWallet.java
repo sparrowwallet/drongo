@@ -101,6 +101,11 @@ public class FinalizingPSBTWallet extends Wallet {
     }
 
     @Override
+    public Map<PSBTInput, WalletNode> getSigningNodes(PSBT psbt, boolean useDerivationFallback) {
+        return signedInputNodes;
+    }
+
+    @Override
     public ECKey getPubKey(WalletNode node) {
         return signedNodeKeys.get(node).get(0);
     }
