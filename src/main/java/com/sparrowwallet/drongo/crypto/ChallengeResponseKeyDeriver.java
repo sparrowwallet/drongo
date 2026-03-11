@@ -34,7 +34,7 @@ public class ChallengeResponseKeyDeriver implements AsymmetricKeyDeriver {
             combined = Sha256Hash.hash(bufferArray);
             return ECKey.fromPrivate(combined);
         } catch(ChallengeResponseException e) {
-            throw new KeyCrypterException("Challenge-response key derivation failed", e);
+            throw new KeyCrypterException(e.getMessage(), e);
         } finally {
             if(innerKeyBytes != null) Arrays.fill(innerKeyBytes, (byte) 0);
             if(hmacResponse != null) Arrays.fill(hmacResponse, (byte) 0);
