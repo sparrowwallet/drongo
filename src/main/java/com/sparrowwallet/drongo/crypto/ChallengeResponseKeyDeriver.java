@@ -17,29 +17,29 @@ public class ChallengeResponseKeyDeriver implements AsymmetricKeyDeriver {
     @Override
     public ECKey deriveECKey(CharSequence password) throws KeyCrypterException {
         ECKey innerKey = innerDeriver.deriveECKey(password);
+        byte[] innerKeyBytes = null;
+        byte[] hmacResponse = null;
+        byte[] bufferArray = null;
+        byte[] combined = null;
         try {
             byte[] challenge = innerDeriver.getSalt();
-            byte[] hmacResponse = provider.getResponse(challenge);
-            byte[] innerKeyBytes = innerKey.getPrivKeyBytes();
-            try {
-                ByteBuffer buffer = ByteBuffer.allocate(innerKeyBytes.length + hmacResponse.length);
-                buffer.put(innerKeyBytes);
-                buffer.put(hmacResponse);
+            hmacResponse = provider.getResponse(challenge);
+            innerKeyBytes = innerKey.getPrivKeyBytes();
 
-                byte[] combined = Sha256Hash.hash(buffer.array());
-                try {
-                    return ECKey.fromPrivate(combined);
-                } finally {
-                    Arrays.fill(buffer.array(), (byte) 0);
-                    Arrays.fill(combined, (byte) 0);
-                }
-            } finally {
-                Arrays.fill(innerKeyBytes, (byte) 0);
-                Arrays.fill(hmacResponse, (byte) 0);
-            }
+            ByteBuffer buffer = ByteBuffer.allocate(innerKeyBytes.length + hmacResponse.length);
+            buffer.put(innerKeyBytes);
+            buffer.put(hmacResponse);
+            bufferArray = buffer.array();
+
+            combined = Sha256Hash.hash(bufferArray);
+            return ECKey.fromPrivate(combined);
         } catch(ChallengeResponseException e) {
             throw new KeyCrypterException("Challenge-response key derivation failed", e);
         } finally {
+            if(innerKeyBytes != null) Arrays.fill(innerKeyBytes, (byte) 0);
+            if(hmacResponse != null) Arrays.fill(hmacResponse, (byte) 0);
+            if(bufferArray != null) Arrays.fill(bufferArray, (byte) 0);
+            if(combined != null) Arrays.fill(combined, (byte) 0);
             innerKey.clear();
         }
     }

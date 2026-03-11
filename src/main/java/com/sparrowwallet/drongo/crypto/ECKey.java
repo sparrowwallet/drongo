@@ -25,9 +25,9 @@ import org.slf4j.LoggerFactory;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.lang.reflect.Field;
 import java.math.BigInteger;
 import java.nio.charset.StandardCharsets;
-import java.lang.reflect.Field;
 import java.security.SecureRandom;
 import java.security.SignatureException;
 import java.util.Arrays;
