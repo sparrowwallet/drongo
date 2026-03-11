@@ -38,7 +38,7 @@ public class ChallengeResponseKeyDeriver implements AsymmetricKeyDeriver {
                 Arrays.fill(hmacResponse, (byte) 0);
             }
         } catch(ChallengeResponseException e) {
-            throw new KeyCrypterException("Challenge-response failed: " + e.getMessage(), e);
+            throw new KeyCrypterException("Challenge-response key derivation failed", e);
         } finally {
             innerKey.clear();
         }

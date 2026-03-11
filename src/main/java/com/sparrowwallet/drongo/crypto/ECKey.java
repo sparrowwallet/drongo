@@ -27,6 +27,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.math.BigInteger;
 import java.nio.charset.StandardCharsets;
+import java.lang.reflect.Field;
 import java.security.SecureRandom;
 import java.security.SignatureException;
 import java.util.Arrays;
@@ -837,8 +838,18 @@ public class ECKey {
     }
 
     public void clear() {
-        for(int i = 0; i < priv.bitLength(); i++) {
-            priv.clearBit(i);
+        if(priv == null) {
+            return;
+        }
+        try {
+            Field magField = BigInteger.class.getDeclaredField("mag");
+            magField.setAccessible(true);
+            int[] mag = (int[]) magField.get(priv);
+            if(mag != null) {
+                Arrays.fill(mag, 0);
+            }
+        } catch(NoSuchFieldException | IllegalAccessException e) {
+            // Best-effort: reflection may be blocked by module system
         }
     }
 
