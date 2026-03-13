@@ -42,11 +42,4 @@ test {
     jvmArgs = ["--enable-native-access=ALL-UNNAMED"]
 }
 
-processResources {
-    doLast {
-        delete fileTree("$buildDir/resources/main/native").matching {
-            exclude "${osName}/**"
-        }
-    }
-}
 
