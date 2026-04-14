@@ -135,7 +135,7 @@ public class Bip322 {
     }
 
     private static void checkScriptType(ScriptType scriptType) {
-        if(!scriptType.isAllowed(PolicyType.SINGLE)) {
+        if(!scriptType.isAllowed(PolicyType.SINGLE_HD)) {
             throw new UnsupportedOperationException("Only singlesig addresses are currently supported");
         }
 

@@ -167,7 +167,7 @@ public class SilentPaymentUtilsTest {
         Assertions.assertEquals("3e9fce73d4e77a4809908e3c3a2e54ee147b9312dc5044a193d1fc85de46e3c1", Utils.bytesToHex(address.getData()));
 
         Wallet sendWallet = new Wallet();
-        sendWallet.setPolicyType(PolicyType.SINGLE);
+        sendWallet.setPolicyType(PolicyType.SINGLE_HD);
         sendWallet.setScriptType(ScriptType.P2WPKH);
         Map<HashIndex, WalletNode> utxos = new LinkedHashMap<>();
         Map<WalletNode, ECKey> privateKeys = new LinkedHashMap<>();
@@ -186,7 +186,7 @@ public class SilentPaymentUtilsTest {
 
         TestKeystore sendKeystore = new TestKeystore(privateKeys);
         sendWallet.getKeystores().add(sendKeystore);
-        sendWallet.setDefaultPolicy(Policy.getPolicy(PolicyType.SINGLE, ScriptType.P2WPKH, sendWallet.getKeystores(), 1));
+        sendWallet.setDefaultPolicy(Policy.getPolicy(PolicyType.SINGLE_HD, ScriptType.P2WPKH, sendWallet.getKeystores(), 1));
 
         SilentPaymentAddress silentPaymentAddress = SilentPaymentAddress.from("sp1qqgste7k9hx0qftg6qmwlkqtwuy6cycyavzmzj85c6qdfhjdpdjtdgqjuexzk6murw56suy3e0rd2cgqvycxttddwsvgxe2usfpxumr70xc9pkqwv");
         List<SilentPayment> silentPayments = List.of(new SilentPayment(silentPaymentAddress, "", 0, false));
@@ -200,7 +200,7 @@ public class SilentPaymentUtilsTest {
     @Test
     public void testSimpleSendTwoInputsReversed() throws InvalidSilentPaymentException {
         Wallet sendWallet = new Wallet();
-        sendWallet.setPolicyType(PolicyType.SINGLE);
+        sendWallet.setPolicyType(PolicyType.SINGLE_HD);
         sendWallet.setScriptType(ScriptType.P2WPKH);
         Map<HashIndex, WalletNode> utxos = new LinkedHashMap<>();
         Map<WalletNode, ECKey> privateKeys = new LinkedHashMap<>();
@@ -219,7 +219,7 @@ public class SilentPaymentUtilsTest {
 
         TestKeystore sendKeystore = new TestKeystore(privateKeys);
         sendWallet.getKeystores().add(sendKeystore);
-        sendWallet.setDefaultPolicy(Policy.getPolicy(PolicyType.SINGLE, ScriptType.P2WPKH, sendWallet.getKeystores(), 1));
+        sendWallet.setDefaultPolicy(Policy.getPolicy(PolicyType.SINGLE_HD, ScriptType.P2WPKH, sendWallet.getKeystores(), 1));
 
         SilentPaymentAddress silentPaymentAddress = SilentPaymentAddress.from("sp1qqgste7k9hx0qftg6qmwlkqtwuy6cycyavzmzj85c6qdfhjdpdjtdgqjuexzk6murw56suy3e0rd2cgqvycxttddwsvgxe2usfpxumr70xc9pkqwv");
         List<SilentPayment> silentPayments = List.of(new SilentPayment(silentPaymentAddress, "", 0, false));
@@ -232,7 +232,7 @@ public class SilentPaymentUtilsTest {
     @Test
     public void testSimpleSendTwoInputsSameTransaction() throws InvalidSilentPaymentException {
         Wallet sendWallet = new Wallet();
-        sendWallet.setPolicyType(PolicyType.SINGLE);
+        sendWallet.setPolicyType(PolicyType.SINGLE_HD);
         sendWallet.setScriptType(ScriptType.P2WPKH);
         Map<HashIndex, WalletNode> utxos = new LinkedHashMap<>();
         Map<WalletNode, ECKey> privateKeys = new LinkedHashMap<>();
@@ -251,7 +251,7 @@ public class SilentPaymentUtilsTest {
 
         TestKeystore sendKeystore = new TestKeystore(privateKeys);
         sendWallet.getKeystores().add(sendKeystore);
-        sendWallet.setDefaultPolicy(Policy.getPolicy(PolicyType.SINGLE, ScriptType.P2WPKH, sendWallet.getKeystores(), 1));
+        sendWallet.setDefaultPolicy(Policy.getPolicy(PolicyType.SINGLE_HD, ScriptType.P2WPKH, sendWallet.getKeystores(), 1));
 
         SilentPaymentAddress silentPaymentAddress = SilentPaymentAddress.from("sp1qqgste7k9hx0qftg6qmwlkqtwuy6cycyavzmzj85c6qdfhjdpdjtdgqjuexzk6murw56suy3e0rd2cgqvycxttddwsvgxe2usfpxumr70xc9pkqwv");
         List<SilentPayment> silentPayments = List.of(new SilentPayment(silentPaymentAddress, "", 0, false));
@@ -264,7 +264,7 @@ public class SilentPaymentUtilsTest {
     @Test
     public void testSimpleSendTwoInputsSameTransactionReversed() throws InvalidSilentPaymentException {
         Wallet sendWallet = new Wallet();
-        sendWallet.setPolicyType(PolicyType.SINGLE);
+        sendWallet.setPolicyType(PolicyType.SINGLE_HD);
         sendWallet.setScriptType(ScriptType.P2WPKH);
         Map<HashIndex, WalletNode> utxos = new LinkedHashMap<>();
         Map<WalletNode, ECKey> privateKeys = new LinkedHashMap<>();
@@ -283,7 +283,7 @@ public class SilentPaymentUtilsTest {
 
         TestKeystore sendKeystore = new TestKeystore(privateKeys);
         sendWallet.getKeystores().add(sendKeystore);
-        sendWallet.setDefaultPolicy(Policy.getPolicy(PolicyType.SINGLE, ScriptType.P2WPKH, sendWallet.getKeystores(), 1));
+        sendWallet.setDefaultPolicy(Policy.getPolicy(PolicyType.SINGLE_HD, ScriptType.P2WPKH, sendWallet.getKeystores(), 1));
 
         SilentPaymentAddress silentPaymentAddress = SilentPaymentAddress.from("sp1qqgste7k9hx0qftg6qmwlkqtwuy6cycyavzmzj85c6qdfhjdpdjtdgqjuexzk6murw56suy3e0rd2cgqvycxttddwsvgxe2usfpxumr70xc9pkqwv");
         List<SilentPayment> silentPayments = List.of(new SilentPayment(silentPaymentAddress, "", 0, false));
@@ -296,7 +296,7 @@ public class SilentPaymentUtilsTest {
     @Test
     public void testOutpointOrderingIndex() throws InvalidSilentPaymentException {
         Wallet sendWallet = new Wallet();
-        sendWallet.setPolicyType(PolicyType.SINGLE);
+        sendWallet.setPolicyType(PolicyType.SINGLE_HD);
         sendWallet.setScriptType(ScriptType.P2WPKH);
         Map<HashIndex, WalletNode> utxos = new LinkedHashMap<>();
         Map<WalletNode, ECKey> privateKeys = new LinkedHashMap<>();
@@ -315,7 +315,7 @@ public class SilentPaymentUtilsTest {
 
         TestKeystore sendKeystore = new TestKeystore(privateKeys);
         sendWallet.getKeystores().add(sendKeystore);
-        sendWallet.setDefaultPolicy(Policy.getPolicy(PolicyType.SINGLE, ScriptType.P2WPKH, sendWallet.getKeystores(), 1));
+        sendWallet.setDefaultPolicy(Policy.getPolicy(PolicyType.SINGLE_HD, ScriptType.P2WPKH, sendWallet.getKeystores(), 1));
 
         SilentPaymentAddress silentPaymentAddress = SilentPaymentAddress.from("sp1qqgste7k9hx0qftg6qmwlkqtwuy6cycyavzmzj85c6qdfhjdpdjtdgqjuexzk6murw56suy3e0rd2cgqvycxttddwsvgxe2usfpxumr70xc9pkqwv");
         List<SilentPayment> silentPayments = List.of(new SilentPayment(silentPaymentAddress, "", 0, false));
@@ -328,7 +328,7 @@ public class SilentPaymentUtilsTest {
     @Test
     public void testSingleRecipientSamePubKey() throws InvalidSilentPaymentException {
         Wallet sendWallet = new Wallet();
-        sendWallet.setPolicyType(PolicyType.SINGLE);
+        sendWallet.setPolicyType(PolicyType.SINGLE_HD);
         sendWallet.setScriptType(ScriptType.P2WPKH);
         Map<HashIndex, WalletNode> utxos = new LinkedHashMap<>();
         Map<WalletNode, ECKey> privateKeys = new LinkedHashMap<>();
@@ -347,7 +347,7 @@ public class SilentPaymentUtilsTest {
 
         TestKeystore sendKeystore = new TestKeystore(privateKeys);
         sendWallet.getKeystores().add(sendKeystore);
-        sendWallet.setDefaultPolicy(Policy.getPolicy(PolicyType.SINGLE, ScriptType.P2WPKH, sendWallet.getKeystores(), 1));
+        sendWallet.setDefaultPolicy(Policy.getPolicy(PolicyType.SINGLE_HD, ScriptType.P2WPKH, sendWallet.getKeystores(), 1));
 
         SilentPaymentAddress silentPaymentAddress = SilentPaymentAddress.from("sp1qqgste7k9hx0qftg6qmwlkqtwuy6cycyavzmzj85c6qdfhjdpdjtdgqjuexzk6murw56suy3e0rd2cgqvycxttddwsvgxe2usfpxumr70xc9pkqwv");
         List<SilentPayment> silentPayments = List.of(new SilentPayment(silentPaymentAddress, "", 0, false));
@@ -360,7 +360,7 @@ public class SilentPaymentUtilsTest {
     @Test
     public void testSingleRecipientTaprootOnlyEvenY() throws InvalidSilentPaymentException {
         Wallet sendWallet = new Wallet();
-        sendWallet.setPolicyType(PolicyType.SINGLE);
+        sendWallet.setPolicyType(PolicyType.SINGLE_HD);
         sendWallet.setScriptType(ScriptType.P2TR);
         Map<HashIndex, WalletNode> utxos = new LinkedHashMap<>();
         Map<WalletNode, ECKey> privateKeys = new LinkedHashMap<>();
@@ -389,7 +389,7 @@ public class SilentPaymentUtilsTest {
 
         TestKeystore sendKeystore = new TestKeystore(privateKeys);
         sendWallet.getKeystores().add(sendKeystore);
-        sendWallet.setDefaultPolicy(Policy.getPolicy(PolicyType.SINGLE, ScriptType.P2WPKH, sendWallet.getKeystores(), 1));
+        sendWallet.setDefaultPolicy(Policy.getPolicy(PolicyType.SINGLE_HD, ScriptType.P2WPKH, sendWallet.getKeystores(), 1));
 
         SilentPaymentAddress silentPaymentAddress = SilentPaymentAddress.from("sp1qqgste7k9hx0qftg6qmwlkqtwuy6cycyavzmzj85c6qdfhjdpdjtdgqjuexzk6murw56suy3e0rd2cgqvycxttddwsvgxe2usfpxumr70xc9pkqwv");
         List<SilentPayment> silentPayments = List.of(new SilentPayment(silentPaymentAddress, "", 0, false));
@@ -402,7 +402,7 @@ public class SilentPaymentUtilsTest {
     @Test
     public void testSingleRecipientTaprootOnlyMixedY() throws InvalidSilentPaymentException {
         Wallet sendWallet = new Wallet();
-        sendWallet.setPolicyType(PolicyType.SINGLE);
+        sendWallet.setPolicyType(PolicyType.SINGLE_HD);
         sendWallet.setScriptType(ScriptType.P2TR);
         Map<HashIndex, WalletNode> utxos = new LinkedHashMap<>();
         Map<WalletNode, ECKey> privateKeys = new LinkedHashMap<>();
@@ -431,7 +431,7 @@ public class SilentPaymentUtilsTest {
 
         TestKeystore sendKeystore = new TestKeystore(privateKeys);
         sendWallet.getKeystores().add(sendKeystore);
-        sendWallet.setDefaultPolicy(Policy.getPolicy(PolicyType.SINGLE, ScriptType.P2WPKH, sendWallet.getKeystores(), 1));
+        sendWallet.setDefaultPolicy(Policy.getPolicy(PolicyType.SINGLE_HD, ScriptType.P2WPKH, sendWallet.getKeystores(), 1));
 
         SilentPaymentAddress silentPaymentAddress = SilentPaymentAddress.from("sp1qqgste7k9hx0qftg6qmwlkqtwuy6cycyavzmzj85c6qdfhjdpdjtdgqjuexzk6murw56suy3e0rd2cgqvycxttddwsvgxe2usfpxumr70xc9pkqwv");
         List<SilentPayment> silentPayments = List.of(new SilentPayment(silentPaymentAddress, "", 0, false));
@@ -444,12 +444,12 @@ public class SilentPaymentUtilsTest {
     @Test
     public void testSingleRecipientTaprootEvenYAndNonTaproot() throws InvalidSilentPaymentException {
         Wallet taprootWallet = new Wallet();
-        taprootWallet.setPolicyType(PolicyType.SINGLE);
+        taprootWallet.setPolicyType(PolicyType.SINGLE_HD);
         taprootWallet.setScriptType(ScriptType.P2TR);
         Map<WalletNode, ECKey> taprootPrivateKeys = new LinkedHashMap<>();
 
         Wallet segwitWallet = new Wallet();
-        segwitWallet.setPolicyType(PolicyType.SINGLE);
+        segwitWallet.setPolicyType(PolicyType.SINGLE_HD);
         segwitWallet.setScriptType(ScriptType.P2WPKH);
         Map<WalletNode, ECKey> segwitPrivateKeys = new LinkedHashMap<>();
 
@@ -474,11 +474,11 @@ public class SilentPaymentUtilsTest {
 
         TestKeystore taprootKeystore = new TestKeystore(taprootPrivateKeys);
         taprootWallet.getKeystores().add(taprootKeystore);
-        taprootWallet.setDefaultPolicy(Policy.getPolicy(PolicyType.SINGLE, ScriptType.P2WPKH, taprootWallet.getKeystores(), 1));
+        taprootWallet.setDefaultPolicy(Policy.getPolicy(PolicyType.SINGLE_HD, ScriptType.P2WPKH, taprootWallet.getKeystores(), 1));
 
         TestKeystore segwitKeystore = new TestKeystore(segwitPrivateKeys);
         segwitWallet.getKeystores().add(segwitKeystore);
-        segwitWallet.setDefaultPolicy(Policy.getPolicy(PolicyType.SINGLE, ScriptType.P2WPKH, segwitWallet.getKeystores(), 1));
+        segwitWallet.setDefaultPolicy(Policy.getPolicy(PolicyType.SINGLE_HD, ScriptType.P2WPKH, segwitWallet.getKeystores(), 1));
 
         SilentPaymentAddress silentPaymentAddress = SilentPaymentAddress.from("sp1qqgste7k9hx0qftg6qmwlkqtwuy6cycyavzmzj85c6qdfhjdpdjtdgqjuexzk6murw56suy3e0rd2cgqvycxttddwsvgxe2usfpxumr70xc9pkqwv");
         List<SilentPayment> silentPayments = List.of(new SilentPayment(silentPaymentAddress, "", 0, false));
@@ -491,12 +491,12 @@ public class SilentPaymentUtilsTest {
     @Test
     public void testSingleRecipientTaprootOddYAndNonTaproot() throws InvalidSilentPaymentException {
         Wallet taprootWallet = new Wallet();
-        taprootWallet.setPolicyType(PolicyType.SINGLE);
+        taprootWallet.setPolicyType(PolicyType.SINGLE_HD);
         taprootWallet.setScriptType(ScriptType.P2TR);
         Map<WalletNode, ECKey> taprootPrivateKeys = new LinkedHashMap<>();
 
         Wallet segwitWallet = new Wallet();
-        segwitWallet.setPolicyType(PolicyType.SINGLE);
+        segwitWallet.setPolicyType(PolicyType.SINGLE_HD);
         segwitWallet.setScriptType(ScriptType.P2WPKH);
         Map<WalletNode, ECKey> segwitPrivateKeys = new LinkedHashMap<>();
 
@@ -521,11 +521,11 @@ public class SilentPaymentUtilsTest {
 
         TestKeystore taprootKeystore = new TestKeystore(taprootPrivateKeys);
         taprootWallet.getKeystores().add(taprootKeystore);
-        taprootWallet.setDefaultPolicy(Policy.getPolicy(PolicyType.SINGLE, ScriptType.P2WPKH, taprootWallet.getKeystores(), 1));
+        taprootWallet.setDefaultPolicy(Policy.getPolicy(PolicyType.SINGLE_HD, ScriptType.P2WPKH, taprootWallet.getKeystores(), 1));
 
         TestKeystore segwitKeystore = new TestKeystore(segwitPrivateKeys);
         segwitWallet.getKeystores().add(segwitKeystore);
-        segwitWallet.setDefaultPolicy(Policy.getPolicy(PolicyType.SINGLE, ScriptType.P2WPKH, segwitWallet.getKeystores(), 1));
+        segwitWallet.setDefaultPolicy(Policy.getPolicy(PolicyType.SINGLE_HD, ScriptType.P2WPKH, segwitWallet.getKeystores(), 1));
 
         SilentPaymentAddress silentPaymentAddress = SilentPaymentAddress.from("sp1qqgste7k9hx0qftg6qmwlkqtwuy6cycyavzmzj85c6qdfhjdpdjtdgqjuexzk6murw56suy3e0rd2cgqvycxttddwsvgxe2usfpxumr70xc9pkqwv");
         List<SilentPayment> silentPayments = List.of(new SilentPayment(silentPaymentAddress, "", 0, false));
@@ -538,7 +538,7 @@ public class SilentPaymentUtilsTest {
     @Test
     public void testMultipleOutputsSameRecipient() throws InvalidSilentPaymentException {
         Wallet sendWallet = new Wallet();
-        sendWallet.setPolicyType(PolicyType.SINGLE);
+        sendWallet.setPolicyType(PolicyType.SINGLE_HD);
         sendWallet.setScriptType(ScriptType.P2WPKH);
         Map<HashIndex, WalletNode> utxos = new LinkedHashMap<>();
         Map<WalletNode, ECKey> privateKeys = new LinkedHashMap<>();
@@ -557,7 +557,7 @@ public class SilentPaymentUtilsTest {
 
         TestKeystore sendKeystore = new TestKeystore(privateKeys);
         sendWallet.getKeystores().add(sendKeystore);
-        sendWallet.setDefaultPolicy(Policy.getPolicy(PolicyType.SINGLE, ScriptType.P2WPKH, sendWallet.getKeystores(), 1));
+        sendWallet.setDefaultPolicy(Policy.getPolicy(PolicyType.SINGLE_HD, ScriptType.P2WPKH, sendWallet.getKeystores(), 1));
 
         SilentPaymentAddress silentPaymentAddress0 = SilentPaymentAddress.from("sp1qqgste7k9hx0qftg6qmwlkqtwuy6cycyavzmzj85c6qdfhjdpdjtdgqjuexzk6murw56suy3e0rd2cgqvycxttddwsvgxe2usfpxumr70xc9pkqwv");
         SilentPaymentAddress silentPaymentAddress1 = SilentPaymentAddress.from("sp1qqgste7k9hx0qftg6qmwlkqtwuy6cycyavzmzj85c6qdfhjdpdjtdgqjuexzk6murw56suy3e0rd2cgqvycxttddwsvgxe2usfpxumr70xc9pkqwv");
@@ -574,7 +574,7 @@ public class SilentPaymentUtilsTest {
     @Test
     public void testMultipleOutputsMultipleRecipients() throws InvalidSilentPaymentException {
         Wallet sendWallet = new Wallet();
-        sendWallet.setPolicyType(PolicyType.SINGLE);
+        sendWallet.setPolicyType(PolicyType.SINGLE_HD);
         sendWallet.setScriptType(ScriptType.P2WPKH);
         Map<HashIndex, WalletNode> utxos = new LinkedHashMap<>();
         Map<WalletNode, ECKey> privateKeys = new LinkedHashMap<>();
@@ -593,7 +593,7 @@ public class SilentPaymentUtilsTest {
 
         TestKeystore sendKeystore = new TestKeystore(privateKeys);
         sendWallet.getKeystores().add(sendKeystore);
-        sendWallet.setDefaultPolicy(Policy.getPolicy(PolicyType.SINGLE, ScriptType.P2WPKH, sendWallet.getKeystores(), 1));
+        sendWallet.setDefaultPolicy(Policy.getPolicy(PolicyType.SINGLE_HD, ScriptType.P2WPKH, sendWallet.getKeystores(), 1));
 
         SilentPaymentAddress silentPaymentAddress0 = SilentPaymentAddress.from("sp1qqgste7k9hx0qftg6qmwlkqtwuy6cycyavzmzj85c6qdfhjdpdjtdgqjuexzk6murw56suy3e0rd2cgqvycxttddwsvgxe2usfpxumr70xc9pkqwv");
         SilentPaymentAddress silentPaymentAddress1 = SilentPaymentAddress.from("sp1qqgrz6j0lcqnc04vxccydl0kpsj4frfje0ktmgcl2t346hkw30226xqupawdf48k8882j0strrvcmgg2kdawz53a54dd376ngdhak364hzcmynqtn");
@@ -619,7 +619,7 @@ public class SilentPaymentUtilsTest {
         // Expected sum = A (non-zero)
 
         Wallet sendWallet = new Wallet();
-        sendWallet.setPolicyType(PolicyType.SINGLE);
+        sendWallet.setPolicyType(PolicyType.SINGLE_HD);
         sendWallet.setScriptType(ScriptType.P2WPKH);
         Map<HashIndex, WalletNode> utxos = new LinkedHashMap<>();
         Map<WalletNode, ECKey> privateKeys = new LinkedHashMap<>();
@@ -647,7 +647,7 @@ public class SilentPaymentUtilsTest {
 
         TestKeystore sendKeystore = new TestKeystore(privateKeys);
         sendWallet.getKeystores().add(sendKeystore);
-        sendWallet.setDefaultPolicy(Policy.getPolicy(PolicyType.SINGLE, ScriptType.P2WPKH, sendWallet.getKeystores(), 1));
+        sendWallet.setDefaultPolicy(Policy.getPolicy(PolicyType.SINGLE_HD, ScriptType.P2WPKH, sendWallet.getKeystores(), 1));
 
         ECKey summedKey = SilentPaymentUtils.getSummedPrivateKey(utxos.values());
         Assertions.assertEquals("a6df6a0bb448992a301df4258e06a89fe7cf7146f59ac3bd5ff26083acb22ceb", Utils.bytesToHex(summedKey.getPrivKeyBytes()));

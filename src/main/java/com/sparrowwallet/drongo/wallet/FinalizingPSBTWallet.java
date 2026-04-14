@@ -10,8 +10,6 @@ import com.sparrowwallet.drongo.psbt.PSBT;
 import com.sparrowwallet.drongo.psbt.PSBTInput;
 
 import java.util.*;
-import java.util.stream.Collectors;
-import java.util.stream.IntStream;
 
 /**
  * This is a special wallet that is used solely to finalize a fully signed PSBT by reading from the partial signatures and UTXO scriptPubKey
@@ -67,7 +65,7 @@ public class FinalizingPSBTWallet extends Wallet {
         setGapLimit(0);
         purposeNode.setChildren(new TreeSet<>());
 
-        setPolicyType(numSignatures == 1 ? PolicyType.SINGLE : PolicyType.MULTI);
+        setPolicyType(numSignatures == 1 ? PolicyType.SINGLE_HD : PolicyType.MULTI_HD);
     }
 
     @Override

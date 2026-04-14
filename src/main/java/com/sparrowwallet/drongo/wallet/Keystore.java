@@ -9,11 +9,11 @@ import com.sparrowwallet.drongo.bip47.PaymentCode;
 import com.sparrowwallet.drongo.crypto.*;
 import com.sparrowwallet.drongo.policy.PolicyType;
 import com.sparrowwallet.drongo.protocol.ScriptType;
+import com.sparrowwallet.drongo.silentpayments.SilentPaymentScanAddress;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 
 public class Keystore extends Persistable {
@@ -28,6 +28,7 @@ public class Keystore extends Persistable {
     private KeyDerivation keyDerivation;
     private ExtendedKey extendedPublicKey;
     private PaymentCode externalPaymentCode;
+    private SilentPaymentScanAddress silentPaymentScanAddress;
     private byte[] deviceRegistration;
     private MasterPrivateExtendedKey masterPrivateExtendedKey;
     private DeterministicSeed seed;
@@ -104,6 +105,14 @@ public class Keystore extends Persistable {
 
     public void setExternalPaymentCode(PaymentCode paymentCode) {
         this.externalPaymentCode = paymentCode;
+    }
+
+    public SilentPaymentScanAddress getSilentPaymentScanAddress() {
+        return silentPaymentScanAddress;
+    }
+
+    public void setSilentPaymentScanAddress(SilentPaymentScanAddress silentPaymentScanAddress) {
+        this.silentPaymentScanAddress = silentPaymentScanAddress;
     }
 
     public byte[] getDeviceRegistration() {
@@ -310,8 +319,8 @@ public class Keystore extends Persistable {
             throw new InvalidKeystoreException("No key derivation specified");
         }
 
-        if(extendedPublicKey == null) {
-            throw new InvalidKeystoreException("No extended public key specified");
+        if(extendedPublicKey == null && silentPaymentScanAddress == null) {
+            throw new InvalidKeystoreException("No extended public key or silent payment scan address specified");
         }
 
         if(label.isEmpty()) {
@@ -385,6 +394,9 @@ public class Keystore extends Persistable {
         if(bip47ExtendedPrivateKey != null) {
             copy.setBip47ExtendedPrivateKey(bip47ExtendedPrivateKey.copy());
         }
+        if(silentPaymentScanAddress != null) {
+            copy.setSilentPaymentScanAddress(silentPaymentScanAddress.copy());
+        }
         return copy;
     }
 
@@ -416,12 +428,17 @@ public class Keystore extends Persistable {
         keystore.setKeyDerivation(new KeyDerivation(masterFingerprint, KeyDerivation.writePath(derivation)));
         keystore.setExtendedPublicKey(ExtendedKey.fromDescriptor(xpub.toString()));
 
-        int account = ScriptType.getScriptTypesForPolicyType(PolicyType.SINGLE).stream()
+        int account = ScriptType.getScriptTypesForPolicyType(PolicyType.SINGLE_HD).stream()
                 .mapToInt(scriptType -> scriptType.getAccount(keystore.getKeyDerivation().getDerivationPath())).filter(idx -> idx > -1).findFirst().orElse(0);
         List<ChildNumber> bip47Derivation = KeyDerivation.getBip47Derivation(account);
         DeterministicKey bip47Key = xprv.getKey(bip47Derivation);
         ExtendedKey bip47ExtendedPrivateKey = new ExtendedKey(bip47Key, bip47Key.getParentFingerprint(), bip47Derivation.get(bip47Derivation.size() - 1));
         keystore.setBip47ExtendedPrivateKey(ExtendedKey.fromDescriptor(bip47ExtendedPrivateKey.toString()));
+
+        DeterministicKey scanKey = xprv.getKey(KeyDerivation.getBip352ScanDerivation(derivation));
+        DeterministicKey spendKey = xprv.getKey(KeyDerivation.getBip352SpendDerivation(derivation));
+        SilentPaymentScanAddress spScanAddress = new SilentPaymentScanAddress(ECKey.fromPrivate(scanKey.getPrivKey()), ECKey.fromPublicOnly(spendKey));
+        keystore.setSilentPaymentScanAddress(spScanAddress);
     }
 
     public boolean isEncrypted() {

@@ -110,6 +110,20 @@ public class KeyDerivation {
         return List.of(new ChildNumber(352, true), new ChildNumber(Network.get() == Network.MAINNET ? 0 : 1, true), new ChildNumber(Math.max(0, account), true));
     }
 
+    public static List<ChildNumber> getBip352ScanDerivation(List<ChildNumber> derivation) {
+        List<ChildNumber> scanDerivation = new ArrayList<>(derivation);
+        scanDerivation.add(new ChildNumber(1, true));
+        scanDerivation.add(new ChildNumber(0, false));
+        return Collections.unmodifiableList(scanDerivation);
+    }
+
+    public static List<ChildNumber> getBip352SpendDerivation(List<ChildNumber> derivation) {
+        List<ChildNumber> spendDerivation = new ArrayList<>(derivation);
+        spendDerivation.add(new ChildNumber(0, true));
+        spendDerivation.add(new ChildNumber(0, false));
+        return Collections.unmodifiableList(spendDerivation);
+    }
+
     public KeyDerivation copy() {
         return new KeyDerivation(masterFingerprint, derivationPath);
     }

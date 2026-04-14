@@ -4,8 +4,9 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 public class Miniscript {
-    private static final Pattern SINGLE_PATTERN = Pattern.compile("pkh?\\(");
+    private static final Pattern KEYHASH_PATTERN = Pattern.compile("pkh?\\(");
     private static final Pattern TAPROOT_PATTERN = Pattern.compile("tr\\(");
+    private static final Pattern SILENT_PAYMENTS_PATTERN = Pattern.compile("sp\\(");
     private static final Pattern MULTI_PATTERN = Pattern.compile("multi\\((\\d+)");
 
     private String script;
@@ -23,13 +24,18 @@ public class Miniscript {
     }
 
     public int getNumSignaturesRequired() {
-        Matcher singleMatcher = SINGLE_PATTERN.matcher(script);
+        Matcher singleMatcher = KEYHASH_PATTERN.matcher(script);
         if(singleMatcher.find()) {
             return 1;
         }
 
         Matcher taprootMatcher = TAPROOT_PATTERN.matcher(script);
         if(taprootMatcher.find()) {
+            return 1;
+        }
+
+        Matcher silentPaymentsMatcher = SILENT_PAYMENTS_PATTERN.matcher(script);
+        if(silentPaymentsMatcher.find()) {
             return 1;
         }
 

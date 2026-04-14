@@ -18,11 +18,11 @@ public class ECKeyTest {
         String words = "absent essay fox snake vast pumpkin height crouch silent bulb excuse razor";
         DeterministicSeed seed = new DeterministicSeed(words, "", 0, DeterministicSeed.Type.BIP39);
         Wallet wallet = new Wallet();
-        wallet.setPolicyType(PolicyType.SINGLE);
+        wallet.setPolicyType(PolicyType.SINGLE_HD);
         wallet.setScriptType(ScriptType.P2PKH);
         Keystore keystore = Keystore.fromSeed(seed, wallet.getScriptType().getDefaultDerivation());
         wallet.getKeystores().add(keystore);
-        wallet.setDefaultPolicy(Policy.getPolicy(PolicyType.SINGLE, ScriptType.P2PKH, wallet.getKeystores(), 1));
+        wallet.setDefaultPolicy(Policy.getPolicy(PolicyType.SINGLE_HD, ScriptType.P2PKH, wallet.getKeystores(), 1));
 
         WalletNode firstReceive = wallet.getNode(KeyPurpose.RECEIVE).getChildren().iterator().next();
         Address address = firstReceive.getAddress();

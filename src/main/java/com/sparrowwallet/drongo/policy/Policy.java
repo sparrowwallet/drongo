@@ -41,11 +41,11 @@ public class Policy extends Persistable {
     }
 
     public static Policy getPolicy(PolicyType policyType, ScriptType scriptType, List<Keystore> keystores, Integer threshold) {
-        if(SINGLE.equals(policyType)) {
+        if(SINGLE_HD.equals(policyType)) {
             return new Policy(new Miniscript(scriptType.getDescriptor() + keystores.get(0).getScriptName() + scriptType.getCloseDescriptor()));
         }
 
-        if(MULTI.equals(policyType)) {
+        if(MULTI_HD.equals(policyType)) {
             StringBuilder builder = new StringBuilder();
             builder.append(scriptType.getDescriptor());
             builder.append(MULTISIG.getDescriptor());
@@ -56,6 +56,10 @@ public class Policy extends Persistable {
             builder.append(MULTISIG.getCloseDescriptor());
             builder.append(scriptType.getCloseDescriptor());
             return new Policy(new Miniscript(builder.toString()));
+        }
+
+        if(SINGLE_SP.equals(policyType)) {
+            return new Policy(new Miniscript("sp(" + keystores.get(0).getScriptName() + ")"));
         }
 
         throw new PolicyException("No standard policy for " + policyType + " policy with script type " + scriptType);

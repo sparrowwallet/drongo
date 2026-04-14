@@ -187,7 +187,7 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
     }
 
     public Wallet addChildWallet(PaymentCode externalPaymentCode, ScriptType childScriptType, String label) {
-        if(policyType != PolicyType.SINGLE) {
+        if(policyType != PolicyType.SINGLE_HD) {
             throw new IllegalStateException("Cannot add payment code wallet to " + policyType.getName() + " wallet");
         }
 
@@ -202,7 +202,7 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
 
         Wallet childWallet = new Wallet(childScriptType + "-" + externalPaymentCode.toString());
         childWallet.setLabel(label);
-        childWallet.setPolicyType(PolicyType.SINGLE);
+        childWallet.setPolicyType(PolicyType.SINGLE_HD);
         childWallet.setScriptType(childScriptType);
         childWallet.setGapLimit(5);
 
@@ -217,7 +217,7 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
         keystore.setExtendedPublicKey(new ExtendedKey(pubKey, keystore.getBip47ExtendedPrivateKey().getParentFingerprint(), derivation.get(derivation.size() - 1)));
 
         childWallet.getKeystores().add(keystore);
-        childWallet.setDefaultPolicy(Policy.getPolicy(PolicyType.SINGLE, scriptType, childWallet.getKeystores(), 1));
+        childWallet.setDefaultPolicy(Policy.getPolicy(PolicyType.SINGLE_HD, scriptType, childWallet.getKeystores(), 1));
 
         childWallet.setMasterWallet(this);
         getChildWallets().add(childWallet);
@@ -251,7 +251,7 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
     }
 
     public boolean hasPaymentCode() {
-        return getKeystores().size() == 1 && getKeystores().get(0).getBip47ExtendedPrivateKey() != null && policyType == PolicyType.SINGLE
+        return getKeystores().size() == 1 && getKeystores().get(0).getBip47ExtendedPrivateKey() != null && policyType == PolicyType.SINGLE_HD
                 && PaymentCode.SEGWIT_SCRIPT_TYPES.contains(scriptType);
     }
 
@@ -266,7 +266,7 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
     public Wallet getNotificationWallet() {
         if(isMasterWallet() && hasPaymentCode()) {
             Wallet notificationWallet = new Wallet();
-            notificationWallet.setPolicyType(PolicyType.SINGLE);
+            notificationWallet.setPolicyType(PolicyType.SINGLE_HD);
             notificationWallet.setScriptType(ScriptType.P2PKH);
             notificationWallet.setGapLimit(0);
 
@@ -280,7 +280,7 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
             keystore.setBip47ExtendedPrivateKey(masterKeystore.getBip47ExtendedPrivateKey());
 
             notificationWallet.getKeystores().add(keystore);
-            notificationWallet.setDefaultPolicy(Policy.getPolicy(PolicyType.SINGLE, ScriptType.P2PKH, notificationWallet.getKeystores(), 1));
+            notificationWallet.setDefaultPolicy(Policy.getPolicy(PolicyType.SINGLE_HD, ScriptType.P2PKH, notificationWallet.getKeystores(), 1));
 
             return notificationWallet;
         }
@@ -322,7 +322,7 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
     }
 
     public boolean canSendSilentPayments() {
-        return getKeystores().size() == 1 && policyType == PolicyType.SINGLE && SilentPayment.VALID_INPUT_SCRIPT_TYPES.contains(scriptType);
+        return getKeystores().size() == 1 && (policyType == PolicyType.SINGLE_HD || policyType == PolicyType.SINGLE_SP) && SilentPayment.VALID_INPUT_SCRIPT_TYPES.contains(scriptType);
     }
 
     public StandardAccount getStandardAccountType() {
@@ -661,10 +661,8 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
     }
 
     public ECKey getPubKey(WalletNode node) {
-        if(policyType == PolicyType.MULTI) {
+        if(policyType == PolicyType.MULTI_HD) {
             throw new IllegalStateException("Attempting to retrieve a single key for a multisig policy wallet");
-        } else if(policyType == PolicyType.CUSTOM) {
-            throw new UnsupportedOperationException("Cannot determine a public key for a custom policy");
         }
 
         Keystore keystore = getKeystores().get(0);
@@ -672,20 +670,18 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
     }
 
     public List<ECKey> getPubKeys(WalletNode node) {
-        if(policyType == PolicyType.SINGLE) {
+        if(policyType == PolicyType.SINGLE_HD || policyType == PolicyType.SINGLE_SP) {
             throw new IllegalStateException("Attempting to retrieve multiple keys for a singlesig policy wallet");
-        } else if(policyType == PolicyType.CUSTOM) {
-            throw new UnsupportedOperationException("Cannot determine public keys for a custom policy");
         }
 
         return getKeystores().stream().map(keystore -> keystore.getPubKey(node)).collect(Collectors.toList());
     }
 
     public Address getAddress(WalletNode node) {
-        if(policyType == PolicyType.SINGLE) {
+        if(policyType == PolicyType.SINGLE_HD || policyType == PolicyType.SINGLE_SP) {
             ECKey pubKey = node.getPubKey();
             return scriptType.getAddress(pubKey);
-        } else if(policyType == PolicyType.MULTI) {
+        } else if(policyType == PolicyType.MULTI_HD) {
             List<ECKey> pubKeys = node.getPubKeys();
             Script script = ScriptType.MULTISIG.getOutputScript(defaultPolicy.getNumSignaturesRequired(), pubKeys);
             return scriptType.getAddress(script);
@@ -695,10 +691,10 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
     }
 
     public Script getOutputScript(WalletNode node) {
-        if(policyType == PolicyType.SINGLE) {
+        if(policyType == PolicyType.SINGLE_HD || policyType == PolicyType.SINGLE_SP) {
             ECKey pubKey = node.getPubKey();
             return scriptType.getOutputScript(pubKey);
-        } else if(policyType == PolicyType.MULTI) {
+        } else if(policyType == PolicyType.MULTI_HD) {
             List<ECKey> pubKeys = node.getPubKeys();
             Script script = ScriptType.MULTISIG.getOutputScript(defaultPolicy.getNumSignaturesRequired(), pubKeys);
             return scriptType.getOutputScript(script);
@@ -708,10 +704,10 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
     }
 
     public String getOutputDescriptor(WalletNode node) {
-        if(policyType == PolicyType.SINGLE) {
+        if(policyType == PolicyType.SINGLE_HD || policyType == PolicyType.SINGLE_SP) {
             ECKey pubKey = node.getPubKey();
             return scriptType.getOutputDescriptor(pubKey);
-        } else if(policyType == PolicyType.MULTI) {
+        } else if(policyType == PolicyType.MULTI_HD) {
             List<ECKey> pubKeys = node.getPubKeys();
             Script script = ScriptType.MULTISIG.getOutputScript(defaultPolicy.getNumSignaturesRequired(), pubKeys);
             return scriptType.getOutputDescriptor(script);
@@ -1004,11 +1000,11 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
         TransactionOutput prevTxOut = transaction.addOutput(1L, receiveNode.getAddress());
 
         TransactionInput txInput = null;
-        if(getPolicyType().equals(PolicyType.SINGLE)) {
+        if(getPolicyType().equals(PolicyType.SINGLE_HD) || getPolicyType().equals(PolicyType.SINGLE_SP)) {
             ECKey pubKey = receiveNode.getPubKey();
             TransactionSignature signature = TransactionSignature.dummy(getScriptType().getSignatureType());
             txInput = getScriptType().addSpendingInput(transaction, prevTxOut, pubKey, signature);
-        } else if(getPolicyType().equals(PolicyType.MULTI)) {
+        } else if(getPolicyType().equals(PolicyType.MULTI_HD)) {
             List<ECKey> pubKeys = receiveNode.getPubKeys();
             int threshold = getDefaultPolicy().getNumSignaturesRequired();
             Map<ECKey, TransactionSignature> pubKeySignatures = new TreeMap<>(new ECKey.LexicographicECKeyComparator());
@@ -1231,10 +1227,10 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
 
     public static TransactionInput addDummySpendingInput(Transaction transaction, WalletNode walletNode, TransactionOutput prevTxOut) {
         Wallet signingWallet = walletNode.getWallet();
-        if(signingWallet.getPolicyType().equals(PolicyType.SINGLE)) {
+        if(signingWallet.getPolicyType().equals(PolicyType.SINGLE_HD) || signingWallet.getPolicyType().equals(PolicyType.SINGLE_SP)) {
             ECKey pubKey = walletNode.getPubKey();
             return signingWallet.getScriptType().addSpendingInput(transaction, prevTxOut, pubKey, TransactionSignature.dummy(signingWallet.getScriptType().getSignatureType()));
-        } else if(signingWallet.getPolicyType().equals(PolicyType.MULTI)) {
+        } else if(signingWallet.getPolicyType().equals(PolicyType.MULTI_HD)) {
             List<ECKey> pubKeys = walletNode.getPubKeys();
             int threshold = signingWallet.getDefaultPolicy().getNumSignaturesRequired();
             Map<ECKey, TransactionSignature> pubKeySignatures = new TreeMap<>(new ECKey.LexicographicECKeyComparator());
@@ -1585,10 +1581,6 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
     }
 
     private WalletNode matchDerivation(KeyDerivation keyDerivation, Script scriptPubKey) {
-        if(policyType == PolicyType.CUSTOM) {
-            return null;
-        }
-
         for(Keystore keystore : getKeystores()) {
             ECKey derivedKey = keystore.getPubKeyForDerivation(keyDerivation);
             if(derivedKey == null) {
@@ -1807,7 +1799,7 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
                 Transaction transaction = new Transaction();
 
                 TransactionInput finalizedTxInput;
-                if(getPolicyType().equals(PolicyType.SINGLE)) {
+                if(getPolicyType().equals(PolicyType.SINGLE_HD) || getPolicyType().equals(PolicyType.SINGLE_SP)) {
                     ECKey pubKey = signingNode.getPubKey();
                     TransactionSignature transactionSignature = psbtInput.isTaproot() ? psbtInput.getTapKeyPathSignature() : psbtInput.getPartialSignature(pubKey);
                     if(transactionSignature == null) {
@@ -1815,7 +1807,7 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
                     }
 
                     finalizedTxInput = signingNode.getWallet().getScriptType().addSpendingInput(transaction, utxo, pubKey, transactionSignature);
-                } else if(getPolicyType().equals(PolicyType.MULTI)) {
+                } else if(getPolicyType().equals(PolicyType.MULTI_HD)) {
                     List<ECKey> pubKeys = signingNode.getPubKeys();
 
                     Map<ECKey, TransactionSignature> pubKeySignatures = new TreeMap<>(new ECKey.LexicographicECKeyComparator());
@@ -1950,12 +1942,20 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
             throw new InvalidWalletException("Cannot determine number of required signatures to sign a transaction");
         }
 
-        if(policyType.equals(PolicyType.SINGLE) && (numSigs != 1 || keystores.size() != 1)) {
+        if((policyType.equals(PolicyType.SINGLE_HD) || policyType.equals(PolicyType.SINGLE_SP)) && (numSigs != 1 || keystores.size() != 1)) {
             throw new InvalidWalletException(policyType + " wallet needs " + numSigs + " and has " + keystores.size() + " keystores");
         }
 
-        if(policyType.equals(PolicyType.MULTI) && (numSigs < 1 || numSigs > keystores.size())) {
+        if(policyType.equals(PolicyType.MULTI_HD) && (numSigs < 1 || numSigs > keystores.size())) {
             throw new InvalidWalletException(policyType + " wallet needs " + numSigs + " and has " + keystores.size() + " keystores");
+        }
+
+        if(policyType.equals(PolicyType.SINGLE_HD) && keystores.getFirst().getExtendedPublicKey() == null) {
+            throw new InvalidWalletException(policyType + " wallet needs an extended public key");
+        }
+
+        if(policyType.equals(PolicyType.SINGLE_SP) && keystores.getFirst().getSilentPaymentScanAddress() == null) {
+            throw new InvalidWalletException(policyType + " wallet needs a silent payment scan address");
         }
 
         if(containsDuplicateKeystoreLabels()) {

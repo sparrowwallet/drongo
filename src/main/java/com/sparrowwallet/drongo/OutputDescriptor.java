@@ -162,7 +162,7 @@ public class OutputDescriptor {
     }
 
     public boolean isCosigner() {
-        return !isMultisig() && scriptType.isAllowed(PolicyType.MULTI);
+        return !isMultisig() && scriptType.isAllowed(PolicyType.MULTI_HD);
     }
 
     public ExtendedKey getSingletonExtendedPublicKey() {
@@ -266,7 +266,7 @@ public class OutputDescriptor {
 
     public Wallet toWallet() {
         Wallet wallet = new Wallet();
-        wallet.setPolicyType(isMultisig() || isCosigner() ? PolicyType.MULTI : PolicyType.SINGLE);
+        wallet.setPolicyType(isMultisig() || isCosigner() ? PolicyType.MULTI_HD : PolicyType.SINGLE_HD);
         wallet.setScriptType(scriptType);
 
         for(Map.Entry<ExtendedKey,KeyDerivation> extKeyEntry : extendedPublicKeys.entrySet()) {
@@ -318,7 +318,7 @@ public class OutputDescriptor {
         keystore.setExtendedPublicKey(extendedKey);
         setKeystoreLabel(keystore);
         wallet.getKeystores().add(keystore);
-        wallet.setDefaultPolicy(Policy.getPolicy(isCosigner() ? PolicyType.MULTI : PolicyType.SINGLE, wallet.getScriptType(), wallet.getKeystores(), 1));
+        wallet.setDefaultPolicy(Policy.getPolicy(isCosigner() ? PolicyType.MULTI_HD : PolicyType.SINGLE_HD, wallet.getScriptType(), wallet.getKeystores(), 1));
 
         return wallet;
     }

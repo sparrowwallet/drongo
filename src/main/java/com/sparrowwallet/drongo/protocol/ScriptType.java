@@ -133,7 +133,7 @@ public enum ScriptType {
 
         @Override
         public List<PolicyType> getAllowedPolicyTypes() {
-            return List.of(SINGLE);
+            return List.of(SINGLE_HD);
         }
     },
     P2PKH("P2PKH", "Legacy (P2PKH)", "m/44'/0'/0'") {
@@ -251,7 +251,7 @@ public enum ScriptType {
 
         @Override
         public List<PolicyType> getAllowedPolicyTypes() {
-            return List.of(SINGLE);
+            return List.of(SINGLE_HD);
         }
     },
     MULTISIG("Bare Multisig", "Bare Multisig", "m/44'/0'/0'") {
@@ -442,7 +442,7 @@ public enum ScriptType {
 
         @Override
         public List<PolicyType> getAllowedPolicyTypes() {
-            return List.of(MULTI);
+            return List.of(MULTI_HD);
         }
     },
     P2SH("P2SH", "Legacy (P2SH)", "m/45'") {
@@ -572,7 +572,7 @@ public enum ScriptType {
 
         @Override
         public List<PolicyType> getAllowedPolicyTypes() {
-            return List.of(MULTI);
+            return List.of(MULTI_HD);
         }
     },
     P2SH_P2WPKH("P2SH-P2WPKH", "Nested Segwit (P2SH-P2WPKH)", "m/49'/0'/0'") {
@@ -680,7 +680,7 @@ public enum ScriptType {
 
         @Override
         public List<PolicyType> getAllowedPolicyTypes() {
-            return List.of(SINGLE);
+            return List.of(SINGLE_HD);
         }
     },
     P2SH_P2WSH("P2SH-P2WSH", "Nested Segwit (P2SH-P2WSH)", "m/48'/0'/0'/1'") {
@@ -786,7 +786,7 @@ public enum ScriptType {
 
         @Override
         public List<PolicyType> getAllowedPolicyTypes() {
-            return List.of(MULTI, CUSTOM);
+            return List.of(MULTI_HD);
         }
     },
     P2WPKH("P2WPKH", "Native Segwit (P2WPKH)", "m/84'/0'/0'") {
@@ -896,7 +896,7 @@ public enum ScriptType {
 
         @Override
         public List<PolicyType> getAllowedPolicyTypes() {
-            return List.of(SINGLE);
+            return List.of(SINGLE_HD);
         }
     },
     P2WSH("P2WSH", "Native Segwit (P2WSH)", "m/48'/0'/0'/2'") {
@@ -1012,7 +1012,7 @@ public enum ScriptType {
 
         @Override
         public List<PolicyType> getAllowedPolicyTypes() {
-            return List.of(MULTI, CUSTOM);
+            return List.of(MULTI_HD);
         }
     },
     P2TR("P2TR", "Taproot (P2TR)", "m/86'/0'/0'") {
@@ -1132,7 +1132,7 @@ public enum ScriptType {
 
         @Override
         public List<PolicyType> getAllowedPolicyTypes() {
-            return List.of(SINGLE);
+            return List.of(SINGLE_HD, SINGLE_SP);
         }
     },
     P2A("P2A", "Anchor (P2A)", "m/86'/0'/0'") {

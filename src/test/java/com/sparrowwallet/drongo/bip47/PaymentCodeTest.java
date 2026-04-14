@@ -92,22 +92,22 @@ public class PaymentCodeTest {
             List<String> receiveWords = bip39MnemonicCode.toMnemonic(receiveEntropy);
             DeterministicSeed receiveSeed = new DeterministicSeed(receiveWords, "", 0, DeterministicSeed.Type.BIP39);
             Wallet receiveWallet = new Wallet();
-            receiveWallet.setPolicyType(PolicyType.SINGLE);
+            receiveWallet.setPolicyType(PolicyType.SINGLE_HD);
             receiveWallet.setScriptType(ScriptType.P2WPKH);
             Keystore receiveKeystore = Keystore.fromSeed(receiveSeed, receiveWallet.getScriptType().getDefaultDerivation());
             receiveWallet.getKeystores().add(receiveKeystore);
-            receiveWallet.setDefaultPolicy(Policy.getPolicy(PolicyType.SINGLE, ScriptType.P2WPKH, receiveWallet.getKeystores(), 1));
+            receiveWallet.setDefaultPolicy(Policy.getPolicy(PolicyType.SINGLE_HD, ScriptType.P2WPKH, receiveWallet.getKeystores(), 1));
 
             byte[] sendEntropy = new byte[128];
             secureRandom.nextBytes(sendEntropy);
             List<String> sendWords = bip39MnemonicCode.toMnemonic(sendEntropy);
             DeterministicSeed sendSeed = new DeterministicSeed(sendWords, "pp", 0, DeterministicSeed.Type.BIP39);
             Wallet sendWallet = new Wallet();
-            sendWallet.setPolicyType(PolicyType.SINGLE);
+            sendWallet.setPolicyType(PolicyType.SINGLE_HD);
             sendWallet.setScriptType(ScriptType.P2WPKH);
             Keystore sendKeystore = Keystore.fromSeed(sendSeed, sendWallet.getScriptType().getDefaultDerivation());
             sendWallet.getKeystores().add(sendKeystore);
-            sendWallet.setDefaultPolicy(Policy.getPolicy(PolicyType.SINGLE, ScriptType.P2WPKH, sendWallet.getKeystores(), 1));
+            sendWallet.setDefaultPolicy(Policy.getPolicy(PolicyType.SINGLE_HD, ScriptType.P2WPKH, sendWallet.getKeystores(), 1));
 
             PaymentCode paymentCode = sendWallet.getPaymentCode();
             PaymentCode externalPaymentCode = receiveWallet.getPaymentCode();
@@ -165,10 +165,10 @@ public class PaymentCodeTest {
     public void testChildWallet() throws MnemonicException, InvalidPaymentCodeException {
         DeterministicSeed aliceSeed = new DeterministicSeed("response seminar brave tip suit recall often sound stick owner lottery motion", "", 0, DeterministicSeed.Type.BIP39);
         Wallet aliceWallet = new Wallet();
-        aliceWallet.setPolicyType(PolicyType.SINGLE);
+        aliceWallet.setPolicyType(PolicyType.SINGLE_HD);
         aliceWallet.setScriptType(ScriptType.P2PKH);
         aliceWallet.getKeystores().add(Keystore.fromSeed(aliceSeed, aliceWallet.getScriptType().getDefaultDerivation()));
-        aliceWallet.setDefaultPolicy(Policy.getPolicy(PolicyType.SINGLE, ScriptType.P2PKH, aliceWallet.getKeystores(), 1));
+        aliceWallet.setDefaultPolicy(Policy.getPolicy(PolicyType.SINGLE_HD, ScriptType.P2PKH, aliceWallet.getKeystores(), 1));
 
         PaymentCode paymentCodeBob = new PaymentCode("PM8TJS2JxQ5ztXUpBBRnpTbcUXbUHy2T1abfrb3KkAAtMEGNbey4oumH7Hc578WgQJhPjBxteQ5GHHToTYHE3A1w6p7tU6KSoFmWBVbFGjKPisZDbP97");
 
@@ -193,10 +193,10 @@ public class PaymentCodeTest {
 
         DeterministicSeed bobSeed = new DeterministicSeed("reward upper indicate eight swift arch injury crystal super wrestle already dentist", "", 0, DeterministicSeed.Type.BIP39);
         Wallet bobWallet = new Wallet();
-        bobWallet.setPolicyType(PolicyType.SINGLE);
+        bobWallet.setPolicyType(PolicyType.SINGLE_HD);
         bobWallet.setScriptType(ScriptType.P2PKH);
         bobWallet.getKeystores().add(Keystore.fromSeed(bobSeed, bobWallet.getScriptType().getDefaultDerivation()));
-        bobWallet.setDefaultPolicy(Policy.getPolicy(PolicyType.SINGLE, ScriptType.P2PKH, bobWallet.getKeystores(), 1));
+        bobWallet.setDefaultPolicy(Policy.getPolicy(PolicyType.SINGLE_HD, ScriptType.P2PKH, bobWallet.getKeystores(), 1));
 
         Wallet bobBip47Wallet = bobWallet.addChildWallet(paymentCodeAlice, ScriptType.P2PKH, "Bob");
         Assertions.assertEquals(paymentCodeBob.toString(), bobBip47Wallet.getKeystores().get(0).getPaymentCode().toString());
