@@ -610,6 +610,49 @@ public class SilentPaymentUtilsTest {
         Assertions.assertEquals("2e847bb01d1b491da512ddd760b8509617ee38057003d6115d00ba562451323a", Utils.bytesToHex(silentPayments.getLast().getAddress().getData()));
     }
 
+    @Test
+    public void testIntermediateZeroSum() throws InvalidSilentPaymentException {
+        // BIP 352 test vector: Input keys intermediate sum is zero but final sum is non-zero
+        // Keys: [A, -A mod n, A] where:
+        // A        = a6df6a0bb448992a301df4258e06a89fe7cf7146f59ac3bd5ff26083acb22ceb
+        // -A mod n = 592095f44bb766d5cfe20bda71f9575ed2df6b9fb9addc7e5fdffe0923841456
+        // Expected sum = A (non-zero)
+
+        Wallet sendWallet = new Wallet();
+        sendWallet.setPolicyType(PolicyType.SINGLE);
+        sendWallet.setScriptType(ScriptType.P2WPKH);
+        Map<HashIndex, WalletNode> utxos = new LinkedHashMap<>();
+        Map<WalletNode, ECKey> privateKeys = new LinkedHashMap<>();
+
+        // Input 0: key A
+        WalletNode walletNode0 = new WalletNode(sendWallet, "/0/0");
+        HashIndex ref0 = new HashIndex(Sha256Hash.wrap("3a286147b25e16ae80aff406f2673c6e565418c40f45c071245cdebc8a94174e"), 0);
+        ECKey privKey0 = ECKey.fromPrivate(Utils.hexToBytes("a6df6a0bb448992a301df4258e06a89fe7cf7146f59ac3bd5ff26083acb22ceb"));
+        utxos.put(ref0, walletNode0);
+        privateKeys.put(walletNode0, privKey0);
+
+        // Input 1: key -A mod n
+        WalletNode walletNode1 = new WalletNode(sendWallet, "/0/1");
+        HashIndex ref1 = new HashIndex(Sha256Hash.wrap("3a286147b25e16ae80aff406f2673c6e565418c40f45c071245cdebc8a94174e"), 1);
+        ECKey privKey1 = ECKey.fromPrivate(Utils.hexToBytes("592095f44bb766d5cfe20bda71f9575ed2df6b9fb9addc7e5fdffe0923841456"));
+        utxos.put(ref1, walletNode1);
+        privateKeys.put(walletNode1, privKey1);
+
+        // Input 2: key A (same as input 0)
+        WalletNode walletNode2 = new WalletNode(sendWallet, "/0/2");
+        HashIndex ref2 = new HashIndex(Sha256Hash.wrap("3a286147b25e16ae80aff406f2673c6e565418c40f45c071245cdebc8a94174e"), 2);
+        ECKey privKey2 = ECKey.fromPrivate(Utils.hexToBytes("a6df6a0bb448992a301df4258e06a89fe7cf7146f59ac3bd5ff26083acb22ceb"));
+        utxos.put(ref2, walletNode2);
+        privateKeys.put(walletNode2, privKey2);
+
+        TestKeystore sendKeystore = new TestKeystore(privateKeys);
+        sendWallet.getKeystores().add(sendKeystore);
+        sendWallet.setDefaultPolicy(Policy.getPolicy(PolicyType.SINGLE, ScriptType.P2WPKH, sendWallet.getKeystores(), 1));
+
+        ECKey summedKey = SilentPaymentUtils.getSummedPrivateKey(utxos.values());
+        Assertions.assertEquals("a6df6a0bb448992a301df4258e06a89fe7cf7146f59ac3bd5ff26083acb22ceb", Utils.bytesToHex(summedKey.getPrivKeyBytes()));
+    }
+
     private static class TestKeystore extends Keystore {
         private final Map<WalletNode, ECKey> privateKeys;
 

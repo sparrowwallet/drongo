@@ -293,7 +293,7 @@ public class SilentPaymentUtils {
     }
 
     public static ECKey getSummedPrivateKey(Collection<WalletNode> walletNodes) throws InvalidSilentPaymentException {
-        ECKey summedPrivateKey = null;
+        BigInteger summedPrivKey = null;
         for(WalletNode walletNode : walletNodes) {
             if(!walletNode.getWallet().canSendSilentPayments()) {
                 continue;
@@ -304,25 +304,25 @@ public class SilentPaymentUtils {
                 if(walletNode.getWallet().getScriptType() == P2TR && privateKey.hasOddYCoord()) {
                     privateKey = privateKey.negatePrivate();
                 }
-                if(summedPrivateKey == null) {
-                    summedPrivateKey = privateKey;
+                if(summedPrivKey == null) {
+                    summedPrivKey = privateKey.getPrivKey();
                 } else {
-                    summedPrivateKey = summedPrivateKey.addPrivate(privateKey);
+                    summedPrivKey = summedPrivKey.add(privateKey.getPrivKey()).mod(ECKey.CURVE.getN());
                 }
             } catch(MnemonicException e) {
                 throw new InvalidSilentPaymentException("Invalid wallet mnemonic for sending silent payment", e);
             }
         }
 
-        if(summedPrivateKey == null) {
+        if(summedPrivKey == null) {
             throw new InvalidSilentPaymentException("There are no eligible inputs to derive a silent payments shared secret");
         }
 
-        if(summedPrivateKey.getPrivKey().equals(BigInteger.ZERO)) {
+        if(summedPrivKey.equals(BigInteger.ZERO)) {
             throw new InvalidSilentPaymentException("The summed private key is zero for the eligible silent payments inputs");
         }
 
-        return summedPrivateKey;
+        return ECKey.fromPrivate(summedPrivKey);
     }
 
     public static ECKey getSummedPublicKey(Collection<ECKey> publicKeys) {
