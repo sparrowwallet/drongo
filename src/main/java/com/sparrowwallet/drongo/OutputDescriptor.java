@@ -6,9 +6,11 @@ import com.sparrowwallet.drongo.crypto.DeterministicKey;
 import com.sparrowwallet.drongo.crypto.ECKey;
 import com.sparrowwallet.drongo.policy.Policy;
 import com.sparrowwallet.drongo.policy.PolicyType;
+import com.sparrowwallet.drongo.crypto.DumpedPrivateKey;
 import com.sparrowwallet.drongo.protocol.ProtocolException;
 import com.sparrowwallet.drongo.protocol.Script;
 import com.sparrowwallet.drongo.protocol.ScriptType;
+import com.sparrowwallet.drongo.silentpayments.SilentPaymentScanAddress;
 import com.sparrowwallet.drongo.wallet.*;
 
 import java.math.BigInteger;
@@ -24,7 +26,7 @@ public class OutputDescriptor {
     private static final String CHECKSUM_CHARSET = "qpzry9x8gf2tvdw0s3jn54khce6mua7l";
 
     public static final Pattern XPUB_PATTERN = Pattern.compile("(\\[[^\\]]+\\])?(.(?:pub|prv)[^/\\,)]{100,112})(/[/\\d*'hH<>;]+)?");
-    private static final Pattern PUBKEY_PATTERN = Pattern.compile("(\\[[^\\]]+\\])?(0[23][0-9a-fA-F]{32})");
+    private static final Pattern PUBKEY_PATTERN = Pattern.compile("(\\[[^\\]]+\\])?(0[23][0-9a-fA-F]{64})");
     private static final Pattern MULTI_PATTERN = Pattern.compile("multi\\((\\d+)");
     public static final Pattern KEY_ORIGIN_PATTERN = Pattern.compile("\\[([A-Fa-f0-9]{8})([/\\d'hH]+)?\\]");
     private static final Pattern MULTIPATH_PATTERN = Pattern.compile("<([\\d*'hH;]+)>");
@@ -36,6 +38,8 @@ public class OutputDescriptor {
     private final Map<ExtendedKey, String> mapChildrenDerivations;
     private final Map<ExtendedKey, String> mapExtendedPublicKeyLabels;
     private final Map<ExtendedKey, ExtendedKey> extendedMasterPrivateKeys;
+    private final Map<SilentPaymentScanAddress, KeyDerivation> silentPaymentScanAddresses;
+    private final Map<SilentPaymentScanAddress, String> mapSilentPaymentLabels;
 
     public OutputDescriptor(ScriptType scriptType, ExtendedKey extendedPublicKey, KeyDerivation keyDerivation) {
         this(scriptType, Collections.singletonMap(extendedPublicKey, keyDerivation));
@@ -68,6 +72,19 @@ public class OutputDescriptor {
         this.mapChildrenDerivations = mapChildrenDerivations;
         this.mapExtendedPublicKeyLabels = mapExtendedPublicKeyLabels;
         this.extendedMasterPrivateKeys = extendedMasterPrivateKeys;
+        this.silentPaymentScanAddresses = new LinkedHashMap<>();
+        this.mapSilentPaymentLabels = new LinkedHashMap<>();
+    }
+
+    public OutputDescriptor(Map<SilentPaymentScanAddress, KeyDerivation> silentPaymentScanAddresses, Map<SilentPaymentScanAddress, String> mapSilentPaymentLabels) {
+        this.scriptType = ScriptType.P2TR;
+        this.multisigThreshold = 1;
+        this.extendedPublicKeys = new LinkedHashMap<>();
+        this.mapChildrenDerivations = new LinkedHashMap<>();
+        this.mapExtendedPublicKeyLabels = new LinkedHashMap<>();
+        this.extendedMasterPrivateKeys = new LinkedHashMap<>();
+        this.silentPaymentScanAddresses = silentPaymentScanAddresses;
+        this.mapSilentPaymentLabels = mapSilentPaymentLabels;
     }
 
     public Set<ExtendedKey> getExtendedPublicKeys() {
@@ -177,6 +194,14 @@ public class OutputDescriptor {
         return scriptType;
     }
 
+    public Map<SilentPaymentScanAddress, KeyDerivation> getSilentPaymentScanAddresses() {
+        return Collections.unmodifiableMap(silentPaymentScanAddresses);
+    }
+
+    public boolean isSilentPayments() {
+        return !silentPaymentScanAddresses.isEmpty();
+    }
+
     public boolean describesMultipleAddresses() {
         for(ExtendedKey pubKey : extendedPublicKeys.keySet()) {
             if(describesMultipleAddresses(pubKey)) {
@@ -265,6 +290,10 @@ public class OutputDescriptor {
     }
 
     public Wallet toWallet() {
+        if(isSilentPayments()) {
+            return toSilentPaymentWallet();
+        }
+
         Wallet wallet = new Wallet();
         wallet.setPolicyType(isMultisig() || isCosigner() ? PolicyType.MULTI_HD : PolicyType.SINGLE_HD);
         wallet.setScriptType(scriptType);
@@ -301,7 +330,39 @@ public class OutputDescriptor {
         return wallet;
     }
 
+    private Wallet toSilentPaymentWallet() {
+        Wallet wallet = new Wallet();
+        wallet.setPolicyType(PolicyType.SINGLE_SP);
+        wallet.setScriptType(ScriptType.P2TR);
+
+        Map.Entry<SilentPaymentScanAddress, KeyDerivation> entry = silentPaymentScanAddresses.entrySet().iterator().next();
+        SilentPaymentScanAddress spScanAddress = entry.getKey();
+        KeyDerivation keyDerivation = entry.getValue();
+
+        Keystore keystore = new Keystore();
+        keystore.setSource(KeystoreSource.SW_WATCH);
+        keystore.setWalletModel(WalletModel.SPARROW);
+        keystore.setKeyDerivation(keyDerivation);
+        keystore.setSilentPaymentScanAddress(spScanAddress);
+        setKeystoreLabel(keystore);
+
+        wallet.getKeystores().add(keystore);
+        wallet.setDefaultPolicy(Policy.getPolicy(PolicyType.SINGLE_SP, ScriptType.P2TR, wallet.getKeystores(), 1));
+
+        return wallet;
+    }
+
     public Wallet toKeystoreWallet(String masterFingerprint) {
+        if(isSilentPayments()) {
+            Wallet wallet = toSilentPaymentWallet();
+            if(masterFingerprint != null) {
+                KeyDerivation existing = wallet.getKeystores().getFirst().getKeyDerivation();
+                wallet.getKeystores().getFirst().setKeyDerivation(new KeyDerivation(masterFingerprint, existing.getDerivationPath()));
+            }
+
+            return wallet;
+        }
+
         Wallet wallet = new Wallet();
         if(isMultisig()) {
             throw new IllegalStateException("Multisig output descriptors are unsupported.");
@@ -324,8 +385,14 @@ public class OutputDescriptor {
     }
 
     public void setKeystoreLabel(Keystore keystore) {
+        String label = null;
         if(keystore.getExtendedPublicKey() != null && mapExtendedPublicKeyLabels.get(keystore.getExtendedPublicKey()) != null) {
-            String label = mapExtendedPublicKeyLabels.get(keystore.getExtendedPublicKey()).trim();
+            label = mapExtendedPublicKeyLabels.get(keystore.getExtendedPublicKey());
+        } else if(keystore.getSilentPaymentScanAddress() != null && mapSilentPaymentLabels.get(keystore.getSilentPaymentScanAddress()) != null) {
+            label = mapSilentPaymentLabels.get(keystore.getSilentPaymentScanAddress());
+        }
+        if(label != null) {
+            label = label.trim();
             if(label.length() > Keystore.MAX_LABEL_LENGTH) {
                 label = label.substring(0, Keystore.MAX_LABEL_LENGTH);
             }
@@ -377,6 +444,10 @@ public class OutputDescriptor {
     }
 
     public static OutputDescriptor getOutputDescriptor(String descriptor, Map<ExtendedKey, String> mapExtendedPublicKeyLabels) {
+        if(descriptor.toLowerCase(Locale.ROOT).startsWith("sp(")) {
+            return parseSilentPaymentDescriptor(descriptor);
+        }
+
         ScriptType scriptType = ScriptType.fromDescriptor(descriptor);
         if(scriptType == null) {
             ExtendedKey.Header header = ExtendedKey.Header.fromExtendedKey(descriptor);
@@ -416,30 +487,11 @@ public class OutputDescriptor {
         Map<ExtendedKey, ExtendedKey> masterPrivateKeyMap = new LinkedHashMap<>();
         Matcher matcher = XPUB_PATTERN.matcher(descriptor);
         while(matcher.find()) {
-            String masterFingerprint = null;
-            String keyDerivationPath = null;
-            String extKey;
-            String childDerivationPath = null;
-
-            if(matcher.group(1) != null) {
-                String keyOrigin = matcher.group(1);
-                Matcher keyOriginMatcher = KEY_ORIGIN_PATTERN.matcher(keyOrigin);
-                if(keyOriginMatcher.matches()) {
-                    byte[] masterFingerprintBytes = keyOriginMatcher.group(1) != null ? Utils.hexToBytes(keyOriginMatcher.group(1)) : new byte[4];
-                    if(masterFingerprintBytes.length != 4) {
-                        throw new IllegalArgumentException("Master fingerprint must be 4 bytes: " + Utils.bytesToHex(masterFingerprintBytes));
-                    }
-                    masterFingerprint = Utils.bytesToHex(masterFingerprintBytes);
-                    keyDerivationPath = KeyDerivation.writePath(KeyDerivation.parsePath(keyOriginMatcher.group(2)));
-                }
-            }
-
-            extKey = matcher.group(2);
-            if(matcher.group(3) != null) {
-                childDerivationPath = matcher.group(3);
-            }
-
-            KeyDerivation keyDerivation = new KeyDerivation(masterFingerprint, keyDerivationPath);
+            String keyOriginAndExtKey = (matcher.group(1) != null ? matcher.group(1) : "") + matcher.group(2);
+            KeyDerivationAndKey originResult = parseKeyOrigin(keyOriginAndExtKey);
+            KeyDerivation keyDerivation = originResult.keyDerivation();
+            String extKey = originResult.key();
+            String childDerivationPath = matcher.group(3);
             try {
                 ExtendedKey extendedKey = ExtendedKey.fromDescriptor(extKey);
                 if(childDerivationPath != null) {
@@ -448,8 +500,8 @@ public class OutputDescriptor {
                         if(childPath.size() > 2 && (extendedKey.getKey().hasPrivKey() || childPath.stream().noneMatch(ChildNumber::isHardened))) {
                             childDerivationPath = childDerivationPath.substring(childDerivationPath.lastIndexOf("/", childDerivationPath.lastIndexOf("/") - 1));
                             childPath = childPath.subList(0, childPath.size() - 2);
-                            if(masterFingerprint == null) {
-                                keyDerivation = new KeyDerivation(Utils.bytesToHex(extendedKey.getKey().getFingerprint()), keyDerivationPath);
+                            if(keyDerivation.getMasterFingerprint() == null) {
+                                keyDerivation = new KeyDerivation(Utils.bytesToHex(extendedKey.getKey().getFingerprint()), keyDerivation.getDerivationPath());
                             }
                             keyDerivation = keyDerivation.extend(childPath);
                             childPath.addFirst(extendedKey.getKeyChildNumber());
@@ -488,6 +540,158 @@ public class OutputDescriptor {
         }
 
         return new OutputDescriptor(scriptType, multisigThreshold, keyDerivationMap, keyChildDerivationMap, mapExtendedPublicKeyLabels, masterPrivateKeyMap);
+    }
+
+    private static OutputDescriptor parseSilentPaymentDescriptor(String descriptor) {
+        Matcher checksumMatcher = CHECKSUM_PATTERN.matcher(descriptor);
+        if(checksumMatcher.find()) {
+            String checksum = checksumMatcher.group(1);
+            String calculatedChecksum = getChecksum(descriptor.substring(0, checksumMatcher.start()));
+            if(!checksum.equals(calculatedChecksum)) {
+                throw new IllegalArgumentException("Descriptor checksum invalid");
+            }
+            descriptor = descriptor.substring(0, checksumMatcher.start());
+        }
+
+        if(!descriptor.startsWith("sp(") || !descriptor.endsWith(")")) {
+            throw new IllegalArgumentException("Invalid sp() descriptor format");
+        }
+        String inner = descriptor.substring(3, descriptor.length() - 1);
+
+        int commaIndex = inner.indexOf(',');
+        if(commaIndex < 0) {
+            return parseSingleArgSp(inner.trim());
+        } else {
+            return parseTwoArgSp(inner.substring(0, commaIndex).trim(), inner.substring(commaIndex + 1).trim());
+        }
+    }
+
+    private record KeyDerivationAndKey(KeyDerivation keyDerivation, String key) {}
+
+    private static KeyDerivationAndKey parseKeyOrigin(String arg) {
+        KeyDerivation keyDerivation = new KeyDerivation(null, (String)null);
+        if(arg.startsWith("[")) {
+            int closeBracket = arg.indexOf(']');
+            if(closeBracket < 0) {
+                throw new IllegalArgumentException("Unclosed key origin bracket in descriptor");
+            }
+            String keyOrigin = arg.substring(0, closeBracket + 1);
+            Matcher keyOriginMatcher = KEY_ORIGIN_PATTERN.matcher(keyOrigin);
+            if(keyOriginMatcher.matches()) {
+                byte[] masterFingerprintBytes = keyOriginMatcher.group(1) != null ? Utils.hexToBytes(keyOriginMatcher.group(1)) : new byte[4];
+                if(masterFingerprintBytes.length != 4) {
+                    throw new IllegalArgumentException("Master fingerprint must be 4 bytes: " + Utils.bytesToHex(masterFingerprintBytes));
+                }
+                String masterFingerprint = Utils.bytesToHex(masterFingerprintBytes);
+                String keyDerivationPath = KeyDerivation.writePath(KeyDerivation.parsePath(keyOriginMatcher.group(2)));
+                keyDerivation = new KeyDerivation(masterFingerprint, keyDerivationPath);
+            }
+            arg = arg.substring(closeBracket + 1);
+        }
+
+        return new KeyDerivationAndKey(keyDerivation, arg);
+    }
+
+    private static OutputDescriptor parseSingleArgSp(String arg) {
+        KeyDerivationAndKey originResult = parseKeyOrigin(arg);
+        KeyDerivation keyDerivation = originResult.keyDerivation();
+        arg = originResult.key();
+
+        String lowerArg = arg.toLowerCase(Locale.ROOT);
+        String scanHrp = Network.get().getSilentPaymentsScanKeyHrp();
+        String spendHrp = Network.get().getSilentPaymentsSpendKeyHrp();
+        if(!lowerArg.startsWith(scanHrp + "1") && !lowerArg.startsWith(spendHrp + "1")) {
+            throw new IllegalArgumentException("Single argument sp() descriptor requires spscan or spspend encoded key, got: " + arg);
+        }
+
+        SilentPaymentScanAddress spScanAddress = SilentPaymentScanAddress.fromKeyString(arg);
+        Map<SilentPaymentScanAddress, KeyDerivation> spMap = new LinkedHashMap<>();
+        spMap.put(spScanAddress, keyDerivation);
+
+        return new OutputDescriptor(spMap, new LinkedHashMap<>());
+    }
+
+    private static OutputDescriptor parseTwoArgSp(String scanArg, String spendArg) {
+        KeyDerivationAndKey originResult = parseKeyOrigin(scanArg);
+        KeyDerivation keyDerivation = originResult.keyDerivation();
+        scanArg = originResult.key();
+
+        ECKey scanPrivateKey = parseSilentPaymentScanKey(scanArg);
+        ECKey spendKey = parseSilentPaymentSpendKey(spendArg);
+
+        ECKey spendPubKey = spendKey.isPubKeyOnly() ? spendKey : ECKey.fromPublicOnly(spendKey.getPubKey());
+        SilentPaymentScanAddress spScanAddress = new SilentPaymentScanAddress(scanPrivateKey, spendPubKey);
+        Map<SilentPaymentScanAddress, KeyDerivation> spMap = new LinkedHashMap<>();
+        spMap.put(spScanAddress, keyDerivation);
+
+        return new OutputDescriptor(spMap, new LinkedHashMap<>());
+    }
+
+    private static ECKey parseSilentPaymentScanKey(String arg) {
+        Matcher xprvMatcher = XPUB_PATTERN.matcher(arg);
+        if(xprvMatcher.matches()) {
+            String extKeyStr = xprvMatcher.group(2);
+            String childPath = xprvMatcher.group(3);
+            ExtendedKey extKey = ExtendedKey.fromDescriptor(extKeyStr);
+            if(!extKey.getKey().hasPrivKey()) {
+                throw new IllegalArgumentException("The scan key must be private, and not an xpub: " + extKeyStr);
+            }
+            if(childPath != null) {
+                List<ChildNumber> path = KeyDerivation.parsePath(childPath);
+                path.addFirst(extKey.getKeyChildNumber());
+                DeterministicKey derived = extKey.getKey(path);
+
+                return ECKey.fromPrivate(derived.getPrivKeyBytes(), true);
+            }
+
+            return ECKey.fromPrivate(extKey.getKey().getPrivKeyBytes(), true);
+        }
+
+        DumpedPrivateKey dpk;
+        try {
+            dpk = DumpedPrivateKey.fromBase58(arg);
+        } catch(Exception e) {
+            throw new IllegalArgumentException("Cannot parse sp() scan key as xprv or WIF: " + arg, e);
+        }
+
+        ECKey key = dpk.getKey();
+        if(!key.isCompressed()) {
+            throw new IllegalArgumentException("Uncompressed keys are not allowed in sp() descriptors");
+        }
+
+        return key;
+    }
+
+    private static ECKey parseSilentPaymentSpendKey(String arg) {
+        if(arg.startsWith("[")) {
+            int closeBracket = arg.indexOf(']');
+            if(closeBracket >= 0) {
+                arg = arg.substring(closeBracket + 1);
+            }
+        }
+
+        Matcher xpubMatcher = XPUB_PATTERN.matcher(arg);
+        if(xpubMatcher.matches()) {
+            String extKeyStr = xpubMatcher.group(2);
+            String childPath = xpubMatcher.group(3);
+            ExtendedKey extKey = ExtendedKey.fromDescriptor(extKeyStr);
+            if(childPath != null) {
+                List<ChildNumber> path = KeyDerivation.parsePath(childPath);
+                path.addFirst(extKey.getKeyChildNumber());
+                DeterministicKey derived = extKey.getKey(path);
+
+                return extKey.getKey().hasPrivKey() ? ECKey.fromPrivate(derived.getPrivKeyBytes(), true) : ECKey.fromPublicOnly(derived.getPubKey());
+            }
+
+            return extKey.getKey().hasPrivKey() ? ECKey.fromPrivate(extKey.getKey().getPrivKeyBytes(), true) : ECKey.fromPublicOnly(extKey.getKey().getPubKey());
+        }
+
+        Matcher pubKeyMatcher = PUBKEY_PATTERN.matcher(arg);
+        if(pubKeyMatcher.matches()) {
+            return ECKey.fromPublicOnly(Utils.hexToBytes(pubKeyMatcher.group(2)));
+        }
+
+        throw new IllegalArgumentException("Cannot parse sp() spend key as xpub, xprv, or compressed pubkey: " + arg);
     }
 
     public static String normalize(String descriptor) {
@@ -578,23 +782,31 @@ public class OutputDescriptor {
 
     public String toString(boolean addKeyOrigin, boolean addKey, boolean addChecksum) {
         StringBuilder builder = new StringBuilder();
-        builder.append(scriptType.getDescriptor());
 
-        if(isMultisig()) {
-            builder.append(ScriptType.MULTISIG.getDescriptor());
-            StringJoiner joiner = new StringJoiner(",");
-            joiner.add(Integer.toString(multisigThreshold));
-            for(ExtendedKey pubKey : sortExtendedPubKeys(extendedPublicKeys.keySet())) {
-                String extKeyString = toString(pubKey, addKeyOrigin, addKey);
-                joiner.add(extKeyString);
-            }
-            builder.append(joiner.toString());
-            builder.append(ScriptType.MULTISIG.getCloseDescriptor());
+        if(isSilentPayments()) {
+            Map.Entry<SilentPaymentScanAddress, KeyDerivation> entry = silentPaymentScanAddresses.entrySet().iterator().next();
+            builder.append("sp(");
+            builder.append(writeKey(entry.getKey(), entry.getValue(), addKeyOrigin));
+            builder.append(")");
         } else {
-            ExtendedKey extendedPublicKey = getSingletonExtendedPublicKey();
-            builder.append(toString(extendedPublicKey, addKeyOrigin, addKey));
+            builder.append(scriptType.getDescriptor());
+
+            if(isMultisig()) {
+                builder.append(ScriptType.MULTISIG.getDescriptor());
+                StringJoiner joiner = new StringJoiner(",");
+                joiner.add(Integer.toString(multisigThreshold));
+                for(ExtendedKey pubKey : sortExtendedPubKeys(extendedPublicKeys.keySet())) {
+                    String extKeyString = toString(pubKey, addKeyOrigin, addKey);
+                    joiner.add(extKeyString);
+                }
+                builder.append(joiner.toString());
+                builder.append(ScriptType.MULTISIG.getCloseDescriptor());
+            } else {
+                ExtendedKey extendedPublicKey = getSingletonExtendedPublicKey();
+                builder.append(toString(extendedPublicKey, addKeyOrigin, addKey));
+            }
+            builder.append(scriptType.getCloseDescriptor());
         }
-        builder.append(scriptType.getCloseDescriptor());
 
         if(addChecksum) {
             String descriptor = builder.toString();
@@ -652,6 +864,25 @@ public class OutputDescriptor {
         return writeKey(pubKey, keyDerivation, childDerivation, addKeyOrigin, addKey);
     }
 
+    public static String writeKey(SilentPaymentScanAddress spScanAddress, KeyDerivation keyDerivation, boolean addKeyOrigin) {
+        return writeKey(spScanAddress, keyDerivation, addKeyOrigin, false);
+    }
+
+    public static String writeKey(SilentPaymentScanAddress spScanAddress, KeyDerivation keyDerivation, boolean addKeyOrigin, boolean useApostrophes) {
+        StringBuilder keyBuilder = new StringBuilder();
+        if(addKeyOrigin && keyDerivation != null && keyDerivation.getMasterFingerprint() != null && keyDerivation.getMasterFingerprint().length() == 8 && Utils.isHex(keyDerivation.getMasterFingerprint())) {
+            keyBuilder.append("[");
+            keyBuilder.append(keyDerivation.getMasterFingerprint());
+            if(!keyDerivation.getDerivation().isEmpty()) {
+                keyBuilder.append(KeyDerivation.writePath(keyDerivation.getDerivation(), useApostrophes).substring(1));
+            }
+            keyBuilder.append("]");
+        }
+        keyBuilder.append(spScanAddress.toKeyString());
+
+        return keyBuilder.toString();
+    }
+
     public static String writeKey(ExtendedKey pubKey, KeyDerivation keyDerivation, String childDerivation, boolean addKeyOrigin, boolean addKey) {
         return writeKey(pubKey, keyDerivation, childDerivation, addKeyOrigin, addKey, false);
     }
@@ -703,6 +934,10 @@ public class OutputDescriptor {
     }
 
     public OutputDescriptor copy(boolean includeChildDerivations) {
+        if(isSilentPayments()) {
+            return new OutputDescriptor(new LinkedHashMap<>(silentPaymentScanAddresses), new LinkedHashMap<>(mapSilentPaymentLabels));
+        }
+
         Map<ExtendedKey, KeyDerivation> copyExtendedPublicKeys = new LinkedHashMap<>(extendedPublicKeys);
         Map<ExtendedKey, String> copyChildDerivations = new LinkedHashMap<>(mapChildrenDerivations);
         Map<ExtendedKey, String> copyExtendedPublicKeyLabels = new LinkedHashMap<>(mapExtendedPublicKeyLabels);
@@ -713,6 +948,7 @@ public class OutputDescriptor {
             Map<ExtendedKey, String> childDerivations = copyExtendedPublicKeys.entrySet().stream().collect(Collectors.toMap(Map.Entry::getKey, _ -> "/0/0"));
             OutputDescriptor copyFirstReceive = new OutputDescriptor(scriptType, multisigThreshold, copyExtendedPublicKeys, childDerivations);
             OutputDescriptor copySortedXpubs = OutputDescriptor.getOutputDescriptor(copyFirstReceive.toString());
+
             return new OutputDescriptor(scriptType, multisigThreshold, copySortedXpubs.extendedPublicKeys, Collections.emptyMap(), copyExtendedPublicKeyLabels, copyExtendedMasterPrivateKeys);
         }
 

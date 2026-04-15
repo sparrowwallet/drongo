@@ -80,7 +80,7 @@ public enum Network {
         return spAddressHrp;
     }
 
-    public String getSilentPaymentsKeyHrp() {
+    public String getSilentPaymentsScanKeyHrp() {
         return spScanKeyHrp;
     }
 

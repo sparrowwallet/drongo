@@ -3,6 +3,7 @@ package com.sparrowwallet.drongo.silentpayments;
 import com.sparrowwallet.drongo.Network;
 import com.sparrowwallet.drongo.Utils;
 import com.sparrowwallet.drongo.crypto.ECKey;
+import com.sparrowwallet.drongo.protocol.Bech32;
 import com.sparrowwallet.drongo.wallet.DeterministicSeed;
 import com.sparrowwallet.drongo.wallet.MnemonicException;
 import org.junit.jupiter.api.AfterEach;
@@ -59,6 +60,60 @@ public class SilentPaymentScanAddressTest {
         Assertions.assertEquals("sp1qqw6vczcfpdh5nf5y2ky99kmqae0tr30hgdfg88parz50cp80wd2wqqlv6saelkk5snl4wfutyxrchpzzwm8rjp3z6q7apna59z9huq4x754e5atr", unlabelled.getChangeAddress().getAddress());
         Assertions.assertEquals("03bc95144daf15336db3456825c70ced0a4462f89aca42c4921ee7ccb2b3a44796", Utils.bytesToHex(spendPrivateKey.getPubKey()));
         Assertions.assertEquals("03ecd43b9fdad484ff57278b21878b844276ce390622d03dd0cfb4288b7e02a6f5", Utils.bytesToHex(unlabelled.getChangeAddress().getSpendKey().getPubKey()));
+    }
+
+    @Test
+    public void testToKeyString() {
+        ECKey scanPrivateKey = ECKey.fromPrivate(Utils.hexToBytes("0f694e068028a717f8af6b9411f9a133dd3565258714cc226594b34db90c1f2c"));
+        ECKey spendPrivateKey = ECKey.fromPrivate(Utils.hexToBytes("9d6ad855ce3417ef84e836892e5a56392bfba05fa5d97ccea30e266f540e08b3"));
+
+        SilentPaymentScanAddress spScanAddress = SilentPaymentScanAddress.from(scanPrivateKey, ECKey.fromPublicOnly(spendPrivateKey));
+        String keyString = spScanAddress.toKeyString();
+        Assertions.assertTrue(keyString.startsWith("spscan1q"));
+    }
+
+    @Test
+    public void testFromKeyStringRoundTrip() {
+        ECKey scanPrivateKey = ECKey.fromPrivate(Utils.hexToBytes("0f694e068028a717f8af6b9411f9a133dd3565258714cc226594b34db90c1f2c"));
+        ECKey spendPrivateKey = ECKey.fromPrivate(Utils.hexToBytes("9d6ad855ce3417ef84e836892e5a56392bfba05fa5d97ccea30e266f540e08b3"));
+
+        SilentPaymentScanAddress original = SilentPaymentScanAddress.from(scanPrivateKey, ECKey.fromPublicOnly(spendPrivateKey));
+        String keyString = original.toKeyString();
+
+        SilentPaymentScanAddress decoded = SilentPaymentScanAddress.fromKeyString(keyString);
+        Assertions.assertArrayEquals(original.getScanKey().getPrivKeyBytes(), decoded.getScanKey().getPrivKeyBytes());
+        Assertions.assertArrayEquals(original.getSpendKey().getPubKey(), decoded.getSpendKey().getPubKey());
+    }
+
+    @Test
+    public void testFromKeyStringSpspend() {
+        ECKey scanPrivateKey = ECKey.fromPrivate(Utils.hexToBytes("0f694e068028a717f8af6b9411f9a133dd3565258714cc226594b34db90c1f2c"));
+        ECKey spendPrivateKey = ECKey.fromPrivate(Utils.hexToBytes("9d6ad855ce3417ef84e836892e5a56392bfba05fa5d97ccea30e266f540e08b3"));
+
+        // Manually encode as spspend: ser_256(b_scan) || ser_256(b_spend)
+        byte[] payload = Utils.concat(scanPrivateKey.getPrivKeyBytes(), spendPrivateKey.getPrivKeyBytes());
+        String spspendEncoded = Bech32.encode(Network.get().getSilentPaymentsSpendKeyHrp(), 0, Bech32.Encoding.BECH32M, payload);
+
+        SilentPaymentScanAddress decoded = SilentPaymentScanAddress.fromKeyString(spspendEncoded);
+        Assertions.assertArrayEquals(scanPrivateKey.getPrivKeyBytes(), decoded.getScanKey().getPrivKeyBytes());
+        // Spend private key is discarded, only public key retained
+        Assertions.assertTrue(decoded.getSpendKey().isPubKeyOnly());
+        Assertions.assertArrayEquals(spendPrivateKey.getPubKey(), decoded.getSpendKey().getPubKey());
+    }
+
+    @Test
+    public void testFromKeyStringTestnet() {
+        Network.set(Network.TESTNET);
+        ECKey scanPrivateKey = ECKey.fromPrivate(Utils.hexToBytes("0f694e068028a717f8af6b9411f9a133dd3565258714cc226594b34db90c1f2c"));
+        ECKey spendPrivateKey = ECKey.fromPrivate(Utils.hexToBytes("9d6ad855ce3417ef84e836892e5a56392bfba05fa5d97ccea30e266f540e08b3"));
+
+        SilentPaymentScanAddress original = SilentPaymentScanAddress.from(scanPrivateKey, ECKey.fromPublicOnly(spendPrivateKey));
+        String keyString = original.toKeyString();
+        Assertions.assertTrue(keyString.startsWith("tspscan1q"));
+
+        SilentPaymentScanAddress decoded = SilentPaymentScanAddress.fromKeyString(keyString);
+        Assertions.assertArrayEquals(original.getScanKey().getPrivKeyBytes(), decoded.getScanKey().getPrivKeyBytes());
+        Assertions.assertArrayEquals(original.getSpendKey().getPubKey(), decoded.getSpendKey().getPubKey());
     }
 
     @AfterEach

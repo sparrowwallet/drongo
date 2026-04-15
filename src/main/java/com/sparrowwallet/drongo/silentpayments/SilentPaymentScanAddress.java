@@ -61,11 +61,41 @@ public class SilentPaymentScanAddress extends SilentPaymentAddress {
     }
 
     public String toKeyString() {
-        return Bech32.encode(Network.get().getSilentPaymentsKeyHrp(), 0, Bech32.Encoding.BECH32M, toBytes());
+        return Bech32.encode(Network.get().getSilentPaymentsScanKeyHrp(), 0, Bech32.Encoding.BECH32M, toBytes());
     }
 
     public byte[] toBytes() {
         return Utils.concat(getScanKey().getPrivKeyBytes(), getSpendKey().getPubKey(true));
+    }
+
+    public static SilentPaymentScanAddress fromKeyString(String encoded) {
+        Bech32.Bech32Data data = Bech32.decode(encoded, 1023);
+        if(data.encoding != Bech32.Encoding.BECH32M) {
+            throw new IllegalArgumentException("Invalid silent payment key encoding");
+        }
+
+        int version = data.data[0];
+        if(version != 0) {
+            throw new UnsupportedOperationException("Unsupported silent payment key version: " + version);
+        }
+
+        byte[] payload = Bech32.convertBits(data.data, 1, data.data.length - 1, 5, 8, false);
+
+        String scanHrp = Network.get().getSilentPaymentsScanKeyHrp();
+        String spendHrp = Network.get().getSilentPaymentsSpendKeyHrp();
+        if(data.hrp.equals(scanHrp)) {
+            return fromBytes(payload);
+        } else if(data.hrp.equals(spendHrp)) {
+            if(payload.length != 64) {
+                throw new IllegalArgumentException("Invalid spspend payload length: " + payload.length);
+            }
+            ECKey scanKey = ECKey.fromPrivate(Arrays.copyOfRange(payload, 0, 32));
+            ECKey spendKey = ECKey.fromPublicOnly(ECKey.fromPrivate(Arrays.copyOfRange(payload, 32, 64)).getPubKey());
+
+            return new SilentPaymentScanAddress(scanKey, spendKey);
+        } else {
+            throw new IllegalArgumentException("Invalid silent payment key HRP: " + data.hrp);
+        }
     }
 
     public static SilentPaymentScanAddress fromBytes(byte[] bytes) {
