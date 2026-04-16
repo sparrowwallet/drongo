@@ -416,6 +416,7 @@ public class OutputDescriptor {
         setKeystoreLabel(keystore);
         wallet.getKeystores().add(keystore);
         wallet.setDefaultPolicy(Policy.getPolicy(isCosigner() ? PolicyType.MULTI_HD : PolicyType.SINGLE_HD, wallet.getScriptType(), wallet.getKeystores(), 1));
+        applyAnnotations(wallet);
 
         return wallet;
     }
@@ -453,6 +454,16 @@ public class OutputDescriptor {
     }
 
     public static OutputDescriptor getOutputDescriptor(Wallet wallet, List<KeyPurpose> keyPurposes, Integer index) {
+        Map<String, Integer> annotations = getWalletAnnotations(wallet);
+
+        if(wallet.getPolicyType() == PolicyType.SINGLE_SP) {
+            Keystore keystore = wallet.getKeystores().getFirst();
+            Map<SilentPaymentScanAddress, KeyDerivation> spMap = new LinkedHashMap<>();
+            spMap.put(keystore.getSilentPaymentScanAddress(), keystore.getKeyDerivation());
+
+            return new OutputDescriptor(spMap, new LinkedHashMap<>(), annotations);
+        }
+
         Map<ExtendedKey, KeyDerivation> extendedKeyDerivationMap = new LinkedHashMap<>();
         Map<ExtendedKey, String> extendedKeyChildDerivationMap = new LinkedHashMap<>();
         for(Keystore keystore : wallet.getKeystores()) {
@@ -472,6 +483,18 @@ public class OutputDescriptor {
         }
 
         return new OutputDescriptor(wallet.getScriptType(), wallet.getDefaultPolicy().getNumSignaturesRequired(), extendedKeyDerivationMap, extendedKeyChildDerivationMap);
+    }
+
+    private static Map<String, Integer> getWalletAnnotations(Wallet wallet) {
+        Map<String, Integer> annotations = new LinkedHashMap<>();
+        if(wallet.getBirthHeight() != null) {
+            annotations.put(ANNOTATION_BLOCK_HEIGHT, wallet.getBirthHeight());
+        }
+        if(wallet.gapLimit() != null && wallet.getPolicyType() != PolicyType.SINGLE_SP) {
+            annotations.put(ANNOTATION_GAP_LIMIT, wallet.getGapLimit());
+        }
+
+        return annotations;
     }
 
     // See https://github.com/bitcoin/bitcoin/blob/master/doc/descriptors.md
