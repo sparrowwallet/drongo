@@ -340,4 +340,94 @@ public class OutputDescriptorTest {
         Assertions.assertDoesNotThrow(() -> OutputDescriptor.getOutputDescriptor(normalized));
         Assertions.assertThrows(IllegalArgumentException.class, () -> OutputDescriptor.getOutputDescriptor(desc + "#aaaaaaaa"));
     }
+
+    @Test
+    public void testAnnotationParsing() {
+        String desc = "wpkh(xpub6CatWdiZiodmUeTDp8LT5or8nmbKNcuyvz7WyksVFkKB4RHwCD3XyuvPEbvqAQY3rAPshWcMLoP2fMFMKHPJ4ZeZXYVUhLv1VMrjPC7PW6V)";
+        String annotated = OutputDescriptor.normalize(desc + "?bh=800000&gl=25");
+
+        OutputDescriptor outputDescriptor = OutputDescriptor.getOutputDescriptor(annotated);
+        Assertions.assertEquals(800000, outputDescriptor.getAnnotations().get(OutputDescriptor.ANNOTATION_BLOCK_HEIGHT));
+        Assertions.assertEquals(25, outputDescriptor.getAnnotations().get(OutputDescriptor.ANNOTATION_GAP_LIMIT));
+        Assertions.assertFalse(outputDescriptor.isSilentPayments());
+    }
+
+    @Test
+    public void testAnnotationRoundTrip() {
+        ECKey scanKey = ECKey.fromPrivate(Utils.hexToBytes("a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2"), true);
+        ECKey spendKey = ECKey.fromPublicOnly(ECKey.fromPrivate(Utils.hexToBytes("b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3"), true).getPubKey());
+        SilentPaymentScanAddress spAddr = new SilentPaymentScanAddress(scanKey, spendKey);
+        String desc = "sp(" + spAddr.toKeyString() + ")?bh=850000&gl=30&ml=5";
+        String normalized = OutputDescriptor.normalize(desc);
+
+        OutputDescriptor parsed = OutputDescriptor.getOutputDescriptor(normalized);
+        Assertions.assertEquals(850000, parsed.getAnnotations().get(OutputDescriptor.ANNOTATION_BLOCK_HEIGHT));
+        Assertions.assertEquals(30, parsed.getAnnotations().get(OutputDescriptor.ANNOTATION_GAP_LIMIT));
+        Assertions.assertEquals(5, parsed.getAnnotations().get(OutputDescriptor.ANNOTATION_MAX_LABEL));
+
+        String serialized = parsed.toString(true);
+        OutputDescriptor reparsed = OutputDescriptor.getOutputDescriptor(serialized);
+        Assertions.assertEquals(parsed.getAnnotations(), reparsed.getAnnotations());
+    }
+
+    @Test
+    public void testAnnotationChecksum() {
+        ECKey scanKey = ECKey.fromPrivate(Utils.hexToBytes("a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2"), true);
+        ECKey spendKey = ECKey.fromPublicOnly(ECKey.fromPrivate(Utils.hexToBytes("b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3"), true).getPubKey());
+        SilentPaymentScanAddress spAddr = new SilentPaymentScanAddress(scanKey, spendKey);
+        String desc = "sp(" + spAddr.toKeyString() + ")?bh=800000";
+        String normalized = OutputDescriptor.normalize(desc);
+
+        Assertions.assertDoesNotThrow(() -> OutputDescriptor.getOutputDescriptor(normalized));
+
+        // Tamper with annotation value — checksum should fail
+        String tampered = normalized.replace("bh=800000", "bh=800001");
+        Assertions.assertThrows(IllegalArgumentException.class, () -> OutputDescriptor.getOutputDescriptor(tampered));
+    }
+
+    @Test
+    public void testAnnotationSpToWallet() {
+        ECKey scanKey = ECKey.fromPrivate(Utils.hexToBytes("a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2"), true);
+        ECKey spendKey = ECKey.fromPublicOnly(ECKey.fromPrivate(Utils.hexToBytes("b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3"), true).getPubKey());
+        SilentPaymentScanAddress spAddr = new SilentPaymentScanAddress(scanKey, spendKey);
+        String desc = "sp(" + spAddr.toKeyString() + ")?bh=800000";
+        String normalized = OutputDescriptor.normalize(desc);
+
+        OutputDescriptor outputDescriptor = OutputDescriptor.getOutputDescriptor(normalized);
+        Wallet wallet = outputDescriptor.toWallet();
+        Assertions.assertEquals(800000, wallet.getBirthHeight());
+    }
+
+    @Test
+    public void testAnnotationUnknownKeysIgnored() {
+        ECKey scanKey = ECKey.fromPrivate(Utils.hexToBytes("a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2"), true);
+        ECKey spendKey = ECKey.fromPublicOnly(ECKey.fromPrivate(Utils.hexToBytes("b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3"), true).getPubKey());
+        SilentPaymentScanAddress spAddr = new SilentPaymentScanAddress(scanKey, spendKey);
+        String desc = "sp(" + spAddr.toKeyString() + ")?bh=800000&xx=42&gl=25";
+        String normalized = OutputDescriptor.normalize(desc);
+
+        OutputDescriptor outputDescriptor = OutputDescriptor.getOutputDescriptor(normalized);
+        Assertions.assertEquals(800000, outputDescriptor.getAnnotations().get(OutputDescriptor.ANNOTATION_BLOCK_HEIGHT));
+        Assertions.assertEquals(25, outputDescriptor.getAnnotations().get(OutputDescriptor.ANNOTATION_GAP_LIMIT));
+        Assertions.assertEquals(42, outputDescriptor.getAnnotations().get("xx"));
+    }
+
+    @Test
+    public void testAnnotationLeadingZerosAccepted() {
+        ECKey scanKey = ECKey.fromPrivate(Utils.hexToBytes("a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2"), true);
+        ECKey spendKey = ECKey.fromPublicOnly(ECKey.fromPrivate(Utils.hexToBytes("b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3"), true).getPubKey());
+        SilentPaymentScanAddress spAddr = new SilentPaymentScanAddress(scanKey, spendKey);
+        String desc = "sp(" + spAddr.toKeyString() + ")?bh=0800000&gl=0";
+        String normalized = OutputDescriptor.normalize(desc);
+
+        OutputDescriptor outputDescriptor = OutputDescriptor.getOutputDescriptor(normalized);
+        Assertions.assertEquals(800000, outputDescriptor.getAnnotations().get(OutputDescriptor.ANNOTATION_BLOCK_HEIGHT));
+        Assertions.assertEquals(0, outputDescriptor.getAnnotations().get(OutputDescriptor.ANNOTATION_GAP_LIMIT));
+    }
+
+    @Test
+    public void testDescriptorWithoutAnnotations() {
+        OutputDescriptor descriptor = OutputDescriptor.getOutputDescriptor("wpkh(xpub6CatWdiZiodmUeTDp8LT5or8nmbKNcuyvz7WyksVFkKB4RHwCD3XyuvPEbvqAQY3rAPshWcMLoP2fMFMKHPJ4ZeZXYVUhLv1VMrjPC7PW6V)");
+        Assertions.assertTrue(descriptor.getAnnotations().isEmpty());
+    }
 }

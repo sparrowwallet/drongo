@@ -31,6 +31,11 @@ public class OutputDescriptor {
     public static final Pattern KEY_ORIGIN_PATTERN = Pattern.compile("\\[([A-Fa-f0-9]{8})([/\\d'hH]+)?\\]");
     private static final Pattern MULTIPATH_PATTERN = Pattern.compile("<([\\d*'hH;]+)>");
     private static final Pattern CHECKSUM_PATTERN = Pattern.compile("#([" + CHECKSUM_CHARSET + "]{8})$");
+    private static final Pattern ANNOTATION_PATTERN = Pattern.compile("([a-zA-Z]+)=([0-9]+)");
+
+    public static final String ANNOTATION_BLOCK_HEIGHT = "bh";
+    public static final String ANNOTATION_GAP_LIMIT = "gl";
+    public static final String ANNOTATION_MAX_LABEL = "ml";
 
     private final ScriptType scriptType;
     private final int multisigThreshold;
@@ -40,6 +45,7 @@ public class OutputDescriptor {
     private final Map<ExtendedKey, ExtendedKey> extendedMasterPrivateKeys;
     private final Map<SilentPaymentScanAddress, KeyDerivation> silentPaymentScanAddresses;
     private final Map<SilentPaymentScanAddress, String> mapSilentPaymentLabels;
+    private final Map<String, Integer> annotations;
 
     public OutputDescriptor(ScriptType scriptType, ExtendedKey extendedPublicKey, KeyDerivation keyDerivation) {
         this(scriptType, Collections.singletonMap(extendedPublicKey, keyDerivation));
@@ -66,6 +72,10 @@ public class OutputDescriptor {
     }
 
     public OutputDescriptor(ScriptType scriptType, int multisigThreshold, Map<ExtendedKey, KeyDerivation> extendedPublicKeys, Map<ExtendedKey, String> mapChildrenDerivations, Map<ExtendedKey, String> mapExtendedPublicKeyLabels, Map<ExtendedKey, ExtendedKey> extendedMasterPrivateKeys) {
+        this(scriptType, multisigThreshold, extendedPublicKeys, mapChildrenDerivations, mapExtendedPublicKeyLabels, extendedMasterPrivateKeys, new LinkedHashMap<>());
+    }
+
+    public OutputDescriptor(ScriptType scriptType, int multisigThreshold, Map<ExtendedKey, KeyDerivation> extendedPublicKeys, Map<ExtendedKey, String> mapChildrenDerivations, Map<ExtendedKey, String> mapExtendedPublicKeyLabels, Map<ExtendedKey, ExtendedKey> extendedMasterPrivateKeys, Map<String, Integer> annotations) {
         this.scriptType = scriptType;
         this.multisigThreshold = multisigThreshold;
         this.extendedPublicKeys = extendedPublicKeys;
@@ -74,9 +84,14 @@ public class OutputDescriptor {
         this.extendedMasterPrivateKeys = extendedMasterPrivateKeys;
         this.silentPaymentScanAddresses = new LinkedHashMap<>();
         this.mapSilentPaymentLabels = new LinkedHashMap<>();
+        this.annotations = annotations;
     }
 
     public OutputDescriptor(Map<SilentPaymentScanAddress, KeyDerivation> silentPaymentScanAddresses, Map<SilentPaymentScanAddress, String> mapSilentPaymentLabels) {
+        this(silentPaymentScanAddresses, mapSilentPaymentLabels, new LinkedHashMap<>());
+    }
+
+    public OutputDescriptor(Map<SilentPaymentScanAddress, KeyDerivation> silentPaymentScanAddresses, Map<SilentPaymentScanAddress, String> mapSilentPaymentLabels, Map<String, Integer> annotations) {
         this.scriptType = ScriptType.P2TR;
         this.multisigThreshold = 1;
         this.extendedPublicKeys = new LinkedHashMap<>();
@@ -85,6 +100,7 @@ public class OutputDescriptor {
         this.extendedMasterPrivateKeys = new LinkedHashMap<>();
         this.silentPaymentScanAddresses = silentPaymentScanAddresses;
         this.mapSilentPaymentLabels = mapSilentPaymentLabels;
+        this.annotations = annotations;
     }
 
     public Set<ExtendedKey> getExtendedPublicKeys() {
@@ -200,6 +216,14 @@ public class OutputDescriptor {
 
     public boolean isSilentPayments() {
         return !silentPaymentScanAddresses.isEmpty();
+    }
+
+    public Map<String, Integer> getAnnotations() {
+        return Collections.unmodifiableMap(annotations);
+    }
+
+    public void clearAnnotations() {
+        annotations.clear();
     }
 
     public boolean describesMultipleAddresses() {
@@ -327,6 +351,8 @@ public class OutputDescriptor {
         }
 
         wallet.setDefaultPolicy(Policy.getPolicy(wallet.getPolicyType(), wallet.getScriptType(), wallet.getKeystores(), getMultisigThreshold()));
+        applyAnnotations(wallet);
+
         return wallet;
     }
 
@@ -348,8 +374,18 @@ public class OutputDescriptor {
 
         wallet.getKeystores().add(keystore);
         wallet.setDefaultPolicy(Policy.getPolicy(PolicyType.SINGLE_SP, ScriptType.P2TR, wallet.getKeystores(), 1));
+        applyAnnotations(wallet);
 
         return wallet;
+    }
+
+    private void applyAnnotations(Wallet wallet) {
+        if(annotations.containsKey(ANNOTATION_BLOCK_HEIGHT)) {
+            wallet.setBirthHeight(annotations.get(ANNOTATION_BLOCK_HEIGHT));
+        }
+        if(annotations.containsKey(ANNOTATION_GAP_LIMIT) && wallet.getPolicyType() != PolicyType.SINGLE_SP) {
+            wallet.setGapLimit(annotations.get(ANNOTATION_GAP_LIMIT));
+        }
     }
 
     public Wallet toKeystoreWallet(String masterFingerprint) {
@@ -444,8 +480,25 @@ public class OutputDescriptor {
     }
 
     public static OutputDescriptor getOutputDescriptor(String descriptor, Map<ExtendedKey, String> mapExtendedPublicKeyLabels) {
+        Matcher checksumMatcher = CHECKSUM_PATTERN.matcher(descriptor);
+        if(checksumMatcher.find()) {
+            String checksum = checksumMatcher.group(1);
+            String calculatedChecksum = getChecksum(descriptor.substring(0, checksumMatcher.start()));
+            if(!checksum.equals(calculatedChecksum)) {
+                throw new IllegalArgumentException("Descriptor checksum invalid - checksum of " + checksum + " did not match calculated checksum of " + calculatedChecksum);
+            }
+            descriptor = descriptor.substring(0, checksumMatcher.start());
+        }
+
+        Map<String, Integer> annotations = new LinkedHashMap<>();
+        int annotationStart = descriptor.indexOf('?');
+        if(annotationStart >= 0) {
+            annotations = parseAnnotations(descriptor.substring(annotationStart + 1));
+            descriptor = descriptor.substring(0, annotationStart);
+        }
+
         if(descriptor.toLowerCase(Locale.ROOT).startsWith("sp(")) {
-            return parseSilentPaymentDescriptor(descriptor);
+            return parseSilentPaymentDescriptor(descriptor, annotations);
         }
 
         ScriptType scriptType = ScriptType.fromDescriptor(descriptor);
@@ -459,7 +512,7 @@ public class OutputDescriptor {
         }
 
         int threshold = getMultisigThreshold(descriptor);
-        return getOutputDescriptorImpl(scriptType, threshold, descriptor, mapExtendedPublicKeyLabels);
+        return getOutputDescriptorImpl(scriptType, threshold, descriptor, mapExtendedPublicKeyLabels, annotations);
     }
 
     private static int getMultisigThreshold(String descriptor) {
@@ -472,16 +525,7 @@ public class OutputDescriptor {
         }
     }
 
-    private static OutputDescriptor getOutputDescriptorImpl(ScriptType scriptType, int multisigThreshold, String descriptor, Map<ExtendedKey, String> mapExtendedPublicKeyLabels) {
-        Matcher checksumMatcher = CHECKSUM_PATTERN.matcher(descriptor);
-        if(checksumMatcher.find()) {
-            String checksum = checksumMatcher.group(1);
-            String calculatedChecksum = getChecksum(descriptor.substring(0, checksumMatcher.start()));
-            if(!checksum.equals(calculatedChecksum)) {
-                throw new IllegalArgumentException("Descriptor checksum invalid - checksum of " + checksum + " did not match calculated checksum of " + calculatedChecksum);
-            }
-        }
-
+    private static OutputDescriptor getOutputDescriptorImpl(ScriptType scriptType, int multisigThreshold, String descriptor, Map<ExtendedKey, String> mapExtendedPublicKeyLabels, Map<String, Integer> annotations) {
         Map<ExtendedKey, KeyDerivation> keyDerivationMap = new LinkedHashMap<>();
         Map<ExtendedKey, String> keyChildDerivationMap = new LinkedHashMap<>();
         Map<ExtendedKey, ExtendedKey> masterPrivateKeyMap = new LinkedHashMap<>();
@@ -539,20 +583,10 @@ public class OutputDescriptor {
             }
         }
 
-        return new OutputDescriptor(scriptType, multisigThreshold, keyDerivationMap, keyChildDerivationMap, mapExtendedPublicKeyLabels, masterPrivateKeyMap);
+        return new OutputDescriptor(scriptType, multisigThreshold, keyDerivationMap, keyChildDerivationMap, mapExtendedPublicKeyLabels, masterPrivateKeyMap, annotations);
     }
 
-    private static OutputDescriptor parseSilentPaymentDescriptor(String descriptor) {
-        Matcher checksumMatcher = CHECKSUM_PATTERN.matcher(descriptor);
-        if(checksumMatcher.find()) {
-            String checksum = checksumMatcher.group(1);
-            String calculatedChecksum = getChecksum(descriptor.substring(0, checksumMatcher.start()));
-            if(!checksum.equals(calculatedChecksum)) {
-                throw new IllegalArgumentException("Descriptor checksum invalid");
-            }
-            descriptor = descriptor.substring(0, checksumMatcher.start());
-        }
-
+    private static OutputDescriptor parseSilentPaymentDescriptor(String descriptor, Map<String, Integer> annotations) {
         if(!descriptor.startsWith("sp(") || !descriptor.endsWith(")")) {
             throw new IllegalArgumentException("Invalid sp() descriptor format");
         }
@@ -560,9 +594,9 @@ public class OutputDescriptor {
 
         int commaIndex = inner.indexOf(',');
         if(commaIndex < 0) {
-            return parseSingleArgSp(inner.trim());
+            return parseSingleArgSp(inner.trim(), annotations);
         } else {
-            return parseTwoArgSp(inner.substring(0, commaIndex).trim(), inner.substring(commaIndex + 1).trim());
+            return parseTwoArgSp(inner.substring(0, commaIndex).trim(), inner.substring(commaIndex + 1).trim(), annotations);
         }
     }
 
@@ -592,7 +626,7 @@ public class OutputDescriptor {
         return new KeyDerivationAndKey(keyDerivation, arg);
     }
 
-    private static OutputDescriptor parseSingleArgSp(String arg) {
+    private static OutputDescriptor parseSingleArgSp(String arg, Map<String, Integer> annotations) {
         KeyDerivationAndKey originResult = parseKeyOrigin(arg);
         KeyDerivation keyDerivation = originResult.keyDerivation();
         arg = originResult.key();
@@ -608,10 +642,10 @@ public class OutputDescriptor {
         Map<SilentPaymentScanAddress, KeyDerivation> spMap = new LinkedHashMap<>();
         spMap.put(spScanAddress, keyDerivation);
 
-        return new OutputDescriptor(spMap, new LinkedHashMap<>());
+        return new OutputDescriptor(spMap, new LinkedHashMap<>(), annotations);
     }
 
-    private static OutputDescriptor parseTwoArgSp(String scanArg, String spendArg) {
+    private static OutputDescriptor parseTwoArgSp(String scanArg, String spendArg, Map<String, Integer> annotations) {
         KeyDerivationAndKey originResult = parseKeyOrigin(scanArg);
         KeyDerivation keyDerivation = originResult.keyDerivation();
         scanArg = originResult.key();
@@ -624,7 +658,7 @@ public class OutputDescriptor {
         Map<SilentPaymentScanAddress, KeyDerivation> spMap = new LinkedHashMap<>();
         spMap.put(spScanAddress, keyDerivation);
 
-        return new OutputDescriptor(spMap, new LinkedHashMap<>());
+        return new OutputDescriptor(spMap, new LinkedHashMap<>(), annotations);
     }
 
     private static ECKey parseSilentPaymentScanKey(String arg) {
@@ -692,6 +726,22 @@ public class OutputDescriptor {
         }
 
         throw new IllegalArgumentException("Cannot parse sp() spend key as xpub, xprv, or compressed pubkey: " + arg);
+    }
+
+    private static Map<String, Integer> parseAnnotations(String annotationString) {
+        Map<String, Integer> annotations = new LinkedHashMap<>();
+        String[] pairs = annotationString.split("&");
+        for(String pair : pairs) {
+            Matcher matcher = ANNOTATION_PATTERN.matcher(pair);
+            if(matcher.matches()) {
+                String key = matcher.group(1).toLowerCase(Locale.ROOT);
+                if(!annotations.containsKey(key)) {
+                    annotations.put(key, Integer.parseInt(matcher.group(2)));
+                }
+            }
+        }
+
+        return annotations;
     }
 
     public static String normalize(String descriptor) {
@@ -806,6 +856,15 @@ public class OutputDescriptor {
                 builder.append(toString(extendedPublicKey, addKeyOrigin, addKey));
             }
             builder.append(scriptType.getCloseDescriptor());
+        }
+
+        if(!annotations.isEmpty()) {
+            builder.append("?");
+            StringJoiner annotationJoiner = new StringJoiner("&");
+            for(Map.Entry<String, Integer> entry : annotations.entrySet()) {
+                annotationJoiner.add(entry.getKey() + "=" + entry.getValue());
+            }
+            builder.append(annotationJoiner);
         }
 
         if(addChecksum) {
@@ -935,13 +994,14 @@ public class OutputDescriptor {
 
     public OutputDescriptor copy(boolean includeChildDerivations) {
         if(isSilentPayments()) {
-            return new OutputDescriptor(new LinkedHashMap<>(silentPaymentScanAddresses), new LinkedHashMap<>(mapSilentPaymentLabels));
+            return new OutputDescriptor(new LinkedHashMap<>(silentPaymentScanAddresses), new LinkedHashMap<>(mapSilentPaymentLabels), new LinkedHashMap<>(annotations));
         }
 
         Map<ExtendedKey, KeyDerivation> copyExtendedPublicKeys = new LinkedHashMap<>(extendedPublicKeys);
         Map<ExtendedKey, String> copyChildDerivations = new LinkedHashMap<>(mapChildrenDerivations);
         Map<ExtendedKey, String> copyExtendedPublicKeyLabels = new LinkedHashMap<>(mapExtendedPublicKeyLabels);
         Map<ExtendedKey, ExtendedKey> copyExtendedMasterPrivateKeys = new LinkedHashMap<>(extendedMasterPrivateKeys);
+        Map<String, Integer> copyAnnotations = new LinkedHashMap<>(annotations);
 
         if(!includeChildDerivations) {
             //Ensure consistent xpub order by sorting on the first receive address
@@ -949,9 +1009,9 @@ public class OutputDescriptor {
             OutputDescriptor copyFirstReceive = new OutputDescriptor(scriptType, multisigThreshold, copyExtendedPublicKeys, childDerivations);
             OutputDescriptor copySortedXpubs = OutputDescriptor.getOutputDescriptor(copyFirstReceive.toString());
 
-            return new OutputDescriptor(scriptType, multisigThreshold, copySortedXpubs.extendedPublicKeys, Collections.emptyMap(), copyExtendedPublicKeyLabels, copyExtendedMasterPrivateKeys);
+            return new OutputDescriptor(scriptType, multisigThreshold, copySortedXpubs.extendedPublicKeys, Collections.emptyMap(), copyExtendedPublicKeyLabels, copyExtendedMasterPrivateKeys, copyAnnotations);
         }
 
-        return new OutputDescriptor(scriptType, multisigThreshold, copyExtendedPublicKeys, copyChildDerivations, copyExtendedPublicKeyLabels, copyExtendedMasterPrivateKeys);
+        return new OutputDescriptor(scriptType, multisigThreshold, copyExtendedPublicKeys, copyChildDerivations, copyExtendedPublicKeyLabels, copyExtendedMasterPrivateKeys, copyAnnotations);
     }
 }

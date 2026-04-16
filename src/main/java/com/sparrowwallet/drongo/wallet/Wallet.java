@@ -50,6 +50,7 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
     private Integer gapLimit;
     private Integer watchLast;
     private Date birthDate;
+    private Integer birthHeight;
 
     public Wallet() {
     }
@@ -576,6 +577,14 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
 
     public void setBirthDate(Date birthDate) {
         this.birthDate = birthDate;
+    }
+
+    public Integer getBirthHeight() {
+        return birthHeight;
+    }
+
+    public void setBirthHeight(Integer birthHeight) {
+        this.birthHeight = birthHeight;
     }
 
     public boolean isMasterWallet() {
@@ -2114,6 +2123,7 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
         copy.gapLimit = gapLimit;
         copy.watchLast = watchLast;
         copy.birthDate = birthDate;
+        copy.birthHeight = birthHeight;
 
         return copy;
     }
