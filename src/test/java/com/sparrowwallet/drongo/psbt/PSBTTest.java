@@ -906,6 +906,133 @@ public class PSBTTest {
         parsed.validateSilentPayments(inputPublicKeys);
     }
 
+    @Test
+    public void testSpSpendFieldsRoundTrip() throws PSBTParseException {
+        Transaction transaction = new Transaction();
+        transaction.setVersion(2);
+        transaction.addInput(Sha256Hash.wrap("75ddabb27b8845f5247975c8a5ba7c6f336c4570708ebe230caf6db5217ae858"), 0, new Script(new byte[0]));
+        byte[] outputXCoord = Utils.hexToBytes("a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2");
+        transaction.addOutput(100000L, ScriptType.P2TR.getOutputScript(outputXCoord));
+
+        PSBT psbt = new PSBT(transaction);
+        psbt.convertVersion(2);
+
+        ECKey spendPubKey = ECKey.fromPrivate(Utils.hexToBytes("b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3"), true);
+        KeyDerivation spendKeyDerivation = new KeyDerivation("deadbeef", "m/352'/0'/0'/0'/0");
+        psbt.getPsbtInputs().getFirst().getSilentPaymentsSpendDerivations().put(ECKey.fromPublicOnly(spendPubKey), spendKeyDerivation);
+
+        byte[] tweak = Utils.hexToBytes("aabbccddaabbccddaabbccddaabbccddaabbccddaabbccddaabbccddaabbccdd");
+        psbt.getPsbtInputs().getFirst().setSilentPaymentsTweak(tweak);
+
+        String serialized = psbt.toBase64String();
+        PSBT reparsed = PSBT.fromString(serialized);
+
+        Assertions.assertEquals(1, reparsed.getPsbtInputs().get(0).getSilentPaymentsSpendDerivations().size());
+        Map.Entry<ECKey, KeyDerivation> entry = reparsed.getPsbtInputs().get(0).getSilentPaymentsSpendDerivations().entrySet().iterator().next();
+        Assertions.assertArrayEquals(spendPubKey.getPubKey(), entry.getKey().getPubKey());
+        Assertions.assertEquals("deadbeef", entry.getValue().getMasterFingerprint());
+        Assertions.assertEquals("m/352'/0'/0'/0'/0", entry.getValue().getDerivationPath());
+        Assertions.assertArrayEquals(tweak, reparsed.getPsbtInputs().get(0).getSilentPaymentsTweak());
+    }
+
+    @Test
+    public void testSignSilentPayments() throws PSBTParseException {
+        ECKey spendPrivKey = ECKey.fromPrivate(Utils.hexToBytes("a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2"));
+        ECKey tweakKey = ECKey.fromPrivate(Utils.hexToBytes("c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4"));
+        byte[] tweak = Utils.bigIntegerToBytes(tweakKey.getPrivKey(), 32);
+
+        // Compute the expected output key: (b_spend + tweak) * G
+        ECKey tweakedKey = spendPrivKey.addPrivate(tweakKey);
+        if(tweakedKey.hasOddYCoord()) {
+            tweakedKey = tweakedKey.negatePrivate();
+        }
+        byte[] outputXCoord = tweakedKey.getPubKeyXCoord();
+
+        // Build a transaction spending a P2TR output with that key
+        Transaction prevTx = new Transaction();
+        prevTx.setVersion(2);
+        prevTx.addInput(Sha256Hash.ZERO_HASH, 0, new Script(new byte[0]));
+        prevTx.addOutput(100000L, ScriptType.P2TR.getOutputScript(outputXCoord));
+
+        Transaction spendTx = new Transaction();
+        spendTx.setVersion(2);
+        spendTx.addInput(prevTx.getTxId(), 0, new Script(new byte[0]));
+        spendTx.addOutput(90000L, ScriptType.P2TR.getOutputScript(outputXCoord));
+
+        PSBT psbt = new PSBT(spendTx);
+        psbt.convertVersion(2);
+        psbt.getPsbtInputs().getFirst().setWitnessUtxo(prevTx.getOutputs().getFirst());
+        psbt.getPsbtInputs().getFirst().setSilentPaymentsTweak(tweak);
+
+        Assertions.assertFalse(psbt.getPsbtInputs().getFirst().isSigned());
+        boolean signed = psbt.getPsbtInputs().getFirst().signSilentPayments(spendPrivKey);
+        Assertions.assertTrue(signed);
+        Assertions.assertTrue(psbt.getPsbtInputs().getFirst().isSigned());
+        Assertions.assertNotNull(psbt.getPsbtInputs().getFirst().getTapKeyPathSignature());
+        Assertions.assertDoesNotThrow(() -> psbt.getPsbtInputs().getFirst().verifySignatures());
+    }
+
+    @Test
+    public void testSignSilentPaymentsTweakMismatch() throws PSBTParseException {
+        ECKey spendPrivKey = ECKey.fromPrivate(Utils.hexToBytes("a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2"));
+        ECKey correctTweakKey = ECKey.fromPrivate(Utils.hexToBytes("c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4"));
+        ECKey wrongTweakKey = ECKey.fromPrivate(Utils.hexToBytes("d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5"));
+
+        // Build output using the correct tweak
+        ECKey correctTweakedKey = spendPrivKey.addPrivate(correctTweakKey);
+        if(correctTweakedKey.hasOddYCoord()) {
+            correctTweakedKey = correctTweakedKey.negatePrivate();
+        }
+        byte[] outputXCoord = correctTweakedKey.getPubKeyXCoord();
+
+        Transaction prevTx = new Transaction();
+        prevTx.setVersion(2);
+        prevTx.addInput(Sha256Hash.ZERO_HASH, 0, new Script(new byte[0]));
+        prevTx.addOutput(100000L, ScriptType.P2TR.getOutputScript(outputXCoord));
+
+        Transaction spendTx = new Transaction();
+        spendTx.setVersion(2);
+        spendTx.addInput(prevTx.getTxId(), 0, new Script(new byte[0]));
+        spendTx.addOutput(90000L, ScriptType.P2TR.getOutputScript(outputXCoord));
+
+        PSBT psbt = new PSBT(spendTx);
+        psbt.convertVersion(2);
+        psbt.getPsbtInputs().getFirst().setWitnessUtxo(prevTx.getOutputs().getFirst());
+        // Set the wrong tweak — x-coordinate won't match
+        psbt.getPsbtInputs().getFirst().setSilentPaymentsTweak(Utils.bigIntegerToBytes(wrongTweakKey.getPrivKey(), 32));
+
+        Assertions.assertThrows(IllegalStateException.class, () -> psbt.getPsbtInputs().getFirst().signSilentPayments(spendPrivKey));
+    }
+
+    @Test
+    public void testClearNonFinalFieldsRemovesSpFields() throws PSBTParseException {
+        Transaction transaction = new Transaction();
+        transaction.setVersion(2);
+        transaction.addInput(Sha256Hash.wrap("75ddabb27b8845f5247975c8a5ba7c6f336c4570708ebe230caf6db5217ae858"), 0, new Script(new byte[0]));
+        transaction.addOutput(100000L, new Script(Utils.hexToBytes("0014d85c2b71d0060b09c9886aeb815e50991dda124d")));
+
+        PSBT psbt = new PSBT(transaction);
+        PSBTInput input = psbt.getPsbtInputs().getFirst();
+
+        // Set all SP fields
+        ECKey scanKey = ECKey.fromPrivate(Utils.hexToBytes("a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2"), true);
+        ECKey ecdhShare = ECKey.fromPrivate(Utils.hexToBytes("b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3"), true);
+        input.getSilentPaymentsEcdhShares().put(ECKey.fromPublicOnly(scanKey), ECKey.fromPublicOnly(ecdhShare));
+        input.getSilentPaymentsSpendDerivations().put(ECKey.fromPublicOnly(scanKey), new KeyDerivation("deadbeef", "m/352'/0'/0'/0'/0"));
+        input.setSilentPaymentsTweak(Utils.hexToBytes("aabbccddaabbccddaabbccddaabbccddaabbccddaabbccddaabbccddaabbccdd"));
+
+        Assertions.assertFalse(input.getSilentPaymentsEcdhShares().isEmpty());
+        Assertions.assertFalse(input.getSilentPaymentsSpendDerivations().isEmpty());
+        Assertions.assertNotNull(input.getSilentPaymentsTweak());
+
+        input.clearNonFinalFields();
+
+        Assertions.assertTrue(input.getSilentPaymentsEcdhShares().isEmpty());
+        Assertions.assertTrue(input.getSilentPaymentsDLEQProofs().isEmpty());
+        Assertions.assertTrue(input.getSilentPaymentsSpendDerivations().isEmpty());
+        Assertions.assertNull(input.getSilentPaymentsTweak());
+    }
+
     @AfterEach
     public void tearDown() {
         Network.set(null);

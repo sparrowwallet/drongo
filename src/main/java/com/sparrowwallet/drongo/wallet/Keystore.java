@@ -13,8 +13,7 @@ import com.sparrowwallet.drongo.silentpayments.SilentPaymentScanAddress;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.ArrayList;
-import java.util.List;
+import java.util.*;
 
 public class Keystore extends Persistable {
     private static final Logger log = LoggerFactory.getLogger(Keystore.class);
@@ -290,6 +289,33 @@ public class Keystore extends Persistable {
         }
 
         return null;
+    }
+
+    public ECKey getSpendPrivateKey(Map<ECKey, KeyDerivation> spendDerivations) throws MnemonicException {
+        String masterFingerprint = getKeyDerivation().getMasterFingerprint();
+        for(Map.Entry<ECKey, KeyDerivation> entry : spendDerivations.entrySet()) {
+            if(masterFingerprint.equals(entry.getValue().getMasterFingerprint())) {
+                DeterministicKey derivedKey = getExtendedMasterPrivateKey().getKey(entry.getValue().getDerivation());
+                ECKey spendPrivKey = ECKey.fromPrivate(derivedKey.getPrivKeyBytes(), true);
+
+                if(!Arrays.equals(spendPrivKey.getPubKey(), entry.getKey().getPubKey())) {
+                    throw new IllegalStateException("Derived spend private key does not match PSBT spend public key");
+                }
+
+                return spendPrivKey;
+            }
+        }
+
+        List<ChildNumber> spendDerivation = KeyDerivation.getBip352SpendDerivation(getKeyDerivation().getDerivation());
+        DeterministicKey derivedKey = getExtendedMasterPrivateKey().getKey(spendDerivation);
+        ECKey spendPrivKey = ECKey.fromPrivate(derivedKey.getPrivKeyBytes(), true);
+
+        ECKey expectedSpendPubKey = getSilentPaymentScanAddress().getSpendKey();
+        if(!Arrays.equals(spendPrivKey.getPubKey(), expectedSpendPubKey.getPubKey())) {
+            throw new IllegalStateException("Derived spend private key does not match keystore spend public key");
+        }
+
+        return spendPrivKey;
     }
 
     public boolean isValid() {

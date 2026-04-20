@@ -41,6 +41,8 @@ public class PSBTInput {
     public static final byte PSBT_IN_TAP_INTERNAL_KEY = 0x17;
     public static final byte PSBT_IN_SP_ECDH_SHARE = 0x1d;
     public static final byte PSBT_IN_SP_DLEQ = 0x1e;
+    public static final byte PSBT_IN_SP_SPEND_BIP32_DERIVATION = 0x1f;
+    public static final byte PSBT_IN_SP_TWEAK = 0x20;
     public static final byte PSBT_IN_PROPRIETARY = (byte)0xfc;
 
     private final PSBT psbt;
@@ -71,6 +73,8 @@ public class PSBTInput {
     private Long requiredHeightLocktime;
     private final Map<ECKey, ECKey> silentPaymentsEcdhShares = new LinkedHashMap<>();
     private final Map<ECKey, SilentPaymentsDLEQProof> silentPaymentsDLEQProofs = new LinkedHashMap<>();
+    private final Map<ECKey, KeyDerivation> silentPaymentsSpendDerivations = new LinkedHashMap<>();
+    private byte[] silentPaymentsTweak;
 
     private int index;
 
@@ -357,6 +361,21 @@ public class PSBTInput {
                     this.silentPaymentsDLEQProofs.put(inputProofScanKey, inputDleqProof);
                     log.debug("Found input silent payments DLEQ proof for scan key: " + Utils.bytesToHex(entry.getKeyData()));
                     break;
+                case PSBT_IN_SP_SPEND_BIP32_DERIVATION:
+                    entry.checkOneBytePlusPubKey();
+                    ECKey spSpendPubKey = ECKey.fromPublicOnly(entry.getKeyData());
+                    KeyDerivation spSpendKeyDerivation = PSBTEntry.parseKeyDerivation(entry.getData());
+                    this.silentPaymentsSpendDerivations.put(spSpendPubKey, spSpendKeyDerivation);
+                    log.debug("Found input silent payments BIP32 derivation for spend key: " + Utils.bytesToHex(entry.getKeyData()));
+                    break;
+                case PSBT_IN_SP_TWEAK:
+                    entry.checkOneByteKey();
+                    if(entry.getData().length != 32) {
+                        throw new PSBTParseException("PSBT input silent payments tweak must be 32 bytes");
+                    }
+                    this.silentPaymentsTweak = entry.getData();
+                    log.debug("Found input silent payments tweak");
+                    break;
                 case PSBT_IN_PROPRIETARY:
                     this.proprietary.put(Utils.bytesToHex(entry.getKeyData()), Utils.bytesToHex(entry.getData()));
                     log.debug("Found proprietary input " + Utils.bytesToHex(entry.getKeyData()) + ": " + Utils.bytesToHex(entry.getData()));
@@ -466,6 +485,12 @@ public class PSBTInput {
             for(Map.Entry<ECKey, SilentPaymentsDLEQProof> entry : silentPaymentsDLEQProofs.entrySet()) {
                 entries.add(populateEntry(PSBT_IN_SP_DLEQ, entry.getKey().getPubKey(), entry.getValue().getBytes()));
             }
+            for(Map.Entry<ECKey, KeyDerivation> entry : silentPaymentsSpendDerivations.entrySet()) {
+                entries.add(populateEntry(PSBT_IN_SP_SPEND_BIP32_DERIVATION, entry.getKey().getPubKey(), serializeKeyDerivation(entry.getValue())));
+            }
+            if(silentPaymentsTweak != null) {
+                entries.add(populateEntry(PSBT_IN_SP_TWEAK, null, silentPaymentsTweak));
+            }
         }
 
         for(Map.Entry<String, String> entry : proprietary.entrySet()) {
@@ -556,6 +581,12 @@ public class PSBTInput {
 
         silentPaymentsEcdhShares.putAll(psbtInput.silentPaymentsEcdhShares);
         silentPaymentsDLEQProofs.putAll(psbtInput.silentPaymentsDLEQProofs);
+
+        silentPaymentsSpendDerivations.putAll(psbtInput.silentPaymentsSpendDerivations);
+
+        if(psbtInput.silentPaymentsTweak != null) {
+            silentPaymentsTweak = psbtInput.silentPaymentsTweak;
+        }
 
         proprietary.putAll(psbtInput.proprietary);
 
@@ -796,6 +827,18 @@ public class PSBTInput {
         return silentPaymentsDLEQProofs;
     }
 
+    public Map<ECKey, KeyDerivation> getSilentPaymentsSpendDerivations() {
+        return silentPaymentsSpendDerivations;
+    }
+
+    public byte[] getSilentPaymentsTweak() {
+        return silentPaymentsTweak;
+    }
+
+    public void setSilentPaymentsTweak(byte[] silentPaymentsTweak) {
+        this.silentPaymentsTweak = silentPaymentsTweak;
+    }
+
     public boolean isSigned() {
         if(getTapKeyPathSignature() != null) {
             return true;
@@ -831,6 +874,26 @@ public class PSBTInput {
         }
 
         return SigHash.ALL;
+    }
+
+    public boolean signSilentPayments(ECKey spendPrivateKey) {
+        if(getSilentPaymentsTweak() == null || getWitnessUtxo() == null) {
+            return false;
+        }
+
+        ECKey tweakKey = ECKey.fromPrivate(getSilentPaymentsTweak());
+        ECKey tweakedKey = spendPrivateKey.addPrivate(tweakKey);
+
+        if(tweakedKey.hasOddYCoord()) {
+            tweakedKey = tweakedKey.negatePrivate();
+        }
+
+        ECKey outputKey = ScriptType.P2TR.getPublicKeyFromScript(getWitnessUtxo().getScript());
+        if(!Arrays.equals(tweakedKey.getPubKeyXCoord(), outputKey.getPubKeyXCoord())) {
+            throw new IllegalStateException("Tweaked spend key does not match output key");
+        }
+
+        return sign(tweakedKey);
     }
 
     public boolean sign(ECKey privKey) {
@@ -1018,6 +1081,10 @@ public class PSBTInput {
         proprietary.clear();
         tapDerivedPublicKeys.clear();
         tapKeyPathSignature = null;
+        silentPaymentsEcdhShares.clear();
+        silentPaymentsDLEQProofs.clear();
+        silentPaymentsSpendDerivations.clear();
+        silentPaymentsTweak = null;
     }
 
     private Sha256Hash getHashForSignature(Script connectedScript, SigHash localSigHash) {

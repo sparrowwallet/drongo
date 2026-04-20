@@ -512,6 +512,12 @@ public class PSBT {
                 if(!input.getSilentPaymentsDLEQProofs().isEmpty()) {
                     throw new PSBTParseException("PSBT_IN_SP_DLEQ is not allowed in PSBTv0");
                 }
+                if(!input.getSilentPaymentsSpendDerivations().isEmpty()) {
+                    throw new PSBTParseException("PSBT_IN_SP_SPEND_BIP32_DERIVATION is not allowed in PSBTv0");
+                }
+                if(input.getSilentPaymentsTweak() != null) {
+                    throw new PSBTParseException("PSBT_IN_SP_TWEAK is not allowed in PSBTv0");
+                }
             } else if(getPsbtVersion() >= 2) {
                 if(input.prevTxid() == null) {
                     throw new PSBTParseException("PSBT_IN_PREV_TXID is required in PSBTv2");
@@ -885,7 +891,8 @@ public class PSBT {
             List<PSBTEntry> inputEntries = psbtInput.getInputEntries(getPsbtVersion());
             for(PSBTEntry entry : inputEntries) {
                 if((includeXpubs || (entry.getKeyType() != PSBT_IN_BIP32_DERIVATION && entry.getKeyType() != PSBT_IN_PROPRIETARY
-                        && entry.getKeyType() != PSBT_IN_TAP_INTERNAL_KEY && entry.getKeyType() != PSBT_IN_TAP_BIP32_DERIVATION))
+                        && entry.getKeyType() != PSBT_IN_TAP_INTERNAL_KEY && entry.getKeyType() != PSBT_IN_TAP_BIP32_DERIVATION
+                        && entry.getKeyType() != PSBT_IN_SP_SPEND_BIP32_DERIVATION))
                         && (includeNonWitnessUtxos || entry.getKeyType() != PSBT_IN_NON_WITNESS_UTXO)) {
                     entry.serializeToStream(baos);
                 }
@@ -1303,6 +1310,7 @@ public class PSBT {
 
     public PSBT getForExport() {
         boolean hasSilentPayments = getPsbtOutputs().stream().anyMatch(psbtOutput -> psbtOutput.getSilentPaymentAddress() != null);
+        hasSilentPayments |= getPsbtInputs().stream().anyMatch(psbtInput -> psbtInput.getSilentPaymentsTweak() != null);
 
         //Export as PSBTv0 unless silent payments are present
         if(!hasSilentPayments && getPsbtVersion() >= 2) {

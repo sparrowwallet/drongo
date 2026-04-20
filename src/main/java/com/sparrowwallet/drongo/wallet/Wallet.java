@@ -1729,11 +1729,16 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
             Wallet signingWallet = signingEntry.getValue().getWallet();
             for(Keystore keystore : signingWallet.getKeystores()) {
                 if(keystore.hasPrivateKey()) {
-                    ECKey privKey = signingWallet.getScriptType().getOutputKey(keystore.getKey(signingEntry.getValue()));
                     PSBTInput psbtInput = signingEntry.getKey();
 
                     if(!psbtInput.isSigned()) {
-                        psbtInput.sign(privKey);
+                        if(psbtInput.getSilentPaymentsTweak() != null && keystore.getSilentPaymentScanAddress() != null) {
+                            ECKey spendPrivKey = keystore.getSpendPrivateKey(psbtInput.getSilentPaymentsSpendDerivations());
+                            psbtInput.signSilentPayments(spendPrivKey);
+                        } else {
+                            ECKey privKey = signingWallet.getScriptType().getOutputKey(keystore.getKey(signingEntry.getValue()));
+                            psbtInput.sign(privKey);
+                        }
                     }
                 }
             }
