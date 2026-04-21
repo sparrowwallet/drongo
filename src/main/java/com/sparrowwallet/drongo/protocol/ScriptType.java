@@ -24,7 +24,7 @@ public enum ScriptType {
         }
 
         @Override
-        public Address getAddress(ECKey key) {
+        public Address getAddress(PolicyType policyType, ECKey key) {
             return getAddress(key.getPubKey());
         }
 
@@ -48,7 +48,7 @@ public enum ScriptType {
         }
 
         @Override
-        public Script getOutputScript(ECKey key) {
+        public Script getOutputScript(PolicyType policyType, ECKey key) {
             return getOutputScript(key.getPubKey());
         }
 
@@ -100,7 +100,7 @@ public enum ScriptType {
         }
 
         @Override
-        public Script getScriptSig(Script scriptPubKey, ECKey pubKey, TransactionSignature signature) {
+        public Script getScriptSig(PolicyType policyType, Script scriptPubKey, ECKey pubKey, TransactionSignature signature) {
             if(!isScriptType(scriptPubKey)) {
                 throw new ProtocolException("Provided scriptPubKey is not a " + getName() + " script");
             }
@@ -111,18 +111,18 @@ public enum ScriptType {
         }
 
         @Override
-        public TransactionInput addSpendingInput(Transaction transaction, TransactionOutput prevOutput, ECKey pubKey, TransactionSignature signature) {
-            Script scriptSig = getScriptSig(prevOutput.getScript(), pubKey, signature);
+        public TransactionInput addSpendingInput(PolicyType policyType, Transaction transaction, TransactionOutput prevOutput, ECKey pubKey, TransactionSignature signature) {
+            Script scriptSig = getScriptSig(policyType, prevOutput.getScript(), pubKey, signature);
             return transaction.addInput(prevOutput.getHash(), prevOutput.getIndex(), scriptSig);
         }
 
         @Override
-        public Script getMultisigScriptSig(Script scriptPubKey, int threshold, Map<ECKey, TransactionSignature> pubKeySignatures) {
+        public Script getMultisigScriptSig(PolicyType policyType, Script scriptPubKey, int threshold, Map<ECKey, TransactionSignature> pubKeySignatures) {
             throw new ProtocolException(getName() + " is not a multisig script type");
         }
 
         @Override
-        public TransactionInput addMultisigSpendingInput(Transaction transaction, TransactionOutput prevOutput, int threshold, Map<ECKey, TransactionSignature> pubKeySignatures) {
+        public TransactionInput addMultisigSpendingInput(PolicyType policyType, Transaction transaction, TransactionOutput prevOutput, int threshold, Map<ECKey, TransactionSignature> pubKeySignatures) {
             throw new ProtocolException(getName() + " is not a multisig script type");
         }
 
@@ -143,7 +143,7 @@ public enum ScriptType {
         }
 
         @Override
-        public Address getAddress(ECKey key) {
+        public Address getAddress(PolicyType policyType, ECKey key) {
             return getAddress(key.getPubKeyHash());
         }
 
@@ -165,7 +165,7 @@ public enum ScriptType {
         }
 
         @Override
-        public Script getOutputScript(ECKey key) {
+        public Script getOutputScript(PolicyType policyType, ECKey key) {
             return getOutputScript(key.getPubKeyHash());
         }
 
@@ -216,7 +216,7 @@ public enum ScriptType {
         }
 
         @Override
-        public Script getScriptSig(Script scriptPubKey, ECKey pubKey, TransactionSignature signature) {
+        public Script getScriptSig(PolicyType policyType, Script scriptPubKey, ECKey pubKey, TransactionSignature signature) {
             if(!isScriptType(scriptPubKey)) {
                 throw new ProtocolException("Provided scriptPubKey is not a " + getName() + " script");
             }
@@ -229,18 +229,18 @@ public enum ScriptType {
         }
 
         @Override
-        public TransactionInput addSpendingInput(Transaction transaction, TransactionOutput prevOutput, ECKey pubKey, TransactionSignature signature) {
-            Script scriptSig = getScriptSig(prevOutput.getScript(), pubKey, signature);
+        public TransactionInput addSpendingInput(PolicyType policyType, Transaction transaction, TransactionOutput prevOutput, ECKey pubKey, TransactionSignature signature) {
+            Script scriptSig = getScriptSig(policyType, prevOutput.getScript(), pubKey, signature);
             return transaction.addInput(prevOutput.getHash(), prevOutput.getIndex(), scriptSig);
         }
 
         @Override
-        public Script getMultisigScriptSig(Script scriptPubKey, int threshold, Map<ECKey, TransactionSignature> pubKeySignatures) {
+        public Script getMultisigScriptSig(PolicyType policyType, Script scriptPubKey, int threshold, Map<ECKey, TransactionSignature> pubKeySignatures) {
             throw new ProtocolException(getName() + " is not a multisig script type");
         }
 
         @Override
-        public TransactionInput addMultisigSpendingInput(Transaction transaction, TransactionOutput prevOutput, int threshold, Map<ECKey, TransactionSignature> pubKeySignatures) {
+        public TransactionInput addMultisigSpendingInput(PolicyType policyType, Transaction transaction, TransactionOutput prevOutput, int threshold, Map<ECKey, TransactionSignature> pubKeySignatures) {
             throw new ProtocolException(getName() + " is not a multisig script type");
         }
 
@@ -266,7 +266,7 @@ public enum ScriptType {
         }
 
         @Override
-        public Address getAddress(ECKey key) {
+        public Address getAddress(PolicyType policyType, ECKey key) {
             throw new ProtocolException("No single key address for multisig script type");
         }
 
@@ -281,7 +281,7 @@ public enum ScriptType {
         }
 
         @Override
-        public Script getOutputScript(ECKey key) {
+        public Script getOutputScript(PolicyType policyType, ECKey key) {
             throw new ProtocolException("Output script for multisig script type must be constructed with method getOutputScript(int threshold, List<ECKey> pubKeys)");
         }
 
@@ -398,17 +398,17 @@ public enum ScriptType {
         }
 
         @Override
-        public Script getScriptSig(Script scriptPubKey, ECKey pubKey, TransactionSignature signature) {
+        public Script getScriptSig(PolicyType policyType, Script scriptPubKey, ECKey pubKey, TransactionSignature signature) {
             throw new ProtocolException(getName() + " is a multisig script type");
         }
 
         @Override
-        public TransactionInput addSpendingInput(Transaction transaction, TransactionOutput prevOutput, ECKey pubKey, TransactionSignature signature) {
+        public TransactionInput addSpendingInput(PolicyType policyType, Transaction transaction, TransactionOutput prevOutput, ECKey pubKey, TransactionSignature signature) {
             throw new ProtocolException(getName() + " is a multisig script type");
         }
 
         @Override
-        public Script getMultisigScriptSig(Script scriptPubKey, int threshold, Map<ECKey, TransactionSignature> pubKeySignatures) {
+        public Script getMultisigScriptSig(PolicyType policyType, Script scriptPubKey, int threshold, Map<ECKey, TransactionSignature> pubKeySignatures) {
             if(!isScriptType(scriptPubKey)) {
                 throw new ProtocolException("Provided scriptPubKey is not a " + getName() + " script");
             }
@@ -430,8 +430,8 @@ public enum ScriptType {
         }
 
         @Override
-        public TransactionInput addMultisigSpendingInput(Transaction transaction, TransactionOutput prevOutput, int threshold, Map<ECKey, TransactionSignature> pubKeySignatures) {
-            Script scriptSig = getMultisigScriptSig(prevOutput.getScript(), threshold, pubKeySignatures);
+        public TransactionInput addMultisigSpendingInput(PolicyType policyType, Transaction transaction, TransactionOutput prevOutput, int threshold, Map<ECKey, TransactionSignature> pubKeySignatures) {
+            Script scriptSig = getMultisigScriptSig(policyType, prevOutput.getScript(), threshold, pubKeySignatures);
             return transaction.addInput(prevOutput.getHash(), prevOutput.getIndex(), scriptSig);
         }
 
@@ -452,7 +452,7 @@ public enum ScriptType {
         }
 
         @Override
-        public Address getAddress(ECKey key) {
+        public Address getAddress(PolicyType policyType, ECKey key) {
             throw new ProtocolException("No single key address for script hash type");
         }
 
@@ -472,7 +472,7 @@ public enum ScriptType {
         }
 
         @Override
-        public Script getOutputScript(ECKey key) {
+        public Script getOutputScript(PolicyType policyType, ECKey key) {
             throw new ProtocolException("No single key output script for script hash type");
         }
 
@@ -531,17 +531,17 @@ public enum ScriptType {
         }
 
         @Override
-        public Script getScriptSig(Script scriptPubKey, ECKey pubKey, TransactionSignature signature) {
+        public Script getScriptSig(PolicyType policyType, Script scriptPubKey, ECKey pubKey, TransactionSignature signature) {
             throw new ProtocolException("Only multisig scriptSigs supported for " + getName() + " scriptPubKeys");
         }
 
         @Override
-        public TransactionInput addSpendingInput(Transaction transaction, TransactionOutput prevOutput, ECKey pubKey, TransactionSignature signature) {
+        public TransactionInput addSpendingInput(PolicyType policyType, Transaction transaction, TransactionOutput prevOutput, ECKey pubKey, TransactionSignature signature) {
             throw new ProtocolException("Only multisig scriptSigs supported for " + getName() + " scriptPubKeys");
         }
 
         @Override
-        public Script getMultisigScriptSig(Script scriptPubKey, int threshold, Map<ECKey, TransactionSignature> pubKeySignatures) {
+        public Script getMultisigScriptSig(PolicyType policyType, Script scriptPubKey, int threshold, Map<ECKey, TransactionSignature> pubKeySignatures) {
             if(!isScriptType(scriptPubKey)) {
                 throw new ProtocolException("Provided scriptPubKey is not a " + getName() + " script");
             }
@@ -551,7 +551,7 @@ public enum ScriptType {
                 throw new ProtocolException("P2SH scriptPubKey hash does not match constructed redeem script hash");
             }
 
-            Script multisigScript = MULTISIG.getMultisigScriptSig(redeemScript, threshold, pubKeySignatures);
+            Script multisigScript = MULTISIG.getMultisigScriptSig(policyType, redeemScript, threshold, pubKeySignatures);
             List<ScriptChunk> chunks = new ArrayList<>(multisigScript.getChunks());
             ScriptChunk redeemScriptChunk = ScriptChunk.fromData(redeemScript.getProgram());
             chunks.add(redeemScriptChunk);
@@ -560,8 +560,8 @@ public enum ScriptType {
         }
 
         @Override
-        public TransactionInput addMultisigSpendingInput(Transaction transaction, TransactionOutput prevOutput, int threshold, Map<ECKey, TransactionSignature> pubKeySignatures) {
-            Script scriptSig = getMultisigScriptSig(prevOutput.getScript(), threshold, pubKeySignatures);
+        public TransactionInput addMultisigSpendingInput(PolicyType policyType, Transaction transaction, TransactionOutput prevOutput, int threshold, Map<ECKey, TransactionSignature> pubKeySignatures) {
+            Script scriptSig = getMultisigScriptSig(policyType, prevOutput.getScript(), threshold, pubKeySignatures);
             return transaction.addInput(prevOutput.getHash(), prevOutput.getIndex(), scriptSig);
         }
 
@@ -582,7 +582,7 @@ public enum ScriptType {
         }
 
         @Override
-        public Address getAddress(ECKey key) {
+        public Address getAddress(PolicyType policyType, ECKey key) {
             Script p2wpkhScript = P2WPKH.getOutputScript(key.getPubKeyHash());
             return P2SH.getAddress(p2wpkhScript);
         }
@@ -602,7 +602,7 @@ public enum ScriptType {
         }
 
         @Override
-        public Script getOutputScript(ECKey key) {
+        public Script getOutputScript(PolicyType policyType, ECKey key) {
             Script p2wpkhScript = P2WPKH.getOutputScript(key.getPubKeyHash());
             return P2SH.getOutputScript(p2wpkhScript);
         }
@@ -642,12 +642,12 @@ public enum ScriptType {
         }
 
         @Override
-        public Script getScriptSig(Script scriptPubKey, ECKey pubKey, TransactionSignature signature) {
+        public Script getScriptSig(PolicyType policyType, Script scriptPubKey, ECKey pubKey, TransactionSignature signature) {
             if(!isScriptType(scriptPubKey)) {
                 throw new ProtocolException("Provided scriptPubKey is not a " + getName() + " script");
             }
 
-            Script redeemScript = P2WPKH.getOutputScript(pubKey);
+            Script redeemScript = P2WPKH.getOutputScript(policyType, pubKey);
             if(!scriptPubKey.equals(P2SH.getOutputScript(redeemScript))) {
                 throw new ProtocolException(getName() + " scriptPubKey hash does not match constructed redeem script hash");
             }
@@ -657,19 +657,19 @@ public enum ScriptType {
         }
 
         @Override
-        public TransactionInput addSpendingInput(Transaction transaction, TransactionOutput prevOutput, ECKey pubKey, TransactionSignature signature) {
-            Script scriptSig = getScriptSig(prevOutput.getScript(), pubKey, signature);
+        public TransactionInput addSpendingInput(PolicyType policyType, Transaction transaction, TransactionOutput prevOutput, ECKey pubKey, TransactionSignature signature) {
+            Script scriptSig = getScriptSig(policyType, prevOutput.getScript(), pubKey, signature);
             TransactionWitness witness = new TransactionWitness(transaction, pubKey, signature);
             return transaction.addInput(prevOutput.getHash(), prevOutput.getIndex(), scriptSig, witness);
         }
 
         @Override
-        public Script getMultisigScriptSig(Script scriptPubKey, int threshold, Map<ECKey, TransactionSignature> pubKeySignatures) {
+        public Script getMultisigScriptSig(PolicyType policyType, Script scriptPubKey, int threshold, Map<ECKey, TransactionSignature> pubKeySignatures) {
             throw new ProtocolException(getName() + " is not a multisig script type");
         }
 
         @Override
-        public TransactionInput addMultisigSpendingInput(Transaction transaction, TransactionOutput prevOutput, int threshold, Map<ECKey, TransactionSignature> pubKeySignatures) {
+        public TransactionInput addMultisigSpendingInput(PolicyType policyType, Transaction transaction, TransactionOutput prevOutput, int threshold, Map<ECKey, TransactionSignature> pubKeySignatures) {
             throw new ProtocolException(getName() + " is not a multisig script type");
         }
 
@@ -690,7 +690,7 @@ public enum ScriptType {
         }
 
         @Override
-        public Address getAddress(ECKey key) {
+        public Address getAddress(PolicyType policyType, ECKey key) {
             throw new ProtocolException("No single key address for wrapped witness script hash type");
         }
 
@@ -706,7 +706,7 @@ public enum ScriptType {
         }
 
         @Override
-        public Script getOutputScript(ECKey key) {
+        public Script getOutputScript(PolicyType policyType, ECKey key) {
             throw new ProtocolException("No single key output script for wrapped witness script hash type");
         }
 
@@ -746,17 +746,17 @@ public enum ScriptType {
         }
 
         @Override
-        public Script getScriptSig(Script scriptPubKey, ECKey pubKey, TransactionSignature signature) {
+        public Script getScriptSig(PolicyType policyType, Script scriptPubKey, ECKey pubKey, TransactionSignature signature) {
             throw new ProtocolException("Only multisig scriptSigs supported for " + getName() + " scriptPubKeys");
         }
 
         @Override
-        public TransactionInput addSpendingInput(Transaction transaction, TransactionOutput prevOutput, ECKey pubKey, TransactionSignature signature) {
+        public TransactionInput addSpendingInput(PolicyType policyType, Transaction transaction, TransactionOutput prevOutput, ECKey pubKey, TransactionSignature signature) {
             throw new ProtocolException("Only multisig scriptSigs supported for " + getName() + " scriptPubKeys");
         }
 
         @Override
-        public Script getMultisigScriptSig(Script scriptPubKey, int threshold, Map<ECKey, TransactionSignature> pubKeySignatures) {
+        public Script getMultisigScriptSig(PolicyType policyType, Script scriptPubKey, int threshold, Map<ECKey, TransactionSignature> pubKeySignatures) {
             if(!isScriptType(scriptPubKey)) {
                 throw new ProtocolException("Provided scriptPubKey is not a " + getName() + " script");
             }
@@ -772,8 +772,8 @@ public enum ScriptType {
         }
 
         @Override
-        public TransactionInput addMultisigSpendingInput(Transaction transaction, TransactionOutput prevOutput, int threshold, Map<ECKey, TransactionSignature> pubKeySignatures) {
-            Script scriptSig = getMultisigScriptSig(prevOutput.getScript(), threshold, pubKeySignatures);
+        public TransactionInput addMultisigSpendingInput(PolicyType policyType, Transaction transaction, TransactionOutput prevOutput, int threshold, Map<ECKey, TransactionSignature> pubKeySignatures) {
+            Script scriptSig = getMultisigScriptSig(policyType, prevOutput.getScript(), threshold, pubKeySignatures);
             Script witnessScript = MULTISIG.getOutputScript(threshold, pubKeySignatures.keySet());
             TransactionWitness witness = new TransactionWitness(transaction, pubKeySignatures.values().stream().filter(Objects::nonNull).limit(threshold).collect(Collectors.toList()), witnessScript);
             return transaction.addInput(prevOutput.getHash(), prevOutput.getIndex(), scriptSig, witness);
@@ -796,7 +796,7 @@ public enum ScriptType {
         }
 
         @Override
-        public Address getAddress(ECKey key) {
+        public Address getAddress(PolicyType policyType, ECKey key) {
             return getAddress(key.getPubKeyHash());
         }
 
@@ -815,7 +815,7 @@ public enum ScriptType {
         }
 
         @Override
-        public Script getOutputScript(ECKey key) {
+        public Script getOutputScript(PolicyType policyType, ECKey key) {
             return getOutputScript(key.getPubKeyHash());
         }
 
@@ -860,12 +860,12 @@ public enum ScriptType {
         }
 
         @Override
-        public Script getScriptSig(Script scriptPubKey, ECKey pubKey, TransactionSignature signature) {
+        public Script getScriptSig(PolicyType policyType, Script scriptPubKey, ECKey pubKey, TransactionSignature signature) {
             if(!isScriptType(scriptPubKey)) {
                 throw new ProtocolException("Provided scriptPubKey is not a " + getName() + " script");
             }
 
-            if(!scriptPubKey.equals(getOutputScript(pubKey))) {
+            if(!scriptPubKey.equals(getOutputScript(policyType, pubKey))) {
                 throw new ProtocolException("P2WPKH scriptPubKey hash does not match constructed pubkey script hash");
             }
 
@@ -873,19 +873,19 @@ public enum ScriptType {
         }
 
         @Override
-        public TransactionInput addSpendingInput(Transaction transaction, TransactionOutput prevOutput, ECKey pubKey, TransactionSignature signature) {
-            Script scriptSig = getScriptSig(prevOutput.getScript(), pubKey, signature);
+        public TransactionInput addSpendingInput(PolicyType policyType, Transaction transaction, TransactionOutput prevOutput, ECKey pubKey, TransactionSignature signature) {
+            Script scriptSig = getScriptSig(policyType, prevOutput.getScript(), pubKey, signature);
             TransactionWitness witness = new TransactionWitness(transaction, pubKey, signature);
             return transaction.addInput(prevOutput.getHash(), prevOutput.getIndex(), scriptSig, witness);
         }
 
         @Override
-        public Script getMultisigScriptSig(Script scriptPubKey, int threshold, Map<ECKey, TransactionSignature> pubKeySignatures) {
+        public Script getMultisigScriptSig(PolicyType policyType, Script scriptPubKey, int threshold, Map<ECKey, TransactionSignature> pubKeySignatures) {
             throw new ProtocolException(getName() + " is not a multisig script type");
         }
 
         @Override
-        public TransactionInput addMultisigSpendingInput(Transaction transaction, TransactionOutput prevOutput, int threshold, Map<ECKey, TransactionSignature> pubKeySignatures) {
+        public TransactionInput addMultisigSpendingInput(PolicyType policyType, Transaction transaction, TransactionOutput prevOutput, int threshold, Map<ECKey, TransactionSignature> pubKeySignatures) {
             throw new ProtocolException(getName() + " is not a multisig script type");
         }
 
@@ -906,7 +906,7 @@ public enum ScriptType {
         }
 
         @Override
-        public Address getAddress(ECKey key) {
+        public Address getAddress(PolicyType policyType, ECKey key) {
             throw new ProtocolException("No single key address for witness script hash type");
         }
 
@@ -925,7 +925,7 @@ public enum ScriptType {
         }
 
         @Override
-        public Script getOutputScript(ECKey key) {
+        public Script getOutputScript(PolicyType policyType, ECKey key) {
             throw new ProtocolException("No single key output script for witness script hash type");
         }
 
@@ -974,17 +974,17 @@ public enum ScriptType {
         }
 
         @Override
-        public Script getScriptSig(Script scriptPubKey, ECKey pubKey, TransactionSignature signature) {
+        public Script getScriptSig(PolicyType policyType, Script scriptPubKey, ECKey pubKey, TransactionSignature signature) {
             throw new ProtocolException("Only multisig scriptSigs supported for " + getName() + " scriptPubKeys");
         }
 
         @Override
-        public TransactionInput addSpendingInput(Transaction transaction, TransactionOutput prevOutput, ECKey pubKey, TransactionSignature signature) {
+        public TransactionInput addSpendingInput(PolicyType policyType, Transaction transaction, TransactionOutput prevOutput, ECKey pubKey, TransactionSignature signature) {
             throw new ProtocolException("Only multisig scriptSigs supported for " + getName() + " scriptPubKeys");
         }
 
         @Override
-        public Script getMultisigScriptSig(Script scriptPubKey, int threshold, Map<ECKey, TransactionSignature> pubKeySignatures) {
+        public Script getMultisigScriptSig(PolicyType policyType, Script scriptPubKey, int threshold, Map<ECKey, TransactionSignature> pubKeySignatures) {
             if(!isScriptType(scriptPubKey)) {
                 throw new ProtocolException("Provided scriptPubKey is not a " + getName() + " script");
             }
@@ -998,8 +998,8 @@ public enum ScriptType {
         }
 
         @Override
-        public TransactionInput addMultisigSpendingInput(Transaction transaction, TransactionOutput prevOutput, int threshold, Map<ECKey, TransactionSignature> pubKeySignatures) {
-            Script scriptSig = getMultisigScriptSig(prevOutput.getScript(), threshold, pubKeySignatures);
+        public TransactionInput addMultisigSpendingInput(PolicyType policyType, Transaction transaction, TransactionOutput prevOutput, int threshold, Map<ECKey, TransactionSignature> pubKeySignatures) {
+            Script scriptSig = getMultisigScriptSig(policyType, prevOutput.getScript(), threshold, pubKeySignatures);
             Script witnessScript = MULTISIG.getOutputScript(threshold, pubKeySignatures.keySet());
             TransactionWitness witness = new TransactionWitness(transaction, pubKeySignatures.values().stream().filter(Objects::nonNull).limit(threshold).collect(Collectors.toList()), witnessScript);
             return transaction.addInput(prevOutput.getHash(), prevOutput.getIndex(), scriptSig, witness);
@@ -1017,8 +1017,8 @@ public enum ScriptType {
     },
     P2TR("P2TR", "Taproot (P2TR)", "m/86'/0'/0'") {
         @Override
-        public ECKey getOutputKey(ECKey derivedKey) {
-            return derivedKey.getTweakedOutputKey();
+        public ECKey getOutputKey(PolicyType policyType, ECKey derivedKey) {
+            return policyType == SINGLE_SP ? derivedKey : derivedKey.getTweakedOutputKey();
         }
 
         @Override
@@ -1027,8 +1027,8 @@ public enum ScriptType {
         }
 
         @Override
-        public Address getAddress(ECKey derivedKey) {
-            return getAddress(getOutputKey(derivedKey).getPubKeyXCoord());
+        public Address getAddress(PolicyType policyType, ECKey derivedKey) {
+            return getAddress(getOutputKey(policyType, derivedKey).getPubKeyXCoord());
         }
 
         @Override
@@ -1046,8 +1046,8 @@ public enum ScriptType {
         }
 
         @Override
-        public Script getOutputScript(ECKey derivedKey) {
-            return getOutputScript(getOutputKey(derivedKey).getPubKeyXCoord());
+        public Script getOutputScript(PolicyType policyType, ECKey derivedKey) {
+            return getOutputScript(getOutputKey(policyType, derivedKey).getPubKeyXCoord());
         }
 
         @Override
@@ -1096,12 +1096,12 @@ public enum ScriptType {
         }
 
         @Override
-        public Script getScriptSig(Script scriptPubKey, ECKey pubKey, TransactionSignature signature) {
+        public Script getScriptSig(PolicyType policyType, Script scriptPubKey, ECKey pubKey, TransactionSignature signature) {
             if(!isScriptType(scriptPubKey)) {
                 throw new ProtocolException("Provided scriptPubKey is not a " + getName() + " script");
             }
 
-            if(!scriptPubKey.equals(getOutputScript(pubKey))) {
+            if(!scriptPubKey.equals(getOutputScript(policyType, pubKey))) {
                 throw new ProtocolException("Provided P2TR scriptPubKey does not match constructed pubkey script");
             }
 
@@ -1109,19 +1109,19 @@ public enum ScriptType {
         }
 
         @Override
-        public TransactionInput addSpendingInput(Transaction transaction, TransactionOutput prevOutput, ECKey pubKey, TransactionSignature signature) {
-            Script scriptSig = getScriptSig(prevOutput.getScript(), pubKey, signature);
+        public TransactionInput addSpendingInput(PolicyType policyType, Transaction transaction, TransactionOutput prevOutput, ECKey pubKey, TransactionSignature signature) {
+            Script scriptSig = getScriptSig(policyType, prevOutput.getScript(), pubKey, signature);
             TransactionWitness witness = new TransactionWitness(transaction, signature);
             return transaction.addInput(prevOutput.getHash(), prevOutput.getIndex(), scriptSig, witness);
         }
 
         @Override
-        public Script getMultisigScriptSig(Script scriptPubKey, int threshold, Map<ECKey, TransactionSignature> pubKeySignatures) {
+        public Script getMultisigScriptSig(PolicyType policyType, Script scriptPubKey, int threshold, Map<ECKey, TransactionSignature> pubKeySignatures) {
             throw new UnsupportedOperationException("Constructing Taproot inputs is not yet supported");
         }
 
         @Override
-        public TransactionInput addMultisigSpendingInput(Transaction transaction, TransactionOutput prevOutput, int threshold, Map<ECKey, TransactionSignature> pubKeySignatures) {
+        public TransactionInput addMultisigSpendingInput(PolicyType policyType, Transaction transaction, TransactionOutput prevOutput, int threshold, Map<ECKey, TransactionSignature> pubKeySignatures) {
             throw new UnsupportedOperationException("Constructing Taproot inputs is not yet supported");
         }
 
@@ -1142,7 +1142,7 @@ public enum ScriptType {
         }
 
         @Override
-        public Address getAddress(ECKey derivedKey) {
+        public Address getAddress(PolicyType policyType, ECKey derivedKey) {
             throw new ProtocolException("Cannot create a anchor address with a key");
         }
 
@@ -1161,7 +1161,7 @@ public enum ScriptType {
         }
 
         @Override
-        public Script getOutputScript(ECKey derivedKey) {
+        public Script getOutputScript(PolicyType policyType, ECKey derivedKey) {
             throw new ProtocolException("Cannot create an anchor output script with a key");
         }
 
@@ -1217,7 +1217,7 @@ public enum ScriptType {
         }
 
         @Override
-        public Script getScriptSig(Script scriptPubKey, ECKey pubKey, TransactionSignature signature) {
+        public Script getScriptSig(PolicyType policyType, Script scriptPubKey, ECKey pubKey, TransactionSignature signature) {
             if(!isScriptType(scriptPubKey)) {
                 throw new ProtocolException("Provided scriptPubKey is not a " + getName() + " script");
             }
@@ -1226,18 +1226,18 @@ public enum ScriptType {
         }
 
         @Override
-        public TransactionInput addSpendingInput(Transaction transaction, TransactionOutput prevOutput, ECKey pubKey, TransactionSignature signature) {
-            Script scriptSig = getScriptSig(prevOutput.getScript(), pubKey, signature);
+        public TransactionInput addSpendingInput(PolicyType policyType, Transaction transaction, TransactionOutput prevOutput, ECKey pubKey, TransactionSignature signature) {
+            Script scriptSig = getScriptSig(policyType, prevOutput.getScript(), pubKey, signature);
             return transaction.addInput(prevOutput.getHash(), prevOutput.getIndex(), scriptSig);
         }
 
         @Override
-        public Script getMultisigScriptSig(Script scriptPubKey, int threshold, Map<ECKey, TransactionSignature> pubKeySignatures) {
+        public Script getMultisigScriptSig(PolicyType policyType, Script scriptPubKey, int threshold, Map<ECKey, TransactionSignature> pubKeySignatures) {
             throw new UnsupportedOperationException("Constructing Taproot inputs is not yet supported");
         }
 
         @Override
-        public TransactionInput addMultisigSpendingInput(Transaction transaction, TransactionOutput prevOutput, int threshold, Map<ECKey, TransactionSignature> pubKeySignatures) {
+        public TransactionInput addMultisigSpendingInput(PolicyType policyType, Transaction transaction, TransactionOutput prevOutput, int threshold, Map<ECKey, TransactionSignature> pubKeySignatures) {
             throw new UnsupportedOperationException("Constructing Taproot inputs is not yet supported");
         }
 
@@ -1334,19 +1334,19 @@ public enum ScriptType {
         return getAllowedPolicyTypes().contains(policyType);
     }
 
-    public ECKey getOutputKey(ECKey derivedKey) {
+    public ECKey getOutputKey(PolicyType policyType, ECKey derivedKey) {
         return derivedKey;
     }
 
     public abstract Address getAddress(byte[] bytes);
 
-    public abstract Address getAddress(ECKey key);
+    public abstract Address getAddress(PolicyType policyType, ECKey key);
 
     public abstract Address getAddress(Script script);
 
     public abstract Script getOutputScript(byte[] bytes);
 
-    public abstract Script getOutputScript(ECKey key);
+    public abstract Script getOutputScript(PolicyType policyType, ECKey key);
 
     public abstract Script getOutputScript(Script script);
 
@@ -1388,13 +1388,13 @@ public enum ScriptType {
         throw new ProtocolException("Script type " + this + " is not a multisig script");
     }
 
-    public abstract Script getScriptSig(Script scriptPubKey, ECKey pubKey, TransactionSignature signature);
+    public abstract Script getScriptSig(PolicyType policyType, Script scriptPubKey, ECKey pubKey, TransactionSignature signature);
 
-    public abstract TransactionInput addSpendingInput(Transaction transaction, TransactionOutput prevOutput, ECKey pubKey, TransactionSignature signature);
+    public abstract TransactionInput addSpendingInput(PolicyType policyType, Transaction transaction, TransactionOutput prevOutput, ECKey pubKey, TransactionSignature signature);
 
-    public abstract Script getMultisigScriptSig(Script scriptPubKey, int threshold, Map<ECKey, TransactionSignature> pubKeySignatures);
+    public abstract Script getMultisigScriptSig(PolicyType policyType, Script scriptPubKey, int threshold, Map<ECKey, TransactionSignature> pubKeySignatures);
 
-    public abstract TransactionInput addMultisigSpendingInput(Transaction transaction, TransactionOutput prevOutput, int threshold, Map<ECKey, TransactionSignature> pubKeySignatures);
+    public abstract TransactionInput addMultisigSpendingInput(PolicyType policyType, Transaction transaction, TransactionOutput prevOutput, int threshold, Map<ECKey, TransactionSignature> pubKeySignatures);
 
     public abstract TransactionSignature.Type getSignatureType();
 

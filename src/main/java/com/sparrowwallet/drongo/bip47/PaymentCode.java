@@ -5,6 +5,7 @@ import com.sparrowwallet.drongo.crypto.ChildNumber;
 import com.sparrowwallet.drongo.crypto.DeterministicKey;
 import com.sparrowwallet.drongo.crypto.ECKey;
 import com.sparrowwallet.drongo.crypto.HDKeyDerivation;
+import com.sparrowwallet.drongo.policy.PolicyType;
 import com.sparrowwallet.drongo.protocol.*;
 import com.sparrowwallet.drongo.wallet.Keystore;
 import org.slf4j.Logger;
@@ -82,7 +83,7 @@ public class PaymentCode {
     }
 
     public Address getNotificationAddress() {
-        return ScriptType.P2PKH.getAddress(getNotificationKey());
+        return ScriptType.P2PKH.getAddress(PolicyType.SINGLE_HD, getNotificationKey());
     }
 
     public ECKey getKey(int index) {

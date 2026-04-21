@@ -3,6 +3,7 @@ package com.sparrowwallet.drongo.protocol;
 import com.sparrowwallet.drongo.Utils;
 import com.sparrowwallet.drongo.address.Address;
 import com.sparrowwallet.drongo.crypto.ECKey;
+import com.sparrowwallet.drongo.policy.PolicyType;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -386,7 +387,7 @@ public class Transaction extends ChildMessage {
     }
 
     public TransactionOutput addOutput(long value, ECKey pubkey) {
-        return addOutput(new TransactionOutput(this, value, ScriptType.P2PK.getOutputScript(pubkey)));
+        return addOutput(new TransactionOutput(this, value, ScriptType.P2PK.getOutputScript(PolicyType.SINGLE_HD, pubkey)));
     }
 
     public TransactionOutput addOutput(TransactionOutput output) {

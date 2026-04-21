@@ -282,7 +282,7 @@ public class OutputDescriptor {
     }
 
     public Address getAddress(DeterministicKey childKey) {
-        return scriptType.getAddress(childKey);
+        return scriptType.getAddress(PolicyType.SINGLE_HD, childKey);
     }
 
     private Address getAddress(Script multisigScript) {

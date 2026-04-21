@@ -154,11 +154,11 @@ public class PaymentCodeTest {
 
         PaymentAddress paymentAddress0 = new PaymentAddress(paymentCodeBob, 0, privateKey.getPrivKeyBytes());
         ECKey sendKey0 = paymentAddress0.getSendECKey();
-        Assertions.assertEquals("141fi7TY3h936vRUKh1qfUZr8rSBuYbVBK", ScriptType.P2PKH.getAddress(sendKey0).toString());
+        Assertions.assertEquals("141fi7TY3h936vRUKh1qfUZr8rSBuYbVBK", ScriptType.P2PKH.getAddress(PolicyType.SINGLE_HD, sendKey0).toString());
 
         PaymentAddress paymentAddress1 = new PaymentAddress(paymentCodeBob, 1, privateKey.getPrivKeyBytes());
         ECKey sendKey1 = paymentAddress1.getSendECKey();
-        Assertions.assertEquals("12u3Uued2fuko2nY4SoSFGCoGLCBUGPkk6", ScriptType.P2PKH.getAddress(sendKey1).toString());
+        Assertions.assertEquals("12u3Uued2fuko2nY4SoSFGCoGLCBUGPkk6", ScriptType.P2PKH.getAddress(PolicyType.SINGLE_HD, sendKey1).toString());
     }
 
     @Test

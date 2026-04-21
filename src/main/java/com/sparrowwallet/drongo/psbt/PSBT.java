@@ -166,7 +166,7 @@ public class PSBT {
                     KeyDerivation spendKeyDerivation = new KeyDerivation(keystore.getKeyDerivation().getMasterFingerprint(), KeyDerivation.writePath(KeyDerivation.getBip352SpendDerivation(keystore.getKeyDerivation().getDerivation())));
                     spSpendDerivations.put(spendPubKey, spendKeyDerivation);
                 } else {
-                    derivedPublicKeys.put(signingWallet.getScriptType().getOutputKey(keystore.getPubKey(walletNode)), keystore.getKeyDerivation().extend(walletNode.getDerivation()));
+                    derivedPublicKeys.put(signingWallet.getScriptType().getOutputKey(signingWallet.getPolicyType(), keystore.getPubKey(walletNode)), keystore.getKeyDerivation().extend(walletNode.getDerivation()));
                     if(signingWallet.getScriptType() == ScriptType.P2TR) {
                         tapInternalKey = keystore.getPubKey(walletNode);
                     }
@@ -214,7 +214,7 @@ public class PSBT {
                         outputSpAddress = new SilentPaymentAddress(ECKey.fromPublicOnly(changeAddress.getScanKey()), changeAddress.getSpendKey());
                         outputSpLabel = 0L;
                     } else {
-                        derivedPublicKeys.put(recipientWallet.getScriptType().getOutputKey(keystore.getPubKey(outputNode)), keystore.getKeyDerivation().extend(outputNode.getDerivation()));
+                        derivedPublicKeys.put(recipientWallet.getScriptType().getOutputKey(recipientWallet.getPolicyType(), keystore.getPubKey(outputNode)), keystore.getKeyDerivation().extend(outputNode.getDerivation()));
                         if(recipientWallet.getScriptType() == ScriptType.P2TR) {
                             tapInternalKey = keystore.getPubKey(outputNode);
                         }
@@ -642,7 +642,7 @@ public class PSBT {
                                 psbtInput.setTapInternalKey(ECKey.fromPublicOnly(pubKey.getPubKeyXCoord()));
                                 psbtInput.getTapDerivedPublicKeys().put(psbtInput.getTapInternalKey(), Map.of(keyDerivation, Collections.emptyList()));
                             } else {
-                                psbtInput.getDerivedPublicKeys().put(scriptType.getOutputKey(pubKey), keyDerivation);
+                                psbtInput.getDerivedPublicKeys().put(scriptType.getOutputKey(signingWallet.getPolicyType(), pubKey), keyDerivation);
                             }
                         }
                     }

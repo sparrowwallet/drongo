@@ -68,7 +68,7 @@ public class ECKeyTest {
         // the y-coordinate of the resulting tweaked pubkey in this sample is odd, so the full pubkey will have 0x03 prefix
         Assertions.assertEquals("03" + expectedTweakedPubKey, Utils.bytesToHex(tweakedOutputKey.getPubKey()));
         // assert that the generated address matches the test vector
-        Address address = ScriptType.P2TR.getAddress(internalPubKey);
+        Address address = ScriptType.P2TR.getAddress(PolicyType.SINGLE_HD, internalPubKey);
         Assertions.assertEquals(expectedAddress, address.toString());
     }
 }

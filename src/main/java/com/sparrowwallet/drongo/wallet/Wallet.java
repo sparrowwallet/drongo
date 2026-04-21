@@ -689,7 +689,7 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
     public Address getAddress(WalletNode node) {
         if(policyType == PolicyType.SINGLE_HD || policyType == PolicyType.SINGLE_SP) {
             ECKey pubKey = node.getPubKey();
-            return policyType == PolicyType.SINGLE_SP ? ScriptType.P2TR.getAddress(pubKey.getPubKeyXCoord()) : scriptType.getAddress(pubKey);
+            return scriptType.getAddress(policyType, pubKey);
         } else if(policyType == PolicyType.MULTI_HD) {
             List<ECKey> pubKeys = node.getPubKeys();
             Script script = ScriptType.MULTISIG.getOutputScript(defaultPolicy.getNumSignaturesRequired(), pubKeys);
@@ -702,7 +702,7 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
     public Script getOutputScript(WalletNode node) {
         if(policyType == PolicyType.SINGLE_HD || policyType == PolicyType.SINGLE_SP) {
             ECKey pubKey = node.getPubKey();
-            return policyType == PolicyType.SINGLE_SP ? ScriptType.P2TR.getOutputScript(pubKey.getPubKeyXCoord()) : scriptType.getOutputScript(pubKey);
+            return scriptType.getOutputScript(policyType, pubKey);
         } else if(policyType == PolicyType.MULTI_HD) {
             List<ECKey> pubKeys = node.getPubKeys();
             Script script = ScriptType.MULTISIG.getOutputScript(defaultPolicy.getNumSignaturesRequired(), pubKeys);
@@ -1012,7 +1012,7 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
         if(getPolicyType().equals(PolicyType.SINGLE_HD) || getPolicyType().equals(PolicyType.SINGLE_SP)) {
             ECKey pubKey = receiveNode.getPubKey();
             TransactionSignature signature = TransactionSignature.dummy(getScriptType().getSignatureType());
-            txInput = getScriptType().addSpendingInput(transaction, prevTxOut, pubKey, signature);
+            txInput = getScriptType().addSpendingInput(getPolicyType(), transaction, prevTxOut, pubKey, signature);
         } else if(getPolicyType().equals(PolicyType.MULTI_HD)) {
             List<ECKey> pubKeys = receiveNode.getPubKeys();
             int threshold = getDefaultPolicy().getNumSignaturesRequired();
@@ -1020,7 +1020,7 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
             for(int i = 0; i < pubKeys.size(); i++) {
                 pubKeySignatures.put(pubKeys.get(i), i < threshold ? TransactionSignature.dummy(getScriptType().getSignatureType()) : null);
             }
-            txInput = getScriptType().addMultisigSpendingInput(transaction, prevTxOut, threshold, pubKeySignatures);
+            txInput = getScriptType().addMultisigSpendingInput(getPolicyType(), transaction, prevTxOut, threshold, pubKeySignatures);
         }
 
         assert txInput != null;
@@ -1238,7 +1238,7 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
         Wallet signingWallet = walletNode.getWallet();
         if(signingWallet.getPolicyType().equals(PolicyType.SINGLE_HD) || signingWallet.getPolicyType().equals(PolicyType.SINGLE_SP)) {
             ECKey pubKey = walletNode.getPubKey();
-            return signingWallet.getScriptType().addSpendingInput(transaction, prevTxOut, pubKey, TransactionSignature.dummy(signingWallet.getScriptType().getSignatureType()));
+            return signingWallet.getScriptType().addSpendingInput(signingWallet.getPolicyType(), transaction, prevTxOut, pubKey, TransactionSignature.dummy(signingWallet.getScriptType().getSignatureType()));
         } else if(signingWallet.getPolicyType().equals(PolicyType.MULTI_HD)) {
             List<ECKey> pubKeys = walletNode.getPubKeys();
             int threshold = signingWallet.getDefaultPolicy().getNumSignaturesRequired();
@@ -1246,7 +1246,7 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
             for(int i = 0; i < pubKeys.size(); i++) {
                 pubKeySignatures.put(pubKeys.get(i), i < threshold ? TransactionSignature.dummy(signingWallet.getScriptType().getSignatureType()) : null);
             }
-            return signingWallet.getScriptType().addMultisigSpendingInput(transaction, prevTxOut, threshold, pubKeySignatures);
+            return signingWallet.getScriptType().addMultisigSpendingInput(signingWallet.getPolicyType(), transaction, prevTxOut, threshold, pubKeySignatures);
         } else {
             throw new UnsupportedOperationException("Cannot create transaction for policy type " + signingWallet.getPolicyType());
         }
@@ -1464,7 +1464,7 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
             WalletNode walletNode = signingNodes.get(txInput);
             Wallet signingWallet = walletNode.getWallet();
             Map<ECKey, Keystore> keystoreKeysForNode = signingWallet.getKeystores().stream()
-                    .collect(Collectors.toMap(keystore -> signingWallet.getPolicyType() == PolicyType.SINGLE_SP ? keystore.getPubKey(walletNode) : signingWallet.getScriptType().getOutputKey(keystore.getPubKey(walletNode)), Function.identity(),
+                    .collect(Collectors.toMap(keystore -> signingWallet.getScriptType().getOutputKey(signingWallet.getPolicyType(), keystore.getPubKey(walletNode)), Function.identity(),
                     (u, v) -> { throw new IllegalStateException("Duplicate keys from different keystores for node " + walletNode); },
                     LinkedHashMap::new));
 
@@ -1696,7 +1696,7 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
             WalletNode walletNode = signingNodes.get(psbtInput);
             Wallet signingWallet = walletNode.getWallet();
             Map<ECKey, Keystore> keystoreKeysForNode = signingWallet.getKeystores().stream()
-                    .collect(Collectors.toMap(keystore -> signingWallet.getPolicyType() == PolicyType.SINGLE_SP ? keystore.getPubKey(walletNode) : signingWallet.getScriptType().getOutputKey(keystore.getPubKey(walletNode)), Function.identity(),
+                    .collect(Collectors.toMap(keystore -> signingWallet.getScriptType().getOutputKey(signingWallet.getPolicyType(), keystore.getPubKey(walletNode)), Function.identity(),
                     (u, v) -> { throw new IllegalStateException("Duplicate keys from different keystores for node " + walletNode); },
                     LinkedHashMap::new));
 
@@ -1736,7 +1736,7 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
                             ECKey spendPrivKey = keystore.getSpendPrivateKey(psbtInput.getSilentPaymentsSpendDerivations());
                             psbtInput.signSilentPayments(spendPrivKey);
                         } else {
-                            ECKey privKey = signingWallet.getScriptType().getOutputKey(keystore.getKey(signingEntry.getValue()));
+                            ECKey privKey = signingWallet.getScriptType().getOutputKey(signingWallet.getPolicyType(), keystore.getKey(signingEntry.getValue()));
                             psbtInput.sign(privKey);
                         }
                     }
@@ -1813,15 +1813,16 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
                 Transaction transaction = new Transaction();
 
                 TransactionInput finalizedTxInput;
-                if(getPolicyType().equals(PolicyType.SINGLE_HD) || getPolicyType().equals(PolicyType.SINGLE_SP)) {
+                Wallet signingWallet = signingNode.getWallet();
+                if(signingWallet.getPolicyType().equals(PolicyType.SINGLE_HD) || signingWallet.getPolicyType().equals(PolicyType.SINGLE_SP)) {
                     ECKey pubKey = signingNode.getPubKey();
                     TransactionSignature transactionSignature = psbtInput.isTaproot() ? psbtInput.getTapKeyPathSignature() : psbtInput.getPartialSignature(pubKey);
                     if(transactionSignature == null) {
                         throw new IllegalArgumentException("Pubkey of partial signature does not match wallet pubkey");
                     }
 
-                    finalizedTxInput = signingNode.getWallet().getScriptType().addSpendingInput(transaction, utxo, pubKey, transactionSignature);
-                } else if(getPolicyType().equals(PolicyType.MULTI_HD)) {
+                    finalizedTxInput = signingWallet.getScriptType().addSpendingInput(signingWallet.getPolicyType(), transaction, utxo, pubKey, transactionSignature);
+                } else if(signingWallet.getPolicyType().equals(PolicyType.MULTI_HD)) {
                     List<ECKey> pubKeys = signingNode.getPubKeys();
 
                     Map<ECKey, TransactionSignature> pubKeySignatures = new TreeMap<>(new ECKey.LexicographicECKeyComparator());
@@ -1834,9 +1835,9 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
                         throw new IllegalArgumentException("Pubkeys of partial signatures do not match wallet pubkeys");
                     }
 
-                    finalizedTxInput = signingNode.getWallet().getScriptType().addMultisigSpendingInput(transaction, utxo, threshold, pubKeySignatures);
+                    finalizedTxInput = signingWallet.getScriptType().addMultisigSpendingInput(signingWallet.getPolicyType(), transaction, utxo, threshold, pubKeySignatures);
                 } else {
-                    throw new UnsupportedOperationException("Cannot finalise PSBT for policy type " + getPolicyType());
+                    throw new UnsupportedOperationException("Cannot finalise PSBT for policy type " + signingWallet.getPolicyType());
                 }
 
                 psbtInput.setFinalScriptSig(finalizedTxInput.getScriptSig());

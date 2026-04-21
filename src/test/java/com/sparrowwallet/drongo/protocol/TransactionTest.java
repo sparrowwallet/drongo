@@ -5,6 +5,7 @@ import com.sparrowwallet.drongo.address.Address;
 import com.sparrowwallet.drongo.address.InvalidAddressException;
 import com.sparrowwallet.drongo.crypto.ECKey;
 import com.sparrowwallet.drongo.crypto.SchnorrSignature;
+import com.sparrowwallet.drongo.policy.PolicyType;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -228,7 +229,7 @@ public class TransactionTest {
         TransactionSignature signature0 = input0.getScriptSig().getChunks().get(0).getSignature();
 
         Transaction transaction = new Transaction();
-        spent0ScriptType.addSpendingInput(transaction, spent0Output, key0, signature0);
+        spent0ScriptType.addSpendingInput(PolicyType.SINGLE_HD, transaction, spent0Output, key0, signature0);
 
         transaction.addOutput(3000000000L, Address.fromString("1GWUbNagGsvpwygRCjoczegGVDvpm5fLV8"));
         transaction.addOutput(2000000000L, Address.fromString("19jCd38mHkNcXiGF4AjUCoJBSo7iqqjRHT"));
@@ -270,8 +271,8 @@ public class TransactionTest {
         ECKey pubKey1 = input1.getScriptSig().getChunks().get(1).getPubKey();
 
         Transaction transaction = new Transaction();
-        spent0ScriptType.addSpendingInput(transaction, spent0Output, pubKey0, signature0);
-        spent1ScriptType.addSpendingInput(transaction, spent1Output, pubKey1, signature1);
+        spent0ScriptType.addSpendingInput(PolicyType.SINGLE_HD, transaction, spent0Output, pubKey0, signature0);
+        spent1ScriptType.addSpendingInput(PolicyType.SINGLE_HD, transaction, spent1Output, pubKey1, signature1);
 
         transaction.addOutput(922, Address.fromString("1JVsQ4L4HAcn58Gj5uF16dvgFNdVTarY6i"));
         transaction.addOutput(9984568, Address.fromString("1Q7CEaM3CQ6ejGHgDZNbdTTAkoLcPk63nQ"));
@@ -311,7 +312,7 @@ public class TransactionTest {
         pubKeySignatures.put(key2, null);
 
         Transaction transaction = new Transaction();
-        spent0ScriptType.addMultisigSpendingInput(transaction, spent0Output, 2, pubKeySignatures);
+        spent0ScriptType.addMultisigSpendingInput(PolicyType.MULTI_HD, transaction, spent0Output, 2, pubKeySignatures);
 
         transaction.addOutput(833300, Address.fromString("31mKrRn3xQoGppLY5dU92Dbm4kN4ddkknE"));
         transaction.addOutput(1222480000, Address.fromString("1CL9kj1seXif6agPfeh6vpKkzc2Hxq1UpM"));
@@ -347,7 +348,7 @@ public class TransactionTest {
 
         Transaction transaction = new Transaction();
         transaction.setSegwitFlag(1);
-        TransactionInput input = ScriptType.P2SH_P2WPKH.addSpendingInput(transaction, spent0Output, pubKey0, signature0);
+        TransactionInput input = ScriptType.P2SH_P2WPKH.addSpendingInput(PolicyType.SINGLE_HD, transaction, spent0Output, pubKey0, signature0);
         input.setSequenceNumber(TransactionInput.SEQUENCE_RBF_ENABLED);
 
         transaction.addOutput(4000, Address.fromString("1LiQZqSwPqb615uyxDKTaN9Tg4CER98cgJ"));
@@ -391,7 +392,7 @@ public class TransactionTest {
 
         Transaction transaction = new Transaction();
         transaction.setSegwitFlag(1);
-        TransactionInput input = ScriptType.P2SH_P2WSH.addMultisigSpendingInput(transaction, spent0Output, 2, pubKeySignatures);
+        TransactionInput input = ScriptType.P2SH_P2WSH.addMultisigSpendingInput(PolicyType.MULTI_HD, transaction, spent0Output, 2, pubKeySignatures);
 
         transaction.addOutput(59287429, Address.fromString("3PBjKH4FRuEKy4sD3NfL7tqfZTG5K42owu"));
         transaction.addOutput(212571, Address.fromString("3KRUgU4XGuErXkjBtFhksPzTGJ4AMwF4jB"));
@@ -425,7 +426,7 @@ public class TransactionTest {
         Transaction transaction = new Transaction();
         transaction.setVersion(2);
         transaction.setSegwitFlag(1);
-        spent0ScriptType.addSpendingInput(transaction, spent0Output, key0, signature0);
+        spent0ScriptType.addSpendingInput(PolicyType.SINGLE_HD, transaction, spent0Output, key0, signature0);
 
         transaction.addOutput(211584990, Address.fromString("bc1q9k6aan6ncahvlslw8w54jzv897k55zh077un6s"));
         transaction.addOutput(1806203, Address.fromString("3QLFcgKFNzo262FYRFgGfrUNiUurpQbDZv"));
@@ -467,7 +468,7 @@ public class TransactionTest {
 
         Transaction transaction = new Transaction();
         transaction.setSegwitFlag(1);
-        spent0ScriptType.addMultisigSpendingInput(transaction, spent0Output, 2, pubKeySignatures);
+        spent0ScriptType.addMultisigSpendingInput(PolicyType.MULTI_HD, transaction, spent0Output, 2, pubKeySignatures);
 
         transaction.addOutput(10900000, Address.fromString("3Dt17mpd8FDXBjP56rCD7a4Sx7wpL91uhn"));
         transaction.addOutput(332500000, Address.fromString("1K6igqzm36x8jxRTavPhgWXLVcVZVDTGc9"));

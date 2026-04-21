@@ -3,6 +3,7 @@ package com.sparrowwallet.drongo.protocol;
 import com.sparrowwallet.drongo.Utils;
 import com.sparrowwallet.drongo.address.*;
 import com.sparrowwallet.drongo.crypto.ECKey;
+import com.sparrowwallet.drongo.policy.PolicyType;
 import org.bouncycastle.util.encoders.Hex;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -198,7 +199,7 @@ public class Script {
 
         for(ScriptType scriptType : SINGLE_KEY_TYPES) {
             if(scriptType.isScriptType(this)) {
-                return new Address[] { scriptType.getAddress(scriptType.getPublicKeyFromScript(this)) };
+                return new Address[] { scriptType.getAddress(PolicyType.SINGLE_HD, scriptType.getPublicKeyFromScript(this)) };
             }
         }
 

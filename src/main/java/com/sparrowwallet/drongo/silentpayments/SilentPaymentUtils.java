@@ -3,9 +3,7 @@ package com.sparrowwallet.drongo.silentpayments;
 import com.sparrowwallet.drongo.Utils;
 import com.sparrowwallet.drongo.address.Address;
 import com.sparrowwallet.drongo.crypto.ECKey;
-import com.sparrowwallet.drongo.policy.PolicyType;
 import com.sparrowwallet.drongo.protocol.*;
-import com.sparrowwallet.drongo.wallet.Keystore;
 import com.sparrowwallet.drongo.wallet.MnemonicException;
 import com.sparrowwallet.drongo.wallet.WalletNode;
 import org.bitcoin.NativeSecp256k1;
@@ -303,7 +301,7 @@ public class SilentPaymentUtils {
 
             try {
                 ECKey rawKey = walletNode.getWallet().getKeystores().getFirst().getKey(walletNode);
-                ECKey privateKey = walletNode.getWallet().getPolicyType() == PolicyType.SINGLE_SP ? rawKey : walletNode.getWallet().getScriptType().getOutputKey(rawKey);
+                ECKey privateKey = walletNode.getWallet().getScriptType().getOutputKey(walletNode.getWallet().getPolicyType(), rawKey);
                 if(walletNode.getWallet().getScriptType() == P2TR && privateKey.hasOddYCoord()) {
                     privateKey = privateKey.negatePrivate();
                 }

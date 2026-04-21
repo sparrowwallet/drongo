@@ -19,11 +19,11 @@ public class Bip322 {
         checkScriptType(scriptType);
 
         ECKey pubKey = ECKey.fromPublicOnly(privKey);
-        Address address = scriptType.getAddress(pubKey);
+        Address address = scriptType.getAddress(PolicyType.SINGLE_HD, pubKey);
 
         PSBT psbt = getBip322Psbt(scriptType, address, message);
         PSBTInput psbtInput = psbt.getPsbtInputs().getFirst();
-        psbtInput.sign(scriptType.getOutputKey(privKey));
+        psbtInput.sign(scriptType.getOutputKey(PolicyType.SINGLE_HD, privKey));
 
         return getBip322SignatureFromPsbt(scriptType, psbt, pubKey);
     }
@@ -55,7 +55,7 @@ public class Bip322 {
 
         TransactionOutput utxoOutput = psbtInput.getWitnessUtxo();
         Transaction finalizeTransaction = new Transaction();
-        Script scriptSig = scriptType.getScriptSig(utxoOutput.getScript(), pubKey, signature);
+        Script scriptSig = scriptType.getScriptSig(PolicyType.SINGLE_HD, utxoOutput.getScript(), pubKey, signature);
         TransactionWitness witness = psbtInput.isTaproot() ? new TransactionWitness(finalizeTransaction, signature) : new TransactionWitness(finalizeTransaction, pubKey, signature);
         TransactionInput finalizedTxInput = finalizeTransaction.addInput(Sha256Hash.ZERO_HASH, 0, scriptSig, witness);
 
@@ -101,7 +101,7 @@ public class Bip322 {
             }
             pubKey = ECKey.fromPublicOnly(witness.getPushes().get(1));
 
-            if(!address.equals(scriptType.getAddress(pubKey))) {
+            if(!address.equals(scriptType.getAddress(PolicyType.SINGLE_HD, pubKey))) {
                 throw new SignatureException("Provided address does not match pubkey in signature");
             }
         } else if(scriptType == ScriptType.P2TR) {
