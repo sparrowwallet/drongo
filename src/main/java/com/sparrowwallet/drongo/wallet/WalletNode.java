@@ -14,6 +14,7 @@ public class WalletNode extends Persistable implements Comparable<WalletNode> {
     private final String derivationPath;
     private String label;
     private Address address;
+    private byte[] silentPaymentTweak;
     private TreeSet<WalletNode> children = new TreeSet<>();
     private TreeSet<BlockTransactionHashIndex> transactionOutputs = new TreeSet<>();
 
@@ -104,6 +105,14 @@ public class WalletNode extends Persistable implements Comparable<WalletNode> {
 
     public void setLabel(String label) {
         this.label = label;
+    }
+
+    public byte[] getSilentPaymentTweak() {
+        return silentPaymentTweak;
+    }
+
+    public void setSilentPaymentTweak(byte[] silentPaymentTweak) {
+        this.silentPaymentTweak = silentPaymentTweak;
     }
 
     public Long getValue() {
@@ -353,6 +362,7 @@ public class WalletNode extends Persistable implements Comparable<WalletNode> {
         copy.setId(getId());
         copy.setLabel(label);
         copy.setAddress(address);
+        copy.setSilentPaymentTweak(silentPaymentTweak);
 
         for(WalletNode child : getChildren()) {
             copy.children.add(child.copy(walletCopy));

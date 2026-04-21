@@ -5,10 +5,7 @@ import com.sparrowwallet.drongo.KeyDerivation;
 import com.sparrowwallet.drongo.Utils;
 import com.sparrowwallet.drongo.crypto.ECKey;
 import com.sparrowwallet.drongo.protocol.*;
-import com.sparrowwallet.drongo.silentpayments.InvalidSilentPaymentException;
-import com.sparrowwallet.drongo.silentpayments.SilentPayment;
-import com.sparrowwallet.drongo.silentpayments.SilentPaymentUtils;
-import com.sparrowwallet.drongo.silentpayments.SilentPaymentsDLEQProof;
+import com.sparrowwallet.drongo.silentpayments.*;
 import com.sparrowwallet.drongo.wallet.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -161,16 +158,23 @@ public class PSBT {
 
             Map<ECKey, KeyDerivation> derivedPublicKeys = new LinkedHashMap<>();
             ECKey tapInternalKey = null;
+            byte[] silentPaymentsTweak = walletNode.getSilentPaymentTweak();
+            Map<ECKey, KeyDerivation> spSpendDerivations = new LinkedHashMap<>();
             for(Keystore keystore : signingWallet.getKeystores()) {
-                derivedPublicKeys.put(signingWallet.getScriptType().getOutputKey(keystore.getPubKey(walletNode)), keystore.getKeyDerivation().extend(walletNode.getDerivation()));
-
-                //TODO: Implement Musig for multisig wallets
-                if(signingWallet.getScriptType() == ScriptType.P2TR) {
-                    tapInternalKey = keystore.getPubKey(walletNode);
+                if(silentPaymentsTweak != null && keystore.getSilentPaymentScanAddress() != null) {
+                    ECKey spendPubKey = keystore.getSilentPaymentScanAddress().getSpendKey();
+                    KeyDerivation spendKeyDerivation = new KeyDerivation(keystore.getKeyDerivation().getMasterFingerprint(), KeyDerivation.writePath(KeyDerivation.getBip352SpendDerivation(keystore.getKeyDerivation().getDerivation())));
+                    spSpendDerivations.put(spendPubKey, spendKeyDerivation);
+                } else {
+                    derivedPublicKeys.put(signingWallet.getScriptType().getOutputKey(keystore.getPubKey(walletNode)), keystore.getKeyDerivation().extend(walletNode.getDerivation()));
+                    if(signingWallet.getScriptType() == ScriptType.P2TR) {
+                        tapInternalKey = keystore.getPubKey(walletNode);
+                    }
                 }
             }
 
-            PSBTInput psbtInput = new PSBTInput(this, signingWallet.getScriptType(), inputIndex, utxo, utxoIndex, txInput.getSequenceNumber(), redeemScript, witnessScript, derivedPublicKeys, Collections.emptyMap(), tapInternalKey, alwaysIncludeNonWitnessTx);
+            PSBTInput psbtInput = new PSBTInput(this, signingWallet.getScriptType(), inputIndex, utxo, utxoIndex, txInput.getSequenceNumber(),
+                    redeemScript, witnessScript, derivedPublicKeys, Collections.emptyMap(), tapInternalKey, alwaysIncludeNonWitnessTx, silentPaymentsTweak, spSpendDerivations);
             psbtInputs.add(psbtInput);
         }
 
@@ -179,9 +183,9 @@ public class PSBT {
             TransactionOutput txOutput = transaction.getOutputs().get(outputIndex);
             PSBTOutput psbtOutput;
             if(output instanceof WalletTransaction.SilentPaymentOutput silentPaymentOutput) {
-                psbtOutput = new PSBTOutput(this, outputIndex, null, txOutput.getValue(), txOutput.getScript(), null, null, Collections.emptyMap(), Collections.emptyMap(), null, silentPaymentOutput.getSilentPayment().getSilentPaymentAddress(), silentPaymentOutput.getDnsSecProof());
+                psbtOutput = new PSBTOutput(this, outputIndex, null, txOutput.getValue(), txOutput.getScript(), null, null, Collections.emptyMap(), Collections.emptyMap(), null, silentPaymentOutput.getSilentPayment().getSilentPaymentAddress(), null, silentPaymentOutput.getDnsSecProof());
             } else if(output instanceof WalletTransaction.PaymentOutput paymentOutput) {
-                psbtOutput = new PSBTOutput(this, outputIndex, null, txOutput.getValue(), txOutput.getScript(), null, null, Collections.emptyMap(), Collections.emptyMap(), null, null, paymentOutput.getDnsSecProof());
+                psbtOutput = new PSBTOutput(this, outputIndex, null, txOutput.getValue(), txOutput.getScript(), null, null, Collections.emptyMap(), Collections.emptyMap(), null, null, null, paymentOutput.getDnsSecProof());
             } else if(output instanceof WalletTransaction.WalletNodeOutput walletNodeOutput) {
                 WalletNode outputNode = walletNodeOutput.getWalletNode();
                 Wallet recipientWallet = outputNode.getWallet();
@@ -202,18 +206,24 @@ public class PSBT {
 
                 Map<ECKey, KeyDerivation> derivedPublicKeys = new LinkedHashMap<>();
                 ECKey tapInternalKey = null;
+                SilentPaymentAddress outputSpAddress = null;
+                Long outputSpLabel = null;
                 for(Keystore keystore : recipientWallet.getKeystores()) {
-                    derivedPublicKeys.put(recipientWallet.getScriptType().getOutputKey(keystore.getPubKey(outputNode)), keystore.getKeyDerivation().extend(outputNode.getDerivation()));
-
-                    //TODO: Implement Musig for multisig wallets
-                    if(recipientWallet.getScriptType() == ScriptType.P2TR) {
-                        tapInternalKey = keystore.getPubKey(outputNode);
+                    if(outputNode.getSilentPaymentTweak() != null && keystore.getSilentPaymentScanAddress() != null) {
+                        SilentPaymentScanAddress changeAddress = keystore.getSilentPaymentScanAddress().getChangeAddress();
+                        outputSpAddress = new SilentPaymentAddress(ECKey.fromPublicOnly(changeAddress.getScanKey()), changeAddress.getSpendKey());
+                        outputSpLabel = 0L;
+                    } else {
+                        derivedPublicKeys.put(recipientWallet.getScriptType().getOutputKey(keystore.getPubKey(outputNode)), keystore.getKeyDerivation().extend(outputNode.getDerivation()));
+                        if(recipientWallet.getScriptType() == ScriptType.P2TR) {
+                            tapInternalKey = keystore.getPubKey(outputNode);
+                        }
                     }
                 }
 
-                psbtOutput = new PSBTOutput(this, outputIndex, recipientWallet.getScriptType(), txOutput.getValue(), txOutput.getScript(), redeemScript, witnessScript, derivedPublicKeys, Collections.emptyMap(), tapInternalKey, null, null);
+                psbtOutput = new PSBTOutput(this, outputIndex, recipientWallet.getScriptType(), txOutput.getValue(), txOutput.getScript(), redeemScript, witnessScript, derivedPublicKeys, Collections.emptyMap(), tapInternalKey, outputSpAddress, outputSpLabel, null);
             } else {
-                psbtOutput = new PSBTOutput(this, outputIndex, null, txOutput.getValue(), txOutput.getScript(), null, null, Collections.emptyMap(), Collections.emptyMap(), null, null, null);
+                psbtOutput = new PSBTOutput(this, outputIndex, null, txOutput.getValue(), txOutput.getScript(), null, null, Collections.emptyMap(), Collections.emptyMap(), null, null, null, null);
             }
             psbtOutputs.add(psbtOutput);
         }
@@ -607,7 +617,8 @@ public class PSBT {
         List<PSBTInput> missingKeyPathInputs = new ArrayList<>();
         for(PSBTInput psbtInput : getPsbtInputs()) {
             ScriptType scriptType = psbtInput.getScriptType();
-            if((scriptType == ScriptType.P2TR && psbtInput.getTapDerivedPublicKeys().isEmpty()) ||
+            if((scriptType == ScriptType.P2TR && psbtInput.getSilentPaymentsTweak() == null && psbtInput.getTapDerivedPublicKeys().isEmpty()) ||
+                    (scriptType == ScriptType.P2TR && psbtInput.getSilentPaymentsTweak() != null && psbtInput.getSilentPaymentsSpendDerivations().isEmpty()) ||
                     (scriptType != null && scriptType != ScriptType.P2TR && psbtInput.getDerivedPublicKeys().isEmpty())) {
                 missingKeyPathInputs.add(psbtInput);
             }
@@ -619,14 +630,20 @@ public class PSBT {
                 WalletNode walletNode = signingNodes.get(psbtInput);
                 if(walletNode != null && walletNode.getWallet() != null) {
                     for(Keystore keystore : signingWallet.getKeystores()) {
-                        ScriptType scriptType = walletNode.getWallet().getScriptType();
-                        ECKey pubKey = keystore.getPubKey(walletNode);
-                        KeyDerivation keyDerivation = keystore.getKeyDerivation().extend(walletNode.getDerivation());
-                        if(scriptType == ScriptType.P2TR) {
-                            psbtInput.setTapInternalKey(ECKey.fromPublicOnly(pubKey.getPubKeyXCoord()));
-                            psbtInput.getTapDerivedPublicKeys().put(psbtInput.getTapInternalKey(), Map.of(keyDerivation, Collections.emptyList()));
+                        if(psbtInput.getSilentPaymentsTweak() != null && keystore.getSilentPaymentScanAddress() != null) {
+                            ECKey spendPubKey = keystore.getSilentPaymentScanAddress().getSpendKey();
+                            KeyDerivation spendKeyDerivation = new KeyDerivation(keystore.getKeyDerivation().getMasterFingerprint(), KeyDerivation.writePath(KeyDerivation.getBip352SpendDerivation(keystore.getKeyDerivation().getDerivation())));
+                            psbtInput.getSilentPaymentsSpendDerivations().put(spendPubKey, spendKeyDerivation);
                         } else {
-                            psbtInput.getDerivedPublicKeys().put(scriptType.getOutputKey(pubKey), keyDerivation);
+                            ScriptType scriptType = walletNode.getWallet().getScriptType();
+                            ECKey pubKey = keystore.getPubKey(walletNode);
+                            KeyDerivation keyDerivation = keystore.getKeyDerivation().extend(walletNode.getDerivation());
+                            if(scriptType == ScriptType.P2TR) {
+                                psbtInput.setTapInternalKey(ECKey.fromPublicOnly(pubKey.getPubKeyXCoord()));
+                                psbtInput.getTapDerivedPublicKeys().put(psbtInput.getTapInternalKey(), Map.of(keyDerivation, Collections.emptyList()));
+                            } else {
+                                psbtInput.getDerivedPublicKeys().put(scriptType.getOutputKey(pubKey), keyDerivation);
+                            }
                         }
                     }
                 }

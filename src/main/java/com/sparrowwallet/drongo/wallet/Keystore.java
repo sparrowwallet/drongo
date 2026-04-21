@@ -227,6 +227,12 @@ public class Keystore extends Persistable {
     }
 
     public ECKey getKey(WalletNode walletNode) throws MnemonicException {
+        if(silentPaymentScanAddress != null && walletNode.getSilentPaymentTweak() != null) {
+            ECKey spendPrivKey = getSpendPrivateKey(Collections.emptyMap());
+            ECKey tweakKey = ECKey.fromPrivate(walletNode.getSilentPaymentTweak());
+            return spendPrivKey.addPrivate(tweakKey);
+        }
+
         if(source == KeystoreSource.SW_PAYMENT_CODE) {
             try {
                 if(walletNode.getKeyPurpose() != KeyPurpose.RECEIVE) {
@@ -250,6 +256,12 @@ public class Keystore extends Persistable {
     }
 
     public ECKey getPubKey(WalletNode walletNode) {
+        if(silentPaymentScanAddress != null && walletNode.getSilentPaymentTweak() != null) {
+            ECKey spendKey = silentPaymentScanAddress.getSpendKey();
+            ECKey tweakPoint = ECKey.fromPublicOnly(ECKey.fromPrivate(walletNode.getSilentPaymentTweak()));
+            return spendKey.add(tweakPoint, true);
+        }
+
         if(source == KeystoreSource.SW_PAYMENT_CODE) {
             try {
                 PaymentAddress paymentAddress = getPaymentAddress(walletNode.getKeyPurpose(), walletNode.getIndex());

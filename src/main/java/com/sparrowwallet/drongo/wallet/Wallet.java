@@ -689,7 +689,7 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
     public Address getAddress(WalletNode node) {
         if(policyType == PolicyType.SINGLE_HD || policyType == PolicyType.SINGLE_SP) {
             ECKey pubKey = node.getPubKey();
-            return scriptType.getAddress(pubKey);
+            return policyType == PolicyType.SINGLE_SP ? ScriptType.P2TR.getAddress(pubKey.getPubKeyXCoord()) : scriptType.getAddress(pubKey);
         } else if(policyType == PolicyType.MULTI_HD) {
             List<ECKey> pubKeys = node.getPubKeys();
             Script script = ScriptType.MULTISIG.getOutputScript(defaultPolicy.getNumSignaturesRequired(), pubKeys);
@@ -702,7 +702,7 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
     public Script getOutputScript(WalletNode node) {
         if(policyType == PolicyType.SINGLE_HD || policyType == PolicyType.SINGLE_SP) {
             ECKey pubKey = node.getPubKey();
-            return scriptType.getOutputScript(pubKey);
+            return policyType == PolicyType.SINGLE_SP ? ScriptType.P2TR.getOutputScript(pubKey.getPubKeyXCoord()) : scriptType.getOutputScript(pubKey);
         } else if(policyType == PolicyType.MULTI_HD) {
             List<ECKey> pubKeys = node.getPubKeys();
             Script script = ScriptType.MULTISIG.getOutputScript(defaultPolicy.getNumSignaturesRequired(), pubKeys);
@@ -1464,7 +1464,7 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
             WalletNode walletNode = signingNodes.get(txInput);
             Wallet signingWallet = walletNode.getWallet();
             Map<ECKey, Keystore> keystoreKeysForNode = signingWallet.getKeystores().stream()
-                    .collect(Collectors.toMap(keystore -> signingWallet.getScriptType().getOutputKey(keystore.getPubKey(walletNode)), Function.identity(),
+                    .collect(Collectors.toMap(keystore -> signingWallet.getPolicyType() == PolicyType.SINGLE_SP ? keystore.getPubKey(walletNode) : signingWallet.getScriptType().getOutputKey(keystore.getPubKey(walletNode)), Function.identity(),
                     (u, v) -> { throw new IllegalStateException("Duplicate keys from different keystores for node " + walletNode); },
                     LinkedHashMap::new));
 
@@ -1696,7 +1696,7 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
             WalletNode walletNode = signingNodes.get(psbtInput);
             Wallet signingWallet = walletNode.getWallet();
             Map<ECKey, Keystore> keystoreKeysForNode = signingWallet.getKeystores().stream()
-                    .collect(Collectors.toMap(keystore -> signingWallet.getScriptType().getOutputKey(keystore.getPubKey(walletNode)), Function.identity(),
+                    .collect(Collectors.toMap(keystore -> signingWallet.getPolicyType() == PolicyType.SINGLE_SP ? keystore.getPubKey(walletNode) : signingWallet.getScriptType().getOutputKey(keystore.getPubKey(walletNode)), Function.identity(),
                     (u, v) -> { throw new IllegalStateException("Duplicate keys from different keystores for node " + walletNode); },
                     LinkedHashMap::new));
 

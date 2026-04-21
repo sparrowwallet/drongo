@@ -85,7 +85,8 @@ public class PSBTInput {
         this.index = index;
     }
 
-    PSBTInput(PSBT psbt, ScriptType scriptType, int index, Transaction utxo, int utxoIndex, Long sequence, Script redeemScript, Script witnessScript, Map<ECKey, KeyDerivation> derivedPublicKeys, Map<String, String> proprietary, ECKey tapInternalKey, boolean alwaysAddNonWitnessTx) {
+    PSBTInput(PSBT psbt, ScriptType scriptType, int index, Transaction utxo, int utxoIndex, Long sequence, Script redeemScript, Script witnessScript,
+              Map<ECKey, KeyDerivation> derivedPublicKeys, Map<String, String> proprietary, ECKey tapInternalKey, boolean alwaysAddNonWitnessTx, byte[] silentPaymentsTweak, Map<ECKey, KeyDerivation> silentPaymentsSpendDerivations) {
         this(psbt, index);
 
         if(Arrays.asList(ScriptType.WITNESS_TYPES).contains(scriptType)) {
@@ -123,6 +124,9 @@ public class PSBTInput {
             this.prevIndex = (long)utxoIndex;
             this.sequence = sequence;
         }
+
+        this.silentPaymentsTweak = silentPaymentsTweak;
+        this.silentPaymentsSpendDerivations.putAll(silentPaymentsSpendDerivations);
     }
 
     PSBTInput(PSBT psbt, List<PSBTEntry> inputEntries, int index) throws PSBTParseException {

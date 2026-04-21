@@ -4,13 +4,12 @@ import com.sparrowwallet.drongo.ExtendedKey;
 import com.sparrowwallet.drongo.KeyDerivation;
 import com.sparrowwallet.drongo.KeyPurpose;
 import com.sparrowwallet.drongo.Utils;
-import com.sparrowwallet.drongo.crypto.Argon2KeyDeriver;
-import com.sparrowwallet.drongo.crypto.ChildNumber;
-import com.sparrowwallet.drongo.crypto.Key;
-import com.sparrowwallet.drongo.crypto.KeyDeriver;
+import com.sparrowwallet.drongo.address.Address;
+import com.sparrowwallet.drongo.crypto.*;
 import com.sparrowwallet.drongo.policy.Policy;
 import com.sparrowwallet.drongo.policy.PolicyType;
 import com.sparrowwallet.drongo.protocol.ScriptType;
+import com.sparrowwallet.drongo.silentpayments.SilentPaymentScanAddress;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -253,5 +252,73 @@ public class WalletTest {
 
         WalletNode receive0 = new WalletNode(wallet, KeyPurpose.RECEIVE, 0);
         Assertions.assertEquals("bc1qarzeu6ncapyvjzdeayjq8vnzp6uvcn4eaeuuqq", receive0.getAddress().toString());
+    }
+
+    @Test
+    public void testWalletNodeTweakCopy() {
+        Wallet wallet = new Wallet();
+        wallet.setPolicyType(PolicyType.SINGLE_SP);
+        wallet.setScriptType(ScriptType.P2TR);
+
+        WalletNode node = new WalletNode(wallet, "m/0");
+        byte[] tweak = Utils.hexToBytes("a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2");
+        node.setSilentPaymentTweak(tweak);
+
+        WalletNode copy = node.copy(wallet);
+        Assertions.assertArrayEquals(tweak, copy.getSilentPaymentTweak());
+    }
+
+    @Test
+    public void testKeystoreGetPubKeyWithSpTweak() {
+        ECKey scanKey = ECKey.fromPrivate(Utils.hexToBytes("a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2"));
+        ECKey spendKey = ECKey.fromPrivate(Utils.hexToBytes("b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3"));
+        SilentPaymentScanAddress spAddr = new SilentPaymentScanAddress(scanKey, ECKey.fromPublicOnly(spendKey));
+
+        Wallet wallet = new Wallet();
+        wallet.setPolicyType(PolicyType.SINGLE_SP);
+        wallet.setScriptType(ScriptType.P2TR);
+        Keystore keystore = new Keystore();
+        keystore.setSilentPaymentScanAddress(spAddr);
+        keystore.setKeyDerivation(new KeyDerivation("deadbeef", "m/352'/0'/0'"));
+        wallet.getKeystores().add(keystore);
+
+        byte[] tweak = Utils.hexToBytes("c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4");
+        WalletNode node = new WalletNode(wallet, "m/0");
+        node.setSilentPaymentTweak(tweak);
+
+        // Compute expected: B_spend + tweak*G
+        ECKey tweakPoint = ECKey.fromPublicOnly(ECKey.fromPrivate(tweak));
+        ECKey expectedOutputKey = ECKey.fromPublicOnly(spendKey).add(tweakPoint, true);
+
+        ECKey result = keystore.getPubKey(node);
+        Assertions.assertArrayEquals(expectedOutputKey.getPubKey(), result.getPubKey());
+    }
+
+    @Test
+    public void testWalletGetAddressForSp() {
+        ECKey scanKey = ECKey.fromPrivate(Utils.hexToBytes("a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2"));
+        ECKey spendKey = ECKey.fromPrivate(Utils.hexToBytes("b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3"));
+        SilentPaymentScanAddress spAddr = new SilentPaymentScanAddress(scanKey, ECKey.fromPublicOnly(spendKey));
+
+        Wallet wallet = new Wallet();
+        wallet.setPolicyType(PolicyType.SINGLE_SP);
+        wallet.setScriptType(ScriptType.P2TR);
+        Keystore keystore = new Keystore();
+        keystore.setSilentPaymentScanAddress(spAddr);
+        keystore.setKeyDerivation(new KeyDerivation("deadbeef", "m/352'/0'/0'"));
+        wallet.getKeystores().add(keystore);
+        wallet.setDefaultPolicy(Policy.getPolicy(PolicyType.SINGLE_SP, ScriptType.P2TR, wallet.getKeystores(), 1));
+
+        byte[] tweak = Utils.hexToBytes("c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4");
+        WalletNode node = new WalletNode(wallet, "m/0");
+        node.setSilentPaymentTweak(tweak);
+
+        // Compute expected address: P2TR address from x-coord of (B_spend + tweak*G)
+        ECKey tweakPoint = ECKey.fromPublicOnly(ECKey.fromPrivate(tweak));
+        ECKey outputKey = ECKey.fromPublicOnly(spendKey).add(tweakPoint, true);
+        Address expectedAddress = ScriptType.P2TR.getAddress(outputKey.getPubKeyXCoord());
+
+        Address result = wallet.getAddress(node);
+        Assertions.assertEquals(expectedAddress, result);
     }
 }
