@@ -99,6 +99,10 @@ public class WalletNode extends Persistable implements Comparable<WalletNode> {
         return derivation;
     }
 
+    public boolean isPurposeNode() {
+        return getDerivation().size() == 1;
+    }
+
     public String getLabel() {
         return label;
     }

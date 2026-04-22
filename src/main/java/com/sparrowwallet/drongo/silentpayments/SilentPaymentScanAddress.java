@@ -56,6 +56,10 @@ public class SilentPaymentScanAddress extends SilentPaymentAddress {
         return new SilentPaymentScanAddress(scanPrivateKey, spendPublicKey);
     }
 
+    public SilentPaymentAddress getSilentPaymentAddress() {
+        return new SilentPaymentAddress(ECKey.fromPublicOnly(getScanKey()), getSpendKey());
+    }
+
     public SilentPaymentScanAddress copy() {
         return new SilentPaymentScanAddress(getScanKey(), getSpendKey());
     }
@@ -66,6 +70,16 @@ public class SilentPaymentScanAddress extends SilentPaymentAddress {
 
     public byte[] toBytes() {
         return Utils.concat(getScanKey().getPrivKeyBytes(), getSpendKey().getPubKey(true));
+    }
+
+    public static boolean isValid(String encoded) {
+        try {
+            fromKeyString(encoded);
+        } catch(Exception e) {
+            return false;
+        }
+
+        return true;
     }
 
     public static SilentPaymentScanAddress fromKeyString(String encoded) {

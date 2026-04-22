@@ -204,10 +204,14 @@ public class SilentPaymentUtils {
      * @throws InvalidSilentPaymentException if the computed shared secrets or addresses are invalid
      */
     public static Map<ECKey, EcdhShareAndProof> computeOutputAddresses(List<SilentPayment> silentPayments, Map<HashIndex, WalletNode> utxos) throws InvalidSilentPaymentException {
+        ECKey summedPrivateKey = getSummedPrivateKey(utxos.values());
+        return computeOutputAddresses(silentPayments, summedPrivateKey, utxos.keySet());
+    }
+
+    public static Map<ECKey, EcdhShareAndProof> computeOutputAddresses(List<SilentPayment> silentPayments, ECKey summedPrivateKey, Set<HashIndex> outpoints) throws InvalidSilentPaymentException {
         Map<ECKey, EcdhShareAndProof> scanKeyProofs = new LinkedHashMap<>();
         SecureRandom random = new SecureRandom();
-        ECKey summedPrivateKey = getSummedPrivateKey(utxos.values());
-        BigInteger inputHash = getInputHash(utxos.keySet(), summedPrivateKey);
+        BigInteger inputHash = getInputHash(outpoints, summedPrivateKey);
         Map<ECKey, List<SilentPayment>> scanKeyGroups = getScanKeyGroups(silentPayments);
         for(Map.Entry<ECKey, List<SilentPayment>> scanKeyGroup : scanKeyGroups.entrySet()) {
             ECKey scanKey = scanKeyGroup.getKey();

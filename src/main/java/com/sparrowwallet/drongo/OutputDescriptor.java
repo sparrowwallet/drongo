@@ -671,9 +671,14 @@ public class OutputDescriptor {
     private static OutputDescriptor parseTwoArgSp(String scanArg, String spendArg, Map<String, Integer> annotations) {
         KeyDerivationAndKey originResult = parseKeyOrigin(scanArg);
         KeyDerivation keyDerivation = originResult.keyDerivation();
-        scanArg = originResult.key();
+        if(keyDerivation.getDerivation().size() > 2) {
+            List<ChildNumber> accountDerivation = keyDerivation.getDerivation().subList(0, keyDerivation.getDerivation().size() - 2);
+            if(KeyDerivation.getBip352ScanDerivation(accountDerivation).equals(keyDerivation.getDerivation())) {
+                keyDerivation = new KeyDerivation(keyDerivation.getMasterFingerprint(), accountDerivation);
+            }
+        }
 
-        ECKey scanPrivateKey = parseSilentPaymentScanKey(scanArg);
+        ECKey scanPrivateKey = parseSilentPaymentScanKey(originResult.key());
         ECKey spendKey = parseSilentPaymentSpendKey(spendArg);
 
         ECKey spendPubKey = spendKey.isPubKeyOnly() ? spendKey : ECKey.fromPublicOnly(spendKey.getPubKey());
@@ -961,6 +966,25 @@ public class OutputDescriptor {
             keyBuilder.append("]");
         }
         keyBuilder.append(spScanAddress.toKeyString());
+
+        return keyBuilder.toString();
+    }
+
+    public static String writeKey(ECKey ecKey, KeyDerivation keyDerivation, boolean addKeyOrigin) {
+        return writeKey(ecKey, keyDerivation, addKeyOrigin, false);
+    }
+
+    public static String writeKey(ECKey ecKey, KeyDerivation keyDerivation, boolean addKeyOrigin, boolean useApostrophes) {
+        StringBuilder keyBuilder = new StringBuilder();
+        if(addKeyOrigin && keyDerivation != null && keyDerivation.getMasterFingerprint() != null && keyDerivation.getMasterFingerprint().length() == 8 && Utils.isHex(keyDerivation.getMasterFingerprint())) {
+            keyBuilder.append("[");
+            keyBuilder.append(keyDerivation.getMasterFingerprint());
+            if(!keyDerivation.getDerivation().isEmpty()) {
+                keyBuilder.append(KeyDerivation.writePath(keyDerivation.getDerivation(), useApostrophes).substring(1));
+            }
+            keyBuilder.append("]");
+        }
+        keyBuilder.append(ecKey.hasPrivKey() ? ecKey.getPrivateKeyEncoded().toString() : Utils.bytesToHex(ecKey.getPubKey()));
 
         return keyBuilder.toString();
     }

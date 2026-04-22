@@ -150,12 +150,14 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
                     Keystore derivedKeystore = keystore.hasSeed() ? Keystore.fromSeed(keystore.getSeed(), childDerivation) : Keystore.fromMasterPrivateExtendedKey(keystore.getMasterPrivateExtendedKey(), childDerivation);
                     keystore.setKeyDerivation(derivedKeystore.getKeyDerivation());
                     keystore.setExtendedPublicKey(derivedKeystore.getExtendedPublicKey());
+                    keystore.setSilentPaymentScanAddress(derivedKeystore.getSilentPaymentScanAddress());
                 } catch(Exception e) {
                     throw new IllegalStateException("Cannot derive keystore for " + standardAccount + " account", e);
                 }
             } else {
                 keystore.setKeyDerivation(new KeyDerivation(null, KeyDerivation.writePath(childDerivation)));
                 keystore.setExtendedPublicKey(null);
+                keystore.setSilentPaymentScanAddress(null);
             }
         }
 
@@ -552,7 +554,7 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
     }
 
     public int getGapLimit() {
-        return gapLimit == null ? DEFAULT_LOOKAHEAD : gapLimit;
+        return policyType == PolicyType.SINGLE_SP ? 0 : (gapLimit == null ? DEFAULT_LOOKAHEAD : gapLimit);
     }
 
     public void gapLimit(Integer gapLimit) {
@@ -1732,7 +1734,7 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
                     PSBTInput psbtInput = signingEntry.getKey();
 
                     if(!psbtInput.isSigned()) {
-                        if(psbtInput.getSilentPaymentsTweak() != null && keystore.getSilentPaymentScanAddress() != null) {
+                        if(psbtInput.getSilentPaymentsTweak() != null && keystore.getSilentPaymentScanAddress() != null && signingWallet.getPolicyType() == PolicyType.SINGLE_SP) {
                             ECKey spendPrivKey = keystore.getSpendPrivateKey(psbtInput.getSilentPaymentsSpendDerivations());
                             psbtInput.signSilentPayments(spendPrivKey);
                         } else {

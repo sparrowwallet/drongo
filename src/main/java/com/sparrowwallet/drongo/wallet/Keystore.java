@@ -37,6 +37,7 @@ public class Keystore extends Persistable {
 
     //Avoid performing repeated expensive seed derivation checks
     private transient boolean extendedPublicKeyChecked;
+    private transient boolean silentPaymentScanAddressChecked;
 
     public Keystore() {
         this(DEFAULT_LABEL);
@@ -112,6 +113,7 @@ public class Keystore extends Persistable {
 
     public void setSilentPaymentScanAddress(SilentPaymentScanAddress silentPaymentScanAddress) {
         this.silentPaymentScanAddress = silentPaymentScanAddress;
+        this.silentPaymentScanAddressChecked = false;
     }
 
     public byte[] getDeviceRegistration() {
@@ -227,10 +229,16 @@ public class Keystore extends Persistable {
     }
 
     public ECKey getKey(WalletNode walletNode) throws MnemonicException {
-        if(silentPaymentScanAddress != null && walletNode.getSilentPaymentTweak() != null) {
+        if(silentPaymentScanAddress != null && walletNode.getWallet().getPolicyType() == PolicyType.SINGLE_SP) {
             ECKey spendPrivKey = getSpendPrivateKey(Collections.emptyMap());
-            ECKey tweakKey = ECKey.fromPrivate(walletNode.getSilentPaymentTweak());
-            return spendPrivKey.addPrivate(tweakKey);
+            byte[] tweak = walletNode.getSilentPaymentTweak();
+            if(tweak == null) {
+                if(walletNode.isPurposeNode()) {
+                    return spendPrivKey;
+                }
+                throw new IllegalStateException("Silent payment tweak is required for address node " + walletNode.getDerivationPath());
+            }
+            return spendPrivKey.addPrivate(ECKey.fromPrivate(tweak));
         }
 
         if(source == KeystoreSource.SW_PAYMENT_CODE) {
@@ -256,9 +264,16 @@ public class Keystore extends Persistable {
     }
 
     public ECKey getPubKey(WalletNode walletNode) {
-        if(silentPaymentScanAddress != null && walletNode.getSilentPaymentTweak() != null) {
+        if(silentPaymentScanAddress != null && walletNode.getWallet().getPolicyType() == PolicyType.SINGLE_SP) {
             ECKey spendKey = silentPaymentScanAddress.getSpendKey();
-            ECKey tweakPoint = ECKey.fromPublicOnly(ECKey.fromPrivate(walletNode.getSilentPaymentTweak()));
+            byte[] tweak = walletNode.getSilentPaymentTweak();
+            if(tweak == null) {
+                if(walletNode.isPurposeNode()) {
+                    return spendKey;
+                }
+                throw new IllegalStateException("Silent payment tweak is required for address node " + walletNode.getDerivationPath());
+            }
+            ECKey tweakPoint = ECKey.fromPublicOnly(ECKey.fromPrivate(tweak));
             return spendKey.add(tweakPoint, true);
         }
 
@@ -382,7 +397,7 @@ public class Keystore extends Persistable {
                 throw new InvalidKeystoreException("Source of " + source + " but no seed or master private key is present");
             }
 
-            if(!extendedPublicKeyChecked && ((seed != null && !seed.isEncrypted()) || (masterPrivateExtendedKey != null && !masterPrivateExtendedKey.isEncrypted()))) {
+            if(!extendedPublicKeyChecked && extendedPublicKey != null && ((seed != null && !seed.isEncrypted()) || (masterPrivateExtendedKey != null && !masterPrivateExtendedKey.isEncrypted()))) {
                 try {
                     List<ChildNumber> derivation = getKeyDerivation().getDerivation();
                     DeterministicKey derivedKey = getExtendedMasterPrivateKey().getKey(derivation);
@@ -392,6 +407,21 @@ public class Keystore extends Persistable {
                         throw new InvalidKeystoreException("Specified extended public key does not match public key derived from seed");
                     }
                     extendedPublicKeyChecked = true;
+                } catch(MnemonicException e) {
+                    throw new InvalidKeystoreException("Invalid mnemonic specified for seed", e);
+                }
+            }
+
+            if(!silentPaymentScanAddressChecked && silentPaymentScanAddress != null && ((seed != null && !seed.isEncrypted()) || (masterPrivateExtendedKey != null && !masterPrivateExtendedKey.isEncrypted()))) {
+                try {
+                    List<ChildNumber> derivation = getKeyDerivation().getDerivation();
+                    DeterministicKey derivedScanKey = getExtendedMasterPrivateKey().getKey(KeyDerivation.getBip352ScanDerivation(derivation));
+                    DeterministicKey derivedSpendKey = getExtendedMasterPrivateKey().getKey(KeyDerivation.getBip352SpendDerivation(derivation));
+                    SilentPaymentScanAddress derivedScanAddress = new SilentPaymentScanAddress(derivedScanKey, derivedSpendKey);
+                    if(!derivedScanAddress.equals(getSilentPaymentScanAddress())) {
+                        throw new InvalidKeystoreException("Specified silent payments scan address does not match scan and spend keys derived from seed");
+                    }
+                    silentPaymentScanAddressChecked = true;
                 } catch(MnemonicException e) {
                     throw new InvalidKeystoreException("Invalid mnemonic specified for seed", e);
                 }

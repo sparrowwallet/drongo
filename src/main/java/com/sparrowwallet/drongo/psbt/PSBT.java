@@ -4,6 +4,7 @@ import com.sparrowwallet.drongo.ExtendedKey;
 import com.sparrowwallet.drongo.KeyDerivation;
 import com.sparrowwallet.drongo.Utils;
 import com.sparrowwallet.drongo.crypto.ECKey;
+import com.sparrowwallet.drongo.policy.PolicyType;
 import com.sparrowwallet.drongo.protocol.*;
 import com.sparrowwallet.drongo.silentpayments.*;
 import com.sparrowwallet.drongo.wallet.*;
@@ -161,7 +162,7 @@ public class PSBT {
             byte[] silentPaymentsTweak = walletNode.getSilentPaymentTweak();
             Map<ECKey, KeyDerivation> spSpendDerivations = new LinkedHashMap<>();
             for(Keystore keystore : signingWallet.getKeystores()) {
-                if(silentPaymentsTweak != null && keystore.getSilentPaymentScanAddress() != null) {
+                if(silentPaymentsTweak != null && keystore.getSilentPaymentScanAddress() != null && signingWallet.getPolicyType() == PolicyType.SINGLE_SP) {
                     ECKey spendPubKey = keystore.getSilentPaymentScanAddress().getSpendKey();
                     KeyDerivation spendKeyDerivation = new KeyDerivation(keystore.getKeyDerivation().getMasterFingerprint(), KeyDerivation.writePath(KeyDerivation.getBip352SpendDerivation(keystore.getKeyDerivation().getDerivation())));
                     spSpendDerivations.put(spendPubKey, spendKeyDerivation);
@@ -209,9 +210,9 @@ public class PSBT {
                 SilentPaymentAddress outputSpAddress = null;
                 Long outputSpLabel = null;
                 for(Keystore keystore : recipientWallet.getKeystores()) {
-                    if(outputNode.getSilentPaymentTweak() != null && keystore.getSilentPaymentScanAddress() != null) {
+                    if(outputNode.getSilentPaymentTweak() != null && keystore.getSilentPaymentScanAddress() != null && recipientWallet.getPolicyType() == PolicyType.SINGLE_SP) {
                         SilentPaymentScanAddress changeAddress = keystore.getSilentPaymentScanAddress().getChangeAddress();
-                        outputSpAddress = new SilentPaymentAddress(ECKey.fromPublicOnly(changeAddress.getScanKey()), changeAddress.getSpendKey());
+                        outputSpAddress = changeAddress.getSilentPaymentAddress();
                         outputSpLabel = 0L;
                     } else {
                         derivedPublicKeys.put(recipientWallet.getScriptType().getOutputKey(recipientWallet.getPolicyType(), keystore.getPubKey(outputNode)), keystore.getKeyDerivation().extend(outputNode.getDerivation()));
@@ -630,7 +631,7 @@ public class PSBT {
                 WalletNode walletNode = signingNodes.get(psbtInput);
                 if(walletNode != null && walletNode.getWallet() != null) {
                     for(Keystore keystore : signingWallet.getKeystores()) {
-                        if(psbtInput.getSilentPaymentsTweak() != null && keystore.getSilentPaymentScanAddress() != null) {
+                        if(psbtInput.getSilentPaymentsTweak() != null && keystore.getSilentPaymentScanAddress() != null && signingWallet.getPolicyType() == PolicyType.SINGLE_SP) {
                             ECKey spendPubKey = keystore.getSilentPaymentScanAddress().getSpendKey();
                             KeyDerivation spendKeyDerivation = new KeyDerivation(keystore.getKeyDerivation().getMasterFingerprint(), KeyDerivation.writePath(KeyDerivation.getBip352SpendDerivation(keystore.getKeyDerivation().getDerivation())));
                             psbtInput.getSilentPaymentsSpendDerivations().put(spendPubKey, spendKeyDerivation);
