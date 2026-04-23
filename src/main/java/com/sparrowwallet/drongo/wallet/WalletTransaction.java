@@ -214,6 +214,10 @@ public class WalletTransaction {
         return payments.stream().filter(payment -> payment instanceof WalletNodePayment).map(payment -> (WalletNodePayment)payment).collect(Collectors.toList());
     }
 
+    public List<SilentPaymentChangeOutput> getSilentPaymentChangeOutputs() {
+        return outputs.stream().filter(o -> o instanceof SilentPaymentChangeOutput).map(o -> (SilentPaymentChangeOutput)o).collect(Collectors.toList());
+    }
+
     public static class Output {
         private final TransactionOutput transactionOutput;
 
@@ -269,6 +273,12 @@ public class WalletTransaction {
 
         public SilentPayment getSilentPayment() {
             return (SilentPayment)getPayment();
+        }
+    }
+
+    public static class SilentPaymentChangeOutput extends SilentPaymentOutput {
+        public SilentPaymentChangeOutput(TransactionOutput transactionOutput, SilentPayment silentPayment) {
+            super(transactionOutput, silentPayment);
         }
     }
 

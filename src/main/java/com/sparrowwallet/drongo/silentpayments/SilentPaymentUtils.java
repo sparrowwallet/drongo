@@ -351,13 +351,13 @@ public class SilentPaymentUtils {
                 .min(new Utils.LexicographicByteArrayComparator()).orElseThrow(() -> new IllegalArgumentException("No inputs provided to calculate silent payments input hash"));
     }
 
-    public static ECKey getLabelledSpendKey(ECKey scanPrivateKey, ECKey spendPublicKey, int labelIndex) {
+    public static ECKey getLabelledSpendKey(ECKey scanPrivateKey, ECKey spendPublicKey, long labelIndex) {
         return spendPublicKey.add(getLabelledTweakKey(scanPrivateKey, labelIndex), true);
     }
 
-    public static ECKey getLabelledTweakKey(ECKey scanPrivateKey, int labelIndex) {
+    public static ECKey getLabelledTweakKey(ECKey scanPrivateKey, long labelIndex) {
         BigInteger labelTweak = new BigInteger(1, Utils.taggedHash(BIP_0352_LABEL_TAG,
-                Utils.concat(scanPrivateKey.getPrivKeyBytes(), ByteBuffer.allocate(4).order(ByteOrder.BIG_ENDIAN).putInt(labelIndex).array())));
+                Utils.concat(scanPrivateKey.getPrivKeyBytes(), ByteBuffer.allocate(4).order(ByteOrder.BIG_ENDIAN).putInt((int)labelIndex).array())));
         return ECKey.fromPublicOnly(ECKey.publicPointFromPrivate(labelTweak).getEncoded(true));
     }
 

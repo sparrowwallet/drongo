@@ -19,6 +19,7 @@ import java.util.stream.Collectors;
 import static com.sparrowwallet.drongo.psbt.PSBTEntry.*;
 import static com.sparrowwallet.drongo.psbt.PSBTInput.*;
 import static com.sparrowwallet.drongo.psbt.PSBTOutput.*;
+import static com.sparrowwallet.drongo.silentpayments.SilentPaymentScanAddress.CHANGE_LABEL_INDEX;
 import static com.sparrowwallet.drongo.wallet.Wallet.addDummySpendingInput;
 
 public class PSBT {
@@ -183,7 +184,9 @@ public class PSBT {
             WalletTransaction.Output output = walletTransactionOutputs.get(outputIndex);
             TransactionOutput txOutput = transaction.getOutputs().get(outputIndex);
             PSBTOutput psbtOutput;
-            if(output instanceof WalletTransaction.SilentPaymentOutput silentPaymentOutput) {
+            if(output instanceof WalletTransaction.SilentPaymentChangeOutput silentPaymentChangeOutput) {
+                psbtOutput = new PSBTOutput(this, outputIndex, null, txOutput.getValue(), txOutput.getScript(), null, null, Collections.emptyMap(), Collections.emptyMap(), null, silentPaymentChangeOutput.getSilentPayment().getSilentPaymentAddress(), CHANGE_LABEL_INDEX, null);
+            } else if(output instanceof WalletTransaction.SilentPaymentOutput silentPaymentOutput) {
                 psbtOutput = new PSBTOutput(this, outputIndex, null, txOutput.getValue(), txOutput.getScript(), null, null, Collections.emptyMap(), Collections.emptyMap(), null, silentPaymentOutput.getSilentPayment().getSilentPaymentAddress(), null, silentPaymentOutput.getDnsSecProof());
             } else if(output instanceof WalletTransaction.PaymentOutput paymentOutput) {
                 psbtOutput = new PSBTOutput(this, outputIndex, null, txOutput.getValue(), txOutput.getScript(), null, null, Collections.emptyMap(), Collections.emptyMap(), null, null, null, paymentOutput.getDnsSecProof());
@@ -207,22 +210,14 @@ public class PSBT {
 
                 Map<ECKey, KeyDerivation> derivedPublicKeys = new LinkedHashMap<>();
                 ECKey tapInternalKey = null;
-                SilentPaymentAddress outputSpAddress = null;
-                Long outputSpLabel = null;
                 for(Keystore keystore : recipientWallet.getKeystores()) {
-                    if(outputNode.getSilentPaymentTweak() != null && keystore.getSilentPaymentScanAddress() != null && recipientWallet.getPolicyType() == PolicyType.SINGLE_SP) {
-                        SilentPaymentScanAddress changeAddress = keystore.getSilentPaymentScanAddress().getChangeAddress();
-                        outputSpAddress = changeAddress.getSilentPaymentAddress();
-                        outputSpLabel = 0L;
-                    } else {
-                        derivedPublicKeys.put(recipientWallet.getScriptType().getOutputKey(recipientWallet.getPolicyType(), keystore.getPubKey(outputNode)), keystore.getKeyDerivation().extend(outputNode.getDerivation()));
-                        if(recipientWallet.getScriptType() == ScriptType.P2TR) {
-                            tapInternalKey = keystore.getPubKey(outputNode);
-                        }
+                    derivedPublicKeys.put(recipientWallet.getScriptType().getOutputKey(recipientWallet.getPolicyType(), keystore.getPubKey(outputNode)), keystore.getKeyDerivation().extend(outputNode.getDerivation()));
+                    if(recipientWallet.getScriptType() == ScriptType.P2TR) {
+                        tapInternalKey = keystore.getPubKey(outputNode);
                     }
                 }
 
-                psbtOutput = new PSBTOutput(this, outputIndex, recipientWallet.getScriptType(), txOutput.getValue(), txOutput.getScript(), redeemScript, witnessScript, derivedPublicKeys, Collections.emptyMap(), tapInternalKey, outputSpAddress, outputSpLabel, null);
+                psbtOutput = new PSBTOutput(this, outputIndex, recipientWallet.getScriptType(), txOutput.getValue(), txOutput.getScript(), redeemScript, witnessScript, derivedPublicKeys, Collections.emptyMap(), tapInternalKey, null, null, null);
             } else {
                 psbtOutput = new PSBTOutput(this, outputIndex, null, txOutput.getValue(), txOutput.getScript(), null, null, Collections.emptyMap(), Collections.emptyMap(), null, null, null, null);
             }

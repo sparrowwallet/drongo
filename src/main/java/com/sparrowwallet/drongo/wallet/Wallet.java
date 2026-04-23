@@ -1035,7 +1035,7 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
     }
 
     public long getCostOfChange(double feeRate, double longTermFeeRate) {
-        WalletNode changeNode = getFreshNode(KeyPurpose.CHANGE);
+        WalletNode changeNode = getNode(KeyPurpose.CHANGE);
         TransactionOutput changeOutput = new TransactionOutput(new Transaction(), 1L, changeNode.getOutputScript());
         return getFee(changeOutput, feeRate, longTermFeeRate);
     }
@@ -1091,9 +1091,15 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
             }
 
             for(int i = 1; i < numSets; i+=2) {
-                WalletNode mixNode = getFreshNode(getChangeKeyPurpose());
-                txExcludedChangeNodes.add(mixNode);
-                Payment fakeMixPayment = new WalletNodePayment(mixNode, ".." + mixNode + " (Fake Mix)", totalPaymentAmount, false);
+                Payment fakeMixPayment;
+                if(policyType == PolicyType.SINGLE_SP) {
+                    SilentPaymentAddress spChangeAddress = getKeystores().getFirst().getSilentPaymentScanAddress().getChangeAddress().getSilentPaymentAddress();
+                    fakeMixPayment = new SilentPayment(spChangeAddress, "(Fake Mix)", totalPaymentAmount, false);
+                } else {
+                    WalletNode mixNode = getFreshNode(getChangeKeyPurpose());
+                    txExcludedChangeNodes.add(mixNode);
+                    fakeMixPayment = new WalletNodePayment(mixNode, ".." + mixNode + " (Fake Mix)", totalPaymentAmount, false);
+                }
                 fakeMixPayment.setType(Payment.Type.FAKE_MIX);
                 txPayments.add(fakeMixPayment);
             }
@@ -1160,11 +1166,7 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
             long costOfChangeAmt = getCostOfChange(noChangeFeeRate, params.longTermFeeRate());
             if(setChangeAmts.stream().allMatch(amt -> amt > costOfChangeAmt) || (numSets > 1 && differenceAmt / transaction.getVirtualSize() > noChangeFeeRate * 2)) {
                 //Change output is required, determine new fee once change output has been added
-                WalletNode changeNode = getFreshNode(getChangeKeyPurpose());
-                while(txExcludedChangeNodes.contains(changeNode)) {
-                    changeNode = getFreshNode(getChangeKeyPurpose(), changeNode);
-                }
-                TransactionOutput changeOutput = new TransactionOutput(transaction, setChangeAmts.getFirst(), changeNode.getOutputScript());
+                TransactionOutput changeOutput = new TransactionOutput(transaction, setChangeAmts.getFirst(), getNode(KeyPurpose.CHANGE).getOutputScript());
                 double changeVSize = noChangeVSize + changeOutput.getLength() * numSets;
                 long changeFeeRequiredAmt = params.getRequiredFeeAmount(changeVSize);
                 if(params.isMinRelayRate()) {
@@ -1177,11 +1179,24 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
                 //Add change output(s)
                 Map<WalletNode, Long> changeMap = new LinkedHashMap<>();
                 setChangeAmts = getSetChangeAmounts(selectedUtxoSets, totalPaymentAmount, changeFeeRequiredAmt);
-                for(Long setChangeAmt : setChangeAmts) {
-                    TransactionOutput output = transaction.addOutput(setChangeAmt, changeNode.getOutputScript());
-                    outputs.add(new WalletTransaction.ChangeOutput(output, changeNode, setChangeAmt));
-                    changeMap.put(changeNode, setChangeAmt);
-                    changeNode = getFreshNode(getChangeKeyPurpose(), changeNode);
+                if(policyType == PolicyType.SINGLE_SP) {
+                    SilentPaymentAddress spChangeAddress = getKeystores().getFirst().getSilentPaymentScanAddress().getChangeAddress().getSilentPaymentAddress();
+                    for(Long setChangeAmt : setChangeAmts) {
+                        TransactionOutput output = transaction.addOutput(setChangeAmt, new Script(new byte[0]));
+                        SilentPayment changeSilentPayment = new SilentPayment(spChangeAddress, null, setChangeAmt, false);
+                        outputs.add(new WalletTransaction.SilentPaymentChangeOutput(output, changeSilentPayment));
+                    }
+                } else {
+                    WalletNode changeNode = getFreshNode(getChangeKeyPurpose());
+                    while(txExcludedChangeNodes.contains(changeNode)) {
+                        changeNode = getFreshNode(getChangeKeyPurpose(), changeNode);
+                    }
+                    for(Long setChangeAmt : setChangeAmts) {
+                        TransactionOutput output = transaction.addOutput(setChangeAmt, changeNode.getOutputScript());
+                        outputs.add(new WalletTransaction.ChangeOutput(output, changeNode, setChangeAmt));
+                        changeMap.put(changeNode, setChangeAmt);
+                        changeNode = getFreshNode(getChangeKeyPurpose(), changeNode);
+                    }
                 }
 
                 if(setChangeAmts.stream().anyMatch(amt -> amt < costOfChangeAmt)) {

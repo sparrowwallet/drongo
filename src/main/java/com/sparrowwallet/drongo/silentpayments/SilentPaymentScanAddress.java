@@ -13,6 +13,8 @@ import com.sparrowwallet.drongo.wallet.*;
 import java.util.Arrays;
 
 public class SilentPaymentScanAddress extends SilentPaymentAddress {
+    public static final long CHANGE_LABEL_INDEX = 0L;
+
     public SilentPaymentScanAddress(ECKey scanPrivateKey, ECKey spendPublicKey) {
         super(scanPrivateKey, spendPublicKey);
 
@@ -22,18 +24,18 @@ public class SilentPaymentScanAddress extends SilentPaymentAddress {
     }
 
     public ECKey getChangeTweakKey() {
-        return SilentPaymentUtils.getLabelledTweakKey(getScanKey(), 0);
+        return SilentPaymentUtils.getLabelledTweakKey(getScanKey(), CHANGE_LABEL_INDEX);
     }
 
-    public ECKey getLabelledTweakKey(int labelIndex) {
+    public ECKey getLabelledTweakKey(long labelIndex) {
         return SilentPaymentUtils.getLabelledTweakKey(getScanKey(), labelIndex);
     }
 
     public SilentPaymentScanAddress getChangeAddress() {
-        return getLabelledAddress(0);
+        return getLabelledAddress(CHANGE_LABEL_INDEX);
     }
 
-    public SilentPaymentScanAddress getLabelledAddress(int labelIndex) {
+    public SilentPaymentScanAddress getLabelledAddress(long labelIndex) {
         ECKey labelledSpendKey = SilentPaymentUtils.getLabelledSpendKey(getScanKey(), getSpendKey(), labelIndex);
         return new SilentPaymentScanAddress(getScanKey(), labelledSpendKey);
     }

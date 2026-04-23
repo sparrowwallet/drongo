@@ -299,7 +299,7 @@ public class Keystore extends Persistable {
     }
 
     public ECKey getPubKeyForDerivation(KeyDerivation keyDerivation) {
-        if(keyDerivation != null) {
+        if(keyDerivation != null && extendedPublicKey != null) {
             List<ChildNumber> derivation = keyDerivation.getDerivation();
             String fingerprint = Utils.bytesToHex(this.extendedPublicKey.getKey().getFingerprint());
             if(derivation.size() > this.keyDerivation.getDerivation().size()) {
