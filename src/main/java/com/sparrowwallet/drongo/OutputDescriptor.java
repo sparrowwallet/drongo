@@ -859,12 +859,24 @@ public class OutputDescriptor {
     }
 
     public String toString(boolean addKeyOrigin, boolean addKey, boolean addChecksum) {
+        return toString(addKeyOrigin, addKey, addChecksum, false);
+    }
+
+    public String toString(boolean addKeyOrigin, boolean addKey, boolean addChecksum, boolean alternateForm) {
         StringBuilder builder = new StringBuilder();
 
         if(isSilentPayments()) {
             Map.Entry<SilentPaymentScanAddress, KeyDerivation> entry = silentPaymentScanAddresses.entrySet().iterator().next();
             builder.append("sp(");
-            builder.append(writeKey(entry.getKey(), entry.getValue(), addKeyOrigin));
+            if(alternateForm) {
+                KeyDerivation scanDerivation = new KeyDerivation(entry.getValue().getMasterFingerprint(), KeyDerivation.getBip352ScanDerivation(entry.getValue().getDerivation()));
+                builder.append(writeKey(entry.getKey().getScanKey(), scanDerivation, addKeyOrigin, addKey));
+                builder.append(",");
+                KeyDerivation spendDerivation = new KeyDerivation(entry.getValue().getMasterFingerprint(), KeyDerivation.getBip352SpendDerivation(entry.getValue().getDerivation()));
+                builder.append(writeKey(entry.getKey().getSpendKey(), spendDerivation, addKeyOrigin, addKey));
+            } else {
+                builder.append(writeKey(entry.getKey(), entry.getValue(), addKeyOrigin, addKey));
+            }
             builder.append(")");
         } else {
             builder.append(scriptType.getDescriptor());
@@ -951,11 +963,11 @@ public class OutputDescriptor {
         return writeKey(pubKey, keyDerivation, childDerivation, addKeyOrigin, addKey);
     }
 
-    public static String writeKey(SilentPaymentScanAddress spScanAddress, KeyDerivation keyDerivation, boolean addKeyOrigin) {
-        return writeKey(spScanAddress, keyDerivation, addKeyOrigin, false);
+    public static String writeKey(SilentPaymentScanAddress spScanAddress, KeyDerivation keyDerivation, boolean addKeyOrigin, boolean addKey) {
+        return writeKey(spScanAddress, keyDerivation, addKeyOrigin, addKey, false);
     }
 
-    public static String writeKey(SilentPaymentScanAddress spScanAddress, KeyDerivation keyDerivation, boolean addKeyOrigin, boolean useApostrophes) {
+    public static String writeKey(SilentPaymentScanAddress spScanAddress, KeyDerivation keyDerivation, boolean addKeyOrigin, boolean addKey, boolean useApostrophes) {
         StringBuilder keyBuilder = new StringBuilder();
         if(addKeyOrigin && keyDerivation != null && keyDerivation.getMasterFingerprint() != null && keyDerivation.getMasterFingerprint().length() == 8 && Utils.isHex(keyDerivation.getMasterFingerprint())) {
             keyBuilder.append("[");
@@ -965,16 +977,18 @@ public class OutputDescriptor {
             }
             keyBuilder.append("]");
         }
-        keyBuilder.append(spScanAddress.toKeyString());
+        if(addKey) {
+            keyBuilder.append(spScanAddress.toKeyString());
+        }
 
         return keyBuilder.toString();
     }
 
-    public static String writeKey(ECKey ecKey, KeyDerivation keyDerivation, boolean addKeyOrigin) {
-        return writeKey(ecKey, keyDerivation, addKeyOrigin, false);
+    public static String writeKey(ECKey ecKey, KeyDerivation keyDerivation, boolean addKeyOrigin, boolean addKey) {
+        return writeKey(ecKey, keyDerivation, addKeyOrigin, addKey, false);
     }
 
-    public static String writeKey(ECKey ecKey, KeyDerivation keyDerivation, boolean addKeyOrigin, boolean useApostrophes) {
+    public static String writeKey(ECKey ecKey, KeyDerivation keyDerivation, boolean addKeyOrigin, boolean addKey, boolean useApostrophes) {
         StringBuilder keyBuilder = new StringBuilder();
         if(addKeyOrigin && keyDerivation != null && keyDerivation.getMasterFingerprint() != null && keyDerivation.getMasterFingerprint().length() == 8 && Utils.isHex(keyDerivation.getMasterFingerprint())) {
             keyBuilder.append("[");
@@ -984,7 +998,9 @@ public class OutputDescriptor {
             }
             keyBuilder.append("]");
         }
-        keyBuilder.append(ecKey.hasPrivKey() ? ecKey.getPrivateKeyEncoded().toString() : Utils.bytesToHex(ecKey.getPubKey()));
+        if(addKey) {
+            keyBuilder.append(ecKey.hasPrivKey() ? ecKey.getPrivateKeyEncoded().toString() : Utils.bytesToHex(ecKey.getPubKey()));
+        }
 
         return keyBuilder.toString();
     }

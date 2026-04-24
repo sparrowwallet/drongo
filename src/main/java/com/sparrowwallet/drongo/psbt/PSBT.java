@@ -126,8 +126,8 @@ public class PSBT {
             Collections.swap(walletTransactionOutputs, i, j);
         }
 
-        if(includeGlobalXpubs) {
-            for(Keystore keystore : walletTransaction.getWallet().getKeystores()) {
+        if(includeGlobalXpubs && wallet.getPolicyType() != PolicyType.SINGLE_SP) {
+            for(Keystore keystore : wallet.getKeystores()) {
                 extendedPublicKeys.put(keystore.getExtendedPublicKey(), keystore.getKeyDerivation());
             }
         }
