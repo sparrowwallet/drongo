@@ -468,45 +468,48 @@ public class Keystore extends Persistable {
         return copy;
     }
 
-    public static Keystore fromSeed(DeterministicSeed seed, List<ChildNumber> derivation) throws MnemonicException {
+    public static Keystore fromSeed(DeterministicSeed seed, PolicyType policyType, List<ChildNumber> derivation) throws MnemonicException {
         Keystore keystore = new Keystore();
         keystore.setSeed(seed);
         keystore.setLabel(seed.getType().name());
-        rederiveKeystoreFromMaster(keystore, derivation);
+        rederiveKeystoreFromMaster(keystore, policyType, derivation);
         return keystore;
     }
 
-    public static Keystore fromMasterPrivateExtendedKey(MasterPrivateExtendedKey masterPrivateExtendedKey, List<ChildNumber> derivation) throws MnemonicException {
+    public static Keystore fromMasterPrivateExtendedKey(MasterPrivateExtendedKey masterPrivateExtendedKey, PolicyType policyType, List<ChildNumber> derivation) throws MnemonicException {
         Keystore keystore = new Keystore();
         keystore.setMasterPrivateExtendedKey(masterPrivateExtendedKey);
         keystore.setLabel("Master Key");
-        rederiveKeystoreFromMaster(keystore, derivation);
+        rederiveKeystoreFromMaster(keystore, policyType, derivation);
         return keystore;
     }
 
-    private static void rederiveKeystoreFromMaster(Keystore keystore, List<ChildNumber> derivation) throws MnemonicException {
+    private static void rederiveKeystoreFromMaster(Keystore keystore, PolicyType policyType, List<ChildNumber> derivation) throws MnemonicException {
         ExtendedKey xprv = keystore.getExtendedMasterPrivateKey();
         String masterFingerprint = Utils.bytesToHex(xprv.getKey().getFingerprint());
-        DeterministicKey derivedKey = xprv.getKey(derivation);
-        DeterministicKey derivedKeyPublicOnly = derivedKey.dropPrivateBytes().dropParent();
-        ExtendedKey xpub = new ExtendedKey(derivedKeyPublicOnly, derivedKey.getParentFingerprint(), derivation.isEmpty() ? ChildNumber.ZERO : derivation.get(derivation.size() - 1));
 
         keystore.setSource(KeystoreSource.SW_SEED);
         keystore.setWalletModel(WalletModel.SPARROW);
         keystore.setKeyDerivation(new KeyDerivation(masterFingerprint, KeyDerivation.writePath(derivation)));
-        keystore.setExtendedPublicKey(ExtendedKey.fromDescriptor(xpub.toString()));
 
-        int account = ScriptType.getScriptTypesForPolicyType(PolicyType.SINGLE_HD).stream()
-                .mapToInt(scriptType -> scriptType.getAccount(keystore.getKeyDerivation().getDerivationPath())).filter(idx -> idx > -1).findFirst().orElse(0);
-        List<ChildNumber> bip47Derivation = KeyDerivation.getBip47Derivation(account);
-        DeterministicKey bip47Key = xprv.getKey(bip47Derivation);
-        ExtendedKey bip47ExtendedPrivateKey = new ExtendedKey(bip47Key, bip47Key.getParentFingerprint(), bip47Derivation.get(bip47Derivation.size() - 1));
-        keystore.setBip47ExtendedPrivateKey(ExtendedKey.fromDescriptor(bip47ExtendedPrivateKey.toString()));
+        if(policyType == PolicyType.SINGLE_SP) {
+            DeterministicKey scanKey = xprv.getKey(KeyDerivation.getBip352ScanDerivation(derivation));
+            DeterministicKey spendKey = xprv.getKey(KeyDerivation.getBip352SpendDerivation(derivation));
+            SilentPaymentScanAddress spScanAddress = new SilentPaymentScanAddress(ECKey.fromPrivate(scanKey.getPrivKey()), ECKey.fromPublicOnly(spendKey));
+            keystore.setSilentPaymentScanAddress(spScanAddress);
+        } else {
+            DeterministicKey derivedKey = xprv.getKey(derivation);
+            DeterministicKey derivedKeyPublicOnly = derivedKey.dropPrivateBytes().dropParent();
+            ExtendedKey xpub = new ExtendedKey(derivedKeyPublicOnly, derivedKey.getParentFingerprint(), derivation.isEmpty() ? ChildNumber.ZERO : derivation.get(derivation.size() - 1));
+            keystore.setExtendedPublicKey(ExtendedKey.fromDescriptor(xpub.toString()));
 
-        DeterministicKey scanKey = xprv.getKey(KeyDerivation.getBip352ScanDerivation(derivation));
-        DeterministicKey spendKey = xprv.getKey(KeyDerivation.getBip352SpendDerivation(derivation));
-        SilentPaymentScanAddress spScanAddress = new SilentPaymentScanAddress(ECKey.fromPrivate(scanKey.getPrivKey()), ECKey.fromPublicOnly(spendKey));
-        keystore.setSilentPaymentScanAddress(spScanAddress);
+            int account = ScriptType.getScriptTypesForPolicyType(PolicyType.SINGLE_HD).stream()
+                    .mapToInt(scriptType -> scriptType.getAccount(keystore.getKeyDerivation().getDerivationPath())).filter(idx -> idx > -1).findFirst().orElse(0);
+            List<ChildNumber> bip47Derivation = KeyDerivation.getBip47Derivation(account);
+            DeterministicKey bip47Key = xprv.getKey(bip47Derivation);
+            ExtendedKey bip47ExtendedPrivateKey = new ExtendedKey(bip47Key, bip47Key.getParentFingerprint(), bip47Derivation.get(bip47Derivation.size() - 1));
+            keystore.setBip47ExtendedPrivateKey(ExtendedKey.fromDescriptor(bip47ExtendedPrivateKey.toString()));
+        }
     }
 
     public boolean isEncrypted() {

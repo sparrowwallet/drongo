@@ -44,7 +44,7 @@ public class SilentPaymentScanAddress extends SilentPaymentAddress {
         Wallet spWallet = new Wallet();
         spWallet.setPolicyType(PolicyType.SINGLE_HD);
         spWallet.setScriptType(ScriptType.P2WPKH);
-        Keystore spKeystore = Keystore.fromSeed(deterministicSeed, KeyDerivation.getBip352Derivation(account));
+        Keystore spKeystore = Keystore.fromSeed(deterministicSeed, PolicyType.SINGLE_HD, KeyDerivation.getBip352Derivation(account));
         spWallet.getKeystores().add(spKeystore);
         spWallet.setDefaultPolicy(Policy.getPolicy(PolicyType.SINGLE_HD, ScriptType.P2WPKH, spWallet.getKeystores(), 1));
 

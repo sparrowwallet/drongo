@@ -147,7 +147,7 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
 
             if(keystore.hasMasterPrivateKey()) {
                 try {
-                    Keystore derivedKeystore = keystore.hasSeed() ? Keystore.fromSeed(keystore.getSeed(), childDerivation) : Keystore.fromMasterPrivateExtendedKey(keystore.getMasterPrivateExtendedKey(), childDerivation);
+                    Keystore derivedKeystore = keystore.hasSeed() ? Keystore.fromSeed(keystore.getSeed(), childWallet.getPolicyType(), childDerivation) : Keystore.fromMasterPrivateExtendedKey(keystore.getMasterPrivateExtendedKey(), childWallet.getPolicyType(), childDerivation);
                     keystore.setKeyDerivation(derivedKeystore.getKeyDerivation());
                     keystore.setExtendedPublicKey(derivedKeystore.getExtendedPublicKey());
                     keystore.setSilentPaymentScanAddress(derivedKeystore.getSilentPaymentScanAddress());

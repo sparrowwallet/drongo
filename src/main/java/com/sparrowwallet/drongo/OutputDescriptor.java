@@ -335,7 +335,7 @@ public class OutputDescriptor {
                     childDerivation = childDerivation.substring(0, childDerivation.length() - 4);
                 }
                 try {
-                    keystore = Keystore.fromMasterPrivateExtendedKey(masterPrivateExtendedKey, KeyDerivation.parsePath(childDerivation));
+                    keystore = Keystore.fromMasterPrivateExtendedKey(masterPrivateExtendedKey, wallet.getPolicyType(), KeyDerivation.parsePath(childDerivation));
                 } catch(MnemonicException e) {
                     throw new RuntimeException(e);
                 }
