@@ -35,6 +35,7 @@ public class SilentPaymentUtils {
     public static final String BIP_0352_INPUTS_TAG = "BIP0352/Inputs";
     public static final String BIP_0352_SHARED_SECRET_TAG = "BIP0352/SharedSecret";
     public static final String BIP_0352_LABEL_TAG = "BIP0352/Label";
+    public static final int K_MAX = 2323;
 
     public static boolean isEligible(Transaction tx, Map<HashIndex, Script> spentScriptPubKeys) {
         if(!containsTaprootOutput(tx)) {
@@ -223,7 +224,7 @@ public class SilentPaymentUtils {
             for(SilentPayment silentPayment : scanKeyGroup.getValue()) {
                 BigInteger tk = new BigInteger(1, Utils.taggedHash(BIP_0352_SHARED_SECRET_TAG,
                         Utils.concat(sharedSecret.getPubKey(true), ByteBuffer.allocate(4).order(ByteOrder.BIG_ENDIAN).putInt(k).array())));
-                if(tk.equals(BigInteger.ZERO) || tk.compareTo(ECKey.CURVE.getCurve().getOrder()) >= 0) {
+                if(tk.equals(BigInteger.ZERO) || tk.compareTo(ECKey.CURVE.getN()) >= 0) {
                     throw new InvalidSilentPaymentException("The tk value is invalid for the eligible silent payments inputs");
                 }
                 ECKey spendKey = silentPayment.getSilentPaymentAddress().getSpendKey();
@@ -247,20 +248,20 @@ public class SilentPaymentUtils {
      * @throws InvalidSilentPaymentException if validation fails or scripts don't match
      */
     public static void validateOutputAddresses(List<SilentPayment> silentPayments, ECKey ecdhShare, ECKey summedPublicKey, Set<HashIndex> outpoints) throws InvalidSilentPaymentException {
-        BigInteger inputHash = SilentPaymentUtils.getInputHash(outpoints, summedPublicKey);
-        Map<ECKey, List<SilentPayment>> scanKeyGroups = SilentPaymentUtils.getScanKeyGroups(silentPayments);
+        BigInteger inputHash = getInputHash(outpoints, summedPublicKey);
+        Map<ECKey, List<SilentPayment>> scanKeyGroups = getScanKeyGroups(silentPayments);
         for(Map.Entry<ECKey, List<SilentPayment>> scanKeyGroup : scanKeyGroups.entrySet()) {
             // Compute shared secret from ECDH share and input hash
             // Instead of: sharedSecret = scanKey.multiply(inputHash).multiply(summedPrivateKey.getPrivKey())
             // We use: sharedSecret = ecdhShare.multiply(inputHash)
             // Because ecdhShare is already (a * B_scan)
-            ECKey sharedSecret = ecdhShare.multiply(inputHash);
+            ECKey sharedSecret = ecdhShare.multiply(inputHash, true);
 
             int k = 0;
             for(SilentPayment silentPayment : scanKeyGroup.getValue()) {
-                BigInteger tk = new BigInteger(1, Utils.taggedHash(SilentPaymentUtils.BIP_0352_SHARED_SECRET_TAG,
+                BigInteger tk = new BigInteger(1, Utils.taggedHash(BIP_0352_SHARED_SECRET_TAG,
                         Utils.concat(sharedSecret.getPubKey(true), ByteBuffer.allocate(4).order(ByteOrder.BIG_ENDIAN).putInt(k).array())));
-                if(tk.equals(BigInteger.ZERO) || tk.compareTo(ECKey.CURVE.getCurve().getOrder()) >= 0) {
+                if(tk.equals(BigInteger.ZERO) || tk.compareTo(ECKey.CURVE.getN()) >= 0) {
                     throw new InvalidSilentPaymentException("The tk value is invalid for the eligible silent payments inputs");
                 }
                 ECKey spendKey = silentPayment.getSilentPaymentAddress().getSpendKey();
@@ -289,7 +290,7 @@ public class SilentPaymentUtils {
         byte[] smallestOutpoint = getSmallestOutpoint(outpoints);
         byte[] concat = Utils.concat(smallestOutpoint, summedInputKey.getPubKey(true));
         BigInteger inputHash = new BigInteger(1, Utils.taggedHash(BIP_0352_INPUTS_TAG, concat));
-        if(inputHash.equals(BigInteger.ZERO) || inputHash.compareTo(ECKey.CURVE.getCurve().getOrder()) >= 0) {
+        if(inputHash.equals(BigInteger.ZERO) || inputHash.compareTo(ECKey.CURVE.getN()) >= 0) {
             throw new InvalidSilentPaymentException("The input hash is invalid for the eligible silent payments inputs");
         }
 
@@ -356,9 +357,127 @@ public class SilentPaymentUtils {
     }
 
     public static ECKey getLabelledTweakKey(ECKey scanPrivateKey, long labelIndex) {
-        BigInteger labelTweak = new BigInteger(1, Utils.taggedHash(BIP_0352_LABEL_TAG,
-                Utils.concat(scanPrivateKey.getPrivKeyBytes(), ByteBuffer.allocate(4).order(ByteOrder.BIG_ENDIAN).putInt((int)labelIndex).array())));
-        return ECKey.fromPublicOnly(ECKey.publicPointFromPrivate(labelTweak).getEncoded(true));
+        return ECKey.fromPublicOnly(ECKey.publicPointFromPrivate(getLabelledTweakScalar(scanPrivateKey, labelIndex)).getEncoded(true));
+    }
+
+    public static BigInteger getLabelledTweakScalar(ECKey scanPrivateKey, long labelIndex) {
+        return new BigInteger(1, Utils.taggedHash(BIP_0352_LABEL_TAG, Utils.concat(scanPrivateKey.getPrivKeyBytes(), ByteBuffer.allocate(4).order(ByteOrder.BIG_ENDIAN).putInt((int)labelIndex).array())));
+    }
+
+    /**
+     * Scans the outputs of a transaction for silent-payment outputs paying to the receiver identified by
+     * {@code scanPrivateKey} and {@code spendPublicKey}, given the per-transaction {@code tweakKey}
+     * (= input_hash * A_sum) supplied by the indexer.
+     * <p>
+     * Implements the BIP352 receive-side algorithm: ECDH against the tweak key, k-iteration with
+     * tagged-hash derivation, unlabeled-then-labeled match per output, terminating when no output
+     * matches at the current k. Both label 0 (change) and any caller-supplied positive labels are
+     * scanned for.
+     * <p>
+     * For labeled matches the returned {@code tweak} is the combined scalar
+     * {@code (t_k + label_m_priv) mod n}, ready for direct storage on a {@code WalletNode}.
+     *
+     * @param scanPrivateKey the receiver's scan private key (b_scan)
+     * @param spendPublicKey the receiver's spend public key (B_spend), 33-byte compressed
+     * @param labelIndices additional positive label indices to scan for; m=0 (change) is always included
+     * @param tweakKey the 33-byte compressed pubkey input_hash * A_sum from the indexer
+     * @param outputs the full list of outputs in the transaction (non-P2TR outputs are ignored)
+     * @return matches in ascending outputIndex order, or empty if none (including server false positives)
+     * @throws IllegalArgumentException if any required input is null or {@code tweakKey} is malformed
+     * @throws InvalidSilentPaymentException if a derived {@code t_k} scalar is invalid (zero or {@code >= n}), per BIP352
+     */
+    public static List<SilentPaymentScanMatch> scanTransactionOutputs(ECKey scanPrivateKey, ECKey spendPublicKey, Set<Integer> labelIndices, byte[] tweakKey, List<TransactionOutput> outputs) throws InvalidSilentPaymentException {
+        if(scanPrivateKey == null || spendPublicKey == null || labelIndices == null || tweakKey == null || outputs == null) {
+            throw new IllegalArgumentException("All arguments must be non-null");
+        }
+        if(tweakKey.length != 33) {
+            throw new IllegalArgumentException("tweakKey must be 33 bytes (compressed pubkey)");
+        }
+
+        ECKey tweakKeyPoint;
+        try {
+            tweakKeyPoint = ECKey.fromPublicOnly(tweakKey);
+        } catch(Exception e) {
+            throw new IllegalArgumentException("tweakKey is not a valid compressed pubkey", e);
+        }
+
+        // shared_secret = scan_priv * tweak_key (point multiplication)
+        ECKey sharedSecret = tweakKeyPoint.multiply(scanPrivateKey.getPrivKey(), true);
+        byte[] sharedSecretCompressed = sharedSecret.getPubKey(true);
+
+        // Precompute label keys for {0} ∪ labelIndices.
+        Set<Integer> allLabels = new TreeSet<>(labelIndices);
+        allLabels.add(0);
+        List<LabelEntry> labelEntries = new ArrayList<>();
+        for(int m : allLabels) {
+            labelEntries.add(new LabelEntry(m, ECKey.fromPrivate(getLabelledTweakScalar(scanPrivateKey, m))));
+        }
+
+        // Filter to P2TR outputs, keeping their original indices and x-only pubkeys.
+        List<ScanMatchCandidate> remaining = new ArrayList<>();
+        for(int i = 0; i < outputs.size(); i++) {
+            Script script = outputs.get(i).getScript();
+            if(P2TR.isScriptType(script)) {
+                byte[] xOnly = P2TR.getPublicKeyFromScript(script).getPubKeyXCoord();
+                remaining.add(new ScanMatchCandidate(i, xOnly));
+            }
+        }
+
+        List<SilentPaymentScanMatch> matches = new ArrayList<>();
+        int k = 0;
+
+        // BIP352 termination: stop when an entire pass over the remaining outputs at a given k
+        // produces no match. k advances only on a match.
+        while(!remaining.isEmpty() && k < K_MAX) {
+            byte[] tkBytes = Utils.taggedHash(BIP_0352_SHARED_SECRET_TAG, Utils.concat(sharedSecretCompressed, ByteBuffer.allocate(4).order(ByteOrder.BIG_ENDIAN).putInt(k).array()));
+            BigInteger tk = new BigInteger(1, tkBytes);
+            if(tk.equals(BigInteger.ZERO) || tk.compareTo(ECKey.CURVE.getN()) >= 0) {
+                throw new InvalidSilentPaymentException("The tk value is invalid for the eligible silent payments inputs");
+            }
+
+            ECKey tkPoint = ECKey.fromPrivate(tk);              // tkPoint.pub == t_k * G
+            ECKey pK = spendPublicKey.add(tkPoint, true);       // P_k = B_spend + t_k * G
+
+            int matchedIndex = -1;
+            Integer matchedLabel = null;
+            byte[] matchedTweak = null;
+
+            for(ScanMatchCandidate candidate : remaining) {
+                // Unlabeled: x_only(P_k) == output x-only?
+                if(Arrays.equals(pK.getPubKeyXCoord(), candidate.xOnly())) {
+                    matchedIndex = candidate.index();
+                    matchedLabel = null;
+                    matchedTweak = Utils.bigIntegerToBytes(tk, 32);
+                    break;
+                }
+                // Labeled: x_only(P_k + label_m * G) == output x-only?
+                for(LabelEntry label : labelEntries) {
+                    ECKey pkLabeled = pK.add(label.key(), true);
+                    if(Arrays.equals(pkLabeled.getPubKeyXCoord(), candidate.xOnly())) {
+                        matchedIndex = candidate.index();
+                        matchedLabel = label.index();
+                        BigInteger combined = tk.add(label.key().getPrivKey()).mod(ECKey.CURVE.getN());
+                        matchedTweak = Utils.bigIntegerToBytes(combined, 32);
+                        break;
+                    }
+                }
+                if(matchedIndex >= 0) {
+                    break;
+                }
+            }
+
+            if(matchedIndex < 0) {
+                break;
+            }
+
+            matches.add(new SilentPaymentScanMatch(matchedIndex, matchedLabel, matchedTweak));
+            int finalMatchedIndex = matchedIndex;
+            remaining.removeIf(c -> c.index() == finalMatchedIndex);
+            k++;
+        }
+
+        matches.sort(Comparator.comparingInt(SilentPaymentScanMatch::outputIndex));
+        return matches;
     }
 
     public static byte[] getSecp256k1PubKey(ECKey ecKey) {
@@ -373,4 +492,8 @@ public class SilentPaymentUtils {
     }
 
     public record EcdhShareAndProof(ECKey ecdhShare, SilentPaymentsDLEQProof dleqProof) {}
+
+    private record LabelEntry(int index, ECKey key) {}
+
+    private record ScanMatchCandidate(int index, byte[] xOnly) {}
 }
