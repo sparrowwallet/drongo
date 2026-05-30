@@ -14,6 +14,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.math.BigInteger;
+import java.net.URI;
 import java.nio.ByteBuffer;
 import java.nio.charset.CharsetDecoder;
 import java.nio.charset.StandardCharsets;
@@ -91,6 +92,15 @@ public class Utils {
         }
 
         return ((st > 0) || (len < bytes.length)) ? Arrays.copyOfRange(bytes, st, len) : bytes;
+    }
+
+    public static boolean isSecureUrl(URI uri) {
+        if(uri == null || uri.getScheme() == null || uri.getHost() == null) {
+            return false;
+        }
+
+        String scheme = uri.getScheme().toLowerCase(Locale.ROOT);
+        return "https".equals(scheme) || ("http".equals(scheme) && uri.getHost().toLowerCase(Locale.ROOT).endsWith(".onion"));
     }
 
     public static String bytesToHex(byte[] bytes) {

@@ -1,6 +1,7 @@
 package com.sparrowwallet.drongo.uri;
 
 import com.sparrowwallet.drongo.Network;
+import com.sparrowwallet.drongo.Utils;
 import com.sparrowwallet.drongo.address.Address;
 import com.sparrowwallet.drongo.address.InvalidAddressException;
 import com.sparrowwallet.drongo.silentpayments.SilentPayment;
@@ -275,10 +276,10 @@ public class BitcoinURI {
         if(payjoinUrl != null) {
             try {
                 URI uri = new URI(payjoinUrl);
-                if(uri.getScheme().equals("https") || uri.getHost().endsWith(".onion")) {
+                if(Utils.isSecureUrl(uri)) {
                     return uri;
                 } else {
-                    log.error("Insecure payjoin URL provided, must be https or .onion: " + payjoinUrl);
+                    log.error("Insecure payjoin URL provided, must be https or http .onion: " + payjoinUrl);
                 }
             } catch(URISyntaxException e) {
                 log.error("Invalid payjoin URL provided", e);
