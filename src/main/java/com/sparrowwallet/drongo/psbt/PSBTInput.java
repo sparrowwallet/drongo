@@ -958,11 +958,11 @@ public class PSBTInput {
             case ANYONECANPAY_NONE:
                 throw new PSBTSignatureException("Input " + index + " requests SIGHASH_NONE | ANYONECANPAY. The signature commits to neither inputs nor outputs and can be re-used in nearly any transaction.");
             case ANYONECANPAY_SINGLE:
-                throw new PSBTSignatureException("Input " + index + " requests SIGHASH_SINGLE | ANYONECANPAY. The signature only commits to one output, and other inputs may be added by an attacker after signing.");
+                throw new PSBTSignatureException("Input " + index + " requests SIGHASH_SINGLE | ANYONECANPAY. The signature only commits to one output, and other inputs may be added after signing.");
             case SINGLE:
-                throw new PSBTSignatureException("Input " + index + " requests SIGHASH_SINGLE. The signature only commits to the output at the same index, allowing an attacker to add or modify other outputs after signing.");
+                throw new PSBTSignatureException("Input " + index + " requests SIGHASH_SINGLE. The signature only commits to the output at the same index, allowing other outputs to be added or modified after signing.");
             case ANYONECANPAY_ALL:
-                throw new PSBTSignatureException("Input " + index + " requests SIGHASH_ALL | ANYONECANPAY. An attacker may add other inputs to the transaction after signing, potentially redirecting value through fees.");
+                throw new PSBTSignatureException("Input " + index + " requests SIGHASH_ALL | ANYONECANPAY. Other inputs may be added to the transaction after signing, potentially redirecting value through fees.");
             case ANYONECANPAY:
                 throw new PSBTSignatureException("Input " + index + " requests a non-standard ANYONECANPAY sighash with no base type. The resulting signature has unpredictable commitment semantics.");
         }
