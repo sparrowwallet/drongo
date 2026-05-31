@@ -4,10 +4,10 @@ import com.sparrowwallet.drongo.ExtendedKey;
 import com.sparrowwallet.drongo.KeyDerivation;
 import com.sparrowwallet.drongo.Network;
 import com.sparrowwallet.drongo.Utils;
+import com.sparrowwallet.drongo.address.P2PKHAddress;
 import com.sparrowwallet.drongo.crypto.ECKey;
 import com.sparrowwallet.drongo.policy.Miniscript;
 import com.sparrowwallet.drongo.policy.Policy;
-import com.sparrowwallet.drongo.policy.PolicyType;
 import com.sparrowwallet.drongo.protocol.*;
 import com.sparrowwallet.drongo.wallet.Wallet;
 import org.bouncycastle.util.encoders.Hex;
@@ -1138,6 +1138,204 @@ public class PSBTTest {
         Assertions.assertTrue(input.getSilentPaymentsDLEQProofs().isEmpty());
         Assertions.assertTrue(input.getSilentPaymentsSpendDerivations().isEmpty());
         Assertions.assertNull(input.getSilentPaymentsTweak());
+    }
+
+    @Test
+    public void sighashSingleLegacyMagicOneBugRefusedAtSignTime() {
+        ECKey victimKey = new ECKey();
+        P2PKHAddress victimAddr = new P2PKHAddress(victimKey.getPubKeyHash());
+        Script victimSpk = victimAddr.getOutputScript();
+
+        Transaction priorTx0 = new Transaction();
+        priorTx0.addInput(Sha256Hash.ZERO_HASH, 0L, new Script(new byte[0]));
+        priorTx0.addOutput(100_000L, victimSpk);
+
+        Transaction priorTx1 = new Transaction();
+        priorTx1.addInput(Sha256Hash.ZERO_HASH, 0L, new Script(new byte[0]));
+        priorTx1.addOutput(200_000L, victimSpk);
+
+        Transaction unsigned = new Transaction();
+        unsigned.addInput(priorTx0.getTxId(), 0, new Script(new byte[0]));
+        unsigned.addInput(priorTx1.getTxId(), 0, new Script(new byte[0]));
+        unsigned.addOutput(90_000L, victimSpk);
+
+        PSBT psbt = new PSBT(unsigned);
+        PSBTInput trapInput = psbt.getPsbtInputs().get(1);
+        trapInput.setNonWitnessUtxo(priorTx1);
+        trapInput.setSigHash(SigHash.SINGLE);
+
+        IllegalStateException thrown = Assertions.assertThrows(IllegalStateException.class, () -> trapInput.sign(victimKey));
+        Assertions.assertTrue(thrown.getMessage().contains("re-broadcastable"), "guard message should describe the risk");
+
+        Sha256Hash magicOne = Sha256Hash.wrap("0100000000000000000000000000000000000000000000000000000000000000");
+        Assertions.assertEquals(magicOne, unsigned.hashForLegacySignature(1, victimSpk, SigHash.SINGLE),
+                "underlying legacy hash function still returns the constant - guard is the sole defence at sign time");
+    }
+
+    @Test
+    public void verifySigHashesAcceptsSafeSighashes() throws PSBTSignatureException {
+        ECKey key = new ECKey();
+        Script spk = new P2PKHAddress(key.getPubKeyHash()).getOutputScript();
+        Transaction prior = new Transaction();
+        prior.addInput(Sha256Hash.ZERO_HASH, 0L, new Script(new byte[0]));
+        prior.addOutput(100_000L, spk);
+
+        Transaction unsigned = new Transaction();
+        unsigned.addInput(prior.getTxId(), 0, new Script(new byte[0]));
+        unsigned.addOutput(90_000L, spk);
+
+        PSBT psbt = new PSBT(unsigned);
+        psbt.getPsbtInputs().get(0).setNonWitnessUtxo(prior);
+
+        // unset sighash, ALL, and DEFAULT should all pass
+        psbt.verifySigHashes();
+        psbt.getPsbtInputs().get(0).setSigHash(SigHash.ALL);
+        psbt.verifySigHashes();
+        psbt.getPsbtInputs().get(0).setSigHash(SigHash.DEFAULT);
+        psbt.verifySigHashes();
+    }
+
+    @Test
+    public void verifySigHashesReportsMostSeriousIssue() {
+        ECKey key = new ECKey();
+        Script spk = new P2PKHAddress(key.getPubKeyHash()).getOutputScript();
+        Transaction prior0 = new Transaction();
+        prior0.addInput(Sha256Hash.ZERO_HASH, 0L, new Script(new byte[0]));
+        prior0.addOutput(100_000L, spk);
+        Transaction prior1 = new Transaction();
+        prior1.addInput(Sha256Hash.ZERO_HASH, 0L, new Script(new byte[0]));
+        prior1.addOutput(200_000L, spk);
+
+        Transaction unsigned = new Transaction();
+        unsigned.addInput(prior0.getTxId(), 0, new Script(new byte[0]));
+        unsigned.addInput(prior1.getTxId(), 0, new Script(new byte[0]));
+        unsigned.addOutput(45_000L, spk);
+        unsigned.addOutput(45_000L, spk);
+
+        PSBT psbt = new PSBT(unsigned);
+        psbt.getPsbtInputs().get(0).setNonWitnessUtxo(prior0);
+        psbt.getPsbtInputs().get(0).setSigHash(SigHash.SINGLE);            // severity 3
+        psbt.getPsbtInputs().get(1).setNonWitnessUtxo(prior1);
+        psbt.getPsbtInputs().get(1).setSigHash(SigHash.NONE);              // severity 5
+
+        PSBTSignatureException ex = Assertions.assertThrows(PSBTSignatureException.class, psbt::verifySigHashes);
+        Assertions.assertTrue(ex.getMessage().contains("SIGHASH_NONE"), "should report the higher-severity NONE input");
+        Assertions.assertTrue(ex.getMessage().contains("Input 1"), "should identify the offending input index");
+    }
+
+    @Test
+    public void verifyCombinedSignaturesRejectsSigHashTampering() {
+        ECKey key = new ECKey();
+        Script spk = new P2PKHAddress(key.getPubKeyHash()).getOutputScript();
+        Transaction prior0 = new Transaction();
+        prior0.addInput(Sha256Hash.ZERO_HASH, 0L, new Script(new byte[0]));
+        prior0.addOutput(100_000L, spk);
+        Transaction prior1 = new Transaction();
+        prior1.addInput(Sha256Hash.ZERO_HASH, 0L, new Script(new byte[0]));
+        prior1.addOutput(200_000L, spk);
+
+        Transaction tx = new Transaction();
+        tx.addInput(prior0.getTxId(), 0, new Script(new byte[0]));
+        tx.addInput(prior1.getTxId(), 0, new Script(new byte[0]));
+        tx.addOutput(90_000L, spk);
+
+        PSBT localPsbt = new PSBT(tx);
+        localPsbt.getPsbtInputs().get(0).setNonWitnessUtxo(prior0);
+        localPsbt.getPsbtInputs().get(0).setSigHash(SigHash.ALL);
+        localPsbt.getPsbtInputs().get(1).setNonWitnessUtxo(prior1);
+        localPsbt.getPsbtInputs().get(1).setSigHash(SigHash.ALL);
+
+        PSBT tamperedPsbt = new PSBT(tx);
+        tamperedPsbt.getPsbtInputs().get(0).setNonWitnessUtxo(prior0);
+        tamperedPsbt.getPsbtInputs().get(0).setSigHash(SigHash.ALL);
+        tamperedPsbt.getPsbtInputs().get(1).setNonWitnessUtxo(prior1);
+        tamperedPsbt.getPsbtInputs().get(1).setSigHash(SigHash.SINGLE);
+
+        SigHash originalLocalSigHash = localPsbt.getPsbtInputs().get(1).getSigHash();
+        Assertions.assertEquals(SigHash.ALL, originalLocalSigHash);
+
+        PSBTSignatureException ex = Assertions.assertThrows(PSBTSignatureException.class,
+                () -> localPsbt.verifyCombinedSignatures(tamperedPsbt));
+        Assertions.assertTrue(ex.getMessage().contains("Combined PSBT would change sighash"),
+                "should describe the combine-time sighash change");
+        Assertions.assertTrue(ex.getMessage().contains("Input 1"),
+                "should identify which input the combine would tamper with");
+        Assertions.assertTrue(ex.getMessage().contains("SIGHASH_SINGLE"),
+                "should describe the unsafe sighash being introduced");
+
+        Assertions.assertEquals(originalLocalSigHash, localPsbt.getPsbtInputs().get(1).getSigHash(),
+                "local PSBT must be unchanged when verifyCombinedSignatures rejects the combine");
+    }
+
+    @Test
+    public void verifyCombinedSignaturesAcceptsUnchangedUnsafeSigHash() throws PSBTSignatureException {
+        ECKey key = new ECKey();
+        Script spk = new P2PKHAddress(key.getPubKeyHash()).getOutputScript();
+        Transaction prior = new Transaction();
+        prior.addInput(Sha256Hash.ZERO_HASH, 0L, new Script(new byte[0]));
+        prior.addOutput(100_000L, spk);
+
+        Transaction tx = new Transaction();
+        tx.addInput(prior.getTxId(), 0, new Script(new byte[0]));
+        tx.addOutput(90_000L, spk);
+
+        PSBT localPsbt = new PSBT(tx);
+        localPsbt.getPsbtInputs().get(0).setNonWitnessUtxo(prior);
+        localPsbt.getPsbtInputs().get(0).setSigHash(SigHash.SINGLE);
+
+        PSBT incomingPsbt = new PSBT(tx);
+        incomingPsbt.getPsbtInputs().get(0).setNonWitnessUtxo(prior);
+        incomingPsbt.getPsbtInputs().get(0).setSigHash(SigHash.SINGLE);
+
+        localPsbt.verifyCombinedSignatures(incomingPsbt);
+    }
+
+    @Test
+    public void verifyCombinedSignaturesRejectsAdditiveUnsafeSigHash() {
+        ECKey key = new ECKey();
+        Script spk = new P2PKHAddress(key.getPubKeyHash()).getOutputScript();
+        Transaction prior = new Transaction();
+        prior.addInput(Sha256Hash.ZERO_HASH, 0L, new Script(new byte[0]));
+        prior.addOutput(100_000L, spk);
+
+        Transaction tx = new Transaction();
+        tx.addInput(prior.getTxId(), 0, new Script(new byte[0]));
+        tx.addOutput(90_000L, spk);
+
+        PSBT localPsbt = new PSBT(tx);
+        localPsbt.getPsbtInputs().get(0).setNonWitnessUtxo(prior);
+        localPsbt.getPsbtInputs().get(0).setSigHash(null);
+
+        PSBT incomingPsbt = new PSBT(tx);
+        incomingPsbt.getPsbtInputs().get(0).setNonWitnessUtxo(prior);
+        incomingPsbt.getPsbtInputs().get(0).setSigHash(SigHash.NONE);
+
+        PSBTSignatureException ex = Assertions.assertThrows(PSBTSignatureException.class,
+                () -> localPsbt.verifyCombinedSignatures(incomingPsbt));
+        Assertions.assertTrue(ex.getMessage().contains("Combined PSBT would change sighash"));
+        Assertions.assertTrue(ex.getMessage().contains("Input 0"));
+        Assertions.assertTrue(ex.getMessage().contains("SIGHASH_NONE"));
+    }
+
+    @Test
+    public void verifySigHashesRejectsPlainSighashSingle() {
+        ECKey key = new ECKey();
+        Script spk = new P2PKHAddress(key.getPubKeyHash()).getOutputScript();
+        Transaction prior = new Transaction();
+        prior.addInput(Sha256Hash.ZERO_HASH, 0L, new Script(new byte[0]));
+        prior.addOutput(100_000L, spk);
+
+        Transaction unsigned = new Transaction();
+        unsigned.addInput(prior.getTxId(), 0, new Script(new byte[0]));
+        unsigned.addOutput(45_000L, spk);
+        unsigned.addOutput(45_000L, spk);
+
+        PSBT psbt = new PSBT(unsigned);
+        psbt.getPsbtInputs().get(0).setNonWitnessUtxo(prior);
+        psbt.getPsbtInputs().get(0).setSigHash(SigHash.SINGLE);
+
+        PSBTSignatureException ex = Assertions.assertThrows(PSBTSignatureException.class, psbt::verifySigHashes);
+        Assertions.assertTrue(ex.getMessage().contains("SIGHASH_SINGLE"));
     }
 
     @AfterEach

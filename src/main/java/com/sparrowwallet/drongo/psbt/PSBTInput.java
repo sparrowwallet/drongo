@@ -923,6 +923,12 @@ public class PSBTInput {
         if(getNonWitnessUtxo() != null || getWitnessUtxo() != null) {
             Script signingScript = getSigningScript();
             if(signingScript != null) {
+                if((localSigHash == SigHash.SINGLE || localSigHash == SigHash.ANYONECANPAY_SINGLE) && index >= psbt.getTransaction().getOutputs().size()
+                        && Arrays.asList(NON_WITNESS_TYPES).contains(getScriptType())) {
+                    throw new IllegalStateException("Refusing to sign SIGHASH_SINGLE on legacy input " + index
+                            + " with only " + psbt.getTransaction().getOutputs().size() + " output(s) as it would produce a re-broadcastable signature");
+                }
+
                 Sha256Hash hash = getHashForSignature(signingScript, localSigHash);
                 TransactionSignature.Type type = isTaproot() ? SCHNORR : ECDSA;
                 TransactionSignature transactionSignature = psbtInputSigner.sign(hash, localSigHash, type);
@@ -939,6 +945,27 @@ public class PSBTInput {
         }
 
         return false;
+    }
+
+    void verifySigHash() throws PSBTSignatureException {
+        if(sigHash == null || sigHash == SigHash.ALL || sigHash == SigHash.DEFAULT) {
+            return;
+        }
+
+        switch(sigHash) {
+            case NONE:
+                throw new PSBTSignatureException("Input " + index + " requests SIGHASH_NONE. The signature does not commit to any of the outputs, and can be re-used on a transaction with completely different outputs.");
+            case ANYONECANPAY_NONE:
+                throw new PSBTSignatureException("Input " + index + " requests SIGHASH_NONE | ANYONECANPAY. The signature commits to neither inputs nor outputs and can be re-used in nearly any transaction.");
+            case ANYONECANPAY_SINGLE:
+                throw new PSBTSignatureException("Input " + index + " requests SIGHASH_SINGLE | ANYONECANPAY. The signature only commits to one output, and other inputs may be added by an attacker after signing.");
+            case SINGLE:
+                throw new PSBTSignatureException("Input " + index + " requests SIGHASH_SINGLE. The signature only commits to the output at the same index, allowing an attacker to add or modify other outputs after signing.");
+            case ANYONECANPAY_ALL:
+                throw new PSBTSignatureException("Input " + index + " requests SIGHASH_ALL | ANYONECANPAY. An attacker may add other inputs to the transaction after signing, potentially redirecting value through fees.");
+            case ANYONECANPAY:
+                throw new PSBTSignatureException("Input " + index + " requests a non-standard ANYONECANPAY sighash with no base type. The resulting signature has unpredictable commitment semantics.");
+        }
     }
 
     boolean verifySignatures() throws PSBTSignatureException {

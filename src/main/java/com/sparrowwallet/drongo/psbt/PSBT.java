@@ -671,6 +671,40 @@ public class PSBT {
         }
     }
 
+    public void verifySigHashes() throws PSBTSignatureException {
+        PSBTSignatureException worst = null;
+        int worstSeverity = 0;
+        for(PSBTInput input : psbtInputs) {
+            try {
+                input.verifySigHash();
+            } catch(PSBTSignatureException e) {
+                int severity = sigHashSeverity(input.getSigHash());
+                if(severity > worstSeverity) {
+                    worstSeverity = severity;
+                    worst = e;
+                }
+            }
+        }
+
+        if(worst != null) {
+            throw worst;
+        }
+    }
+
+    private static int sigHashSeverity(SigHash sigHash) {
+        if(sigHash == null) {
+            return 0;
+        }
+        return switch(sigHash) {
+            case NONE, ANYONECANPAY_NONE -> 5;
+            case ANYONECANPAY_SINGLE -> 4;
+            case SINGLE -> 3;
+            case ANYONECANPAY_ALL -> 2;
+            case ANYONECANPAY -> 1;
+            default -> 0;
+        };
+    }
+
     public void validateSilentPayments(Transaction extractedTransaction) throws PSBTProofException {
         Map<HashIndex, Script> spentScriptPubKeys = getPsbtInputs().stream()
                 .collect(Collectors.toMap(psbtInput -> new HashIndex(psbtInput.getPrevTxid(), psbtInput.getPrevIndex()), psbtInput -> psbtInput.getUtxo().getScript()));
@@ -944,6 +978,21 @@ public class PSBT {
         PSBT verificationCopy = this.copy();
         verificationCopy.combine(psbt);
         verificationCopy.verifySignatures();
+        verifyCombinedSigHashes(verificationCopy);
+    }
+
+    private void verifyCombinedSigHashes(PSBT verificationCopy) throws PSBTSignatureException {
+        for(int i = 0; i < getPsbtInputs().size(); i++) {
+            PSBTInput thisInput = getPsbtInputs().get(i);
+            PSBTInput otherInput = verificationCopy.getPsbtInputs().get(i);
+            if(sigHashSeverity(otherInput.getSigHash()) > sigHashSeverity(thisInput.getSigHash())) {
+                try {
+                    otherInput.verifySigHash();
+                } catch(PSBTSignatureException e) {
+                    throw new PSBTSignatureException("Combined PSBT would change sighash: " + e.getMessage());
+                }
+            }
+        }
     }
 
     public void combine(PSBT... psbts) {
