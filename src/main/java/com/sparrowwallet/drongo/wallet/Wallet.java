@@ -1088,6 +1088,10 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
             throw new InsufficientFundsException("Not enough combined value in all available UTXOs to send a transaction to the provided addresses at this fee rate");
         }
 
+        if(params.anyoneCanPay()) {
+            return createAnyoneCanPayWalletTransaction(params, availableTxos);
+        }
+
         //When a user fee is set, we can calculate the fees to spend all UTXOs because we assume all UTXOs are spendable at a fee rate of 1 sat/vB
         //We can then add the user set fee less this amount as a "phantom payment amount" to the value required to find (which cannot include transaction fees)
         long valueRequiredAmt = totalPaymentAmount + (params.fee() != null ? params.fee() - (totalAvailableValue - maxSpendableAmt) : 0);
@@ -1256,6 +1260,55 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
 
             return new WalletTransaction(this, transaction, params.utxoSelectors(), selectedUtxoSets, txPayments, outputs, differenceAmt);
         }
+    }
+
+    private WalletTransaction createAnyoneCanPayWalletTransaction(TransactionParameters params, Map<BlockTransactionHashIndex, WalletNode> availableTxos) throws InsufficientFundsException {
+        if(availableTxos.isEmpty()) {
+            throw new InsufficientFundsException("No UTXOs available for an anyonecanpay transaction");
+        }
+
+        for(Payment payment : params.payments()) {
+            if(payment instanceof SilentPayment) {
+                throw new IllegalArgumentException("Silent payments are not supported for anyonecanpay transactions");
+            }
+        }
+
+        long sequence = params.allowRbf() ? TransactionInput.SEQUENCE_RBF_ENABLED : TransactionInput.SEQUENCE_RBF_DISABLED;
+
+        Transaction transaction = new Transaction();
+        transaction.setVersion(2);
+        if(params.currentBlockHeight() != null) {
+            transaction.setLocktime(params.currentBlockHeight().longValue());
+        }
+
+        Map<BlockTransactionHashIndex, WalletNode> selectedUtxos = new LinkedHashMap<>(availableTxos);
+        List<Map<BlockTransactionHashIndex, WalletNode>> selectedUtxoSets = List.of(selectedUtxos);
+
+        for(Map.Entry<BlockTransactionHashIndex, WalletNode> selectedUtxo : selectedUtxos.entrySet()) {
+            Transaction prevTx = getWalletTransaction(selectedUtxo.getKey().getHash()).getTransaction();
+            TransactionOutput prevTxOut = prevTx.getOutputs().get((int)selectedUtxo.getKey().getIndex());
+            TransactionInput txInput = addDummySpendingInput(transaction, selectedUtxo.getValue(), prevTxOut);
+            txInput.setSequenceNumber(sequence);
+        }
+
+        List<Payment> txPayments = new ArrayList<>(params.payments());
+        List<WalletTransaction.Output> outputs = new ArrayList<>();
+
+        for(Payment payment : txPayments) {
+            TransactionOutput output = transaction.addOutput(payment.getAmount(), payment.getAddress());
+            outputs.add(new WalletTransaction.PaymentOutput(output, payment));
+        }
+
+        for(byte[] opReturn : params.opReturns()) {
+            TransactionOutput output = transaction.addOutput(0L, new Script(List.of(ScriptChunk.fromOpcode(ScriptOpCodes.OP_RETURN), ScriptChunk.fromData(opReturn))));
+            outputs.add(new WalletTransaction.NonAddressOutput(output));
+        }
+
+        long totalSelectedAmt = selectedUtxos.keySet().stream().mapToLong(BlockTransactionHashIndex::getValue).sum();
+        long totalPaymentAmount = params.getTotalPaymentAmount();
+        long fee = totalSelectedAmt - totalPaymentAmount;
+
+        return new WalletTransaction(this, transaction, params.utxoSelectors(), selectedUtxoSets, txPayments, outputs, fee);
     }
 
     private void applySequenceAntiFeeSniping(Transaction transaction, Map<BlockTransactionHashIndex, WalletNode> selectedUtxos, int currentBlockHeight) {
