@@ -816,7 +816,7 @@ public class PSBT {
                 for(int i = 0; i < getPsbtOutputs().size(); i++) {
                     PSBTOutput psbtOutput = getPsbtOutputs().get(i);
                     TransactionOutput txOutput = transaction.getOutputs().get(i);
-                    if(psbtOutput.getSilentPaymentAddress() != null && !psbtOutput.getScript().equals(txOutput.getScript()) && txOutput.getScript().getToAddress() != null) {
+                    if(psbtOutput.getSilentPaymentAddress() != null && !txOutput.getScript().equals(psbtOutput.getScript()) && txOutput.getScript().getToAddress() != null) {
                         return true;
                     }
                 }

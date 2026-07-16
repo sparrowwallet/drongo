@@ -1419,6 +1419,15 @@ public class PSBTTest {
     }
 
     @Test
+    public void resolvedSilentPaymentTransactionIsPossiblyUnverifiable() {
+        PSBT psbt = buildSilentPaymentPsbt(40000L);
+        Assertions.assertNull(psbt.getPsbtOutputs().get(0).getScript(), "An unresolved v2 silent payment output should have a null script");
+
+        Transaction resolvedTx = buildSilentPaymentTransaction(P2TR_SCRIPT, 40000L, CHANGE_SCRIPT);
+        Assertions.assertTrue(psbt.possibleUnverifiableSilentPaymentsTransaction(resolvedTx));
+    }
+
+    @Test
     public void v0TransactionMatchesSourcePsbt() throws PSBTParseException {
         PSBT psbt = PSBT.fromString(MATCHES_V0_PSBT);
         Assertions.assertEquals(0, psbt.getPsbtVersion());
