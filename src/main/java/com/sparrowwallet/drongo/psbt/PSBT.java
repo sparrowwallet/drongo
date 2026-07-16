@@ -806,7 +806,7 @@ public class PSBT {
     }
 
     public boolean possibleUnverifiableSilentPaymentsTransaction(Transaction transaction) {
-        if(getPsbtOutputs().stream().anyMatch(output -> output.getSilentPaymentAddress() != null)) {
+        if(hasSilentPaymentOutputs()) {
             Set<HashIndex> ourInputs = getPsbtInputs().stream().map(input -> new HashIndex(input.getPrevTxid(), input.getPrevIndex())).collect(Collectors.toSet());
             Set<HashIndex> txInputs = transaction.getInputs().stream().map(input -> new HashIndex(input.getOutpoint().getHash(), input.getOutpoint().getIndex())).collect(Collectors.toSet());
             List<Long> ourAmounts = getPsbtOutputs().stream().map(PSBTOutput::getAmount).collect(Collectors.toList());
@@ -1075,7 +1075,7 @@ public class PSBT {
             }
         }
 
-        if(getPsbtOutputs().stream().anyMatch(output -> output.getSilentPaymentAddress() != null)) {
+        if(hasSilentPaymentOutputs()) {
             validateSilentPayments(finalTransaction);
         }
 
@@ -1182,7 +1182,35 @@ public class PSBT {
             return getTransaction(true).getTxId().equals(psbt.getTransaction(true).getTxId());
         }
 
-        return getTransaction().getTxId().equals(psbt.getTransaction().getTxId());
+        return getTransaction().calculateTxId(false).equals(psbt.getTransaction().calculateTxId(false));
+    }
+
+    /**
+     * Checks if the given transaction matches the transaction this PSBT represents, ignoring any signatures the given transaction contains.
+     * The comparison is made against a copy of the given transaction with empty scriptSigs, since a signed non-segwit transaction will have a different txid to the PSBT transaction.
+     * Note that a transaction containing resolved silent payment output scripts will not match, since these scripts cannot be verified from this PSBT alone -
+     * a silent payments transaction must be provided as a PSBT so the BIP375 ECDH shares and DLEQ proofs can be verified.
+     *
+     * @param transaction the transaction to compare with the current PSBT
+     * @return true if the transaction matches the transaction this PSBT represents; false otherwise
+     */
+    public boolean matches(Transaction transaction) {
+        Transaction unsigned = new Transaction();
+        unsigned.setVersion(transaction.getVersion());
+        unsigned.setLocktime(transaction.getLocktime());
+        for(TransactionInput txInput : transaction.getInputs()) {
+            TransactionInput unsignedInput = unsigned.addInput(txInput.getOutpoint().getHash(), txInput.getOutpoint().getIndex(), new Script(new byte[0]));
+            unsignedInput.setSequenceNumber(txInput.getSequenceNumber());
+        }
+        for(TransactionOutput txOutput : transaction.getOutputs()) {
+            unsigned.addOutput(txOutput.getValue(), txOutput.getScript());
+        }
+
+        return getTransaction().calculateTxId(false).equals(unsigned.getTxId());
+    }
+
+    public boolean hasSilentPaymentOutputs() {
+        return getPsbtOutputs().stream().anyMatch(output -> output.getSilentPaymentAddress() != null);
     }
 
     public Integer getVersion() {

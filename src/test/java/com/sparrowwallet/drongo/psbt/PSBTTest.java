@@ -9,12 +9,15 @@ import com.sparrowwallet.drongo.crypto.ECKey;
 import com.sparrowwallet.drongo.policy.Miniscript;
 import com.sparrowwallet.drongo.policy.Policy;
 import com.sparrowwallet.drongo.protocol.*;
+import com.sparrowwallet.drongo.silentpayments.SilentPaymentAddress;
 import com.sparrowwallet.drongo.wallet.Wallet;
 import org.bouncycastle.util.encoders.Hex;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -1336,6 +1339,160 @@ public class PSBTTest {
 
         PSBTSignatureException ex = Assertions.assertThrows(PSBTSignatureException.class, psbt::verifySigHashes);
         Assertions.assertTrue(ex.getMessage().contains("SIGHASH_SINGLE"));
+    }
+
+    @Test
+    public void signedLegacyTransactionMatchesSourcePsbt() {
+        PSBT psbt = new PSBT(buildMatchesTransaction(new byte[0], 12345L));
+        Transaction signedTx = buildMatchesTransaction(Utils.hexToBytes("483045022100aa11"), 12345L);
+
+        Assertions.assertNotEquals(psbt.getTransaction().getTxId(), signedTx.getTxId(), "Legacy signed txid should differ from unsigned txid");
+        Assertions.assertTrue(psbt.matches(signedTx));
+    }
+
+    @Test
+    public void signedSegwitTransactionMatchesSourcePsbt() {
+        PSBT psbt = new PSBT(buildMatchesTransaction(new byte[0], 12345L));
+        Transaction signedTx = buildMatchesTransaction(new byte[0], 12345L);
+        signedTx.getInputs().getFirst().setWitness(new TransactionWitness(signedTx, List.of(Utils.hexToBytes("3045022100aa11"), Utils.hexToBytes("02aa00000000000000000000000000000000000000000000000000000000000011"))));
+
+        Assertions.assertTrue(psbt.matches(signedTx));
+    }
+
+    @Test
+    public void unsignedTransactionMatchesSourcePsbt() {
+        PSBT psbt = new PSBT(buildMatchesTransaction(new byte[0], 12345L));
+        Transaction sameTx = buildMatchesTransaction(new byte[0], 12345L);
+
+        Assertions.assertTrue(psbt.matches(sameTx));
+    }
+
+    @Test
+    public void tamperedAmountTransactionDoesNotMatchSourcePsbt() {
+        PSBT psbt = new PSBT(buildMatchesTransaction(new byte[0], 12345L));
+        Transaction tamperedTx = buildMatchesTransaction(Utils.hexToBytes("483045022100aa11"), 99999L);
+
+        Assertions.assertFalse(psbt.matches(tamperedTx));
+    }
+
+    @Test
+    public void addressSwappedTransactionDoesNotMatchSourcePsbt() {
+        PSBT psbt = new PSBT(buildMatchesTransaction(new byte[0], 12345L));
+        Transaction tamperedTx = buildMatchesTransaction(new byte[0], 12345L, new Script(Utils.hexToBytes("76a914111111111111111111111111111111111111111188ac")));
+
+        Assertions.assertFalse(psbt.matches(tamperedTx));
+    }
+
+    @Test
+    public void changedSequenceTransactionDoesNotMatchSourcePsbt() {
+        PSBT psbt = new PSBT(buildMatchesTransaction(new byte[0], 12345L));
+        Transaction tamperedTx = buildMatchesTransaction(new byte[0], 12345L);
+        tamperedTx.getInputs().getFirst().setSequenceNumber(0xffffffffL);
+
+        Assertions.assertFalse(psbt.matches(tamperedTx));
+    }
+
+    @Test
+    public void additionalOutputTransactionDoesNotMatchSourcePsbt() {
+        PSBT psbt = new PSBT(buildMatchesTransaction(new byte[0], 12345L));
+        Transaction tamperedTx = buildMatchesTransaction(new byte[0], 12345L);
+        tamperedTx.addOutput(1000L, new Script(Utils.hexToBytes("76a914111111111111111111111111111111111111111188ac")));
+
+        Assertions.assertFalse(psbt.matches(tamperedTx));
+    }
+
+    @Test
+    public void resolvedSilentPaymentTransactionDoesNotMatchSourcePsbt() {
+        PSBT psbt = buildSilentPaymentPsbt(40000L);
+        Transaction resolvedTx = buildSilentPaymentTransaction(P2TR_SCRIPT, 40000L, CHANGE_SCRIPT);
+
+        Assertions.assertTrue(psbt.hasSilentPaymentOutputs());
+        Assertions.assertFalse(psbt.matches(resolvedTx), "A resolved silent payment output script cannot be verified from the PSBT alone, so the transaction must not match");
+    }
+
+    @Test
+    public void unresolvedSilentPaymentTransactionMatchesSourcePsbt() {
+        PSBT psbt = buildSilentPaymentPsbt(40000L);
+        Transaction unresolvedTx = buildSilentPaymentTransaction(new Script(new byte[0]), 40000L, CHANGE_SCRIPT);
+
+        Assertions.assertTrue(psbt.matches(unresolvedTx));
+    }
+
+    @Test
+    public void v0TransactionMatchesSourcePsbt() throws PSBTParseException {
+        PSBT psbt = PSBT.fromString(MATCHES_V0_PSBT);
+        Assertions.assertEquals(0, psbt.getPsbtVersion());
+        Assertions.assertTrue(psbt.matches(new Transaction(psbt.getTransaction().bitcoinSerialize())));
+
+        Transaction tamperedTx = new Transaction(psbt.getTransaction().bitcoinSerialize());
+        tamperedTx.setLocktime(psbt.getTransaction().getLocktime() + 1);
+        Assertions.assertFalse(psbt.matches(tamperedTx));
+    }
+
+    @Test
+    public void editedTransactionMatchesSourcePsbt() throws PSBTParseException {
+        PSBT psbt = PSBT.fromString(MATCHES_V0_PSBT);
+        Assertions.assertNotNull(psbt.getTransaction().getTxId(), "Cache the txid before editing, as parsing does");
+        psbt.getTransaction().setLocktime(psbt.getTransaction().getLocktime() + 1);
+        Transaction editedTx = new Transaction(psbt.getTransaction().bitcoinSerialize());
+
+        Assertions.assertTrue(psbt.matches(editedTx), "A transaction reflecting an edit to the PSBT transaction must match despite the previously cached txid");
+    }
+
+    @Test
+    public void editedPsbtMatchesSourcePsbt() throws PSBTParseException {
+        PSBT psbt = PSBT.fromString(MATCHES_V0_PSBT);
+        Assertions.assertNotNull(psbt.getTransaction().getTxId(), "Cache the txid before editing, as parsing does");
+        psbt.getTransaction().setLocktime(psbt.getTransaction().getLocktime() + 1);
+        PSBT editedPsbt = new PSBT(psbt.serialize(), false);
+
+        Assertions.assertEquals(psbt.getTransaction().getLocktime(), editedPsbt.getTransaction().getLocktime());
+        Assertions.assertTrue(psbt.matches(editedPsbt), "A PSBT reflecting an edit to the PSBT transaction must match despite the previously cached txid");
+    }
+
+    @Test
+    public void truncatedPsbtDoesNotMatchSourceTransaction() throws PSBTParseException {
+        Transaction tx = buildMatchesTransaction(new byte[0], 12345L);
+        byte[] serialized = new PSBT(tx).serialize();
+        PSBT truncatedPsbt = new PSBT(Arrays.copyOf(serialized, serialized.length - 1), false);
+
+        Assertions.assertTrue(truncatedPsbt.getPsbtOutputs().isEmpty(), "Truncated PSBT should parse with no outputs");
+        Assertions.assertFalse(truncatedPsbt.matches(tx));
+    }
+
+    private static final Script CHANGE_SCRIPT = new Script(Utils.hexToBytes("76a914000000000000000000000000000000000000000088ac"));
+    private static final Script P2TR_SCRIPT = new Script(Utils.hexToBytes("5120aa00000000000000000000000000000000000000000000000000000000000011"));
+    private static final String MATCHES_V0_PSBT = "cHNidP8BAHUCAAAAASaBcTce3/KF6Tet7qSze3gADAVmy7OtZGQXE8pCFxv2AAAAAAD+////AtPf9QUAAAAAGXapFNDFmQPFusKGh2DpD9UhpGZap2UgiKwA4fUFAAAAABepFDVF5uM7gyxHBQ8k0+65PJwDlIvHh7MuEwAAAQD9pQEBAAAAAAECiaPHHqtNIOA3G7ukzGmPopXJRjr6Ljl/hTPMti+VZ+UBAAAAFxYAFL4Y0VKpsBIDna89p95PUzSe7LmF/////4b4qkOnHf8USIk6UwpyN+9rRgi7st0tAXHmOuxqSJC0AQAAABcWABT+Pp7xp0XpdNkCxDVZQ6vLNL1TU/////8CAMLrCwAAAAAZdqkUhc/xCX/Z4Ai7NK9wnGIZeziXikiIrHL++E4sAAAAF6kUM5cluiHv1irHU6m80GfWx6ajnQWHAkcwRAIgJxK+IuAnDzlPVoMR3HyppolwuAJf3TskAinwf4pfOiQCIAGLONfc0xTnNMkna9b7QPZzMlvEuqFEyADS8vAtsnZcASED0uFWdJQbrUqZY3LLh+GFbTZSYG2YVi/jnF6efkE/IQUCSDBFAiEA0SuFLYXc2WHS9fSrZgZU327tzHlMDDPOXMMJ/7X85Y0CIGczio4OFyXBl/saiK9Z9R5E5CVbIBZ8hoQDHAXR8lkqASECI7cr7vCWXRC+B3jv7NYfysb3mk6haTkzgHNEZPhPKrMAAAAAAAAA";
+
+    private Transaction buildMatchesTransaction(byte[] scriptSig, long outputValue) {
+        return buildMatchesTransaction(scriptSig, outputValue, CHANGE_SCRIPT);
+    }
+
+    private Transaction buildMatchesTransaction(byte[] scriptSig, long outputValue, Script outputScript) {
+        Transaction tx = new Transaction();
+        tx.setVersion(2);
+        tx.setLocktime(850000);
+        TransactionInput input = tx.addInput(Sha256Hash.wrap(Utils.hexToBytes("aa00000000000000000000000000000000000000000000000000000000000011")), 1, new Script(scriptSig));
+        input.setSequenceNumber(0xfffffffdL);
+        tx.addOutput(outputValue, outputScript);
+        return tx;
+    }
+
+    private Transaction buildSilentPaymentTransaction(Script silentPaymentScript, long silentPaymentAmount, Script changeScript) {
+        Transaction tx = new Transaction();
+        tx.setVersion(2);
+        TransactionInput input = tx.addInput(Sha256Hash.wrap(Utils.hexToBytes("aa00000000000000000000000000000000000000000000000000000000000011")), 1, new Script(new byte[0]));
+        input.setSequenceNumber(0xfffffffdL);
+        tx.addOutput(silentPaymentAmount, silentPaymentScript);
+        tx.addOutput(5000L, changeScript);
+        return tx;
+    }
+
+    private PSBT buildSilentPaymentPsbt(long silentPaymentAmount) {
+        PSBT psbt = new PSBT(buildSilentPaymentTransaction(new Script(new byte[0]), silentPaymentAmount, CHANGE_SCRIPT));
+        SilentPaymentAddress silentPaymentAddress = new SilentPaymentAddress(new ECKey(), new ECKey());
+        psbt.getPsbtOutputs().set(0, new PSBTOutput(psbt, 0, null, silentPaymentAmount, new Script(new byte[0]), null, null, Collections.emptyMap(), Collections.emptyMap(), null, silentPaymentAddress, null, null));
+        return psbt;
     }
 
     @AfterEach
