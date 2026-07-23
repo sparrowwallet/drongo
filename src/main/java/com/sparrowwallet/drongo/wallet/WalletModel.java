@@ -6,7 +6,7 @@ public enum WalletModel {
     SEED, SPARROW, BITCOIN_CORE, ELECTRUM, TREZOR_1, TREZOR_T, COLDCARD, LEDGER_NANO_S, LEDGER_NANO_X, DIGITALBITBOX_01, KEEPKEY, SPECTER_DESKTOP, COBO_VAULT,
     BITBOX_02, SPECTER_DIY, PASSPORT, BLUE_WALLET, KEYSTONE, SEEDSIGNER, CARAVAN, GORDIAN_SEED_TOOL, JADE, LEDGER_NANO_S_PLUS, EPS, TAPSIGNER, SATSCARD, LABELS,
     BSMS, KRUX, SATOCHIP, TRANSACTIONS, AIRGAP_VAULT, TREZOR_SAFE_3, SATSCHIP, SAMOURAI, TREZOR_SAFE_5, LEDGER_STAX, LEDGER_FLEX, ONEKEY_CLASSIC_1S, ONEKEY_PRO,
-    KEYCARD_SHELL, KEYCARD, TREZOR_SAFE_7, LEDGER_NANO_GEN5;
+    KEYCARD_SHELL, KEYCARD, TREZOR_SAFE_7, LEDGER_NANO_GEN5, ERA_WALLET;
 
     public static WalletModel getModel(String model) {
         return valueOf(model.toUpperCase(Locale.ROOT));
@@ -61,12 +61,16 @@ public enum WalletModel {
             return "keycard";
         }
 
+        if(this == ERA_WALLET) {
+            return "era";
+        }
+
         return this.toString().toLowerCase(Locale.ROOT);
     }
 
     public boolean alwaysIncludeNonWitnessUtxo() {
         if(this == COLDCARD || this == COBO_VAULT || this == PASSPORT || this == KEYSTONE || this == GORDIAN_SEED_TOOL || this == SEEDSIGNER || this == KRUX || this == JADE ||
-           this == TAPSIGNER || this == SATOCHIP || this == KEYCARD_SHELL || this == KEYCARD) {
+           this == TAPSIGNER || this == SATOCHIP || this == KEYCARD_SHELL || this == KEYCARD || this == ERA_WALLET) {
             return false;
         }
 
@@ -189,6 +193,8 @@ public enum WalletModel {
                 word = "OneKey";
             } else if(word.equals("diy")) {
                 word = "DIY";
+            } else if(word.equals("era")) {
+                word = "ERA";
             }
             builder.append(Character.toUpperCase(word.charAt(0)));
             builder.append(word.substring(1));
