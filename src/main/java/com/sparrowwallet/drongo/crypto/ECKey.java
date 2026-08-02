@@ -836,12 +836,6 @@ public class ECKey {
         return Utils.bigIntegerToBytes(getPrivKey(), 32);
     }
 
-    public void clear() {
-        for(int i = 0; i < priv.bitLength(); i++) {
-            priv.clearBit(i);
-        }
-    }
-
     public static class MissingPrivateKeyException extends RuntimeException {
     }
 
