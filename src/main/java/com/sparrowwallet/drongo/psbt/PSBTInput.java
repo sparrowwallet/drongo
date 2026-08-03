@@ -199,47 +199,12 @@ public class PSBTInput {
                 case PSBT_IN_REDEEM_SCRIPT:
                     entry.checkOneByteKey();
                     Script redeemScript = new Script(entry.getData());
-                    Script scriptPubKey = null;
-                    if(this.nonWitnessUtxo != null) {
-                        Long prevIndex = getPrevIndex();
-                        if(prevIndex == null) {
-                            throw new PSBTParseException("Outpoint index not present for input " + index);
-                        }
-                        scriptPubKey = this.nonWitnessUtxo.getOutputs().get(prevIndex.intValue()).getScript();
-                    } else if(this.witnessUtxo != null) {
-                        scriptPubKey = this.witnessUtxo.getScript();
-                        if(!P2WPKH.isScriptType(redeemScript) && !P2WSH.isScriptType(redeemScript)) { //Witness UTXO should only be provided for P2SH-P2WPKH or P2SH-P2WSH
-                            throw new PSBTParseException("Witness UTXO provided but redeem script is not P2WPKH or P2WSH");
-                        }
-                    }
-                    if(scriptPubKey == null) {
-                        log.warn("PSBT provided a redeem script for a transaction output that was not provided");
-                    } else {
-                        if(!P2SH.isScriptType(scriptPubKey)) {
-                            throw new PSBTParseException("PSBT provided a redeem script for a transaction output that does not need one");
-                        }
-                        if(!Arrays.equals(Utils.sha256hash160(redeemScript.getProgram()), scriptPubKey.getPubKeyHash())) {
-                            throw new PSBTParseException("Redeem script hash does not match transaction output script pubkey hash " + Utils.bytesToHex(scriptPubKey.getPubKeyHash()));
-                        }
-                    }
-
                     this.redeemScript = redeemScript;
                     log.debug("Found input redeem script hex " + Utils.bytesToHex(redeemScript.getProgram()) + " script " + redeemScript);
                     break;
                 case PSBT_IN_WITNESS_SCRIPT:
                     entry.checkOneByteKey();
                     Script witnessScript = new Script(entry.getData());
-                    byte[] pubKeyHash = null;
-                    if(this.redeemScript != null && P2WSH.isScriptType(this.redeemScript)) { //P2SH-P2WSH
-                        pubKeyHash = this.redeemScript.getPubKeyHash();
-                    } else if(this.witnessUtxo != null && P2WSH.isScriptType(this.witnessUtxo.getScript())) { //P2WSH
-                        pubKeyHash = this.witnessUtxo.getScript().getPubKeyHash();
-                    }
-                    if(pubKeyHash == null) {
-                        log.warn("Witness script provided without P2WSH witness utxo or P2SH redeem script");
-                    } else if(!Arrays.equals(Sha256Hash.hash(witnessScript.getProgram()), pubKeyHash)) {
-                        throw new PSBTParseException("Witness script hash does not match provided pay to script hash " + Utils.bytesToHex(pubKeyHash));
-                    }
                     this.witnessScript = witnessScript;
                     log.debug("Found input witness script hex " + Utils.bytesToHex(witnessScript.getProgram()) + " script " + witnessScript);
                     break;
@@ -411,6 +376,72 @@ public class PSBTInput {
                     log.warn("PSBT input not recognized key type: " + entry.getKeyType());
             }
         }
+
+        verifyUtxo();
+    }
+
+    /**
+     * Verifies the utxo of this input is internally consistent, and that any provided redeem and witness scripts match it.
+     * Only the non witness utxo is verified against the outpoint txid, so a witness utxo can only be relied on where the
+     * sighash commits to the input amount - that is, where the input is a witness type.
+     *
+     * @throws PSBTParseException if the utxo, redeem script or witness script provided for this input are inconsistent
+     */
+    void verifyUtxo() throws PSBTParseException {
+        //Any provided outpoint index must be present in the non witness utxo transaction, which is verified against the outpoint txid
+        TransactionOutput nonWitnessUtxoOutput = getNonWitnessUtxoOutput();
+        if(nonWitnessUtxo != null && getPrevIndex() != null && nonWitnessUtxoOutput == null) {
+            throw new PSBTParseException("Non witness utxo transaction has no output at index " + getPrevIndex() + " for input " + index);
+        }
+
+        if(witnessUtxo != null && nonWitnessUtxoOutput != null
+                && (witnessUtxo.getValue() != nonWitnessUtxoOutput.getValue() || !Arrays.equals(witnessUtxo.getScript().getProgram(), nonWitnessUtxoOutput.getScript().getProgram()))) {
+            throw new PSBTParseException("Witness utxo of " + witnessUtxo.getValue() + " sats does not match the non witness utxo output of " + nonWitnessUtxoOutput.getValue() + " sats for input " + index);
+        }
+
+        //Witness utxos should only be provided for P2SH-P2WPKH or P2SH-P2WSH, as the legacy sighash does not commit to the input amount
+        //A witness utxo that matches the txid verified non witness utxo output is redundant but harmless
+        if(witnessUtxo != null && nonWitnessUtxoOutput == null && P2SH.isScriptType(witnessUtxo.getScript())) {
+            Script nestedScript = redeemScript != null ? redeemScript : (finalScriptSig != null ? finalScriptSig.getFirstNestedScript() : null);
+            if(nestedScript == null || (!P2WPKH.isScriptType(nestedScript) && !P2WSH.isScriptType(nestedScript))) {
+                throw new PSBTParseException("Witness utxo provided for input " + index + " but redeem script is not P2WPKH or P2WSH");
+            }
+        }
+
+        Script scriptPubKey = nonWitnessUtxoOutput != null ? nonWitnessUtxoOutput.getScript() : (witnessUtxo != null ? witnessUtxo.getScript() : null);
+
+        if(redeemScript != null) {
+            if(scriptPubKey == null) {
+                log.warn("PSBT provided a redeem script for a transaction output that was not provided");
+            } else if(!P2SH.isScriptType(scriptPubKey)) {
+                throw new PSBTParseException("PSBT provided a redeem script for a transaction output that does not need one");
+            } else if(!Arrays.equals(Utils.sha256hash160(redeemScript.getProgram()), scriptPubKey.getPubKeyHash())) {
+                throw new PSBTParseException("Redeem script hash does not match transaction output script pubkey hash " + Utils.bytesToHex(scriptPubKey.getPubKeyHash()));
+            }
+        }
+
+        if(witnessScript != null) {
+            byte[] pubKeyHash = null;
+            if(redeemScript != null && P2WSH.isScriptType(redeemScript)) { //P2SH-P2WSH
+                pubKeyHash = redeemScript.getPubKeyHash();
+            } else if(scriptPubKey != null && P2WSH.isScriptType(scriptPubKey)) { //P2WSH
+                pubKeyHash = scriptPubKey.getPubKeyHash();
+            }
+            if(pubKeyHash == null) {
+                log.warn("Witness script provided without P2WSH witness utxo or P2SH redeem script");
+            } else if(!Arrays.equals(Sha256Hash.hash(witnessScript.getProgram()), pubKeyHash)) {
+                throw new PSBTParseException("Witness script hash does not match provided pay to script hash " + Utils.bytesToHex(pubKeyHash));
+            }
+        }
+    }
+
+    private TransactionOutput getNonWitnessUtxoOutput() {
+        Long prevIndex = getPrevIndex();
+        if(nonWitnessUtxo == null || prevIndex == null || prevIndex < 0 || prevIndex >= nonWitnessUtxo.getOutputs().size()) {
+            return null;
+        }
+
+        return nonWitnessUtxo.getOutputs().get(prevIndex.intValue());
     }
 
     public List<PSBTEntry> getInputEntries(int psbtVersion) {
@@ -1023,7 +1054,12 @@ public class PSBTInput {
     }
 
     public ScriptType getScriptType() {
-        Script signingScript = getUtxo().getScript();
+        TransactionOutput utxo = getUtxo();
+        if(utxo == null) {
+            return null;
+        }
+
+        Script signingScript = utxo.getScript();
 
         boolean p2sh = false;
         if(P2SH.isScriptType(signingScript)) {
@@ -1091,8 +1127,9 @@ public class PSBTInput {
     }
 
     public TransactionOutput getUtxo() {
-        int vout = (int)getInput().getOutpoint().getIndex();
-        return getWitnessUtxo() != null ? getWitnessUtxo() : (getNonWitnessUtxo() != null ?  getNonWitnessUtxo().getOutputs().get(vout) : null);
+        //Prefer the non witness utxo, as it is the only form verified against the outpoint txid
+        TransactionOutput nonWitnessUtxoOutput = getNonWitnessUtxoOutput();
+        return nonWitnessUtxoOutput != null ? nonWitnessUtxoOutput : getWitnessUtxo();
     }
 
     int getIndex() {

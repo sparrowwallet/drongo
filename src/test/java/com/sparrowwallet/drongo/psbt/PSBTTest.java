@@ -1469,6 +1469,103 @@ public class PSBTTest {
         Assertions.assertFalse(truncatedPsbt.matches(tx));
     }
 
+    //BIP174 test vector - input 0 is a legacy P2SH multisig with a non witness utxo, input 1 is P2SH-P2WSH with a witness utxo
+    private static final String TWO_INPUTS_TWO_OUTPUTS_PSBT = "cHNidP8BAJoCAAAAAljoeiG1ba8MI76OcHBFbDNvfLqlyHV5JPVFiHuyq911AAAAAAD/////g40EJ9DsZQpoqka7CwmK6kQiwHGyyng1Kgd5WdB86h0BAAAAAP////8CcKrwCAAAAAAWABTYXCtx0AYLCcmIauuBXlCZHdoSTQDh9QUAAAAAFgAUAK6pouXw+HaliN9VRuh0LR2HAI8AAAAAAAEAuwIAAAABqtc5MQGL0l+ErkALaISL4J23BurCrBgpi6vucatlb4sAAAAASEcwRAIgWPb8fGoz4bMVSNSByCbAFb0wE1qtQs1neQ2rZtKtJDsCIEoc7SYExnNbY5PltBaR3XiwDwxZQvufdRhW+qk4FX26Af7///8CgPD6AgAAAAAXqRQPuUY0IWlrgsgzryQceMF9295JNIfQ8gonAQAAABepFCnKdPigj4GZlCgYXJe12FLkBj9hh2UAAAAiAgKVg785rgpgl0etGZrd1jT6YQhVnWxc05tMIYPxq5bgf0cwRAIgdAGK1BgAl7hzMjwAFXILNoTMgSOJEEjn282bVa1nnJkCIHPTabdA4+tT3O+jOCPIBwUUylWn3ZVE8VfBZ5EyYRGMASICAtq2H/SaFNtqfQKwzR+7ePxLGDErW05U2uTbovv+9TbXSDBFAiEA9hA4swjcHahlo0hSdG8BV3KTQgjG0kRUOTzZm98iF3cCIAVuZ1pnWm0KArhbFOXikHTYolqbV2C+ooFvZhkQoAbqAQEDBAEAAAABBEdSIQKVg785rgpgl0etGZrd1jT6YQhVnWxc05tMIYPxq5bgfyEC2rYf9JoU22p9ArDNH7t4/EsYMStbTlTa5Nui+/71NtdSriIGApWDvzmuCmCXR60Zmt3WNPphCFWdbFzTm0whg/GrluB/ENkMak8AAACAAAAAgAAAAIAiBgLath/0mhTban0CsM0fu3j8SxgxK1tOVNrk26L7/vU21xDZDGpPAAAAgAAAAIABAACAAAEBIADC6wsAAAAAF6kUt/X69A49QKWkWbHbNTXyty+pIeiHIgIDCJ3BDHrG21T5EymvYXMz2ziM6tDCMfcjN50bmQMLAtxHMEQCIGLrelVhB6fHP0WsSrWh3d9vcHX7EnWWmn84Pv/3hLyyAiAMBdu3Rw2/LwhVfdNWxzJcHtMJE+mWzThAlF2xIijaXwEiAgI63ZBPPW3PWd25BrDe4jUpt/+57VDl6GFRkmhgIh8Oc0cwRAIgZfRbpZmLWaJ//hp77QFq8fH5DVSzqo90UKpfVqJRA70CIH9yRwOtHtuWaAsoS1bU/8uI9/t1nqu+CKow8puFE4PSAQEDBAEAAAABBCIAIIwjUxc3Q7WV37Sge3K6jkLjeX2nTof+fZ10l+OyAokDAQVHUiEDCJ3BDHrG21T5EymvYXMz2ziM6tDCMfcjN50bmQMLAtwhAjrdkE89bc9Z3bkGsN7iNSm3/7ntUOXoYVGSaGAiHw5zUq4iBgI63ZBPPW3PWd25BrDe4jUpt/+57VDl6GFRkmhgIh8OcxDZDGpPAAAAgAAAAIADAACAIgYDCJ3BDHrG21T5EymvYXMz2ziM6tDCMfcjN50bmQMLAtwQ2QxqTwAAAIAAAACAAgAAgAAiAgOppMN/WZbTqiXbrGtXCvBlA5RJKUJGCzVHU+2e7KWHcRDZDGpPAAAAgAAAAIAEAACAACICAn9jmXV9Lv9VoTatAsaEsYOLZVbl8bazQoKpS2tQBRCWENkMak8AAACAAAAAgAUAAIAA";
+
+    @Test
+    public void witnessUtxoMustMatchNonWitnessUtxo() throws PSBTParseException {
+        PSBT psbt = PSBT.fromString(TWO_INPUTS_TWO_OUTPUTS_PSBT);
+        PSBTInput psbtInput = psbt.getPsbtInputs().get(0);
+        TransactionOutput utxo = psbtInput.getUtxo();
+        psbtInput.setWitnessUtxo(new TransactionOutput(null, utxo.getValue() / 10, utxo.getScript()));
+
+        String tampered = psbt.toBase64String();
+        Exception e = Assertions.assertThrows(PSBTParseException.class, () -> PSBT.fromString(tampered));
+        Assertions.assertTrue(e.getMessage().contains("does not match the non witness utxo output"), e.getMessage());
+    }
+
+    @Test
+    public void witnessUtxoNotAllowedForLegacyP2shInput() throws PSBTParseException {
+        PSBT psbt = PSBT.fromString(TWO_INPUTS_TWO_OUTPUTS_PSBT);
+        PSBTInput psbtInput = psbt.getPsbtInputs().get(0);
+        TransactionOutput utxo = psbtInput.getUtxo();
+        //An understated amount is undetectable without the non witness utxo, as the legacy sighash does not commit to it
+        psbtInput.setWitnessUtxo(new TransactionOutput(null, utxo.getValue() / 10, utxo.getScript()));
+        psbtInput.setNonWitnessUtxo(null);
+
+        String tampered = psbt.toBase64String();
+        Exception e = Assertions.assertThrows(PSBTParseException.class, () -> PSBT.fromString(tampered));
+        Assertions.assertTrue(e.getMessage().contains("redeem script is not P2WPKH or P2WSH"), e.getMessage());
+    }
+
+    @Test
+    public void witnessUtxoNotAllowedForLegacyP2shInputWithReorderedEntries() throws PSBTParseException {
+        PSBT psbt = PSBT.fromString(TWO_INPUTS_TWO_OUTPUTS_PSBT);
+        PSBTInput psbtInput = psbt.getPsbtInputs().get(0);
+        TransactionOutput utxo = psbtInput.getUtxo();
+        psbtInput.setWitnessUtxo(new TransactionOutput(null, utxo.getValue() / 10, utxo.getScript()));
+        psbtInput.setNonWitnessUtxo(null);
+        psbtInput.getPartialSignatures().clear();
+        psbtInput.setSigHash(null);
+        psbtInput.getDerivedPublicKeys().clear();
+
+        //A redeem script provided before the witness utxo cannot be checked against it while the entries are being parsed
+        String witnessUtxoEntry = "0101" + Utils.bytesToHex(new byte[] {(byte)psbtInput.getWitnessUtxo().bitcoinSerialize().length}) + Utils.bytesToHex(psbtInput.getWitnessUtxo().bitcoinSerialize());
+        String redeemScriptEntry = "0104" + Utils.bytesToHex(new byte[] {(byte)psbtInput.getRedeemScript().getProgram().length}) + Utils.bytesToHex(psbtInput.getRedeemScript().getProgram());
+        String serialized = Utils.bytesToHex(psbt.serialize());
+        Assertions.assertTrue(serialized.contains(witnessUtxoEntry + redeemScriptEntry));
+        byte[] reordered = Utils.hexToBytes(serialized.replace(witnessUtxoEntry + redeemScriptEntry, redeemScriptEntry + witnessUtxoEntry));
+
+        Exception e = Assertions.assertThrows(PSBTParseException.class, () -> new PSBT(reordered, false));
+        Assertions.assertTrue(e.getMessage().contains("redeem script is not P2WPKH or P2WSH"), e.getMessage());
+    }
+
+    @Test
+    public void consistentWitnessUtxoAllowedForLegacyP2shInput() throws PSBTParseException {
+        PSBT psbt = PSBT.fromString(TWO_INPUTS_TWO_OUTPUTS_PSBT);
+        PSBTInput psbtInput = psbt.getPsbtInputs().get(0);
+        TransactionOutput utxo = psbtInput.getUtxo();
+        //A redundant witness utxo matching the txid verified non witness utxo output is harmless, as the verified amount is used
+        psbtInput.setWitnessUtxo(new TransactionOutput(null, utxo.getValue(), utxo.getScript()));
+
+        PSBT reparsed = PSBT.fromString(psbt.toBase64String());
+        Assertions.assertEquals(utxo.getValue(), reparsed.getPsbtInputs().get(0).getUtxo().getValue());
+        Assertions.assertEquals(psbt.getFee(), reparsed.getFee());
+    }
+
+    @Test
+    public void witnessUtxoAllowedForNestedSegwitInput() throws PSBTParseException {
+        PSBT psbt = PSBT.fromString(TWO_INPUTS_TWO_OUTPUTS_PSBT);
+        PSBTInput psbtInput = psbt.getPsbtInputs().get(1);
+
+        Assertions.assertEquals(ScriptType.P2SH_P2WSH, psbtInput.getScriptType());
+        Assertions.assertNotNull(psbtInput.getWitnessUtxo());
+        Assertions.assertEquals(psbtInput.getWitnessUtxo().getValue(), PSBT.fromString(psbt.toBase64String()).getPsbtInputs().get(1).getUtxo().getValue());
+    }
+
+    @Test
+    public void nonWitnessUtxoMustContainOutpointIndex() throws PSBTParseException {
+        PSBT psbt = PSBT.fromString(TWO_INPUTS_TWO_OUTPUTS_PSBT);
+        psbt.convertVersion(2);
+        psbt.getPsbtInputs().get(0).setPrevIndex(5L);
+
+        String tampered = psbt.toBase64String();
+        Exception e = Assertions.assertThrows(PSBTParseException.class, () -> PSBT.fromString(tampered));
+        Assertions.assertTrue(e.getMessage().contains("has no output at index 5"), e.getMessage());
+    }
+
+    @Test
+    public void getUtxoPrefersTxidVerifiedNonWitnessUtxo() throws PSBTParseException {
+        PSBT psbt = PSBT.fromString(TWO_INPUTS_TWO_OUTPUTS_PSBT);
+        PSBTInput psbtInput = psbt.getPsbtInputs().get(0);
+        long utxoValue = psbtInput.getUtxo().getValue();
+        Long fee = psbt.getFee();
+        psbtInput.setWitnessUtxo(new TransactionOutput(null, utxoValue / 10, psbtInput.getUtxo().getScript()));
+
+        Assertions.assertEquals(utxoValue, psbtInput.getUtxo().getValue());
+        Assertions.assertEquals(fee, psbt.getFee());
+    }
+
     private static final Script CHANGE_SCRIPT = new Script(Utils.hexToBytes("76a914000000000000000000000000000000000000000088ac"));
     private static final Script P2TR_SCRIPT = new Script(Utils.hexToBytes("5120aa00000000000000000000000000000000000000000000000000000000000011"));
     private static final String MATCHES_V0_PSBT = "cHNidP8BAHUCAAAAASaBcTce3/KF6Tet7qSze3gADAVmy7OtZGQXE8pCFxv2AAAAAAD+////AtPf9QUAAAAAGXapFNDFmQPFusKGh2DpD9UhpGZap2UgiKwA4fUFAAAAABepFDVF5uM7gyxHBQ8k0+65PJwDlIvHh7MuEwAAAQD9pQEBAAAAAAECiaPHHqtNIOA3G7ukzGmPopXJRjr6Ljl/hTPMti+VZ+UBAAAAFxYAFL4Y0VKpsBIDna89p95PUzSe7LmF/////4b4qkOnHf8USIk6UwpyN+9rRgi7st0tAXHmOuxqSJC0AQAAABcWABT+Pp7xp0XpdNkCxDVZQ6vLNL1TU/////8CAMLrCwAAAAAZdqkUhc/xCX/Z4Ai7NK9wnGIZeziXikiIrHL++E4sAAAAF6kUM5cluiHv1irHU6m80GfWx6ajnQWHAkcwRAIgJxK+IuAnDzlPVoMR3HyppolwuAJf3TskAinwf4pfOiQCIAGLONfc0xTnNMkna9b7QPZzMlvEuqFEyADS8vAtsnZcASED0uFWdJQbrUqZY3LLh+GFbTZSYG2YVi/jnF6efkE/IQUCSDBFAiEA0SuFLYXc2WHS9fSrZgZU327tzHlMDDPOXMMJ/7X85Y0CIGczio4OFyXBl/saiK9Z9R5E5CVbIBZ8hoQDHAXR8lkqASECI7cr7vCWXRC+B3jv7NYfysb3mk6haTkzgHNEZPhPKrMAAAAAAAAA";
