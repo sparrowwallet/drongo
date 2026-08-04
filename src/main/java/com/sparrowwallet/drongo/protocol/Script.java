@@ -291,24 +291,30 @@ public class Script {
         while (cursor < inputScript.length) {
             boolean skip = equalsRange(inputScript, cursor, chunkToRemove);
 
+            int opcodeStart = cursor;
             int opcode = inputScript[cursor++] & 0xFF;
-            int additionalBytes = 0;
+            // A length that cannot be read in full is signalled as -1. Held as a long so that a PUSHDATA4 length near
+            // 2^32 compares as the oversized push it is, rather than wrapping on a cast to int.
+            long additionalBytes = 0;
             if (opcode >= 0 && opcode < OP_PUSHDATA1) {
                 additionalBytes = opcode;
             } else if (opcode == OP_PUSHDATA1) {
-                additionalBytes = (0xFF & inputScript[cursor]) + 1;
+                additionalBytes = inputScript.length - cursor < 1 ? -1 : (0xFF & inputScript[cursor]) + 1;
             } else if (opcode == OP_PUSHDATA2) {
-                additionalBytes = Utils.readUint16(inputScript, cursor) + 2;
+                additionalBytes = inputScript.length - cursor < 2 ? -1 : Utils.readUint16(inputScript, cursor) + 2;
             } else if (opcode == OP_PUSHDATA4) {
-                additionalBytes = (int) Utils.readUint32(inputScript, cursor) + 4;
+                additionalBytes = inputScript.length - cursor < 4 ? -1 : Utils.readUint32(inputScript, cursor) + 4;
+            }
+            if (additionalBytes < 0 || additionalBytes > inputScript.length - cursor) {
+                // A push whose length prefix or data runs past the end of the script cannot be parsed. Bitcoin Core's
+                // FindAndDelete copies such a trailing fragment through unchanged, so do the same rather than reading
+                // out of bounds or zero padding the result.
+                bos.write(inputScript, opcodeStart, inputScript.length - opcodeStart);
+                break;
             }
             if (!skip) {
-                try {
-                    bos.write(opcode);
-                    bos.write(Arrays.copyOfRange(inputScript, cursor, cursor + additionalBytes));
-                } catch (IOException e) {
-                    throw new RuntimeException(e);
-                }
+                bos.write(opcode);
+                bos.write(inputScript, cursor, (int)additionalBytes);
             }
             cursor += additionalBytes;
         }

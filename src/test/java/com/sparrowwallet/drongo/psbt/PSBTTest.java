@@ -1566,6 +1566,59 @@ public class PSBTTest {
         Assertions.assertEquals(fee, psbt.getFee());
     }
 
+    @Test
+    public void truncatedSigningScriptPushIsCopiedThroughUnchanged() {
+        //A push whose data runs past the end of the script cannot be parsed. Bitcoin Core's FindAndDelete copies
+        //such a trailing fragment through unchanged, rather than zero padding it out to the claimed length.
+        assertSigningScriptCode("51050102", "51050102");
+        assertSigningScriptCode("514c", "514c");
+    }
+
+    @Test
+    public void oversizedSigningScriptPushIsCopiedThroughUnchanged() {
+        //An OP_PUSHDATA4 length near 2^32 must be treated as the oversized push it is. Wrapping it onto an int
+        //makes 0xffffffff read as a three byte push, resuming the scan in the middle of the push data.
+        assertSigningScriptCode("4effffffffab", "4effffffffab");
+        assertSigningScriptCode("514efbffffff", "514efbffffff");
+    }
+
+    @Test
+    public void codeSeparatorBeforeUnparseableSigningScriptPushIsStillRemoved() {
+        //Preserving the unparseable fragment must not stop separators ahead of it being removed as usual
+        assertSigningScriptCode("ab514c", "514c");
+        assertSigningScriptCode("ab88ab4effffffff", "884effffffff");
+    }
+
+    private void assertSigningScriptCode(String utxoScriptHex, String expectedScriptCodeHex) {
+        PSBT psbt = buildNonStandardUtxoPsbt(utxoScriptHex);
+        Script signingScript = psbt.getPsbtInputs().getFirst().getSigningScript();
+        Assertions.assertArrayEquals(Utils.hexToBytes(expectedScriptCodeHex), Script.removeAllInstancesOfOp(signingScript.getProgram(), ScriptOpCodes.OP_CODESEPARATOR));
+    }
+
+    private PSBT buildNonStandardUtxoPsbt(String utxoScriptHex) {
+        //An output script of an unrecognised type is returned verbatim by getSigningScript(), so a malformed one
+        //reaches the legacy sighash. Supplying the previous transaction in full keeps the outpoint txid consistent.
+        Transaction prevTx = new Transaction();
+        prevTx.setVersion(2);
+        prevTx.addInput(Sha256Hash.wrap(Utils.hexToBytes("aa00000000000000000000000000000000000000000000000000000000000011")), 0, new Script(new byte[0]));
+        prevTx.addOutput(100000L, new Script(Utils.hexToBytes(utxoScriptHex)));
+
+        Transaction tx = new Transaction();
+        tx.setVersion(2);
+        tx.addInput(prevTx.getTxId(), 0, new Script(new byte[0]));
+        tx.addOutput(90000L, CHANGE_SCRIPT);
+
+        PSBT psbt = new PSBT(tx);
+        psbt.getPsbtInputs().getFirst().setNonWitnessUtxo(prevTx);
+
+        try {
+            //Parsing with signature verification enabled computes the legacy sighash, which must not throw
+            return new PSBT(psbt.serialize(), true);
+        } catch(PSBTParseException e) {
+            throw new IllegalStateException("Could not reparse constructed PSBT", e);
+        }
+    }
+
     private static final Script CHANGE_SCRIPT = new Script(Utils.hexToBytes("76a914000000000000000000000000000000000000000088ac"));
     private static final Script P2TR_SCRIPT = new Script(Utils.hexToBytes("5120aa00000000000000000000000000000000000000000000000000000000000011"));
     private static final String MATCHES_V0_PSBT = "cHNidP8BAHUCAAAAASaBcTce3/KF6Tet7qSze3gADAVmy7OtZGQXE8pCFxv2AAAAAAD+////AtPf9QUAAAAAGXapFNDFmQPFusKGh2DpD9UhpGZap2UgiKwA4fUFAAAAABepFDVF5uM7gyxHBQ8k0+65PJwDlIvHh7MuEwAAAQD9pQEBAAAAAAECiaPHHqtNIOA3G7ukzGmPopXJRjr6Ljl/hTPMti+VZ+UBAAAAFxYAFL4Y0VKpsBIDna89p95PUzSe7LmF/////4b4qkOnHf8USIk6UwpyN+9rRgi7st0tAXHmOuxqSJC0AQAAABcWABT+Pp7xp0XpdNkCxDVZQ6vLNL1TU/////8CAMLrCwAAAAAZdqkUhc/xCX/Z4Ai7NK9wnGIZeziXikiIrHL++E4sAAAAF6kUM5cluiHv1irHU6m80GfWx6ajnQWHAkcwRAIgJxK+IuAnDzlPVoMR3HyppolwuAJf3TskAinwf4pfOiQCIAGLONfc0xTnNMkna9b7QPZzMlvEuqFEyADS8vAtsnZcASED0uFWdJQbrUqZY3LLh+GFbTZSYG2YVi/jnF6efkE/IQUCSDBFAiEA0SuFLYXc2WHS9fSrZgZU327tzHlMDDPOXMMJ/7X85Y0CIGczio4OFyXBl/saiK9Z9R5E5CVbIBZ8hoQDHAXR8lkqASECI7cr7vCWXRC+B3jv7NYfysb3mk6haTkzgHNEZPhPKrMAAAAAAAAA";
