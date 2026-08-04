@@ -1096,10 +1096,14 @@ public class PSBT {
         publicCopy.globalProprietary.clear();
         for(PSBTInput psbtInput : publicCopy.getPsbtInputs()) {
             psbtInput.getDerivedPublicKeys().clear();
+            psbtInput.getTapDerivedPublicKeys().clear();
+            psbtInput.setTapInternalKey(null);
             psbtInput.getProprietary().clear();
         }
         for(PSBTOutput psbtOutput : publicCopy.getPsbtOutputs()) {
             psbtOutput.getDerivedPublicKeys().clear();
+            psbtOutput.getTapDerivedPublicKeys().clear();
+            psbtOutput.setTapInternalKey(null);
             psbtOutput.getProprietary().clear();
         }
 
