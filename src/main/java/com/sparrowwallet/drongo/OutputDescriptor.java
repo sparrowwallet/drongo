@@ -132,7 +132,8 @@ public class OutputDescriptor {
     }
 
     public boolean describesMultipleAddresses(ExtendedKey extendedPublicKey) {
-        return getChildDerivationPath(extendedPublicKey) == null || getChildDerivationPath(extendedPublicKey).endsWith("/*");
+        String childDerivationPath = getChildDerivationPath(extendedPublicKey);
+        return childDerivationPath == null || childDerivationPath.endsWith("*");
     }
 
     public List<ChildNumber> getReceivingDerivation(ExtendedKey extendedPublicKey, int wildCardReplacement) {
@@ -229,11 +230,11 @@ public class OutputDescriptor {
     public boolean describesMultipleAddresses() {
         for(ExtendedKey pubKey : extendedPublicKeys.keySet()) {
             if(describesMultipleAddresses(pubKey)) {
-                return false;
+                return true;
             }
         }
 
-        return true;
+        return false;
     }
 
     public List<ChildNumber> getChildDerivation() {
@@ -302,7 +303,9 @@ public class OutputDescriptor {
 
     private List<ChildNumber> getKeyPath(ExtendedKey pubKey, List<ChildNumber> childPath) {
         List<ChildNumber> keyPath;
-        if(childPath.get(0).num() == 0) {
+        if(!describesMultipleAddresses(pubKey)) {
+            keyPath = getChildDerivation(pubKey);
+        } else if(childPath.get(0).num() == 0) {
             keyPath = getReceivingDerivation(pubKey, childPath.get(1).num());
         } else if(childPath.get(0).num() == 1) {
             keyPath = getChangeDerivation(pubKey, childPath.get(1).num());
@@ -542,7 +545,11 @@ public class OutputDescriptor {
         Matcher matcher = MULTI_PATTERN.matcher(descriptor);
         if(matcher.find()) {
             String threshold = matcher.group(1);
-            return Integer.parseInt(threshold);
+            try {
+                return Integer.parseInt(threshold);
+            } catch(NumberFormatException e) {
+                throw new IllegalArgumentException("Invalid multisig threshold of " + threshold + " in descriptor");
+            }
         } else {
             return 1;
         }
@@ -604,6 +611,10 @@ public class OutputDescriptor {
             if(pubKeyMatcher.find()) {
                 throw new IllegalArgumentException("Descriptors with single public keys are not supported - use descriptors with xpubs");
             }
+        }
+
+        if(MULTI_PATTERN.matcher(descriptor).find() && (multisigThreshold < 1 || multisigThreshold > keyDerivationMap.size())) {
+            throw new IllegalArgumentException("Invalid multisig threshold of " + multisigThreshold + " in a descriptor providing " + keyDerivationMap.size() + " key" + (keyDerivationMap.size() == 1 ? "" : "s"));
         }
 
         return new OutputDescriptor(scriptType, multisigThreshold, keyDerivationMap, keyChildDerivationMap, mapExtendedPublicKeyLabels, masterPrivateKeyMap, annotations);

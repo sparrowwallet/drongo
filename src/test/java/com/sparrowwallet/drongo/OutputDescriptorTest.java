@@ -430,4 +430,38 @@ public class OutputDescriptorTest {
         OutputDescriptor descriptor = OutputDescriptor.getOutputDescriptor("wpkh(xpub6CatWdiZiodmUeTDp8LT5or8nmbKNcuyvz7WyksVFkKB4RHwCD3XyuvPEbvqAQY3rAPshWcMLoP2fMFMKHPJ4ZeZXYVUhLv1VMrjPC7PW6V)");
         Assertions.assertTrue(descriptor.getAnnotations().isEmpty());
     }
+
+    @Test
+    public void describesMultipleAddresses() {
+        String a = "[1cf0bf7e/48'/0'/0'/2']xpub6FL8FhxNNUVnG64YurPd16AfGyvFLhh7S2uSsDqR3Qfcm6o9jtcMYwh6DvmcBF9qozxNQmTCVvWtxLpKTnhVLN3Pgnu2D3pAoXYFgVyd8Yz";
+        String b = "[4fc1dd4a/48'/0'/0'/2']xpub6EebMbEps7ZcV3FYEnddRsvrFWDrt2tiPmCeM7pPXQEmphvq9ZfJ1LWFUDjf3vxCeBuPrfyGrMazWUsYsetrnHatQZVLJH7LsgCjtMqdzgj";
+
+        //A /** descriptor template describes multiple addresses, as does an explicit wildcard or a multipath expression
+        Assertions.assertTrue(OutputDescriptor.getOutputDescriptor("wsh(sortedmulti(2," + a + "/**," + b + "/**))").describesMultipleAddresses());
+        Assertions.assertTrue(OutputDescriptor.getOutputDescriptor("wsh(sortedmulti(2," + a + "/0/*," + b + "/0/*))").describesMultipleAddresses());
+        Assertions.assertTrue(OutputDescriptor.getOutputDescriptor("wsh(sortedmulti(2," + a + "/<0;1>/*," + b + "/<0;1>/*))").describesMultipleAddresses());
+        Assertions.assertTrue(OutputDescriptor.getOutputDescriptor("wsh(sortedmulti(2," + a + "," + b + "))").describesMultipleAddresses());
+
+        //A concrete child derivation describes exactly one address
+        Assertions.assertFalse(OutputDescriptor.getOutputDescriptor("wsh(sortedmulti(2," + a + "/0/0," + b + "/0/0))").describesMultipleAddresses());
+        Assertions.assertFalse(OutputDescriptor.getOutputDescriptor("wsh(sortedmulti(2," + a + "/1/5," + b + "/1/5))").describesMultipleAddresses());
+    }
+
+    @Test
+    public void singleAddressMultisigDerivation() {
+        //The child number of the keys must not be mistaken for a chain index - 2' here, but 1' for P2SH-P2WSH and 0' for P2SH
+        String p2wsh = "wsh(sortedmulti(2,[1cf0bf7e/48'/0'/0'/2']xpub6FL8FhxNNUVnG64YurPd16AfGyvFLhh7S2uSsDqR3Qfcm6o9jtcMYwh6DvmcBF9qozxNQmTCVvWtxLpKTnhVLN3Pgnu2D3pAoXYFgVyd8Yz/0/0,[4fc1dd4a/48'/0'/0'/2']xpub6EebMbEps7ZcV3FYEnddRsvrFWDrt2tiPmCeM7pPXQEmphvq9ZfJ1LWFUDjf3vxCeBuPrfyGrMazWUsYsetrnHatQZVLJH7LsgCjtMqdzgj/0/0))";
+        String p2shP2wsh = "sh(wsh(sortedmulti(2,[793cc70b/48'/0'/0'/1']xpub6ErVmcYYHmavsMgxEcTZyzN5sqth1ZyRpFNJC26ij1wYGC2SBKYrgt9yariSbn7HLRoZUvhUhmPfsRTPrdhhGFscpPZzmch6UTdmRP1aZUj/0/0,[b3118e52/48'/0'/0'/1']xpub6Du5Jn6eYZE96ccmAc1ZTFPzdnzrvqfG4mpamDun2qZYKywoiQJMCbS3kWWMr6U3XW6s125RLsaPABWgv2yA749ieaMe67FxkTjMsbcxCch/0/0,[842bd2ed/48'/0'/0'/1']xpub6Ex81KopPkEt9hJiWHabYy8LNsSR4A7sUQoFBk9dR8XxHrr4p9HrYWN3NCf5uwfopHnQkCG7FYnZMztKbtRtbh6tzZC4xtHPbmVVxRSN7ic/0/0)))";
+
+        OutputDescriptor p2wshDescriptor = OutputDescriptor.getOutputDescriptor(p2wsh);
+        Assertions.assertEquals("bc1qrgc6p3kylfztu06ysl752gwwuekhvtfh9vr7zg43jvu60mutamcsv948ej", p2wshDescriptor.getAddress(p2wshDescriptor.getChildDerivation()).toString());
+
+        OutputDescriptor p2shP2wshDescriptor = OutputDescriptor.getOutputDescriptor(p2shP2wsh);
+        Assertions.assertEquals("3MmNkJ3e67jDGNwGL7yQ886T192Bbb81zP", p2shP2wshDescriptor.getAddress(p2shP2wshDescriptor.getChildDerivation()).toString());
+
+        //A fixed /0/0 descriptor must describe the same address as the equivalent template at receive index 0
+        OutputDescriptor template = OutputDescriptor.getOutputDescriptor(p2shP2wsh.replace("/0/0", "/**"));
+        Assertions.assertEquals(p2shP2wshDescriptor.getAddress(p2shP2wshDescriptor.getChildDerivation()),
+                template.toWallet().getNode(KeyPurpose.RECEIVE).getChildren().iterator().next().getAddress());
+    }
 }

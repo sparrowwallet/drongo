@@ -77,4 +77,22 @@ public class WatchWalletTest {
         WatchWallet wallet = new WatchWallet("", "wsh(multi(2,xpub699B7APGMoPLUrvPsXiBFrJRV8sTHDBHptpHSH36aESP5SLYs4VcEotnX1EvvA5ZoKF2rZ24Wh4U5ALxM21CfL5Kcj6Tu41PjRr2KKMkJTJ/0/0,xpub6Ds1jx5qxAtdczVBnJfHeGgpspzYuxnXHXLCoPZFFyyMoKJ7zzLgcERB1t7eDV1UuBQL1UKNxHFvcMJ7Zj6D2amdaA8gb21cZSXPrpG1bZr/0/0))");
         Assertions.assertEquals("bc1q2jxsrw70ug8jgskmhynvs49h3q5h8fglkdl3trvrc6wsde07wuzqfz98z0", wallet.getAddress(wallet.getOutputDescriptor().getChildDerivation()).toString());
     }
+
+    @Test
+    public void initialiseAddressesMultiple() {
+        WatchWallet wallet = new WatchWallet("", "wsh(multi(2,xpub699B7APGMoPLUrvPsXiBFrJRV8sTHDBHptpHSH36aESP5SLYs4VcEotnX1EvvA5ZoKF2rZ24Wh4U5ALxM21CfL5Kcj6Tu41PjRr2KKMkJTJ/0/*,xpub6Ds1jx5qxAtdczVBnJfHeGgpspzYuxnXHXLCoPZFFyyMoKJ7zzLgcERB1t7eDV1UuBQL1UKNxHFvcMJ7Zj6D2amdaA8gb21cZSXPrpG1bZr/0/*))");
+        wallet.initialiseAddresses();
+
+        Assertions.assertTrue(wallet.containsAddress(wallet.getReceivingAddress(0)));
+        Assertions.assertTrue(wallet.containsAddress(wallet.getChangeAddress(0)));
+        Assertions.assertTrue(wallet.containsAddress(wallet.getReceivingAddress(500)));
+    }
+
+    @Test
+    public void initialiseAddressesSingle() {
+        WatchWallet wallet = new WatchWallet("", "wsh(multi(2,xpub699B7APGMoPLUrvPsXiBFrJRV8sTHDBHptpHSH36aESP5SLYs4VcEotnX1EvvA5ZoKF2rZ24Wh4U5ALxM21CfL5Kcj6Tu41PjRr2KKMkJTJ/0/0,xpub6Ds1jx5qxAtdczVBnJfHeGgpspzYuxnXHXLCoPZFFyyMoKJ7zzLgcERB1t7eDV1UuBQL1UKNxHFvcMJ7Zj6D2amdaA8gb21cZSXPrpG1bZr/0/0))");
+        wallet.initialiseAddresses();
+
+        Assertions.assertTrue(wallet.containsAddress(wallet.getAddress(wallet.getOutputDescriptor().getChildDerivation())));
+    }
 }
