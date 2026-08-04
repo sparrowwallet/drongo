@@ -60,18 +60,28 @@ public class PaymentAddress {
     private ECKey getSendECKey(BigInteger s) throws IllegalStateException {
         ECPoint ecPoint = getECPoint();
         ECPoint sG = get_sG(s);
-        return ECKey.fromPublicOnly(ecPoint.add(sG).getEncoded(true));
+        ECPoint sum = ecPoint.add(sG);
+        if(sum.equals(CURVE.getCurve().getInfinity())) {
+            throw new IllegalStateException("Illegal derived key: derived public key equals infinity");
+        }
+
+        return ECKey.fromPublicOnly(sum.getEncoded(true));
     }
 
-    private ECKey getReceiveECKey(BigInteger s) {
+    private ECKey getReceiveECKey(BigInteger s) throws IllegalStateException {
         BigInteger privKeyValue = ECKey.fromPrivate(privKey).getPrivKey();
-        return ECKey.fromPrivate(addSecp256k1(privKeyValue, s));
+        BigInteger sum = addSecp256k1(privKeyValue, s);
+        if(sum.equals(BigInteger.ZERO)) {
+            throw new IllegalStateException("Illegal derived key: derived private key equals 0");
+        }
+
+        return ECKey.fromPrivate(sum);
     }
 
     private BigInteger addSecp256k1(BigInteger b1, BigInteger b2) {
         BigInteger ret = b1.add(b2);
 
-        if(ret.compareTo(CURVE.getN()) > 0) {
+        if(ret.compareTo(CURVE.getN()) >= 0) {
             return ret.mod(CURVE.getN());
         }
 

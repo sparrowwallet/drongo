@@ -31,7 +31,7 @@ public class HDKeyDerivation {
 
     public static DeterministicKey createMasterPrivKeyFromBytes(byte[] privKeyBytes, byte[] chainCode, List<ChildNumber> childNumberPath) throws HDDerivationException {
         BigInteger priv = new BigInteger(1, privKeyBytes);
-        if(priv.equals(BigInteger.ZERO) || priv.compareTo(ECKey.CURVE.getN()) > 0) {
+        if(priv.equals(BigInteger.ZERO) || priv.compareTo(ECKey.CURVE.getN()) >= 0) {
             throw new HDDerivationException("Private key bytes are not valid");
         }
 
@@ -78,7 +78,7 @@ public class HDKeyDerivation {
         byte[] il = Arrays.copyOfRange(i, 0, 32);
         byte[] chainCode = Arrays.copyOfRange(i, 32, 64);
         BigInteger ilInt = new BigInteger(1, il);
-        if(ilInt.compareTo(ECKey.CURVE.getN()) > 0) {
+        if(ilInt.compareTo(ECKey.CURVE.getN()) >= 0) {
             throw new HDDerivationException("Illegal derived key: I_L >= n");
         }
 
@@ -112,7 +112,7 @@ public class HDKeyDerivation {
         byte[] il = Arrays.copyOfRange(i, 0, 32);
         byte[] chainCode = Arrays.copyOfRange(i, 32, 64);
         BigInteger ilInt = new BigInteger(1, il);
-        if(ilInt.compareTo(ECKey.CURVE.getN()) > 0) {
+        if(ilInt.compareTo(ECKey.CURVE.getN()) >= 0) {
             throw new HDDerivationException("Illegal derived key: I_L >= n");
         }
 
