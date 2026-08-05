@@ -1,5 +1,6 @@
 package com.sparrowwallet.drongo;
 
+import java.math.BigInteger;
 import java.util.Locale;
 
 public enum Network {
@@ -102,6 +103,17 @@ public enum Network {
 
     public int getDefaultPort() {
         return defaultPort;
+    }
+
+    /** The maximum (easiest) allowed difficulty target for this network, decoded from the consensus powLimit compact bits. */
+    public BigInteger getProofOfWorkLimit() {
+        if(this == REGTEST) {
+            return Utils.decodeCompactBits(0x207fffffL);
+        } else if(this == SIGNET) {
+            return Utils.decodeCompactBits(0x1e0377aeL);
+        }
+
+        return Utils.decodeCompactBits(0x1d00ffffL);
     }
 
     public boolean hasP2PKHAddressPrefix(String address) {

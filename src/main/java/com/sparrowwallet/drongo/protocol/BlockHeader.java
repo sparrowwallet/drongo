@@ -1,8 +1,12 @@
 package com.sparrowwallet.drongo.protocol;
 
+import com.sparrowwallet.drongo.Network;
+import com.sparrowwallet.drongo.Utils;
+
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
+import java.math.BigInteger;
 import java.util.Date;
 
 import static com.sparrowwallet.drongo.Utils.uint32ToByteStreamLE;
@@ -75,6 +79,24 @@ public class BlockHeader extends Message {
 
     public long getNonce() {
         return nonce;
+    }
+
+    public Sha256Hash getHash() {
+        return Sha256Hash.wrapReversed(Sha256Hash.hashTwice(bitcoinSerialize()));
+    }
+
+    public BigInteger getDifficultyTargetAsInteger() {
+        return Utils.decodeCompactBits(difficultyTarget);
+    }
+
+    /** Checks the header hash meets its own claimed difficulty target, and that the target does not exceed the network proof of work limit. */
+    public boolean verifyProofOfWork() {
+        BigInteger target = getDifficultyTargetAsInteger();
+        if(target.signum() <= 0 || target.compareTo(Network.get().getProofOfWorkLimit()) > 0) {
+            return false;
+        }
+
+        return getHash().toBigInteger().compareTo(target) <= 0;
     }
 
     public byte[] bitcoinSerialize() {

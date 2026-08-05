@@ -222,6 +222,15 @@ public class Utils {
                 ((bytes[offset + 3] & 0xffl) << 24);
     }
 
+    /** Decode a difficulty target from the compact "nBits" representation used in block headers, following Bitcoin Core's arith_uint256::SetCompact. */
+    public static BigInteger decodeCompactBits(long compact) {
+        int size = (int)(compact >> 24) & 0xFF;
+        long word = compact & 0x007fffffL;
+        BigInteger result = size <= 3 ? BigInteger.valueOf(word >> (8 * (3 - size))) : BigInteger.valueOf(word).shiftLeft(8 * (size - 3));
+
+        return (compact & 0x00800000L) != 0 ? result.negate() : result;
+    }
+
     /** Parse 8 bytes from the byte array (starting at the offset) as signed 64-bit integer in little endian format. */
     public static long readInt64(byte[] bytes, int offset) {
         return (bytes[offset] & 0xffl) |
