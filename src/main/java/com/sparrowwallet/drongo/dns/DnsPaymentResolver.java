@@ -14,6 +14,7 @@ import org.xbill.DNS.lookup.NoSuchDomainException;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.net.Proxy;
 import java.nio.charset.StandardCharsets;
 import java.time.Clock;
 import java.time.Instant;
@@ -52,23 +53,24 @@ public class DnsPaymentResolver {
         this.clock = clock;
     }
 
-    public Optional<DnsPayment> resolve() throws IOException, DnsPaymentValidationException, BitcoinURIParseException, ExecutionException, InterruptedException {
-        return resolve(DEFAULT_RESOLVER_IP_ADDRESS);
+    public Optional<DnsPayment> resolve(Proxy proxy) throws IOException, DnsPaymentValidationException, BitcoinURIParseException, ExecutionException, InterruptedException {
+        return resolve(DEFAULT_RESOLVER_IP_ADDRESS, proxy);
     }
 
     /**
      * Performs online resolution of the BIP 353 HRN via the configured resolver
      *
      * @param resolverIpAddress the IP address of the resolver to use for the DNS lookup
+     * @param proxy the SOCKS proxy through which to connect to the resolver, or null to connect directly
      * @return The DNS payment instruction, if present
      * @throws IOException Thrown for a general I/O error
      * @throws DnsPaymentValidationException Thrown for a DNSSEC or BIP 353 validation failure
      * @throws BitcoinURIParseException Thrown for an invalid BIP 21 URI
      */
-    public Optional<DnsPayment> resolve(String resolverIpAddress) throws IOException, DnsPaymentValidationException, BitcoinURIParseException, ExecutionException, InterruptedException {
+    public Optional<DnsPayment> resolve(String resolverIpAddress, Proxy proxy) throws IOException, DnsPaymentValidationException, BitcoinURIParseException, ExecutionException, InterruptedException {
         log.debug("Resolving payment record for: " + domain);
 
-        PersistingResolver persistingResolver = new PersistingResolver(resolverIpAddress);
+        PersistingResolver persistingResolver = new PersistingResolver(resolverIpAddress, proxy);
         ValidatingResolver validatingResolver = new ValidatingResolver(persistingResolver, clock);
         validatingResolver.loadTrustAnchors(new ByteArrayInputStream(ROOT.getBytes(StandardCharsets.US_ASCII)));
         validatingResolver.setEDNS(0, 0, ExtendedFlags.DO);
@@ -98,6 +100,8 @@ public class DnsPaymentResolver {
             } else {
                 throw e;
             }
+        } finally {
+            persistingResolver.close();
         }
     }
 
