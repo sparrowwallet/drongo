@@ -2202,6 +2202,10 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
             throw new InvalidWalletException(policyType + " wallet needs " + numSigs + " and has " + keystores.size() + " keystores");
         }
 
+        if(policyType.equals(PolicyType.MULTI_HD) && keystores.size() > scriptType.getMaxCosigners()) {
+            throw new InvalidWalletException(scriptType.getName() + " wallets support a maximum of " + scriptType.getMaxCosigners() + " cosigners, but this wallet has " + keystores.size());
+        }
+
         if(policyType.equals(PolicyType.SINGLE_HD) && keystores.getFirst().getExtendedPublicKey() == null) {
             throw new InvalidWalletException(policyType + " wallet needs an extended public key");
         }

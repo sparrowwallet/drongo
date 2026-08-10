@@ -8,6 +8,8 @@ import com.sparrowwallet.drongo.address.Address;
 import com.sparrowwallet.drongo.crypto.*;
 import com.sparrowwallet.drongo.policy.Policy;
 import com.sparrowwallet.drongo.policy.PolicyType;
+import com.sparrowwallet.drongo.protocol.ProtocolException;
+import com.sparrowwallet.drongo.protocol.Script;
 import com.sparrowwallet.drongo.protocol.ScriptType;
 import com.sparrowwallet.drongo.silentpayments.SilentPaymentScanAddress;
 import org.junit.jupiter.api.Assertions;
@@ -386,6 +388,55 @@ public class WalletTest {
     public void testRequiredGapLimitNullForSp() {
         Wallet wallet = buildValidSpWallet();
         Assertions.assertNull(wallet.getRequiredGapLimit(null));
+    }
+
+    @Test
+    public void maxCosignersP2shTest() throws MnemonicException, InvalidWalletException {
+        //A 15 cosigner P2SH redeem script is 513 bytes and spendable, so it must keep working
+        Wallet wallet = buildMultisigWallet(ScriptType.P2SH, 15);
+        wallet.checkWallet();
+        WalletNode receive0 = new WalletNode(wallet, KeyPurpose.RECEIVE, 0);
+        Assertions.assertEquals(513, ScriptType.MULTISIG.getOutputScript(2, receive0.getPubKeys()).getProgram().length);
+        Assertions.assertNotNull(receive0.getAddress());
+
+        //A 16 cosigner P2SH redeem script is 547 bytes, which exceeds the 520 byte maximum script element size and is unspendable
+        Wallet oversize = buildMultisigWallet(ScriptType.P2SH, 16);
+        InvalidWalletException e = Assertions.assertThrows(InvalidWalletException.class, oversize::checkWallet);
+        Assertions.assertTrue(e.getMessage().contains("maximum of 15 cosigners"));
+        Assertions.assertFalse(oversize.isValid());
+
+        //Anything bypassing wallet validation must still be rejected when the address or output script is derived
+        Script oversizeRedeemScript = ScriptType.MULTISIG.getOutputScript(2, new WalletNode(oversize, KeyPurpose.RECEIVE, 0).getPubKeys());
+        Assertions.assertEquals(547, oversizeRedeemScript.getProgram().length);
+        Assertions.assertThrows(ProtocolException.class, () -> ScriptType.P2SH.getAddress(oversizeRedeemScript));
+        Assertions.assertThrows(ProtocolException.class, () -> ScriptType.P2SH.getOutputScript(oversizeRedeemScript));
+    }
+
+    @Test
+    public void maxCosignersSegwitTest() throws MnemonicException, InvalidWalletException {
+        //The witness script is exempt from the maximum script element size, so 16 cosigners remains valid for both segwit types
+        for(ScriptType scriptType : List.of(ScriptType.P2WSH, ScriptType.P2SH_P2WSH)) {
+            Wallet wallet = buildMultisigWallet(scriptType, 16);
+            wallet.checkWallet();
+            Assertions.assertNotNull(new WalletNode(wallet, KeyPurpose.RECEIVE, 0).getAddress());
+        }
+    }
+
+    private Wallet buildMultisigWallet(ScriptType scriptType, int cosigners) throws MnemonicException {
+        Wallet wallet = new Wallet();
+        wallet.setPolicyType(PolicyType.MULTI_HD);
+        wallet.setScriptType(scriptType);
+
+        for(int i = 0; i < cosigners; i++) {
+            byte[] entropy = Utils.hexToBytes(String.format("%032x", i + 1));
+            DeterministicSeed seed = new DeterministicSeed(entropy, "", 0);
+            Keystore keystore = Keystore.fromSeed(seed, PolicyType.MULTI_HD, scriptType.getDefaultDerivation());
+            keystore.setLabel("Keystore " + (i + 1));
+            wallet.getKeystores().add(keystore);
+        }
+
+        wallet.setDefaultPolicy(Policy.getPolicy(PolicyType.MULTI_HD, scriptType, wallet.getKeystores(), 2));
+        return wallet;
     }
 
     private Wallet buildValidSpWallet() {

@@ -458,7 +458,7 @@ public enum ScriptType {
 
         @Override
         public Address getAddress(Script script) {
-            return getAddress(Utils.sha256hash160(script.getProgram()));
+            return getAddress(Utils.sha256hash160(getRedeemScriptProgram(script)));
         }
 
         @Override
@@ -478,7 +478,16 @@ public enum ScriptType {
 
         @Override
         public Script getOutputScript(Script script) {
-            return getOutputScript(Utils.sha256hash160(script.getProgram()));
+            return getOutputScript(Utils.sha256hash160(getRedeemScriptProgram(script)));
+        }
+
+        private byte[] getRedeemScriptProgram(Script redeemScript) {
+            byte[] program = redeemScript.getProgram();
+            if(program.length > Script.MAX_SCRIPT_ELEMENT_SIZE) {
+                throw new ProtocolException("Redeem script of " + program.length + " bytes exceeds the maximum script element size of " + Script.MAX_SCRIPT_ELEMENT_SIZE + " bytes, and could never be pushed when spending");
+            }
+
+            return program;
         }
 
         @Override
@@ -573,6 +582,13 @@ public enum ScriptType {
         @Override
         public List<PolicyType> getAllowedPolicyTypes() {
             return List.of(MULTI_HD);
+        }
+
+        @Override
+        public int getMaxCosigners() {
+            //A multisig redeem script of OP_M, N compressed pubkey pushes, OP_N and OP_CHECKMULTISIG is 3 + (N * 34) bytes,
+            //so 16 cosigners produce a 547 byte redeem script that exceeds the maximum script element size and is unspendable
+            return (int)(Script.MAX_SCRIPT_ELEMENT_SIZE - 3) / 34;
         }
     },
     P2SH_P2WPKH("P2SH-P2WPKH", "Nested Segwit (P2SH-P2WPKH)", "m/49'/0'/0'") {
@@ -1386,6 +1402,11 @@ public enum ScriptType {
 
     public int getThreshold(Script script) {
         throw new ProtocolException("Script type " + this + " is not a multisig script");
+    }
+
+    public int getMaxCosigners() {
+        //Both the threshold and the number of cosigners are encoded as OP_N, which cannot represent a value above 16
+        return 16;
     }
 
     public abstract Script getScriptSig(PolicyType policyType, Script scriptPubKey, ECKey pubKey, TransactionSignature signature);
