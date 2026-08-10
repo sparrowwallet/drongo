@@ -70,7 +70,7 @@ public class MasterPrivateExtendedKey extends Persistable implements Encryptable
     }
 
     @Override
-    public long getCreationTimeSeconds() {
+    public long getCreationTimeMillis() {
         return 0;
     }
 

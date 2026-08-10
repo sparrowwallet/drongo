@@ -18,6 +18,6 @@ public interface EncryptableItem {
     /** Returns an object containing enums describing which algorithms are used to derive the key and encrypt the data. */
     EncryptionType getEncryptionType();
 
-    /** Returns the time in seconds since the UNIX epoch at which this encryptable item was first created/derived. */
-    long getCreationTimeSeconds();
+    /** Returns the time in milliseconds since the UNIX epoch at which this encryptable item was first created/derived. */
+    long getCreationTimeMillis();
 }

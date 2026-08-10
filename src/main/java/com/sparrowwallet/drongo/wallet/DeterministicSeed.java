@@ -17,33 +17,33 @@ public class DeterministicSeed extends Persistable implements EncryptableItem {
     private final List<String> mnemonicCode;
     private final EncryptedData encryptedMnemonicCode;
     private final boolean needsPassphrase;
-    private long creationTimeSeconds;
+    private long creationTimeMillis;
 
     //Session only storage
     private transient SecureString passphrase;
 
-    public DeterministicSeed(CharSequence mnemonicString, String passphrase, long creationTimeSeconds, Type type) {
-        this(decodeMnemonicCode(mnemonicString), passphrase, creationTimeSeconds, type);
+    public DeterministicSeed(CharSequence mnemonicString, String passphrase, long creationTimeMillis, Type type) {
+        this(decodeMnemonicCode(mnemonicString), passphrase, creationTimeMillis, type);
     }
 
-    public DeterministicSeed(List<String> mnemonic, String passphrase, long creationTimeSeconds, Type type) {
-        this(mnemonic, needsPassphrase(passphrase), creationTimeSeconds, type);
+    public DeterministicSeed(List<String> mnemonic, String passphrase, long creationTimeMillis, Type type) {
+        this(mnemonic, needsPassphrase(passphrase), creationTimeMillis, type);
         this.passphrase = (passphrase == null ? null : new SecureString(passphrase));
     }
 
-    public DeterministicSeed(List<String> mnemonic, boolean needsPassphrase, long creationTimeSeconds, Type type) {
+    public DeterministicSeed(List<String> mnemonic, boolean needsPassphrase, long creationTimeMillis, Type type) {
         this.mnemonicCode = mnemonic.stream().map(type::lengthen).collect(Collectors.toList());
         this.encryptedMnemonicCode = null;
         this.needsPassphrase = needsPassphrase;
-        this.creationTimeSeconds = creationTimeSeconds;
+        this.creationTimeMillis = creationTimeMillis;
         this.type = type;
     }
 
-    public DeterministicSeed(EncryptedData encryptedMnemonic, boolean needsPassphrase, long creationTimeSeconds, Type type) {
+    public DeterministicSeed(EncryptedData encryptedMnemonic, boolean needsPassphrase, long creationTimeMillis, Type type) {
         this.mnemonicCode = null;
         this.encryptedMnemonicCode = encryptedMnemonic;
         this.needsPassphrase = needsPassphrase;
-        this.creationTimeSeconds = creationTimeSeconds;
+        this.creationTimeMillis = creationTimeMillis;
         this.type = type;
     }
 
@@ -63,13 +63,13 @@ public class DeterministicSeed extends Persistable implements EncryptableItem {
      * details on this scheme.
      * @param entropy entropy bits, length must be divisible by 32
      * @param passphrase A user supplied passphrase, or an empty string if there is no passphrase
-     * @param creationTimeSeconds When the seed was originally created, UNIX time.
+     * @param creationTimeMillis When the seed was originally created, in milliseconds since the UNIX epoch.
      */
-    public DeterministicSeed(byte[] entropy, String passphrase, long creationTimeSeconds) {
-        this(entropy, passphrase, creationTimeSeconds, Type.BIP39);
+    public DeterministicSeed(byte[] entropy, String passphrase, long creationTimeMillis) {
+        this(entropy, passphrase, creationTimeMillis, Type.BIP39);
     }
 
-    public DeterministicSeed(byte[] entropy, String passphrase, long creationTimeSeconds, Type type) {
+    public DeterministicSeed(byte[] entropy, String passphrase, long creationTimeMillis, Type type) {
         if(entropy.length % 4 != 0) {
             throw new IllegalArgumentException("Entropy size in bits not divisible by 32");
         }
@@ -95,7 +95,7 @@ public class DeterministicSeed extends Persistable implements EncryptableItem {
         this.encryptedMnemonicCode = null;
         this.needsPassphrase = needsPassphrase(passphrase);
         this.passphrase = new SecureString(passphrase);
-        this.creationTimeSeconds = creationTimeSeconds;
+        this.creationTimeMillis = creationTimeMillis;
         this.type = type;
     }
 
@@ -168,12 +168,12 @@ public class DeterministicSeed extends Persistable implements EncryptableItem {
     }
 
     @Override
-    public long getCreationTimeSeconds() {
-        return creationTimeSeconds;
+    public long getCreationTimeMillis() {
+        return creationTimeMillis;
     }
 
-    public void setCreationTimeSeconds(long creationTimeSeconds) {
-        this.creationTimeSeconds = creationTimeSeconds;
+    public void setCreationTimeMillis(long creationTimeMillis) {
+        this.creationTimeMillis = creationTimeMillis;
     }
 
     public Type getType() {
@@ -193,7 +193,7 @@ public class DeterministicSeed extends Persistable implements EncryptableItem {
         EncryptedData encryptedMnemonic = keyCrypter.encrypt(mnemonicBytes, null, key);
         Arrays.fill(mnemonicBytes != null ? mnemonicBytes : new byte[0], (byte)0);
         
-        DeterministicSeed seed = new DeterministicSeed(encryptedMnemonic, needsPassphrase, creationTimeSeconds, type);
+        DeterministicSeed seed = new DeterministicSeed(encryptedMnemonic, needsPassphrase, creationTimeMillis, type);
         seed.setId(getId());
         seed.setPassphrase(passphrase);
 
@@ -236,7 +236,7 @@ public class DeterministicSeed extends Persistable implements EncryptableItem {
         List<String> mnemonic = decodeMnemonicCode(decrypted);
         Arrays.fill(decrypted, (byte)0);
 
-        DeterministicSeed seed = new DeterministicSeed(mnemonic, needsPassphrase, creationTimeSeconds, type);
+        DeterministicSeed seed = new DeterministicSeed(mnemonic, needsPassphrase, creationTimeMillis, type);
         seed.setId(getId());
         seed.setPassphrase(passphrase);
         mnemonic.clear();
@@ -258,14 +258,14 @@ public class DeterministicSeed extends Persistable implements EncryptableItem {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
         DeterministicSeed other = (DeterministicSeed) o;
-        return creationTimeSeconds == other.creationTimeSeconds
+        return creationTimeMillis == other.creationTimeMillis
             && Objects.equals(encryptedMnemonicCode, other.encryptedMnemonicCode)
             && Objects.equals(mnemonicCode, other.mnemonicCode);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(creationTimeSeconds, encryptedMnemonicCode, mnemonicCode);
+        return Objects.hash(creationTimeMillis, encryptedMnemonicCode, mnemonicCode);
     }
 
     /**
@@ -354,9 +354,9 @@ public class DeterministicSeed extends Persistable implements EncryptableItem {
         DeterministicSeed seed;
 
         if(isEncrypted()) {
-            seed = new DeterministicSeed(encryptedMnemonicCode.copy(), needsPassphrase, creationTimeSeconds, type);
+            seed = new DeterministicSeed(encryptedMnemonicCode.copy(), needsPassphrase, creationTimeMillis, type);
         } else {
-            seed = new DeterministicSeed(mnemonicCode, needsPassphrase, creationTimeSeconds, type);
+            seed = new DeterministicSeed(mnemonicCode, needsPassphrase, creationTimeMillis, type);
         }
 
         seed.setId(getId());
