@@ -11,11 +11,18 @@ import com.sparrowwallet.drongo.policy.PolicyType;
 import com.sparrowwallet.drongo.protocol.ProtocolException;
 import com.sparrowwallet.drongo.protocol.Script;
 import com.sparrowwallet.drongo.protocol.ScriptType;
+import com.sparrowwallet.drongo.protocol.SigHash;
+import com.sparrowwallet.drongo.protocol.Transaction;
+import com.sparrowwallet.drongo.protocol.TransactionSignature;
+import com.sparrowwallet.drongo.psbt.PSBT;
 import com.sparrowwallet.drongo.silentpayments.SilentPaymentScanAddress;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
+import java.util.Date;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 public class WalletTest {
     @Test
@@ -452,6 +459,74 @@ public class WalletTest {
         keystore.setKeyDerivation(new KeyDerivation("deadbeef", "m/352'/0'/0'"));
         wallet.getKeystores().add(keystore);
         wallet.setDefaultPolicy(Policy.getPolicy(PolicyType.SINGLE_SP, ScriptType.P2TR, wallet.getKeystores(), 1));
+        return wallet;
+    }
+
+    @Test
+    public void anyoneCanPayAllowsOutputExceedingInputs() throws MnemonicException {
+        Wallet wallet = buildFundedP2wpkhWallet(50_000L);
+        WalletNode receive0 = wallet.getNode(KeyPurpose.RECEIVE).getChildren().iterator().next();
+        Payment payment = new Payment(wallet.getAddress(receive0), "test", 100_000L, false);
+        TransactionParameters params = new TransactionParameters(List.of(), List.of(), List.of(payment), List.of(),
+                Set.of(), 1.0, 1.0, 1.0, null, null, false, false, true, true);
+
+        WalletTransaction walletTx = Assertions.assertDoesNotThrow(() -> wallet.createWalletTransaction(params));
+        Assertions.assertNotNull(walletTx);
+        Assertions.assertEquals(1, walletTx.getTransaction().getInputs().size());
+        Assertions.assertEquals(1, walletTx.getTransaction().getOutputs().size());
+        Assertions.assertEquals(-50_000L, walletTx.getFee());
+    }
+
+    @Test
+    public void anyoneCanPayPsbtSignsWithAnyoneCanPaySigHash() throws MnemonicException {
+        Wallet wallet = buildFundedP2wpkhWallet(50_000L);
+        WalletNode receive0 = wallet.getNode(KeyPurpose.RECEIVE).getChildren().iterator().next();
+        Payment payment = new Payment(wallet.getAddress(receive0), "test", 100_000L, false);
+        TransactionParameters params = new TransactionParameters(List.of(), List.of(), List.of(payment), List.of(),
+                Set.of(), 1.0, 1.0, 1.0, null, null, false, false, true, true);
+
+        WalletTransaction walletTx = Assertions.assertDoesNotThrow(() -> wallet.createWalletTransaction(params));
+        PSBT psbt = walletTx.createPSBT();
+        Assertions.assertEquals(1, psbt.getPsbtInputs().size());
+
+        psbt.getPsbtInputs().forEach(psbtInput -> psbtInput.setSigHash(SigHash.ANYONECANPAY_ALL));
+        wallet.sign(psbt);
+
+        TransactionSignature signature = psbt.getPsbtInputs().getFirst().getPartialSignatures().values().iterator().next();
+        Assertions.assertTrue(signature.anyoneCanPay());
+        Assertions.assertEquals((byte)0x81, signature.sighashFlags);
+    }
+
+    @Test
+    public void standardWalletThrowsInsufficientFunds() throws MnemonicException {
+        Wallet wallet = buildFundedP2wpkhWallet(50_000L);
+        WalletNode receive0 = wallet.getNode(KeyPurpose.RECEIVE).getChildren().iterator().next();
+        Payment payment = new Payment(wallet.getAddress(receive0), "test", 100_000L, false);
+        TransactionParameters params = new TransactionParameters(List.of(), List.of(), List.of(payment), List.of(),
+                Set.of(), 1.0, 1.0, 1.0, null, null, false, false, true, false);
+
+        Assertions.assertThrows(InsufficientFundsException.class, () -> wallet.createWalletTransaction(params));
+    }
+
+    private Wallet buildFundedP2wpkhWallet(long utxoValue) throws MnemonicException {
+        String words = "absent essay fox snake vast pumpkin height crouch silent bulb excuse razor";
+        DeterministicSeed seed = new DeterministicSeed(words, "pp", 0, DeterministicSeed.Type.BIP39);
+        Wallet wallet = new Wallet();
+        wallet.setPolicyType(PolicyType.SINGLE_HD);
+        wallet.setScriptType(ScriptType.P2WPKH);
+        Keystore keystore = Keystore.fromSeed(seed, PolicyType.SINGLE_HD, wallet.getScriptType().getDefaultDerivation());
+        wallet.getKeystores().add(keystore);
+        wallet.setDefaultPolicy(Policy.getPolicy(PolicyType.SINGLE_HD, ScriptType.P2WPKH, wallet.getKeystores(), 1));
+
+        WalletNode receive0 = wallet.getNode(KeyPurpose.RECEIVE).getChildren().iterator().next();
+        Transaction fundingTx = new Transaction();
+        fundingTx.addOutput(utxoValue, receive0.getOutputScript());
+        BlockTransaction blockTx = new BlockTransaction(fundingTx.getTxId(), 100, new Date(), null, fundingTx);
+        wallet.updateTransactions(Map.of(fundingTx.getTxId(), blockTx));
+
+        BlockTransactionHashIndex utxo = new BlockTransactionHashIndex(fundingTx.getTxId(), 100, new Date(), null, 0, utxoValue);
+        receive0.getTransactionOutputs().add(utxo);
+
         return wallet;
     }
 }
