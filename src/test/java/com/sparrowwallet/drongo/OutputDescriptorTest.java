@@ -11,6 +11,8 @@ import org.junit.jupiter.api.Test;
 
 import java.util.*;
 
+import static com.sparrowwallet.drongo.OutputDescriptor.LEGACY_MULTI_PATTERN;
+
 public class OutputDescriptorTest {
 
     @Test
@@ -101,6 +103,76 @@ public class OutputDescriptorTest {
     public void testChecksum() {
         OutputDescriptor descriptor = OutputDescriptor.getOutputDescriptor("sh(multi(2,[00000000/111'/222]xpub6ERApfZwUNrhLCkDtcHTcxd75RbzS1ed54G1LkBUHQVHQKqhMkhgbmJbZRkrgZw4koxb5JaHWkY4ALHY2grBGRjaDMzQLcgJvLJuZZvRcEL,xpub68NZiKmJWnxxS6aaHmn81bvJeTESw724CRDs6HbuccFQN9Ku14VQrADWgqbhhTHBaohPX4CjNLf9fq9MYo6oDaPPLPxSb7gwQN3ih19Zm4Y/0))#tjg09x5t");
         Assertions.assertEquals("sh(sortedmulti(2,[00000000/111h/222]xpub6ERApfZwUNrhLCkDtcHTcxd75RbzS1ed54G1LkBUHQVHQKqhMkhgbmJbZRkrgZw4koxb5JaHWkY4ALHY2grBGRjaDMzQLcgJvLJuZZvRcEL,xpub68NZiKmJWnxxS6aaHmn81bvJeTESw724CRDs6HbuccFQN9Ku14VQrADWgqbhhTHBaohPX4CjNLf9fq9MYo6oDaPPLPxSb7gwQN3ih19Zm4Y/0))#vqfgjk5v", descriptor.toString(true));
+    }
+
+    private static final String MULTI_KEY_1 = "[04fefef0/48h/0h/0h/2h]xpub661MyMwAqRbcFW31YEwpkMuc5THy2PSt5bDMsktWQcFF8syAmRUapSCGu8ED9W6oDMSgv6Zz8idoc4a6mr8BDzTJY47LJhkJ8UB7WEGuduB/0/*";
+    private static final String MULTI_KEY_2 = "[04ba1ef0/48h/0h/0h/2h]xpub69H7F5d8KSRgmmdJg2KhpAK8SR3DjMwAdkxj3ZuxV27CprR9LgpeyGmXUbC6wb7ERfvrnKZjXoUmmDznezpbZb7ap6r1D3tgFxHmwMkQTPH/0/*";
+    private static final String MULTI_KEY_3 = "[04fefef1/48h/0h/0h/2h]xpub6ERApfZwUNrhLCkDtcHTcxd75RbzS1ed54G1LkBUHQVHQKqhMkhgbmJbZRkrgZw4koxb5JaHWkY4ALHY2grBGRjaDMzQLcgJvLJuZZvRcEL/0/*";
+
+    private static String multisigDescriptor(String function, String threshold) {
+        return "wsh(" + function + "(" + threshold + "," + MULTI_KEY_1 + "," + MULTI_KEY_2 + "," + MULTI_KEY_3 + "))";
+    }
+
+    @Test
+    public void testMultisigThresholdCaseInsensitive() {
+        //The script type is determined case insensitively, so the threshold must be extracted the same way - see GHSA-rr8c-7vxh-fm72
+        for(String descriptor : List.of(multisigDescriptor("sortedMULTI", "2"), multisigDescriptor("SORTEDMULTI", "2"),
+                multisigDescriptor("SortedMulti", "2"), multisigDescriptor("MULTI", "2"))) {
+            OutputDescriptor outputDescriptor = OutputDescriptor.getOutputDescriptor(descriptor);
+            Assertions.assertEquals(2, outputDescriptor.getMultisigThreshold(), descriptor);
+            Assertions.assertEquals(3, outputDescriptor.getExtendedPublicKeys().size(), descriptor);
+
+            Wallet wallet = outputDescriptor.toWallet();
+            Assertions.assertEquals(2, wallet.getDefaultPolicy().getNumSignaturesRequired(), descriptor);
+        }
+    }
+
+    @Test
+    public void testMultisigThresholdWhitespace() {
+        OutputDescriptor outputDescriptor = OutputDescriptor.getOutputDescriptor(multisigDescriptor("sortedmulti", " 2"));
+        Assertions.assertEquals(2, outputDescriptor.getMultisigThreshold());
+        Assertions.assertEquals(2, outputDescriptor.toWallet().getDefaultPolicy().getNumSignaturesRequired());
+    }
+
+    @Test
+    public void testMultisigThresholdNeverDefaulted() {
+        //A descriptor providing multiple keys but no recognisable threshold must be rejected, not silently downgraded to 1 of n
+        Assertions.assertThrows(IllegalArgumentException.class, () -> OutputDescriptor.getOutputDescriptor(
+                "tr(multi_a(2," + MULTI_KEY_1 + "," + MULTI_KEY_2 + "," + MULTI_KEY_3 + "))"));
+    }
+
+    @Test
+    public void testMultisigThresholdOutOfRange() {
+        Assertions.assertThrows(IllegalArgumentException.class, () -> OutputDescriptor.getOutputDescriptor(multisigDescriptor("sortedmulti", "0")));
+        Assertions.assertThrows(IllegalArgumentException.class, () -> OutputDescriptor.getOutputDescriptor(multisigDescriptor("sortedmulti", "4")));
+    }
+
+    @Test
+    public void testSingleKeyThresholdUnchanged() {
+        //Single key descriptors have no threshold to state, and must continue to yield a threshold of 1
+        OutputDescriptor singleSig = OutputDescriptor.getOutputDescriptor("wpkh([04fefef0/84h/0h/0h]xpub661MyMwAqRbcFW31YEwpkMuc5THy2PSt5bDMsktWQcFF8syAmRUapSCGu8ED9W6oDMSgv6Zz8idoc4a6mr8BDzTJY47LJhkJ8UB7WEGuduB/0/*)");
+        Assertions.assertEquals(1, singleSig.getMultisigThreshold());
+        Assertions.assertEquals(PolicyType.SINGLE_HD, singleSig.toWallet().getPolicyType());
+
+        //A single key cosigner descriptor is a MULTI_HD policy, and must render as sortedmulti(1,...) rather than sortedmulti(0,...)
+        OutputDescriptor cosigner = OutputDescriptor.getOutputDescriptor("sh(" + MULTI_KEY_1 + ")");
+        Assertions.assertEquals(1, cosigner.getMultisigThreshold());
+        Wallet cosignerWallet = cosigner.toWallet();
+        Assertions.assertEquals(PolicyType.MULTI_HD, cosignerWallet.getPolicyType());
+        Assertions.assertEquals(1, cosignerWallet.getDefaultPolicy().getNumSignaturesRequired());
+    }
+
+    @Test
+    public void testLegacyMultiDetectionCaseInsensitive() {
+        //The BIP67 sorting warning shown in wallet settings must not be skipped for uppercase or spaced function names
+        Assertions.assertTrue(LEGACY_MULTI_PATTERN.matcher(multisigDescriptor("multi", "2")).find());
+        Assertions.assertTrue(LEGACY_MULTI_PATTERN.matcher(multisigDescriptor("MULTI", "2")).find());
+        Assertions.assertTrue(LEGACY_MULTI_PATTERN.matcher(multisigDescriptor("Multi", " 2")).find());
+        Assertions.assertTrue(LEGACY_MULTI_PATTERN.matcher(multisigDescriptor(" multi", "2")).find());
+
+        Assertions.assertFalse(LEGACY_MULTI_PATTERN.matcher(multisigDescriptor("sortedmulti", "2")).find());
+        Assertions.assertFalse(LEGACY_MULTI_PATTERN.matcher(multisigDescriptor("sortedMULTI", "2")).find());
+        Assertions.assertFalse(LEGACY_MULTI_PATTERN.matcher(multisigDescriptor(" sortedmulti", " 2")).find());
     }
 
     @Test

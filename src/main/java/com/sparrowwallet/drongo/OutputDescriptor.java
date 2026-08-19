@@ -27,11 +27,14 @@ public class OutputDescriptor {
 
     public static final Pattern XPUB_PATTERN = Pattern.compile("(\\[[^\\]]+\\])?(.(?:pub|prv)[^/\\,)]{100,112})(/[/\\d*'hH<>;]+)?");
     private static final Pattern PUBKEY_PATTERN = Pattern.compile("(\\[[^\\]]+\\])?(0[23][0-9a-fA-F]{64})");
-    private static final Pattern MULTI_PATTERN = Pattern.compile("multi\\((\\d+)");
+    private static final Pattern MULTI_PATTERN = Pattern.compile("multi\\(\\s*(\\d+)", Pattern.CASE_INSENSITIVE);
+    public static final Pattern LEGACY_MULTI_PATTERN = Pattern.compile("(?<!sorted)multi\\(\\s*\\d+", Pattern.CASE_INSENSITIVE);
     public static final Pattern KEY_ORIGIN_PATTERN = Pattern.compile("\\[([A-Fa-f0-9]{8})([/\\d'hH]+)?\\]");
     private static final Pattern MULTIPATH_PATTERN = Pattern.compile("<([\\d*'hH;]+)>");
     private static final Pattern CHECKSUM_PATTERN = Pattern.compile("#([" + CHECKSUM_CHARSET + "]{8})$");
     private static final Pattern ANNOTATION_PATTERN = Pattern.compile("([a-zA-Z]+)=([0-9]+)");
+
+    private static final int THRESHOLD_ABSENT = -1;
 
     public static final String ANNOTATION_BLOCK_HEIGHT = "bh";
     public static final String ANNOTATION_GAP_LIMIT = "gl";
@@ -551,7 +554,7 @@ public class OutputDescriptor {
                 throw new IllegalArgumentException("Invalid multisig threshold of " + threshold + " in descriptor");
             }
         } else {
-            return 1;
+            return THRESHOLD_ABSENT;
         }
     }
 
@@ -613,11 +616,15 @@ public class OutputDescriptor {
             }
         }
 
-        if(MULTI_PATTERN.matcher(descriptor).find() && (multisigThreshold < 1 || multisigThreshold > keyDerivationMap.size())) {
+        if(multisigThreshold == THRESHOLD_ABSENT && keyDerivationMap.size() > 1) {
+            throw new IllegalArgumentException("Cannot determine the multisig threshold in a descriptor providing " + keyDerivationMap.size() + " keys");
+        }
+
+        if(multisigThreshold != THRESHOLD_ABSENT && (multisigThreshold < 1 || multisigThreshold > keyDerivationMap.size())) {
             throw new IllegalArgumentException("Invalid multisig threshold of " + multisigThreshold + " in a descriptor providing " + keyDerivationMap.size() + " key" + (keyDerivationMap.size() == 1 ? "" : "s"));
         }
 
-        return new OutputDescriptor(scriptType, multisigThreshold, keyDerivationMap, keyChildDerivationMap, mapExtendedPublicKeyLabels, masterPrivateKeyMap, annotations);
+        return new OutputDescriptor(scriptType, Math.max(multisigThreshold, 1), keyDerivationMap, keyChildDerivationMap, mapExtendedPublicKeyLabels, masterPrivateKeyMap, annotations);
     }
 
     private static OutputDescriptor parseSilentPaymentDescriptor(String descriptor, Map<String, Integer> annotations) {
