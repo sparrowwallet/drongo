@@ -1,5 +1,7 @@
 package com.sparrowwallet.drongo.wallet.slip39;
 
+import com.sparrowwallet.drongo.wallet.MnemonicException;
+
 import java.util.Arrays;
 
 public class EncryptedMasterSecret {
@@ -36,7 +38,11 @@ public class EncryptedMasterSecret {
         return new EncryptedMasterSecret(identifier, extendable, iterationExponent, ciphertext);
     }
 
-    public byte[] decrypt(byte[] passphrase) {
-        return Cipher.decrypt(ciphertext, passphrase, iterationExponent, identifier, extendable);
+    public byte[] decrypt(byte[] passphrase) throws MnemonicException {
+        try {
+            return Cipher.decrypt(ciphertext, passphrase, iterationExponent, identifier, extendable);
+        } catch(IllegalArgumentException e) {
+            throw new MnemonicException("Invalid mnemonic", e.getMessage());
+        }
     }
 }

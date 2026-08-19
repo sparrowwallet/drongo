@@ -67,6 +67,22 @@ public class ShareTest {
     }
 
     @Test
+    public void testLeadingZeroValue() throws MnemonicException {
+        //the fifth share value begins with a zero byte, which must be preserved to keep all share values the same length
+        String mnemonic1 = "budget surprise agency romp clay quiet spew favorite purchase thumb observe sympathy acrobat presence unfold focus already tricycle diagnose muscle";
+        String mnemonic2 = "budget surprise birthday romp breathe scroll intend humidity aspect plains isolate crystal blimp dragon garbage both kind dance human craft";
+        String mnemonic3 = "budget surprise cleanup romp early remove uncover hearing lamp firefly ounce species submit snake phrase genuine tactics mustang desire artist";
+        String mnemonic4 = "budget surprise desert romp deny easy senior arena smirk average single smart fatal lecture threaten eyebrow lunar carve indicate romantic";
+        String mnemonic5 = "budget surprise email romp academic anxiety sister nylon fake makeup spine breathe window true recall desktop shelter divorce luck screw";
+
+        Share share5 = Share.fromMnemonic(mnemonic5);
+        Assertions.assertEquals("000bf319a1478ab5418bedeb2de34f26", HexFormat.of().formatHex(share5.getValue()));
+
+        byte[] secret = Shamir.combineMnemonics(List.of(mnemonic1, mnemonic2, mnemonic3, mnemonic4, mnemonic5), new byte[0]);
+        Assertions.assertEquals("609d9cf21c065a88e9f5b97c0e6928c6", HexFormat.of().formatHex(secret));
+    }
+
+    @Test
     public void test2of3() throws MnemonicException {
         String mnemonic1 = "shadow pistol academic always adequate wildlife fancy gross oasis cylinder mustang wrist rescue view short owner flip making coding armed";
         Share share1 = Share.fromMnemonic(mnemonic1);

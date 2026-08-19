@@ -7,6 +7,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Objects;
 import java.util.StringJoiner;
 import java.util.stream.Collectors;
 
@@ -59,7 +60,7 @@ public class Share {
         this.groupCount = groupCount;
         this.index = index;
         this.memberThreshold = memberThreshold;
-        this.value = value;
+        this.value = Arrays.copyOf(value, value.length);
     }
 
     public CommonParameters getCommonParameters() {
@@ -75,7 +76,7 @@ public class Share {
     }
 
     public byte[] getValue() {
-        return value;
+        return Arrays.copyOf(value, value.length);
     }
 
     public int getMemberThreshold() {
@@ -178,6 +179,13 @@ public class Share {
             throw new MnemonicException("Invalid mnemonic", "Invalid mnemonic padding");
         }
 
+        if(value.length < valueByteCount) {
+            //restore the leading zero bytes dropped by the big integer conversion
+            byte[] padded = new byte[valueByteCount];
+            System.arraycopy(value, 0, padded, valueByteCount - value.length, value.length);
+            value = padded;
+        }
+
         return new Share(identifier, extendable, iterationExponent, groupIndex, groupThreshold + 1, groupCount + 1, index, memberThreshold + 1, value);
     }
 
@@ -199,6 +207,27 @@ public class Share {
 
     public Share withGroupIndex(int groupIndex) {
         return new Share(identifier, extendable, iterationExponent, groupIndex, groupThreshold, groupCount, index, memberThreshold, value);
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if(this == o) {
+            return true;
+        }
+        if(!(o instanceof Share share)) {
+            return false;
+        }
+
+        return identifier == share.identifier && extendable == share.extendable && iterationExponent == share.iterationExponent && groupIndex == share.groupIndex
+                && groupThreshold == share.groupThreshold && groupCount == share.groupCount && index == share.index && memberThreshold == share.memberThreshold
+                && Arrays.equals(value, share.value);
+    }
+
+    @Override
+    public int hashCode() {
+        int result = Objects.hash(identifier, extendable, iterationExponent, groupIndex, groupThreshold, groupCount, index, memberThreshold);
+        result = 31 * result + Arrays.hashCode(value);
+        return result;
     }
 
     public record CommonParameters(int identifier, boolean extendable, int iterationExponent, int groupThreshold, int groupCount) {}
