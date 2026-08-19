@@ -59,7 +59,8 @@ public class Keystore extends Persistable {
     }
 
     public String getScriptName() {
-        return label.replace(" ", "");
+        String scriptName = label.replaceAll("[^\\p{L}\\p{N}]", "");
+        return scriptName.isEmpty() ? "Keystore" : scriptName;
     }
 
     public void setLabel(String label) {
