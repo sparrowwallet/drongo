@@ -315,7 +315,13 @@ public class DeterministicSeed extends Persistable implements EncryptableItem {
                 builder.setLength(builder.length() - 1);
             }
 
-            return new SecureString(builder);
+            SecureString mnemonicString = new SecureString(builder);
+
+            for(int i = 0; i < builder.length(); i++) {
+                builder.setCharAt(i, ' ');
+            }
+
+            return mnemonicString;
         }
 
         return null;
