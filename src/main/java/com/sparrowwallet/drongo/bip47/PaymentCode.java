@@ -177,10 +177,10 @@ public class PaymentCode {
         if(scriptChunks.get(0).getOpcode() != ScriptOpCodes.OP_RETURN) {
             return null;
         }
-        if(scriptChunks.get(1).getData() != null && scriptChunks.get(1).getData().length != 80) {
+        byte[] data = scriptChunks.get(1).getData();
+        if(data == null || data.length != PAYLOAD_LEN) {
             return null;
         }
-        byte[] data = scriptChunks.get(1).getData();
         if(data[0] != 0x01 || (data[2] != 0x02 && data[2] != 0x03)) {
             return null;
         }

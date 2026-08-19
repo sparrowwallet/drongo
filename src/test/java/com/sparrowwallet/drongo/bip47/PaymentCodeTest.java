@@ -19,6 +19,7 @@ import java.security.NoSuchAlgorithmException;
 import java.security.NoSuchProviderException;
 import java.security.SecureRandom;
 import java.security.spec.InvalidKeySpecException;
+import java.util.Arrays;
 import java.util.List;
 
 public class PaymentCodeTest {
@@ -221,5 +222,34 @@ public class PaymentCodeTest {
         ECKey privKey1 = bobWallet.getKeystores().get(0).getKey(receiveNode1);
         ECKey pubKey1 = bobWallet.getKeystores().get(0).getPubKey(receiveNode1);
         Assertions.assertArrayEquals(privKey1.getPubKey(), pubKey1.getPubKey());
+    }
+
+    @Test
+    public void testOpReturnWithoutPushDataIsNotNotification() {
+        //Standard relay policy allows any opcode up to OP_16 after OP_RETURN, so these outputs can be sent by anyone
+        for(int opcode : List.of(ScriptOpCodes.OP_1NEGATE, ScriptOpCodes.OP_RESERVED, ScriptOpCodes.OP_1, ScriptOpCodes.OP_16)) {
+            Transaction transaction = new Transaction();
+            transaction.addOutput(0, new Script(List.of(ScriptChunk.fromOpcode(ScriptOpCodes.OP_RETURN), ScriptChunk.fromOpcode(opcode))));
+            Assertions.assertThrows(IllegalArgumentException.class, () -> PaymentCode.getOpReturnData(transaction));
+        }
+    }
+
+    @Test
+    public void testOpReturnPayloadLength() {
+        byte[] payload = getNotificationPayload();
+        Transaction transaction = new Transaction();
+        transaction.addOutput(0, new Script(List.of(ScriptChunk.fromOpcode(ScriptOpCodes.OP_RETURN), ScriptChunk.fromData(payload))));
+        Assertions.assertArrayEquals(payload, PaymentCode.getOpReturnData(transaction));
+
+        Transaction shortTransaction = new Transaction();
+        shortTransaction.addOutput(0, new Script(List.of(ScriptChunk.fromOpcode(ScriptOpCodes.OP_RETURN), ScriptChunk.fromData(Arrays.copyOf(payload, payload.length - 1)))));
+        Assertions.assertThrows(IllegalArgumentException.class, () -> PaymentCode.getOpReturnData(shortTransaction));
+    }
+
+    public static byte[] getNotificationPayload() {
+        byte[] payload = new byte[80];
+        payload[0] = 0x01;
+        payload[2] = 0x02;
+        return payload;
     }
 }

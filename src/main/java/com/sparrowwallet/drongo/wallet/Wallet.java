@@ -1434,6 +1434,10 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
 
     private boolean isNotificationChange(Map<Sha256Hash, BlockTransaction> walletTransactions, Sha256Hash txId) {
         BlockTransaction utxoBlkTx = walletTransactions.get(txId);
+        if(utxoBlkTx == null) {
+            return false;
+        }
+
         try {
             PaymentCode.getOpReturnData(utxoBlkTx.getTransaction());
             return true;

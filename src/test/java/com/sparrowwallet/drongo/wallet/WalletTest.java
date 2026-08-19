@@ -5,17 +5,20 @@ import com.sparrowwallet.drongo.KeyDerivation;
 import com.sparrowwallet.drongo.KeyPurpose;
 import com.sparrowwallet.drongo.Utils;
 import com.sparrowwallet.drongo.address.Address;
+import com.sparrowwallet.drongo.bip47.PaymentCodeTest;
 import com.sparrowwallet.drongo.crypto.*;
 import com.sparrowwallet.drongo.policy.Policy;
 import com.sparrowwallet.drongo.policy.PolicyType;
-import com.sparrowwallet.drongo.protocol.ProtocolException;
-import com.sparrowwallet.drongo.protocol.Script;
-import com.sparrowwallet.drongo.protocol.ScriptType;
+import com.sparrowwallet.drongo.protocol.*;
 import com.sparrowwallet.drongo.silentpayments.SilentPaymentScanAddress;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
+import java.util.Collections;
+import java.util.Date;
 import java.util.List;
+import java.util.Map;
+import java.util.TreeSet;
 
 public class WalletTest {
     @Test
@@ -422,6 +425,33 @@ public class WalletTest {
         }
     }
 
+    @Test
+    public void testMalformedOpReturnDoesNotBreakCoinSelection() {
+        Wallet wallet = buildFundedWallet(new Script(List.of(ScriptChunk.fromOpcode(ScriptOpCodes.OP_RETURN), ScriptChunk.fromOpcode(ScriptOpCodes.OP_1))), true);
+
+        List<OutputGroup> outputGroups = wallet.getGroupedUtxos(Collections.emptyList(), 1.0d, 1.0d, false);
+        Assertions.assertEquals(1, outputGroups.size());
+        Assertions.assertFalse(outputGroups.get(0).isSpendLast());
+    }
+
+    @Test
+    public void testUnknownFundingTransactionDoesNotBreakCoinSelection() {
+        Wallet wallet = buildFundedWallet(new Script(List.of(ScriptChunk.fromOpcode(ScriptOpCodes.OP_RETURN), ScriptChunk.fromData(PaymentCodeTest.getNotificationPayload()))), false);
+
+        List<OutputGroup> outputGroups = wallet.getGroupedUtxos(Collections.emptyList(), 1.0d, 1.0d, false);
+        Assertions.assertEquals(1, outputGroups.size());
+        Assertions.assertFalse(outputGroups.get(0).isSpendLast());
+    }
+
+    @Test
+    public void testNotificationChangeIsSpentLast() {
+        Wallet wallet = buildFundedWallet(new Script(List.of(ScriptChunk.fromOpcode(ScriptOpCodes.OP_RETURN), ScriptChunk.fromData(PaymentCodeTest.getNotificationPayload()))), true);
+
+        List<OutputGroup> outputGroups = wallet.getGroupedUtxos(Collections.emptyList(), 1.0d, 1.0d, false);
+        Assertions.assertEquals(1, outputGroups.size());
+        Assertions.assertTrue(outputGroups.get(0).isSpendLast());
+    }
+
     private Wallet buildMultisigWallet(ScriptType scriptType, int cosigners) throws MnemonicException {
         Wallet wallet = new Wallet();
         wallet.setPolicyType(PolicyType.MULTI_HD);
@@ -452,6 +482,36 @@ public class WalletTest {
         keystore.setKeyDerivation(new KeyDerivation("deadbeef", "m/352'/0'/0'"));
         wallet.getKeystores().add(keystore);
         wallet.setDefaultPolicy(Policy.getPolicy(PolicyType.SINGLE_SP, ScriptType.P2TR, wallet.getKeystores(), 1));
+        return wallet;
+    }
+
+    private Wallet buildFundedWallet(Script opReturnScript, boolean addWalletTransaction) {
+        Wallet wallet = new Wallet();
+        wallet.setPolicyType(PolicyType.SINGLE_HD);
+        wallet.setScriptType(ScriptType.P2WPKH);
+        Keystore keystore = new Keystore();
+        keystore.setKeyDerivation(new KeyDerivation("00000000", "m/84'/0'/0'"));
+        keystore.setExtendedPublicKey(ExtendedKey.fromDescriptor("xpub6BosfCnifzxcFwrSzQiqu2DBVTshkCXacvNsWGYJVVhhawA7d4R5WSWGFNbi8Aw6ZRc1brxMyWMzG3DSSSSoekkudhUd9yLb6qx39T9nMdj"));
+        wallet.getKeystores().add(keystore);
+        wallet.setDefaultPolicy(Policy.getPolicy(PolicyType.SINGLE_HD, ScriptType.P2WPKH, wallet.getKeystores(), 1));
+        wallet.setStoredBlockHeight(800006);
+
+        WalletNode receiveNode = wallet.getNode(KeyPurpose.RECEIVE);
+        receiveNode.fillToIndex(0);
+        WalletNode addressNode = receiveNode.getChildren().iterator().next();
+
+        //An unsolicited payment to a known receive address, carrying an OP_RETURN output alongside it
+        Transaction transaction = new Transaction();
+        transaction.addInput(Sha256Hash.ZERO_HASH, 0, new Script(new byte[0]));
+        transaction.addOutput(10000, wallet.getAddress(addressNode));
+        transaction.addOutput(0, opReturnScript);
+
+        Date date = new Date();
+        if(addWalletTransaction) {
+            wallet.updateTransactions(Map.of(transaction.getTxId(), new BlockTransaction(transaction.getTxId(), 800000, date, 0L, transaction)));
+        }
+        addressNode.setTransactionOutputs(new TreeSet<>(List.of(new BlockTransactionHashIndex(transaction.getTxId(), 800000, date, 0L, 0, 10000))));
+
         return wallet;
     }
 }
