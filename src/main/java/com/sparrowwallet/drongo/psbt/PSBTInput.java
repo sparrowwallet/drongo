@@ -954,9 +954,8 @@ public class PSBTInput {
         if(getNonWitnessUtxo() != null || getWitnessUtxo() != null) {
             Script signingScript = getSigningScript();
             if(signingScript != null) {
-                if((localSigHash == SigHash.SINGLE || localSigHash == SigHash.ANYONECANPAY_SINGLE) && index >= psbt.getTransaction().getOutputs().size()
-                        && Arrays.asList(NON_WITNESS_TYPES).contains(getScriptType())) {
-                    throw new IllegalStateException("Refusing to sign SIGHASH_SINGLE on legacy input " + index
+                if((localSigHash == SigHash.SINGLE || localSigHash == SigHash.ANYONECANPAY_SINGLE) && index >= psbt.getTransaction().getOutputs().size()) {
+                    throw new IllegalStateException("Refusing to sign SIGHASH_SINGLE on input " + index
                             + " with only " + psbt.getTransaction().getOutputs().size() + " output(s) as it would produce a re-broadcastable signature");
                 }
 
@@ -981,6 +980,12 @@ public class PSBTInput {
     void verifySigHash() throws PSBTSignatureException {
         if(sigHash == null || sigHash == SigHash.ALL || sigHash == SigHash.DEFAULT) {
             return;
+        }
+
+        int numOutputs = psbt.getTransaction().getOutputs().size();
+        if((sigHash == SigHash.SINGLE || sigHash == SigHash.ANYONECANPAY_SINGLE) && index >= numOutputs) {
+            throw new PSBTSignatureException("Input " + index + " requests " + (sigHash == SigHash.ANYONECANPAY_SINGLE ? "SIGHASH_SINGLE | ANYONECANPAY" : "SIGHASH_SINGLE")
+                    + ", but the transaction has only " + numOutputs + " output(s), so there is no output at that index. The signature would commit to no outputs at all, and could be re-used on a transaction with completely different outputs.");
         }
 
         switch(sigHash) {

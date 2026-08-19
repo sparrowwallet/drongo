@@ -8,6 +8,7 @@ import com.sparrowwallet.drongo.address.P2PKHAddress;
 import com.sparrowwallet.drongo.crypto.ECKey;
 import com.sparrowwallet.drongo.policy.Miniscript;
 import com.sparrowwallet.drongo.policy.Policy;
+import com.sparrowwallet.drongo.policy.PolicyType;
 import com.sparrowwallet.drongo.protocol.*;
 import com.sparrowwallet.drongo.silentpayments.SilentPaymentAddress;
 import com.sparrowwallet.drongo.wallet.Wallet;
@@ -1173,6 +1174,160 @@ public class PSBTTest {
         Sha256Hash magicOne = Sha256Hash.wrap("0100000000000000000000000000000000000000000000000000000000000000");
         Assertions.assertEquals(magicOne, unsigned.hashForLegacySignature(1, victimSpk, SigHash.SINGLE),
                 "underlying legacy hash function still returns the constant - guard is the sole defence at sign time");
+    }
+
+    @Test
+    public void sighashSingleOutOfRangeRefusedOnSegwitInput() {
+        ECKey victimKey = new ECKey();
+        Script victimSpk = ScriptType.P2WPKH.getOutputScript(victimKey.getPubKeyHash());
+        ECKey attackerKey = new ECKey();
+        Script attackerSpk = ScriptType.P2WPKH.getOutputScript(attackerKey.getPubKeyHash());
+
+        Transaction priorTx0 = new Transaction();
+        priorTx0.addInput(Sha256Hash.ZERO_HASH, 0L, new Script(new byte[0]));
+        priorTx0.addOutput(100_000L, attackerSpk);
+
+        Transaction priorTx1 = new Transaction();
+        priorTx1.addInput(Sha256Hash.ZERO_HASH, 0L, new Script(new byte[0]));
+        priorTx1.addOutput(200_000L, victimSpk);
+
+        //A coordinator presents two inputs and a single output, placing the victim's input beyond the last output
+        Transaction unsigned = new Transaction();
+        unsigned.addInput(priorTx0.getTxId(), 0, new Script(new byte[0]));
+        unsigned.addInput(priorTx1.getTxId(), 0, new Script(new byte[0]));
+        unsigned.addOutput(290_000L, victimSpk);
+
+        PSBT psbt = new PSBT(unsigned);
+        psbt.getPsbtInputs().get(0).setWitnessUtxo(priorTx0.getOutputs().getFirst());
+        PSBTInput trapInput = psbt.getPsbtInputs().get(1);
+        trapInput.setWitnessUtxo(priorTx1.getOutputs().getFirst());
+        trapInput.setSigHash(SigHash.SINGLE);
+
+        IllegalStateException thrown = Assertions.assertThrows(IllegalStateException.class, () -> trapInput.sign(victimKey));
+        Assertions.assertTrue(thrown.getMessage().contains("re-broadcastable"), "guard message should describe the risk");
+        Assertions.assertTrue(trapInput.getPartialSignatures().isEmpty(), "no signature should be recorded for a refused input");
+
+        //Why the guard is required: BIP143 leaves hashOutputs zeroed when the input index is out of range, so the sighash
+        //is identical over an entirely different set of outputs and any signature made over it is freely re-usable
+        Script scriptCode = trapInput.getSigningScript();
+        Transaction swapped = new Transaction();
+        swapped.addInput(priorTx0.getTxId(), 0, new Script(new byte[0]));
+        swapped.addInput(priorTx1.getTxId(), 0, new Script(new byte[0]));
+        swapped.addOutput(295_000L, attackerSpk);
+        Assertions.assertEquals(unsigned.hashForWitnessSignature(1, scriptCode, 200_000L, SigHash.SINGLE),
+                swapped.hashForWitnessSignature(1, scriptCode, 200_000L, SigHash.SINGLE),
+                "the witness sighash commits to no output at all when the input index is out of range");
+    }
+
+    @Test
+    public void sighashSingleOutOfRangeRefusedOnEveryScriptType() {
+        ECKey key = new ECKey();
+        Script witnessScript = ScriptType.MULTISIG.getOutputScript(1, List.of(key));
+        Map<String, Script> scriptPubKeys = new LinkedHashMap<>();
+        scriptPubKeys.put("P2PKH", ScriptType.P2PKH.getOutputScript(key.getPubKeyHash()));
+        scriptPubKeys.put("MULTISIG", witnessScript);
+        scriptPubKeys.put("P2WPKH", ScriptType.P2WPKH.getOutputScript(key.getPubKeyHash()));
+        scriptPubKeys.put("P2SH_P2WPKH", ScriptType.P2SH_P2WPKH.getOutputScript(PolicyType.SINGLE_HD, key));
+        scriptPubKeys.put("P2WSH", ScriptType.P2WSH.getOutputScript(witnessScript));
+        scriptPubKeys.put("P2TR", ScriptType.P2TR.getOutputScript(key.getPubKeyXCoord()));
+
+        for(Map.Entry<String, Script> entry : scriptPubKeys.entrySet()) {
+            Transaction priorTx = new Transaction();
+            priorTx.addInput(Sha256Hash.ZERO_HASH, 0L, new Script(new byte[0]));
+            priorTx.addOutput(200_000L, entry.getValue());
+
+            Transaction unsigned = new Transaction();
+            unsigned.addInput(Sha256Hash.ZERO_HASH, 1L, new Script(new byte[0]));
+            unsigned.addInput(priorTx.getTxId(), 0, new Script(new byte[0]));
+            unsigned.addOutput(190_000L, entry.getValue());
+
+            PSBT psbt = new PSBT(unsigned);
+            PSBTInput trapInput = psbt.getPsbtInputs().get(1);
+            trapInput.setWitnessUtxo(priorTx.getOutputs().getFirst());
+            trapInput.setRedeemScript(ScriptType.P2WPKH.getOutputScript(key.getPubKeyHash()));
+            trapInput.setWitnessScript(witnessScript);
+            trapInput.setSigHash(SigHash.SINGLE);
+
+            IllegalStateException thrown = Assertions.assertThrows(IllegalStateException.class, () -> trapInput.sign(key), entry.getKey() + " must refuse an out of range SIGHASH_SINGLE");
+            Assertions.assertTrue(thrown.getMessage().startsWith("Refusing to sign SIGHASH_SINGLE on input 1"), entry.getKey() + " must be refused by the sighash guard, not by an unrelated failure");
+        }
+    }
+
+    @Test
+    public void anyoneCanPaySighashSingleOutOfRangeRefused() {
+        ECKey key = new ECKey();
+        Script spk = ScriptType.P2WPKH.getOutputScript(key.getPubKeyHash());
+
+        Transaction priorTx = new Transaction();
+        priorTx.addInput(Sha256Hash.ZERO_HASH, 0L, new Script(new byte[0]));
+        priorTx.addOutput(200_000L, spk);
+
+        Transaction unsigned = new Transaction();
+        unsigned.addInput(Sha256Hash.ZERO_HASH, 1L, new Script(new byte[0]));
+        unsigned.addInput(priorTx.getTxId(), 0, new Script(new byte[0]));
+        unsigned.addOutput(190_000L, spk);
+
+        PSBT psbt = new PSBT(unsigned);
+        PSBTInput trapInput = psbt.getPsbtInputs().get(1);
+        trapInput.setWitnessUtxo(priorTx.getOutputs().getFirst());
+        trapInput.setSigHash(SigHash.ANYONECANPAY_SINGLE);
+
+        IllegalStateException thrown = Assertions.assertThrows(IllegalStateException.class, () -> trapInput.sign(key));
+        Assertions.assertTrue(thrown.getMessage().startsWith("Refusing to sign SIGHASH_SINGLE on input 1"));
+    }
+
+    @Test
+    public void sighashSingleInRangeSegwitInputStillSigns() {
+        ECKey key = new ECKey();
+        Script spk = ScriptType.P2WPKH.getOutputScript(key.getPubKeyHash());
+
+        Transaction priorTx0 = new Transaction();
+        priorTx0.addInput(Sha256Hash.ZERO_HASH, 0L, new Script(new byte[0]));
+        priorTx0.addOutput(100_000L, spk);
+
+        Transaction priorTx1 = new Transaction();
+        priorTx1.addInput(Sha256Hash.ZERO_HASH, 0L, new Script(new byte[0]));
+        priorTx1.addOutput(200_000L, spk);
+
+        //The second input has a matching output at the same index, which is the legitimate SIGHASH_SINGLE use
+        Transaction unsigned = new Transaction();
+        unsigned.addInput(priorTx0.getTxId(), 0, new Script(new byte[0]));
+        unsigned.addInput(priorTx1.getTxId(), 0, new Script(new byte[0]));
+        unsigned.addOutput(95_000L, spk);
+        unsigned.addOutput(190_000L, spk);
+
+        PSBT psbt = new PSBT(unsigned);
+        psbt.getPsbtInputs().get(0).setWitnessUtxo(priorTx0.getOutputs().getFirst());
+        PSBTInput signingInput = psbt.getPsbtInputs().get(1);
+        signingInput.setWitnessUtxo(priorTx1.getOutputs().getFirst());
+        signingInput.setSigHash(SigHash.SINGLE);
+
+        Assertions.assertTrue(signingInput.sign(key));
+        Assertions.assertDoesNotThrow(signingInput::verifySignatures);
+    }
+
+    @Test
+    public void verifySigHashesDescribesTheMissingOutput() {
+        ECKey key = new ECKey();
+        Script spk = ScriptType.P2WPKH.getOutputScript(key.getPubKeyHash());
+
+        Transaction priorTx = new Transaction();
+        priorTx.addInput(Sha256Hash.ZERO_HASH, 0L, new Script(new byte[0]));
+        priorTx.addOutput(200_000L, spk);
+
+        Transaction unsigned = new Transaction();
+        unsigned.addInput(Sha256Hash.ZERO_HASH, 1L, new Script(new byte[0]));
+        unsigned.addInput(priorTx.getTxId(), 0, new Script(new byte[0]));
+        unsigned.addOutput(190_000L, spk);
+
+        PSBT psbt = new PSBT(unsigned);
+        psbt.getPsbtInputs().get(1).setWitnessUtxo(priorTx.getOutputs().getFirst());
+        psbt.getPsbtInputs().get(1).setSigHash(SigHash.SINGLE);
+
+        PSBTSignatureException ex = Assertions.assertThrows(PSBTSignatureException.class, psbt::verifySigHashes);
+        Assertions.assertTrue(ex.getMessage().contains("Input 1"));
+        Assertions.assertTrue(ex.getMessage().contains("no output at that index"), "the warning must not claim a same index output exists");
+        Assertions.assertTrue(ex.getMessage().contains("commit to no outputs at all"));
     }
 
     @Test
