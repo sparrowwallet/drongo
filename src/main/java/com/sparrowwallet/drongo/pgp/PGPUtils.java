@@ -127,10 +127,16 @@ public class PGPUtils {
         try {
             String[] keyFiles = IOUtils.getResourceListing(PGPUtils.class, APPLICATION_KEYRING_DIR);
             for(String keyFile : keyFiles) {
+                //A resource that is not a public key ring must not add a null to the collection, or remove the keys following it
                 try(InputStream pubkeyStream = PGPUtils.class.getResourceAsStream("/" + APPLICATION_KEYRING_DIR + keyFile)) {
-                    if(pubkeyStream != null) {
-                        rings.add(PGPainless.readKeyRing().publicKeyRing(pubkeyStream));
+                    PGPPublicKeyRing publicKeyRing = pubkeyStream == null ? null : PGPainless.readKeyRing().publicKeyRing(pubkeyStream);
+                    if(publicKeyRing != null) {
+                        rings.add(publicKeyRing);
+                    } else {
+                        log.warn("Ignoring " + keyFile + " in " + APPLICATION_KEYRING_DIR + ", not a public key ring");
                     }
+                } catch(Exception e) {
+                    log.warn("Error loading application key ring " + keyFile, e);
                 }
             }
         } catch(Exception e) {
@@ -150,7 +156,10 @@ public class PGPUtils {
                     List<PGPPublicKeyRing> rings = new ArrayList<>();
                     for(KeyBlob keyBlob : bcKeyBox.getKeyBlobs()) {
                         if(keyBlob instanceof PublicKeyRingBlob publicKeyRingBlob) {
-                            rings.add(publicKeyRingBlob.getPGPPublicKeyRing());
+                            PGPPublicKeyRing publicKeyRing = publicKeyRingBlob.getPGPPublicKeyRing();
+                            if(publicKeyRing != null) {
+                                rings.add(publicKeyRing);
+                            }
                         }
                     }
                     if(!rings.isEmpty()) {
