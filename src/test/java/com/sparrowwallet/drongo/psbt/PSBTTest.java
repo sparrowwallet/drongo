@@ -17,6 +17,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
+import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.LinkedHashMap;
@@ -1615,13 +1616,147 @@ public class PSBTTest {
     }
 
     @Test
-    public void truncatedPsbtDoesNotMatchSourceTransaction() throws PSBTParseException {
-        Transaction tx = buildMatchesTransaction(new byte[0], 12345L);
-        byte[] serialized = new PSBT(tx).serialize();
-        PSBT truncatedPsbt = new PSBT(Arrays.copyOf(serialized, serialized.length - 1), false);
+    public void truncatedPsbtIsRejected() {
+        byte[] serialized = new PSBT(buildMatchesTransaction(new byte[0], 12345L)).serialize();
 
-        Assertions.assertTrue(truncatedPsbt.getPsbtOutputs().isEmpty(), "Truncated PSBT should parse with no outputs");
-        Assertions.assertFalse(truncatedPsbt.matches(tx));
+        Exception e = Assertions.assertThrows(PSBTParseException.class, () -> new PSBT(Arrays.copyOf(serialized, serialized.length - 1), false));
+        Assertions.assertTrue(e.getMessage().contains("PSBT is truncated"), e.getMessage());
+    }
+
+    @Test
+    public void truncatedV0PsbtIsRejected() throws PSBTParseException {
+        byte[] serialized = PSBT.fromString(MATCHES_V0_PSBT).serialize();
+
+        Exception e = Assertions.assertThrows(PSBTParseException.class, () -> new PSBT(Arrays.copyOf(serialized, serialized.length - 1), false));
+        Assertions.assertTrue(e.getMessage().contains("PSBT is truncated"), e.getMessage());
+    }
+
+    @Test
+    public void everyV0TruncationIsRejected() throws PSBTParseException {
+        PSBT psbt = PSBT.fromString(TWO_INPUTS_TWO_OUTPUTS_PSBT);
+        Assertions.assertEquals(0, psbt.getPsbtVersion());
+        assertEveryTruncationIsRejected(psbt.serialize());
+    }
+
+    @Test
+    public void everyV2TruncationIsRejected() throws PSBTParseException {
+        //TWO_INPUTS_TWO_OUTPUTS_PSBT is a BIP174 v0 vector, so convert it to exercise the count entries and per-input outpoints
+        PSBT psbt = PSBT.fromString(TWO_INPUTS_TWO_OUTPUTS_PSBT);
+        psbt.convertVersion(2);
+        Assertions.assertEquals(2, psbt.getPsbtVersion());
+        assertEveryTruncationIsRejected(psbt.serialize());
+    }
+
+    @Test
+    public void psbtShorterThanHeaderIsRejected() {
+        byte[] header = Utils.hexToBytes("70736274");
+
+        Exception e = Assertions.assertThrows(PSBTParseException.class, () -> new PSBT(header, false));
+        Assertions.assertTrue(e.getMessage().contains("PSBT is truncated"), e.getMessage());
+    }
+
+    @Test
+    public void entryLengthBeyondRemainingBytesIsRejected() {
+        //A key length of 0x7fffffff was previously allocated before the remaining bytes were checked
+        byte[] oversized = Utils.hexToBytes("70736274fffeffffff7f");
+
+        Exception e = Assertions.assertThrows(PSBTParseException.class, () -> new PSBT(oversized, false));
+        Assertions.assertTrue(e.getMessage().contains("cannot read 2147483647 bytes of entry key"), e.getMessage());
+    }
+
+    @Test
+    public void entryLengthBeyondIntRangeIsRejected() {
+        //A key length of 0xffffffff previously read as -1, giving a NegativeArraySizeException
+        byte[] beyondIntRange = Utils.hexToBytes("70736274fffeffffffff");
+
+        Exception e = Assertions.assertThrows(PSBTParseException.class, () -> new PSBT(beyondIntRange, false));
+        Assertions.assertTrue(e.getMessage().contains("Data too long:4294967295"), e.getMessage());
+    }
+
+    @Test
+    public void compactIntBoundariesUseTheShortestEncoding() {
+        Assertions.assertEquals("fc", Utils.bytesToHex(PSBTEntry.writeCompactInt(0xfcL)));
+        Assertions.assertEquals("fdfd00", Utils.bytesToHex(PSBTEntry.writeCompactInt(0xfdL)));
+        //0xffff and 0xffffffff are the last values the three and five byte forms can hold, and were previously written in the next widest form
+        Assertions.assertEquals("fdffff", Utils.bytesToHex(PSBTEntry.writeCompactInt(0xffffL)));
+        Assertions.assertEquals("fe00000100", Utils.bytesToHex(PSBTEntry.writeCompactInt(0x10000L)));
+        Assertions.assertEquals("feffffffff", Utils.bytesToHex(PSBTEntry.writeCompactInt(0xffffffffL)));
+        Assertions.assertEquals("ff0000000001000000", Utils.bytesToHex(PSBTEntry.writeCompactInt(0x100000000L)));
+    }
+
+    @Test
+    public void compactIntRoundTripsUpToIntRange() throws PSBTParseException {
+        for(long value : List.of(0L, 1L, 0xfcL, 0xfdL, 0xffL, 0x100L, 0xfffeL, 0xffffL, 0x10000L, (long)Integer.MAX_VALUE)) {
+            ByteBuffer buffer = ByteBuffer.wrap(PSBTEntry.writeCompactInt(value));
+            Assertions.assertEquals(value, PSBTEntry.readCompactInt(buffer), "Compact size integer " + value + " must round trip");
+            Assertions.assertFalse(buffer.hasRemaining(), "Compact size integer " + value + " must be written in the shortest form");
+        }
+    }
+
+    @Test
+    public void declaredInputCountBeyondIntRangeIsRejected() {
+        //An input count of 0x100000001 truncates to a single input in an int
+        byte[] inflated = serializeWithInputCountEntry("010409ff0100000001000000");
+
+        Exception e = Assertions.assertThrows(PSBTParseException.class, () -> new PSBT(inflated, false));
+        Assertions.assertTrue(e.getMessage().contains("4294967297 inputs"), e.getMessage());
+    }
+
+    @Test
+    public void emptyInputCountIsRejected() {
+        byte[] empty = serializeWithInputCountEntry("010400");
+
+        Exception e = Assertions.assertThrows(PSBTParseException.class, () -> new PSBT(empty, false));
+        Assertions.assertTrue(e.getMessage().contains("PSBT input count must be at least one"), e.getMessage());
+    }
+
+    @Test
+    public void outputAmountOutOfRangeIsRejected() {
+        byte[] excessive = new PSBT(buildMatchesTransaction(new byte[0], Transaction.MAX_SATOSHIS + 1)).serialize();
+        Exception e = Assertions.assertThrows(PSBTParseException.class, () -> new PSBT(excessive, false));
+        Assertions.assertTrue(e.getMessage().contains("PSBT output amount is out of range"), e.getMessage());
+
+        byte[] negative = new PSBT(buildMatchesTransaction(new byte[0], -12345L)).serialize();
+        e = Assertions.assertThrows(PSBTParseException.class, () -> new PSBT(negative, false));
+        Assertions.assertTrue(e.getMessage().contains("PSBT output amount is out of range"), e.getMessage());
+    }
+
+    @Test
+    public void witnessUtxoAmountOutOfRangeIsRejected() throws PSBTParseException {
+        PSBT psbt = PSBT.fromString(TWO_INPUTS_TWO_OUTPUTS_PSBT);
+        PSBTInput psbtInput = psbt.getPsbtInputs().get(1);
+        psbtInput.setWitnessUtxo(new TransactionOutput(null, Transaction.MAX_SATOSHIS + 1, psbtInput.getWitnessUtxo().getScript()));
+
+        String tampered = psbt.toBase64String();
+        Exception e = Assertions.assertThrows(PSBTParseException.class, () -> PSBT.fromString(tampered));
+        Assertions.assertTrue(e.getMessage().contains("Witness UTXO amount is out of range"), e.getMessage());
+    }
+
+    @Test
+    public void unsupportedPsbtVersionIsRejected() {
+        PSBT psbt = new PSBT(buildMatchesTransaction(new byte[0], 12345L));
+        psbt.setVersion(3);
+        byte[] serialized = psbt.serialize();
+
+        Exception e = Assertions.assertThrows(PSBTParseException.class, () -> new PSBT(serialized, false));
+        Assertions.assertTrue(e.getMessage().contains("PSBT version 3 is not supported"), e.getMessage());
+    }
+
+    @Test
+    public void overflowingFeeIsUnknown() {
+        Transaction tx = new Transaction();
+        tx.setVersion(2);
+        for(int i = 0; i < 5000; i++) {
+            tx.addInput(Sha256Hash.wrap(Utils.hexToBytes("aa00000000000000000000000000000000000000000000000000000000000011")), i, new Script(new byte[0]));
+        }
+        tx.addOutput(12345L, CHANGE_SCRIPT);
+
+        PSBT psbt = new PSBT(tx);
+        for(PSBTInput psbtInput : psbt.getPsbtInputs()) {
+            psbtInput.setWitnessUtxo(new TransactionOutput(null, Transaction.MAX_SATOSHIS, P2TR_SCRIPT));
+        }
+
+        Assertions.assertNull(psbt.getFee(), "A sum of input amounts that overflows a long must report an unknown fee");
     }
 
     //BIP174 test vector - input 0 is a legacy P2SH multisig with a non witness utxo, input 1 is P2SH-P2WSH with a witness utxo
@@ -1777,6 +1912,21 @@ public class PSBTTest {
     private static final Script CHANGE_SCRIPT = new Script(Utils.hexToBytes("76a914000000000000000000000000000000000000000088ac"));
     private static final Script P2TR_SCRIPT = new Script(Utils.hexToBytes("5120aa00000000000000000000000000000000000000000000000000000000000011"));
     private static final String MATCHES_V0_PSBT = "cHNidP8BAHUCAAAAASaBcTce3/KF6Tet7qSze3gADAVmy7OtZGQXE8pCFxv2AAAAAAD+////AtPf9QUAAAAAGXapFNDFmQPFusKGh2DpD9UhpGZap2UgiKwA4fUFAAAAABepFDVF5uM7gyxHBQ8k0+65PJwDlIvHh7MuEwAAAQD9pQEBAAAAAAECiaPHHqtNIOA3G7ukzGmPopXJRjr6Ljl/hTPMti+VZ+UBAAAAFxYAFL4Y0VKpsBIDna89p95PUzSe7LmF/////4b4qkOnHf8USIk6UwpyN+9rRgi7st0tAXHmOuxqSJC0AQAAABcWABT+Pp7xp0XpdNkCxDVZQ6vLNL1TU/////8CAMLrCwAAAAAZdqkUhc/xCX/Z4Ai7NK9wnGIZeziXikiIrHL++E4sAAAAF6kUM5cluiHv1irHU6m80GfWx6ajnQWHAkcwRAIgJxK+IuAnDzlPVoMR3HyppolwuAJf3TskAinwf4pfOiQCIAGLONfc0xTnNMkna9b7QPZzMlvEuqFEyADS8vAtsnZcASED0uFWdJQbrUqZY3LLh+GFbTZSYG2YVi/jnF6efkE/IQUCSDBFAiEA0SuFLYXc2WHS9fSrZgZU327tzHlMDDPOXMMJ/7X85Y0CIGczio4OFyXBl/saiK9Z9R5E5CVbIBZ8hoQDHAXR8lkqASECI7cr7vCWXRC+B3jv7NYfysb3mk6haTkzgHNEZPhPKrMAAAAAAAAA";
+
+    private void assertEveryTruncationIsRejected(byte[] serialized) {
+        Assertions.assertDoesNotThrow(() -> new PSBT(serialized, false), "The untruncated PSBT must parse, otherwise every truncation is rejected vacuously");
+
+        for(int length = 0; length < serialized.length; length++) {
+            byte[] truncated = Arrays.copyOf(serialized, length);
+            Assertions.assertThrows(PSBTParseException.class, () -> new PSBT(truncated, false), "Truncating to " + length + "/" + serialized.length + " bytes must be rejected");
+        }
+    }
+
+    private byte[] serializeWithInputCountEntry(String inputCountEntryHex) {
+        String hex = Utils.bytesToHex(new PSBT(buildMatchesTransaction(new byte[0], 12345L)).serialize());
+        Assertions.assertEquals(hex.indexOf("01040101"), hex.lastIndexOf("01040101"), "The single input count entry must be uniquely identifiable in the serialized PSBT");
+        return Utils.hexToBytes(hex.replace("01040101", inputCountEntryHex));
+    }
 
     private Transaction buildMatchesTransaction(byte[] scriptSig, long outputValue) {
         return buildMatchesTransaction(scriptSig, outputValue, CHANGE_SCRIPT);

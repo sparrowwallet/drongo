@@ -34,8 +34,7 @@ public class PSBTEntry {
             keyData = null;
             data = null;
         } else {
-            byte[] key = new byte[keyLen];
-            psbtByteBuffer.get(key);
+            byte[] key = readBytes(psbtByteBuffer, keyLen, "entry key");
 
             ByteBuffer keyBuf = ByteBuffer.wrap(key);
             int keyType = readCompactInt(keyBuf);
@@ -47,8 +46,7 @@ public class PSBTEntry {
             }
 
             int dataLen = readCompactInt(psbtByteBuffer);
-            byte[] data = new byte[dataLen];
-            psbtByteBuffer.get(data);
+            byte[] data = readBytes(psbtByteBuffer, dataLen, "entry data");
 
             this.key = key;
             this.keyType = keyType;
@@ -213,33 +211,46 @@ public class PSBTEntry {
     }
 
     public static int readCompactInt(ByteBuffer psbtByteBuffer) throws PSBTParseException {
+        if(!psbtByteBuffer.hasRemaining()) {
+            throw new PSBTParseException("PSBT is truncated - no bytes remain to read a compact size integer");
+        }
+
         byte b = psbtByteBuffer.get();
 
         switch (b) {
             case (byte) 0xfd: {
-                byte[] buf = new byte[2];
-                psbtByteBuffer.get(buf);
-                ByteBuffer byteBuffer = ByteBuffer.wrap(buf);
+                ByteBuffer byteBuffer = ByteBuffer.wrap(readBytes(psbtByteBuffer, 2, "compact size integer"));
                 byteBuffer.order(ByteOrder.LITTLE_ENDIAN);
                 return Short.toUnsignedInt(byteBuffer.getShort());
             }
             case (byte) 0xfe: {
-                byte[] buf = new byte[4];
-                psbtByteBuffer.get(buf);
-                ByteBuffer byteBuffer = ByteBuffer.wrap(buf);
+                ByteBuffer byteBuffer = ByteBuffer.wrap(readBytes(psbtByteBuffer, 4, "compact size integer"));
                 byteBuffer.order(ByteOrder.LITTLE_ENDIAN);
-                return byteBuffer.getInt();
+                long value = Integer.toUnsignedLong(byteBuffer.getInt());
+                if(value > Integer.MAX_VALUE) {
+                    throw new PSBTParseException("Data too long:" + value);
+                }
+                return (int)value;
             }
             case (byte) 0xff: {
-                byte[] buf = new byte[8];
-                psbtByteBuffer.get(buf);
-                ByteBuffer byteBuffer = ByteBuffer.wrap(buf);
+                ByteBuffer byteBuffer = ByteBuffer.wrap(readBytes(psbtByteBuffer, 8, "compact size integer"));
                 byteBuffer.order(ByteOrder.LITTLE_ENDIAN);
                 throw new PSBTParseException("Data too long:" + byteBuffer.getLong());
             }
             default:
                 return (int) (b & 0xff);
         }
+    }
+
+    private static byte[] readBytes(ByteBuffer psbtByteBuffer, int length, String type) throws PSBTParseException {
+        if(length > psbtByteBuffer.remaining()) {
+            throw new PSBTParseException("PSBT is truncated - cannot read " + length + " bytes of " + type + " from the remaining " + psbtByteBuffer.remaining());
+        }
+
+        byte[] bytes = new byte[length];
+        psbtByteBuffer.get(bytes);
+
+        return bytes;
     }
 
     public static byte[] writeCompactInt(long val) {
@@ -249,13 +260,13 @@ public class PSBTEntry {
             bb = ByteBuffer.allocate(1);
             bb.order(ByteOrder.LITTLE_ENDIAN);
             bb.put((byte) val);
-        } else if (val < 0xffffL) {
+        } else if (val <= 0xffffL) {
             bb = ByteBuffer.allocate(3);
             bb.order(ByteOrder.LITTLE_ENDIAN);
             bb.put((byte) 0xfd);
             bb.put((byte) (val & 0xff));
             bb.put((byte) ((val >> 8) & 0xff));
-        } else if (val < 0xffffffffL) {
+        } else if (val <= 0xffffffffL) {
             bb = ByteBuffer.allocate(5);
             bb.order(ByteOrder.LITTLE_ENDIAN);
             bb.put((byte) 0xfe);

@@ -45,8 +45,8 @@ public class PSBT {
     public static final int STATE_OUTPUTS = 3;
     public static final int STATE_END = 4;
 
-    private int inputs = 0;
-    private int outputs = 0;
+    private long inputs = 0;
+    private long outputs = 0;
 
     private byte[] psbtBytes;
 
@@ -252,6 +252,10 @@ public class PSBT {
 
         ByteBuffer psbtByteBuffer = ByteBuffer.wrap(psbtBytes);
 
+        if(psbtByteBuffer.remaining() < 5) {
+            throw new PSBTParseException("PSBT is truncated - only " + psbtByteBuffer.remaining() + " bytes are present, too short for the magic value and separator");
+        }
+
         byte[] magicBuf = new byte[4];
         psbtByteBuffer.get(magicBuf);
         if (!PSBT_MAGIC_HEX.equalsIgnoreCase(Utils.bytesToHex(magicBuf))) {
@@ -316,10 +320,12 @@ public class PSBT {
             }
         }
 
+        if(currentState == STATE_GLOBALS) {
+            throw new PSBTParseException("Missing transaction");
+        }
+
         if(currentState != STATE_END) {
-            if(getPsbtVersion() == 0 && transaction == null) {
-                throw new PSBTParseException("Missing transaction");
-            }
+            throw new PSBTParseException("PSBT is truncated - " + inputs + " inputs and " + outputs + " outputs are expected, but only " + seenInputs + " input maps and " + seenOutputs + " output maps are present");
         }
 
         if(verifySignatures) {
@@ -388,16 +394,14 @@ public class PSBT {
                     break;
                 case PSBT_GLOBAL_INPUT_COUNT:
                     entry.checkOneByteKey();
-                    VarInt varIntInputCount = new VarInt(entry.getData(), 0);
-                    this.inputCount = varIntInputCount.value;
-                    this.inputs = inputCount.intValue();
+                    this.inputCount = readCount(entry, "input");
+                    this.inputs = inputCount;
                     log.debug("PSBT input count: " + inputCount);
                     break;
                 case PSBT_GLOBAL_OUTPUT_COUNT:
                     entry.checkOneByteKey();
-                    VarInt varIntOutputCount = new VarInt(entry.getData(), 0);
-                    this.outputCount = varIntOutputCount.value;
-                    this.outputs = outputCount.intValue();
+                    this.outputCount = readCount(entry, "output");
+                    this.outputs = outputCount;
                     log.debug("PSBT output count: " + outputCount);
                     break;
                 case PSBT_GLOBAL_TX_MODIFIABLE:
@@ -413,8 +417,11 @@ public class PSBT {
                     if(entry.getData().length != 4) {
                         throw new PSBTParseException("PSBT global version must be 4 bytes");
                     }
-                    int version = (int)Utils.readUint32(entry.getData(), 0);
-                    this.version = version;
+                    long version = Utils.readUint32(entry.getData(), 0);
+                    if(version > 2) {
+                        throw new PSBTParseException("PSBT version " + version + " is not supported");
+                    }
+                    this.version = (int)version;
                     log.debug("PSBT version: " + version);
                     break;
                 case PSBT_GLOBAL_SP_ECDH_SHARE:
@@ -585,6 +592,17 @@ public class PSBT {
         return version == null ? 0 : version;
     }
 
+    private long readCount(PSBTEntry entry, String type) throws PSBTParseException {
+        //Pad the data so a short or absent encoding cannot read beyond it. Note the length is not required to match the encoding,
+        //since some implementations write a four byte value here rather than the compact size uint BIP370 specifies.
+        VarInt varIntCount = new VarInt(Arrays.copyOf(entry.getData(), 9), 0);
+        if(varIntCount.value < 1) {
+            throw new PSBTParseException("PSBT " + type + " count must be at least one");
+        }
+
+        return varIntCount.value;
+    }
+
     private PSBTEntry findDuplicateKey(List<PSBTEntry> entries) {
         Set<String> checkSet = new HashSet<>();
         for(PSBTEntry entry: entries) {
@@ -599,19 +617,24 @@ public class PSBT {
     public Long getFee() {
         long fee = 0L;
 
-        for(PSBTInput input : psbtInputs) {
-            TransactionOutput utxo = input.getUtxo();
+        try {
+            for(PSBTInput input : psbtInputs) {
+                TransactionOutput utxo = input.getUtxo();
 
-            if(utxo != null) {
-                fee += utxo.getValue();
-            } else {
-                log.warn("Cannot determine fee - inputs are missing UTXO data");
-                return null;
+                if(utxo != null) {
+                    fee = Math.addExact(fee, utxo.getValue());
+                } else {
+                    log.warn("Cannot determine fee - inputs are missing UTXO data");
+                    return null;
+                }
             }
-        }
 
-        for(PSBTOutput output : psbtOutputs) {
-            fee -= output.getAmount();
+            for(PSBTOutput output : psbtOutputs) {
+                fee = Math.subtractExact(fee, output.getAmount());
+            }
+        } catch(ArithmeticException e) {
+            log.warn("Cannot determine fee - the sum of the input or output amounts is out of range");
+            return null;
         }
 
         return fee;

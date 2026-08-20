@@ -18,6 +18,7 @@ public class Transaction extends ChildMessage {
     public static final int MAX_BLOCK_SIZE_VBYTES = 1000 * 1000;
     public static final long MAX_BITCOIN = 21 * 1000 * 1000L;
     public static final long SATOSHIS_PER_BITCOIN = 100 * 1000 * 1000L;
+    public static final long MAX_SATOSHIS = MAX_BITCOIN * SATOSHIS_PER_BITCOIN;
     public static final long MAX_BLOCK_LOCKTIME = 500000000L;
     public static final int WITNESS_SCALE_FACTOR = 4;
     public static final int DEFAULT_SEGWIT_FLAG = 1;
@@ -420,8 +421,7 @@ public class Transaction extends ChildMessage {
             } catch (ArithmeticException e) {
                 throw new VerificationException.ExcessiveValue();
             }
-            double bitcoin = (double)value/SATOSHIS_PER_BITCOIN;
-            if (bitcoin > MAX_BITCOIN) {
+            if (value > MAX_SATOSHIS) {
                 throw new VerificationException.ExcessiveValue();
             }
         }
