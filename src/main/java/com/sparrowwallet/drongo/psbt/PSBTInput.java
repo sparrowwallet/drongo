@@ -349,6 +349,7 @@ public class PSBTInput {
                     log.debug("Found input silent payments tweak");
                     break;
                 case PSBT_IN_PROPRIETARY:
+                    entry.checkOneBytePlusKeyData();
                     this.proprietary.put(Utils.bytesToHex(entry.getKeyData()), Utils.bytesToHex(entry.getData()));
                     log.debug("Found proprietary input " + Utils.bytesToHex(entry.getKeyData()) + ": " + Utils.bytesToHex(entry.getData()));
                     break;

@@ -131,6 +131,7 @@ public class PSBTOutput {
                     log.debug("Found output script hex " + Utils.bytesToHex(script.getProgram()) + " script " + script);
                     break;
                 case PSBT_OUT_PROPRIETARY:
+                    entry.checkOneBytePlusKeyData();
                     proprietary.put(Utils.bytesToHex(entry.getKeyData()), Utils.bytesToHex(entry.getData()));
                     log.debug("Found proprietary output " + Utils.bytesToHex(entry.getKeyData()) + ": " + Utils.bytesToHex(entry.getData()));
                     break;

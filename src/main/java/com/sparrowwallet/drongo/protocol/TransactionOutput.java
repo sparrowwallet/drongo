@@ -32,9 +32,9 @@ public class TransactionOutput extends ChildMessage {
 
     protected void parse() throws ProtocolException {
         value = readInt64();
-        int scriptLen = (int) readVarInt();
-        length = cursor - offset + scriptLen;
+        long scriptLen = readVarInt();
         scriptBytes = readBytes(scriptLen);
+        length = cursor - offset;
     }
 
     public byte[] bitcoinSerialize() {

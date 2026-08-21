@@ -51,10 +51,10 @@ public class TransactionInput extends ChildMessage {
     protected void parse() throws ProtocolException {
         outpoint = new TransactionOutPoint(payload, cursor, this);
         cursor += outpoint.getMessageSize();
-        int scriptLen = (int) readVarInt();
-        length = cursor - offset + scriptLen + 4;
+        long scriptLen = readVarInt();
         scriptBytes = readBytes(scriptLen);
         sequence = readUint32();
+        length = cursor - offset;
     }
 
     public byte[] getScriptBytes() {

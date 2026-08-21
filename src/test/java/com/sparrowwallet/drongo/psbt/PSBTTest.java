@@ -1674,6 +1674,72 @@ public class PSBTTest {
     }
 
     @Test
+    public void malformedEntryDataThrowsPSBTParseException() {
+        //A structurally valid PSBT whose witness utxo entry holds four bytes reached TransactionOutput.parse,
+        //which threw a ProtocolException straight out of the constructor
+        String hex = Utils.bytesToHex(new PSBT(buildMatchesTransaction(new byte[0], 12345L)).serialize());
+        String prevTxidEntry = "010e20";
+        Assertions.assertEquals(hex.indexOf(prevTxidEntry), hex.lastIndexOf(prevTxidEntry), "The previous txid entry must be uniquely identifiable in the serialized PSBT");
+        byte[] spliced = Utils.hexToBytes(hex.replace(prevTxidEntry, "01010400000000" + prevTxidEntry));
+
+        Exception e = Assertions.assertThrows(PSBTParseException.class, () -> new PSBT(spliced, false));
+        Assertions.assertTrue(e.getMessage().contains("Invalid data in PSBT"), e.getMessage());
+    }
+
+    @Test
+    public void proprietaryKeyWithoutKeyDataIsRejected() {
+        //A proprietary key is 0xfc plus an identifier and subtype, so a bare type byte left keyData null and gave an NPE
+        String hex = Utils.bytesToHex(new PSBT(buildMatchesTransaction(new byte[0], 12345L)).serialize());
+        byte[] bareProprietaryKey = Utils.hexToBytes(hex.replace("70736274ff", "70736274ff" + "01fc00"));
+
+        Exception e = Assertions.assertThrows(PSBTParseException.class, () -> new PSBT(bareProprietaryKey, false));
+        Assertions.assertTrue(e.getMessage().contains("one byte plus key data"), e.getMessage());
+    }
+
+    @Test
+    public void bip32DerivationMustBeAWholeNumberOfChildNumbers() {
+        //Nine bytes of derivation data underflowed the buffer on the third read
+        Exception e = Assertions.assertThrows(PSBTParseException.class, () -> PSBTEntry.parseKeyDerivation(Utils.hexToBytes("00000000" + "010203040506070809")));
+        Assertions.assertTrue(e.getMessage().contains("Invalid BIP32 derivation of 9 bytes"), e.getMessage());
+    }
+
+    @Test
+    public void invalidPublicKeyThrowsPSBTParseException() {
+        //ECKey.fromPublicOnly throws an IllegalArgumentException, which is neither a ProtocolException nor a VerificationException
+        String hex = Utils.bytesToHex(new PSBT(buildMatchesTransaction(new byte[0], 12345L)).serialize());
+        String outputAmountEntry = "0103083930000000000000";
+        Assertions.assertEquals(hex.indexOf(outputAmountEntry), hex.lastIndexOf(outputAmountEntry), "The output amount entry must be uniquely identifiable in the serialized PSBT");
+        byte[] invalidPublicKey = Utils.hexToBytes(hex.replace(outputAmountEntry, "2202" + "00".repeat(33) + "04" + "00000000" + outputAmountEntry));
+
+        Exception e = Assertions.assertThrows(PSBTParseException.class, () -> new PSBT(invalidPublicKey, false));
+        Assertions.assertTrue(e.getMessage().contains("Invalid data in PSBT"), e.getMessage());
+    }
+
+    @Test
+    public void unterminatedGlobalMapIsRejected() {
+        //A PSBT truncated before the global separator has no transaction in either version, so it is a truncation rather than a missing field
+        Exception e = Assertions.assertThrows(PSBTParseException.class, () -> new PSBT(Utils.hexToBytes("70736274ff"), false));
+        Assertions.assertTrue(e.getMessage().contains("the global map is not terminated"), e.getMessage());
+    }
+
+    @Test
+    public void unverifiableUnsignedTransactionThrowsPSBTParseException() {
+        //An unsigned transaction with no outputs fails Transaction.verify(), which threw a VerificationException
+        String unsignedTx = "02000000" + "01" + "aa00000000000000000000000000000000000000000000000000000000000011" + "01000000" + "00" + "ffffffff" + "00" + "00000000";
+        byte[] noOutputs = Utils.hexToBytes("70736274ff" + "010033" + unsignedTx + "00");
+
+        Exception e = Assertions.assertThrows(PSBTParseException.class, () -> new PSBT(noOutputs, false));
+        Assertions.assertTrue(e.getMessage().contains("Invalid data in PSBT"), e.getMessage());
+    }
+
+    @Test
+    public void dnssecProofNameLengthIsUnsigned() {
+        //The name length was read as a signed byte, so a high byte gave a negative length and a NegativeArraySizeException
+        Exception e = Assertions.assertThrows(PSBTParseException.class, () -> PSBTEntry.parseDnssecProof(Utils.hexToBytes("80010203")));
+        Assertions.assertTrue(e.getMessage().contains("Invalid string length of 128"), e.getMessage());
+    }
+
+    @Test
     public void compactIntBoundariesUseTheShortestEncoding() {
         Assertions.assertEquals("fc", Utils.bytesToHex(PSBTEntry.writeCompactInt(0xfcL)));
         Assertions.assertEquals("fdfd00", Utils.bytesToHex(PSBTEntry.writeCompactInt(0xfdL)));

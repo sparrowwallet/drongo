@@ -59,10 +59,13 @@ public class TransactionWitness extends ChildMessage {
 
     protected void parse() throws ProtocolException {
         long pushCount = readVarInt();
-        for (int y = 0; y < pushCount; y++) {
+        if (pushCount < 0) {
+            throw new ProtocolException("Invalid witness push count: " + pushCount);
+        }
+        for (long y = 0; y < pushCount; y++) {
             long pushSize = readVarInt();
-            byte[] push = readBytes((int)pushSize);
-            setPush(y, push);
+            byte[] push = readBytes(pushSize);
+            setPush((int)y, push);
         }
     }
 

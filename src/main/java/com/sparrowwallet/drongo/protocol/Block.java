@@ -1,5 +1,7 @@
 package com.sparrowwallet.drongo.protocol;
 
+import com.sparrowwallet.drongo.Utils;
+
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -19,9 +21,12 @@ public class Block extends Message {
 
         hash = Sha256Hash.wrapReversed(Sha256Hash.hashTwice(payload, offset, cursor - offset));
         if(cursor != payload.length) {
-            int numTransactions = (int)readVarInt();
-            transactions = new ArrayList<>(numTransactions);
-            for(int i = 0; i < numTransactions; i++) {
+            long numTransactions = readVarInt();
+            if(numTransactions < 0) {
+                throw new ProtocolException("Invalid transaction count: " + numTransactions);
+            }
+            transactions = new ArrayList<>((int)Math.min(numTransactions, Utils.MAX_INITIAL_ARRAY_LENGTH));
+            for(long i = 0; i < numTransactions; i++) {
                 Transaction tx = new Transaction(payload, cursor);
                 transactions.add(tx);
                 cursor += tx.getMessageSize();

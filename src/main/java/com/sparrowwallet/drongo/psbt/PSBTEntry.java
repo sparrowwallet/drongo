@@ -97,7 +97,11 @@ public class PSBTEntry {
         return Utils.bytesToHex(data);
     }
 
-    public static List<ChildNumber> readBIP32Derivation(byte[] data) {
+    public static List<ChildNumber> readBIP32Derivation(byte[] data) throws PSBTParseException {
+        if(data.length == 0 || data.length % 4 != 0) {
+            throw new PSBTParseException("Invalid BIP32 derivation of " + data.length + " bytes, must be a whole number of child numbers");
+        }
+
         List<ChildNumber> path = new ArrayList<>();
 
         ByteBuffer bb = ByteBuffer.wrap(data);
@@ -149,7 +153,7 @@ public class PSBTEntry {
         }
 
         ByteBuffer bb = ByteBuffer.wrap(data);
-        int strLen = bb.get();
+        int strLen = bb.get() & 0xff;
         if(data.length < strLen + 1) {
             throw new PSBTParseException("Invalid string length of " + strLen + " provided for DNSSEC proof");
         }
@@ -302,6 +306,12 @@ public class PSBTEntry {
     public void checkOneBytePlusXOnlyPubKey() throws PSBTParseException {
         if(this.getKey().length != 33) {
             throw new PSBTParseException("PSBT key type must be one byte plus x only pub key");
+        }
+    }
+
+    public void checkOneBytePlusKeyData() throws PSBTParseException {
+        if(this.getKey().length < 2) {
+            throw new PSBTParseException("PSBT key type must be one byte plus key data");
         }
     }
 

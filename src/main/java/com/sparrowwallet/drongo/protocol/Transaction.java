@@ -53,6 +53,9 @@ public class Transaction extends ChildMessage {
 
     public Transaction(byte[] rawtx) {
         super(rawtx, 0);
+        if(length != rawtx.length) {
+            throw new ProtocolException("Transaction of " + length + " bytes is followed by " + (rawtx.length - length) + " unparsed bytes");
+        }
     }
 
     public Transaction(byte[] blockdata, int offset) {
@@ -254,6 +257,9 @@ public class Transaction extends ChildMessage {
         // version
         version = readUint32();
         // peek at marker
+        if (cursor >= payload.length) {
+            throw new ProtocolException("Transaction is truncated, no bytes remain to read the segwit marker");
+        }
         byte marker = payload[cursor];
         segwit = (marker == 0);
         // marker, flag
@@ -276,7 +282,10 @@ public class Transaction extends ChildMessage {
 
     private void parseInputs() {
         long numInputs = readVarInt();
-        inputs = new ArrayList<>(Math.min((int) numInputs, Utils.MAX_INITIAL_ARRAY_LENGTH));
+        if (numInputs < 0) {
+            throw new ProtocolException("Invalid input count: " + numInputs);
+        }
+        inputs = new ArrayList<>((int)Math.min(numInputs, Utils.MAX_INITIAL_ARRAY_LENGTH));
         for (long i = 0; i < numInputs; i++) {
             TransactionInput input = new TransactionInput(this, payload, cursor);
             inputs.add(input);
@@ -287,7 +296,10 @@ public class Transaction extends ChildMessage {
 
     private void parseOutputs() {
         long numOutputs = readVarInt();
-        outputs = new ArrayList<>(Math.min((int) numOutputs, Utils.MAX_INITIAL_ARRAY_LENGTH));
+        if (numOutputs < 0) {
+            throw new ProtocolException("Invalid output count: " + numOutputs);
+        }
+        outputs = new ArrayList<>((int)Math.min(numOutputs, Utils.MAX_INITIAL_ARRAY_LENGTH));
         for (long i = 0; i < numOutputs; i++) {
             TransactionOutput output = new TransactionOutput(this, payload, cursor);
             outputs.add(output);
@@ -424,6 +436,10 @@ public class Transaction extends ChildMessage {
             if (value > MAX_SATOSHIS) {
                 throw new VerificationException.ExcessiveValue();
             }
+        }
+
+        if (valueOut > MAX_SATOSHIS) {
+            throw new VerificationException.ExcessiveValue();
         }
 
         if (isCoinBase()) {

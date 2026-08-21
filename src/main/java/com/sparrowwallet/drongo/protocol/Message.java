@@ -75,14 +75,14 @@ public abstract class Message {
         }
     }
 
-    protected byte[] readBytes(int length) throws ProtocolException {
-        if ((length > MAX_SIZE) || (cursor + length > payload.length)) {
+    protected byte[] readBytes(long length) throws ProtocolException {
+        if (length < 0 || length > MAX_SIZE || cursor + length > payload.length) {
             throw new ProtocolException("Claimed value length too large: " + length);
         }
         try {
-            byte[] b = new byte[length];
-            System.arraycopy(payload, cursor, b, 0, length);
-            cursor += length;
+            byte[] b = new byte[(int)length];
+            System.arraycopy(payload, cursor, b, 0, (int)length);
+            cursor += (int)length;
             return b;
         } catch (IndexOutOfBoundsException e) {
             throw new ProtocolException(e);

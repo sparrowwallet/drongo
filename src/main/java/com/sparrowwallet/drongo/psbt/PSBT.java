@@ -243,7 +243,11 @@ public class PSBT {
 
     public PSBT(byte[] psbt, boolean verifySignatures) throws PSBTParseException {
         this.psbtBytes = psbt;
-        parse(verifySignatures);
+        try {
+            parse(verifySignatures);
+        } catch(RuntimeException e) {
+            throw new PSBTParseException("Invalid data in PSBT" + (e.getMessage() == null ? "" : ": " + e.getMessage()), e);
+        }
     }
 
     private void parse(boolean verifySignatures) throws PSBTParseException {
@@ -321,7 +325,7 @@ public class PSBT {
         }
 
         if(currentState == STATE_GLOBALS) {
-            throw new PSBTParseException("Missing transaction");
+            throw new PSBTParseException("PSBT is truncated, the global map is not terminated");
         }
 
         if(currentState != STATE_END) {
@@ -450,6 +454,7 @@ public class PSBT {
                     log.debug("PSBT global generic signed message: " + genericSignedMessage);
                     break;
                 case PSBT_GLOBAL_PROPRIETARY:
+                    entry.checkOneBytePlusKeyData();
                     globalProprietary.put(Utils.bytesToHex(entry.getKeyData()), Utils.bytesToHex(entry.getData()));
                     log.debug("PSBT global proprietary data: " + Utils.bytesToHex(entry.getData()));
                     break;
@@ -593,8 +598,9 @@ public class PSBT {
     }
 
     private long readCount(PSBTEntry entry, String type) throws PSBTParseException {
-        //Pad the data so a short or absent encoding cannot read beyond it. Note the length is not required to match the encoding,
-        //since some implementations write a four byte value here rather than the compact size uint BIP370 specifies.
+        //Pad the data so a short or absent encoding cannot read beyond it. The length is not required to match the encoding,
+        //since some implementations write a four byte value here rather than the compact size uint BIP370 specifies. The two forms
+        //coincide below 253 only - above that this reads the leading byte of the four byte form, and the map count check rejects it.
         VarInt varIntCount = new VarInt(Arrays.copyOf(entry.getData(), 9), 0);
         if(varIntCount.value < 1) {
             throw new PSBTParseException("PSBT " + type + " count must be at least one");
