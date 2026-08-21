@@ -3,14 +3,20 @@ package com.sparrowwallet.drongo.crypto;
 import com.sparrowwallet.drongo.SecureString;
 import com.sparrowwallet.drongo.protocol.Sha256Hash;
 
+import java.util.Arrays;
+
 public class DoubleSha256KeyDeriver implements KeyDeriver {
 
     @Override
     public Key deriveKey(CharSequence password) throws KeyCrypterException {
         byte[] passwordBytes = SecureString.toBytesUTF8(password);
-        byte[] sha256 = Sha256Hash.hash(passwordBytes);
-        byte[] doubleSha256 = Sha256Hash.hash(sha256);
-        return new Key(doubleSha256, null, getDeriverType());
+        try {
+            byte[] sha256 = Sha256Hash.hash(passwordBytes);
+            byte[] doubleSha256 = Sha256Hash.hash(sha256);
+            return new Key(doubleSha256, null, getDeriverType());
+        } finally {
+            Arrays.fill(passwordBytes, (byte)0);
+        }
     }
 
     @Override

@@ -5,6 +5,8 @@ import org.bouncycastle.crypto.digests.SHA512Digest;
 import org.bouncycastle.crypto.generators.PKCS5S2ParametersGenerator;
 import org.bouncycastle.crypto.params.KeyParameter;
 
+import java.util.Arrays;
+
 public class Pbkdf2KeyDeriver implements KeyDeriver, AsymmetricKeyDeriver {
     public static final int DEFAULT_ITERATION_COUNT = 1024;
     public static final int DEFAULT_KEY_SIZE = 512;
@@ -46,10 +48,15 @@ public class Pbkdf2KeyDeriver implements KeyDeriver, AsymmetricKeyDeriver {
 
     @Override
     public Key deriveKey(CharSequence password) throws KeyCrypterException {
-        PKCS5S2ParametersGenerator gen = new PKCS5S2ParametersGenerator(new SHA512Digest());
-        gen.init(SecureString.toBytesUTF8(password), salt, iterationCount);
-        byte[] keyBytes = ((KeyParameter)gen.generateDerivedParameters(keySize)).getKey();
-        return new Key(keyBytes, salt, getDeriverType());
+        byte[] passwordBytes = SecureString.toBytesUTF8(password);
+        try {
+            PKCS5S2ParametersGenerator gen = new PKCS5S2ParametersGenerator(new SHA512Digest());
+            gen.init(passwordBytes, salt, iterationCount);
+            byte[] keyBytes = ((KeyParameter)gen.generateDerivedParameters(keySize)).getKey();
+            return new Key(keyBytes, salt, getDeriverType());
+        } finally {
+            Arrays.fill(passwordBytes, (byte)0);
+        }
     }
 
     @Override

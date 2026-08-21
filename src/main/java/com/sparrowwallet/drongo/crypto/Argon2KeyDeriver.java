@@ -5,6 +5,7 @@ import de.mkammerer.argon2.Argon2Advanced;
 import de.mkammerer.argon2.Argon2Factory;
 
 import java.security.SecureRandom;
+import java.util.Arrays;
 
 public class Argon2KeyDeriver implements KeyDeriver, AsymmetricKeyDeriver {
     public static final Argon2Parameters TEST_PARAMETERS = new Argon2Parameters(16, 32, 1, 1024, 1);
@@ -41,9 +42,14 @@ public class Argon2KeyDeriver implements KeyDeriver, AsymmetricKeyDeriver {
 
     @Override
     public Key deriveKey(CharSequence password) throws KeyCrypterException {
-        Argon2Advanced argon2 = Argon2Factory.createAdvanced(Argon2Factory.Argon2Types.ARGON2id, argon2Parameters.saltLength, argon2Parameters.hashLength);
-        byte[] hash = argon2.rawHash(argon2Parameters.iterations, argon2Parameters.memory, argon2Parameters.parallelism, SecureString.toBytesUTF8(password), salt);
-        return new Key(hash, salt, getDeriverType());
+        byte[] passwordBytes = SecureString.toBytesUTF8(password);
+        try {
+            Argon2Advanced argon2 = Argon2Factory.createAdvanced(Argon2Factory.Argon2Types.ARGON2id, argon2Parameters.saltLength, argon2Parameters.hashLength);
+            byte[] hash = argon2.rawHash(argon2Parameters.iterations, argon2Parameters.memory, argon2Parameters.parallelism, passwordBytes, salt);
+            return new Key(hash, salt, getDeriverType());
+        } finally {
+            Arrays.fill(passwordBytes, (byte)0);
+        }
     }
 
     @Override
