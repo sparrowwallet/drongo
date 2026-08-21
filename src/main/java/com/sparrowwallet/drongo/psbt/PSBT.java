@@ -14,6 +14,7 @@ import org.slf4j.LoggerFactory;
 import java.io.*;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
+import java.security.SecureRandom;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -122,7 +123,7 @@ public class PSBT {
         }
 
         //Shuffle outputs so change outputs are less obvious
-        Random random = new Random();
+        SecureRandom random = new SecureRandom();
         for(int i = transaction.getOutputs().size() - 1; i > 0; i--) {
             int j = random.nextInt(i + 1);
             transaction.swapOutputs(i, j);

@@ -17,6 +17,7 @@ import com.sparrowwallet.drongo.psbt.PSBTProofException;
 import com.sparrowwallet.drongo.silentpayments.*;
 
 import java.nio.charset.StandardCharsets;
+import java.security.SecureRandom;
 import java.util.*;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -29,6 +30,8 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
     public static final int SEARCH_LOOKAHEAD = 4000;
     public static final String ALLOW_DERIVATIONS_MATCHING_OTHER_SCRIPT_TYPES_PROPERTY = "com.sparrowwallet.allowDerivationsMatchingOtherScriptTypes";
     public static final String ALLOW_DERIVATIONS_MATCHING_OTHER_NETWORKS_PROPERTY = "com.sparrowwallet.allowDerivationsMatchingOtherNetworks";
+
+    private static final SecureRandom SECURE_RANDOM = new SecureRandom();
 
     private String name;
     private String label;
@@ -1259,22 +1262,21 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
     }
 
     private void applySequenceAntiFeeSniping(Transaction transaction, Map<BlockTransactionHashIndex, WalletNode> selectedUtxos, int currentBlockHeight) {
-        Random random = new Random();
-        boolean locktime = random.nextInt(2) == 0 || getScriptType() != P2TR || selectedUtxos.keySet().stream().anyMatch(utxo -> utxo.getConfirmations(currentBlockHeight) > 65535);
+        boolean locktime = SECURE_RANDOM.nextInt(2) == 0 || getScriptType() != P2TR || selectedUtxos.keySet().stream().anyMatch(utxo -> utxo.getConfirmations(currentBlockHeight) > 65535);
 
         if(locktime) {
             transaction.setLocktime(currentBlockHeight);
-            if(random.nextInt(10) == 0) {
-                transaction.setLocktime(Math.max(0, currentBlockHeight - random.nextInt(100)));
+            if(SECURE_RANDOM.nextInt(10) == 0) {
+                transaction.setLocktime(Math.max(0, currentBlockHeight - SECURE_RANDOM.nextInt(100)));
             }
         } else {
             transaction.setLocktime(0);
-            int inputIndex = random.nextInt(transaction.getInputs().size());
+            int inputIndex = SECURE_RANDOM.nextInt(transaction.getInputs().size());
             TransactionInput txInput = transaction.getInputs().get(inputIndex);
             BlockTransactionHashIndex utxo = selectedUtxos.keySet().stream().filter(ref -> ref.getHash().equals(txInput.getOutpoint().getHash()) && ref.getIndex() == txInput.getOutpoint().getIndex()).findFirst().orElseThrow();
             txInput.setSequenceNumber(utxo.getConfirmations(currentBlockHeight));
-            if(random.nextInt(10) == 0) {
-                txInput.setSequenceNumber(Math.max(0, txInput.getSequenceNumber() - random.nextInt(100)));
+            if(SECURE_RANDOM.nextInt(10) == 0) {
+                txInput.setSequenceNumber(Math.max(0, txInput.getSequenceNumber() - SECURE_RANDOM.nextInt(100)));
             }
         }
     }
@@ -1339,7 +1341,7 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
                     Map<BlockTransactionHashIndex, WalletNode> selectedInputsMap = new LinkedHashMap<>();
                     List<BlockTransactionHashIndex> shuffledInputs = new ArrayList<>(selectedInputs);
                     if(utxoSelector.shuffleInputs()) {
-                        Collections.shuffle(shuffledInputs);
+                        Collections.shuffle(shuffledInputs, SECURE_RANDOM);
                     }
                     for(BlockTransactionHashIndex shuffledInput : shuffledInputs) {
                         selectedInputsMap.put(shuffledInput, availableTxos.get(shuffledInput));

@@ -2,11 +2,13 @@ package com.sparrowwallet.drongo.wallet;
 
 import com.sparrowwallet.drongo.protocol.Transaction;
 
+import java.security.SecureRandom;
 import java.util.*;
 import java.util.stream.Collectors;
 
 public class KnapsackUtxoSelector extends SingleSetUtxoSelector {
     private static final long MIN_CHANGE = Transaction.SATOSHIS_PER_BITCOIN / 1000;
+    private static final SecureRandom SECURE_RANDOM = new SecureRandom();
 
     private final long noInputsFee;
 
@@ -19,7 +21,7 @@ public class KnapsackUtxoSelector extends SingleSetUtxoSelector {
         long actualTargetValue = targetValue + noInputsFee;
 
         List<OutputGroup> shuffled = new ArrayList<>(candidates);
-        Collections.shuffle(shuffled);
+        Collections.shuffle(shuffled, SECURE_RANDOM);
 
         OutputGroup lowestLarger = null;
         List<OutputGroup> applicableGroups = new ArrayList<>();
@@ -82,7 +84,8 @@ public class KnapsackUtxoSelector extends SingleSetUtxoSelector {
         Arrays.fill(bestSelection, true);
         long bestValue = totalLower;
 
-        Random random = new Random();
+        //Seeded from SecureRandom so the sequence is unpredictable, but drawn from a fast rng as the solver below requires
+        Random random = new Random(SECURE_RANDOM.nextLong());
 
         for(int rep = 0; rep < iterations && bestValue != actualTargetValue; rep++) {
             includedSelection = new boolean[groups.size()];

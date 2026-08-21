@@ -2,15 +2,18 @@ package com.sparrowwallet.drongo.wallet;
 
 import com.sparrowwallet.drongo.protocol.ScriptType;
 
+import java.security.SecureRandom;
 import java.util.*;
 import java.util.stream.Collectors;
 
 public class StonewallUtxoSelector implements UtxoSelector {
+    private static final long SEED = new SecureRandom().nextLong();
+
     private final ScriptType preferredScriptType;
     private final long noInputsFee;
 
     //Use the same seed so the UTXO selection is deterministic
-    private final Random random = new Random(42);
+    private final Random random = new Random(SEED);
 
     public StonewallUtxoSelector(ScriptType preferredScriptType, long noInputsFee) {
         this.preferredScriptType = preferredScriptType;
