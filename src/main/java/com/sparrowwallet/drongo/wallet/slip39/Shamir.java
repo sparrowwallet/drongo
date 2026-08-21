@@ -22,7 +22,7 @@ public class Shamir {
         int[] log = new int[256];
 
         int poly = 1;
-        for (int i = 0; i < 255; i++) {
+        for(int i = 0; i < 255; i++) {
             exp[i] = poly;
             log[poly] = i;
 
@@ -30,7 +30,7 @@ public class Shamir {
             poly = (poly << 1) ^ poly;
 
             // Reduce poly by x^8 + x^4 + x^3 + x + 1.
-            if ((poly & 0x100) != 0) {
+            if((poly & 0x100) != 0) {
                 poly ^= 0x11B;
             }
         }
@@ -78,7 +78,7 @@ public class Shamir {
             for(int i = 0; i < result.length; i++) {
                 int shareVal = Byte.toUnsignedInt(shareData[i]);
                 int intermediateSum = Byte.toUnsignedInt(result[i]);
-                result[i] = (byte) (intermediateSum ^ (shareVal != 0 ? TABLE.exp[(TABLE.log[shareVal] + logBasisEval) % 255] : 0));
+                result[i] = (byte)(intermediateSum ^ (shareVal != 0 ? TABLE.exp[(TABLE.log[shareVal] + logBasisEval) % 255] : 0));
             }
         }
 
@@ -179,7 +179,7 @@ public class Shamir {
 
         if(commonParams.size() != 1) {
             throw new MnemonicException("Mismatched parameters", "Invalid set of mnemonics, all mnemonics must begin with the same " + ID_EXP_LENGTH_WORDS + " words, "
-                            + "must have the same group threshold and the same group count");
+                    + "must have the same group threshold and the same group count");
         }
 
         return groups;
@@ -316,5 +316,6 @@ public class Shamir {
         return encryptedMasterSecret.decrypt(passphrase);
     }
 
-    private record Table(int[] exp, int[] log) {}
+    private record Table(int[] exp, int[] log) {
+    }
 }

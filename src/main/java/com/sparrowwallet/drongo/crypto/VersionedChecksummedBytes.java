@@ -42,7 +42,7 @@ public class VersionedChecksummedBytes implements Serializable, Cloneable, Compa
         // A stringified buffer is:
         //   1 byte version + data bytes + 4 bytes check code (a truncated hash)
         byte[] addressBytes = new byte[1 + bytes.length + 4];
-        addressBytes[0] = (byte) version;
+        addressBytes[0] = (byte)version;
         System.arraycopy(bytes, 0, addressBytes, 1, bytes.length);
         byte[] checksum = Sha256Hash.hashTwice(addressBytes, 0, bytes.length + 1);
         System.arraycopy(checksum, 0, addressBytes, bytes.length + 1, 4);
@@ -62,7 +62,7 @@ public class VersionedChecksummedBytes implements Serializable, Cloneable, Compa
         if(o == null || getClass() != o.getClass()) {
             return false;
         }
-        VersionedChecksummedBytes that = (VersionedChecksummedBytes) o;
+        VersionedChecksummedBytes that = (VersionedChecksummedBytes)o;
         return version == that.version && Arrays.equals(bytes, that.bytes);
     }
 
@@ -75,24 +75,24 @@ public class VersionedChecksummedBytes implements Serializable, Cloneable, Compa
 
     /**
      * {@inheritDoc}
-     *
+     * <p>
      * This implementation narrows the return type to <code>VersionedChecksummedBytes</code>
      * and allows subclasses to throw <code>CloneNotSupportedException</code> even though it
      * is never thrown by this implementation.
      */
     @Override
     public VersionedChecksummedBytes clone() throws CloneNotSupportedException {
-        return (VersionedChecksummedBytes) super.clone();
+        return (VersionedChecksummedBytes)super.clone();
     }
 
     /**
      * {@inheritDoc}
-     *
+     * <p>
      * This implementation uses an optimized Google Guava method to compare <code>bytes</code>.
      */
     @Override
     public int compareTo(VersionedChecksummedBytes o) {
-        int result =  Integer.compare(this.version, o.version);
+        int result = Integer.compare(this.version, o.version);
         Utils.LexicographicByteArrayComparator lexicographicByteArrayComparator = new Utils.LexicographicByteArrayComparator();
         return result != 0 ? result : lexicographicByteArrayComparator.compare(this.bytes, o.bytes);
     }

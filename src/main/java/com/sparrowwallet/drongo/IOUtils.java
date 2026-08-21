@@ -42,9 +42,9 @@ public class IOUtils {
                 }
 
                 return FileType.BINARY;
-            } else if (type.equals("application/json")) {
+            } else if(type.equals("application/json")) {
                 return FileType.JSON;
-            } else if (type.startsWith("text")) {
+            } else if(type.startsWith("text")) {
                 return FileType.TEXT;
             }
         } catch(IOException e) {
@@ -59,9 +59,9 @@ public class IOUtils {
      * Works for regular files, JARs, and Java modules.
      *
      * @param clazz A class from the same module or package as the resources.
-     * @param path The resource directory path (e.g., "myfolder/"). Must end with "/", must not start with "/".
+     * @param path  The resource directory path (e.g., "myfolder/"). Must end with "/", must not start with "/".
      * @return An array of filenames (not full paths) in the specified directory.
-     * @throws IOException If an I/O error occurs while accessing the resources.
+     * @throws IOException        If an I/O error occurs while accessing the resources.
      * @throws URISyntaxException If the path is invalid or unsupported.
      */
     public static String[] getResourceListing(Class<?> clazz, String path) throws URISyntaxException, IOException {
@@ -135,7 +135,7 @@ public class IOUtils {
         if(file.exists()) {
             long length = file.length();
             SecureRandom random = new SecureRandom();
-            byte[] data = new byte[1024*1024];
+            byte[] data = new byte[1024 * 1024];
             random.nextBytes(data);
             try(RandomAccessFile raf = new RandomAccessFile(file, "rws")) {
                 raf.seek(0);

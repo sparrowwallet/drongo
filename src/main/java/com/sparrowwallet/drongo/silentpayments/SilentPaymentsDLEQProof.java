@@ -9,7 +9,7 @@ import java.util.Arrays;
 
 /**
  * Represents a BIP-375 Silent Payments DLEQ proof.
- *
+ * <p>
  * This class wraps a 64-byte DLEQ proof that proves the discrete logarithm
  * equivalency between a public key and an ECDH share, as used in BIP-375
  * Silent Payments for PSBTs.
@@ -41,15 +41,15 @@ public class SilentPaymentsDLEQProof {
 
     /**
      * Generate a DLEQ proof for Silent Payments according to BIP-375.
-     *
+     * <p>
      * This method generates a proof that the ECDH share (a⋅B_scan) and the public key (a⋅G)
      * were both generated from the same private key a without revealing a.
      *
      * @param privateKey The private key (a) - either a single input's private key or the sum of the private keys for all eligible inputs
-     * @param scanKey The scan public key (B_scan) from the silent payment address
-     * @param auxRand 32 bytes of auxiliary random data (should be fresh randomness for each proof)
+     * @param scanKey    The scan public key (B_scan) from the silent payment address
+     * @param auxRand    32 bytes of auxiliary random data (should be fresh randomness for each proof)
      * @return A new SilentPaymentsDLEQProof instance
-     * @throws IllegalArgumentException if scanKey is not a public-only key, or if auxRand is not 32 bytes
+     * @throws IllegalArgumentException      if scanKey is not a public-only key, or if auxRand is not 32 bytes
      * @throws InvalidSilentPaymentException if proof generation fails
      */
     public static SilentPaymentsDLEQProof generate(BigInteger privateKey, ECKey scanKey, byte[] auxRand) throws InvalidSilentPaymentException {
@@ -89,12 +89,12 @@ public class SilentPaymentsDLEQProof {
 
     /**
      * Verify this DLEQ proof according to BIP-375.
-     *
+     * <p>
      * This verifies that the ECDH share was generated from the same private key
      * as the public key, without revealing the private key.
      *
      * @param publicKey The public key of the input, or the sum of the public keys of all eligible inputs (A = a⋅G)
-     * @param scanKey The scan public key (B_scan) from the silent payment address
+     * @param scanKey   The scan public key (B_scan) from the silent payment address
      * @param ecdhShare The ECDH share for the input, or the ECDH share for all inputs (C = a⋅B_scan)
      * @return true if the proof is valid, false otherwise
      * @throws IllegalArgumentException if any key is not a public-only key

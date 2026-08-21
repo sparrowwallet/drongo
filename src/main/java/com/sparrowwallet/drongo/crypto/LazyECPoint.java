@@ -32,8 +32,9 @@ public class LazyECPoint {
     }
 
     public ECPoint get() {
-        if (point == null)
+        if(point == null) {
             point = curve.decodePoint(bits);
+        }
         return point;
     }
 
@@ -48,17 +49,19 @@ public class LazyECPoint {
     }
 
     public byte[] getEncoded() {
-        if (bits != null)
+        if(bits != null) {
             return Arrays.copyOf(bits, bits.length);
-        else
+        } else {
             return get().getEncoded(compressed);
+        }
     }
 
     public byte[] getEncoded(boolean compressed) {
-        if (compressed == isCompressed() && bits != null)
+        if(compressed == isCompressed() && bits != null) {
             return Arrays.copyOf(bits, bits.length);
-        else
+        } else {
             return get().getEncoded(compressed);
+        }
     }
 
     public byte[] getEncodedXCoord() {
@@ -78,8 +81,12 @@ public class LazyECPoint {
 
     @Override
     public boolean equals(Object o) {
-        if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
+        if(this == o) {
+            return true;
+        }
+        if(o == null || getClass() != o.getClass()) {
+            return false;
+        }
         return Arrays.equals(getCanonicalEncoding(), ((LazyECPoint)o).getCanonicalEncoding());
     }
 

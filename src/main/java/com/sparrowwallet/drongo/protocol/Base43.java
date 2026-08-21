@@ -40,7 +40,7 @@ public class Base43 {
             if(input[startAt] == 0) {
                 ++startAt;
             }
-            temp[--j] = (byte) ALPHABET[mod];
+            temp[--j] = (byte)ALPHABET[mod];
         }
 
         // Strip extra '1' if there are some after decoding.
@@ -50,7 +50,7 @@ public class Base43 {
 
         // Add as many leading '1' as there were leading zeros.
         while(--zeroCount >= 0) {
-            temp[--j] = (byte) ALPHABET[0];
+            temp[--j] = (byte)ALPHABET[0];
         }
 
         final byte[] output = copyOfRange(temp, j, temp.length);
@@ -78,7 +78,7 @@ public class Base43 {
                 throw new IllegalArgumentException("Illegal character " + c + " at " + i);
             }
 
-            input43[i] = (byte) digit43;
+            input43[i] = (byte)digit43;
         }
 
         // Count leading zeroes
@@ -115,15 +115,15 @@ public class Base43 {
     private static byte divmod43(final byte[] number, final int startAt) {
         int remainder = 0;
         for(int i = startAt; i < number.length; i++) {
-            final int digit256 = (int) number[i] & 0xFF;
+            final int digit256 = (int)number[i] & 0xFF;
             final int temp = remainder * 256 + digit256;
 
-            number[i] = (byte) (temp / 43);
+            number[i] = (byte)(temp / 43);
 
             remainder = temp % 43;
         }
 
-        return (byte) remainder;
+        return (byte)remainder;
     }
 
     //
@@ -132,15 +132,15 @@ public class Base43 {
     private static byte divmod256(final byte[] number43, final int startAt) {
         int remainder = 0;
         for(int i = startAt; i < number43.length; i++) {
-            final int digit58 = (int) number43[i] & 0xFF;
+            final int digit58 = (int)number43[i] & 0xFF;
             final int temp = remainder * 43 + digit58;
 
-            number43[i] = (byte) (temp / 256);
+            number43[i] = (byte)(temp / 256);
 
             remainder = temp % 256;
         }
 
-        return (byte) remainder;
+        return (byte)remainder;
     }
 
     private static byte[] copyOfRange(final byte[] source, final int from, final int to) {

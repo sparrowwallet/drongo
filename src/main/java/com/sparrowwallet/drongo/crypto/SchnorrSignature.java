@@ -87,7 +87,7 @@ public class SchnorrSignature {
         if(o == null || getClass() != o.getClass()) {
             return false;
         }
-        SchnorrSignature that = (SchnorrSignature) o;
+        SchnorrSignature that = (SchnorrSignature)o;
         return r.equals(that.r) && s.equals(that.s);
     }
 

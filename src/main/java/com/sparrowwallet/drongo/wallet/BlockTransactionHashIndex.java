@@ -61,10 +61,16 @@ public class BlockTransactionHashIndex extends BlockTransactionHash implements C
 
     @Override
     public boolean equals(Object o) {
-        if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
-        if (!super.equals(o)) return false;
-        BlockTransactionHashIndex that = (BlockTransactionHashIndex) o;
+        if(this == o) {
+            return true;
+        }
+        if(o == null || getClass() != o.getClass()) {
+            return false;
+        }
+        if(!super.equals(o)) {
+            return false;
+        }
+        BlockTransactionHashIndex that = (BlockTransactionHashIndex)o;
         return index == that.index &&
                 value == that.value &&
                 Objects.equals(spentBy, that.spentBy);

@@ -28,7 +28,7 @@ public class HMacDSANonceKCalculator implements DSAKCalculator {
     /**
      * Base constructor.
      *
-     * @param digest digest to build the HMAC on.
+     * @param digest  digest to build the HMAC on.
      * @param counter additional data as per RFC 6979 3.6
      */
     public HMacDSANonceKCalculator(Digest digest, Integer counter) {
@@ -38,18 +38,15 @@ public class HMacDSANonceKCalculator implements DSAKCalculator {
         this.counter = (counter == null ? null : Integer.toUnsignedLong(counter));
     }
 
-    public boolean isDeterministic()
-    {
+    public boolean isDeterministic() {
         return true;
     }
 
-    public void init(BigInteger n, SecureRandom random)
-    {
+    public void init(BigInteger n, SecureRandom random) {
         throw new IllegalStateException("Operation not supported");
     }
 
-    public void init(BigInteger n, BigInteger d, byte[] message)
-    {
+    public void init(BigInteger n, BigInteger d, byte[] message) {
         this.n = n;
 
         Arrays.fill(V, (byte)0x01);
@@ -65,8 +62,7 @@ public class HMacDSANonceKCalculator implements DSAKCalculator {
 
         BigInteger mInt = bitsToInt(message);
 
-        if (mInt.compareTo(n) >= 0)
-        {
+        if(mInt.compareTo(n) >= 0) {
             mInt = mInt.subtract(n);
         }
 
@@ -116,16 +112,13 @@ public class HMacDSANonceKCalculator implements DSAKCalculator {
         hMac.doFinal(V, 0);
     }
 
-    public BigInteger nextK()
-    {
+    public BigInteger nextK() {
         byte[] t = new byte[BigIntegers.getUnsignedByteLength(n)];
 
-        for (;;)
-        {
+        for(; ; ) {
             int tOff = 0;
 
-            while (tOff < t.length)
-            {
+            while(tOff < t.length) {
                 hMac.update(V, 0, V.length);
 
                 hMac.doFinal(V, 0);
@@ -137,8 +130,7 @@ public class HMacDSANonceKCalculator implements DSAKCalculator {
 
             BigInteger k = bitsToInt(t);
 
-            if (k.compareTo(ZERO) > 0 && k.compareTo(n) < 0)
-            {
+            if(k.compareTo(ZERO) > 0 && k.compareTo(n) < 0) {
                 return k;
             }
 
@@ -155,12 +147,10 @@ public class HMacDSANonceKCalculator implements DSAKCalculator {
         }
     }
 
-    private BigInteger bitsToInt(byte[] t)
-    {
+    private BigInteger bitsToInt(byte[] t) {
         BigInteger v = new BigInteger(1, t);
 
-        if (t.length * 8 > n.bitLength())
-        {
+        if(t.length * 8 > n.bitLength()) {
             v = v.shiftRight(t.length * 8 - n.bitLength());
         }
 

@@ -37,7 +37,9 @@ public class ScryptKeyDeriver implements KeyDeriver {
 
     private static final SecureRandom secureRandom = new SecureRandom();
 
-    /** Returns SALT_LENGTH (8) bytes of random data */
+    /**
+     * Returns SALT_LENGTH (8) bytes of random data
+     */
     public static byte[] randomSalt() {
         byte[] salt = new byte[SALT_LENGTH];
         secureRandom.nextBytes(salt);
@@ -65,8 +67,7 @@ public class ScryptKeyDeriver implements KeyDeriver {
      * Encryption/Decryption using custom number of iterations parameters and a random salt.
      * As of August 2016, a useful value for mobile devices is 4096 (derivation takes about 1 second).
      *
-     * @param iterations
-     *            number of scrypt iterations
+     * @param iterations number of scrypt iterations
      */
     public ScryptKeyDeriver(int iterations) {
         this.scryptParameters = new ScryptParameters(randomSalt(), iterations);
@@ -80,7 +81,7 @@ public class ScryptKeyDeriver implements KeyDeriver {
      */
     public ScryptKeyDeriver(ScryptParameters scryptParameters) {
         this.scryptParameters = scryptParameters;
-        if (scryptParameters.getSalt() == null || scryptParameters.getSalt() == null || scryptParameters.getSalt().length == 0) {
+        if(scryptParameters.getSalt() == null || scryptParameters.getSalt() == null || scryptParameters.getSalt().length == 0) {
             log.warn("You are using a ScryptParameters with no salt. Your encryption may be vulnerable to a dictionary attack.");
         }
     }
@@ -92,12 +93,12 @@ public class ScryptKeyDeriver implements KeyDeriver {
 
     /**
      * Generate AES key.
-     *
+     * <p>
      * This is a very slow operation compared to encrypt/ decrypt so it is normally worth caching the result.
      *
-     * @param password    The password to use in key generation
-     * @return            The Key containing the created AES key
-     * @throws            KeyCrypterException
+     * @param password The password to use in key generation
+     * @return The Key containing the created AES key
+     * @throws KeyCrypterException
      */
     @Override
     public Key deriveKey(CharSequence password) throws KeyCrypterException {
@@ -105,20 +106,20 @@ public class ScryptKeyDeriver implements KeyDeriver {
         try {
             passwordBytes = SecureString.toBytesUTF8(password);
             byte[] salt = new byte[0];
-            if (scryptParameters.getSalt() != null) {
+            if(scryptParameters.getSalt() != null) {
                 salt = scryptParameters.getSalt();
             } else {
                 log.warn("You are using a ScryptParameters with no salt. Your encryption may be vulnerable to a dictionary attack.");
             }
 
-            byte[] keyBytes = SCrypt.generate(passwordBytes, salt, (int) scryptParameters.getN(), scryptParameters.getR(), scryptParameters.getP(), KEY_LENGTH);
+            byte[] keyBytes = SCrypt.generate(passwordBytes, salt, (int)scryptParameters.getN(), scryptParameters.getR(), scryptParameters.getP(), KEY_LENGTH);
             return new Key(keyBytes, scryptParameters.getSalt(), getDeriverType());
-        } catch (Exception e) {
+        } catch(Exception e) {
             throw new KeyCrypterException("Could not generate key from password and salt.", e);
         } finally {
             // Zero the password bytes.
             if(passwordBytes != null) {
-                java.util.Arrays.fill(passwordBytes, (byte) 0);
+                java.util.Arrays.fill(passwordBytes, (byte)0);
             }
         }
     }
@@ -143,8 +144,12 @@ public class ScryptKeyDeriver implements KeyDeriver {
 
     @Override
     public boolean equals(Object o) {
-        if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
+        if(this == o) {
+            return true;
+        }
+        if(o == null || getClass() != o.getClass()) {
+            return false;
+        }
         return Objects.equals(scryptParameters, ((ScryptKeyDeriver)o).scryptParameters);
     }
 
@@ -162,7 +167,7 @@ public class ScryptKeyDeriver implements KeyDeriver {
         }
 
         byte[] getSalt() {
-           return salt;
+            return salt;
         }
 
         long getN() {

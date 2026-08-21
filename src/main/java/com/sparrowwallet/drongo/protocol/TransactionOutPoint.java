@@ -12,9 +12,13 @@ public class TransactionOutPoint extends ChildMessage {
 
     static final int MESSAGE_LENGTH = 36;
 
-    /** Hash of the transaction to which we refer. */
+    /**
+     * Hash of the transaction to which we refer.
+     */
     private Sha256Hash hash;
-    /** Which output of that transaction we are talking about. */
+    /**
+     * Which output of that transaction we are talking about.
+     */
     private long index;
 
     private Address[] addresses = new Address[0];
@@ -57,7 +61,7 @@ public class TransactionOutPoint extends ChildMessage {
             ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
             bitcoinSerializeToStream(outputStream);
             return outputStream.toByteArray();
-        } catch (IOException e) {
+        } catch(IOException e) {
             //can't happen
         }
 
@@ -72,9 +76,13 @@ public class TransactionOutPoint extends ChildMessage {
 
     @Override
     public boolean equals(Object o) {
-        if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
-        TransactionOutPoint other = (TransactionOutPoint) o;
+        if(this == o) {
+            return true;
+        }
+        if(o == null || getClass() != o.getClass()) {
+            return false;
+        }
+        TransactionOutPoint other = (TransactionOutPoint)o;
         return getIndex() == other.getIndex() && getHash().equals(other.getHash());
     }
 

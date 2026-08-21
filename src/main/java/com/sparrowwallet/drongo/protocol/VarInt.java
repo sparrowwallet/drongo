@@ -38,18 +38,18 @@ public class VarInt {
     /**
      * Constructs a new VarInt with the value parsed from the specified offset of the given buffer.
      *
-     * @param buf the buffer containing the value
+     * @param buf    the buffer containing the value
      * @param offset the offset of the value
      */
     public VarInt(byte[] buf, int offset) {
         int first = 0xFF & buf[offset];
-        if (first < 253) {
+        if(first < 253) {
             value = first;
             originallyEncodedSize = 1; // 1 data byte (8 bits)
-        } else if (first == 253) {
+        } else if(first == 253) {
             value = Utils.readUint16(buf, offset + 1);
             originallyEncodedSize = 3; // 1 marker + 2 data bytes (16 bits)
-        } else if (first == 254) {
+        } else if(first == 254) {
             value = Utils.readUint32(buf, offset + 1);
             originallyEncodedSize = 5; // 1 marker + 4 data bytes (32 bits)
         } else {
@@ -80,10 +80,18 @@ public class VarInt {
      */
     public static int sizeOf(long value) {
         // if negative, it's actually a very large unsigned long value
-        if (value < 0) return 9; // 1 marker + 8 data bytes
-        if (value < 253) return 1; // 1 data byte
-        if (value <= 0xFFFFL) return 3; // 1 marker + 2 data bytes
-        if (value <= 0xFFFFFFFFL) return 5; // 1 marker + 4 data bytes
+        if(value < 0) {
+            return 9; // 1 marker + 8 data bytes
+        }
+        if(value < 253) {
+            return 1; // 1 data byte
+        }
+        if(value <= 0xFFFFL) {
+            return 3; // 1 marker + 2 data bytes
+        }
+        if(value <= 0xFFFFFFFFL) {
+            return 5; // 1 marker + 4 data bytes
+        }
         return 9; // 1 marker + 8 data bytes
     }
 
@@ -94,22 +102,22 @@ public class VarInt {
      */
     public byte[] encode() {
         byte[] bytes;
-        switch (sizeOf(value)) {
+        switch(sizeOf(value)) {
             case 1:
-                return new byte[]{(byte) value};
+                return new byte[]{(byte)value};
             case 3:
                 bytes = new byte[3];
-                bytes[0] = (byte) 253;
-                Utils.uint16ToByteArrayLE((int) value, bytes, 1);
+                bytes[0] = (byte)253;
+                Utils.uint16ToByteArrayLE((int)value, bytes, 1);
                 return bytes;
             case 5:
                 bytes = new byte[5];
-                bytes[0] = (byte) 254;
+                bytes[0] = (byte)254;
                 Utils.uint32ToByteArrayLE(value, bytes, 1);
                 return bytes;
             default:
                 bytes = new byte[9];
-                bytes[0] = (byte) 255;
+                bytes[0] = (byte)255;
                 Utils.int64ToByteArrayLE(value, bytes, 1);
                 return bytes;
         }

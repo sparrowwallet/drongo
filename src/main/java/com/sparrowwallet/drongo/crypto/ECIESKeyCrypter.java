@@ -89,13 +89,13 @@ public class ECIESKeyCrypter implements AsymmetricKeyCrypter {
         return result;
     }
 
-    private byte[] concat(byte[] ...bytes) {
+    private byte[] concat(byte[]... bytes) {
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         try {
             for(byte[] byteArray : bytes) {
                 out.write(byteArray);
             }
-        } catch (IOException e) {
+        } catch(IOException e) {
             //can't happen
         }
         return out.toByteArray();

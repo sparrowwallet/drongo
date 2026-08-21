@@ -60,33 +60,40 @@ public class Script {
         chunks = new ArrayList<>(5);   // Common size.
         ByteArrayInputStream bis = new ByteArrayInputStream(program);
         int initialSize = bis.available();
-        while (bis.available() > 0) {
+        while(bis.available() > 0) {
             int opcode = bis.read();
 
             long dataToRead = -1;
-            if (opcode >= 0 && opcode < OP_PUSHDATA1) {
+            if(opcode >= 0 && opcode < OP_PUSHDATA1) {
                 // Read some bytes of data, where how many is the opcode value itself.
                 dataToRead = opcode;
-            } else if (opcode == OP_PUSHDATA1) {
-                if (bis.available() < 1) throw new ProtocolException("Unexpected end of script - OP_PUSHDATA1 was followed by " + bis.available() + " bytes");
+            } else if(opcode == OP_PUSHDATA1) {
+                if(bis.available() < 1) {
+                    throw new ProtocolException("Unexpected end of script - OP_PUSHDATA1 was followed by " + bis.available() + " bytes");
+                }
                 dataToRead = bis.read();
-            } else if (opcode == OP_PUSHDATA2) {
+            } else if(opcode == OP_PUSHDATA2) {
                 // Read a short, then read that many bytes of data.
-                if (bis.available() < 2) throw new ProtocolException("Unexpected end of script - OP_PUSHDATA2 was followed by only " + bis.available() + " bytes");
+                if(bis.available() < 2) {
+                    throw new ProtocolException("Unexpected end of script - OP_PUSHDATA2 was followed by only " + bis.available() + " bytes");
+                }
                 dataToRead = Utils.readUint16FromStream(bis);
-            } else if (opcode == OP_PUSHDATA4) {
+            } else if(opcode == OP_PUSHDATA4) {
                 // Read a uint32, then read that many bytes of data.
                 // Though this is allowed, because its value cannot be > 520, it should never actually be used
-                if (bis.available() < 4) throw new ProtocolException("Unexpected end of script - OP_PUSHDATA4 was followed by only " + bis.available() + " bytes");
+                if(bis.available() < 4) {
+                    throw new ProtocolException("Unexpected end of script - OP_PUSHDATA4 was followed by only " + bis.available() + " bytes");
+                }
                 dataToRead = Utils.readUint32FromStream(bis);
             }
 
             ScriptChunk chunk;
-            if (dataToRead == -1) {
+            if(dataToRead == -1) {
                 chunk = new ScriptChunk(opcode, null);
             } else {
-                if (dataToRead > bis.available())
+                if(dataToRead > bis.available()) {
                     throw new ProtocolException("Push of data element that is larger than remaining data");
+                }
                 byte[] data = new byte[(int)dataToRead];
                 if(dataToRead != 0 && bis.read(data, 0, (int)dataToRead) != dataToRead) {
                     throw new ProtocolException();
@@ -95,26 +102,31 @@ public class Script {
                 chunk = new ScriptChunk(opcode, data);
             }
             // Save some memory by eliminating redundant copies of the same chunk objects.
-            for (ScriptChunk c : STANDARD_TRANSACTION_SCRIPT_CHUNKS) {
-                if (c.equals(chunk)) chunk = c;
+            for(ScriptChunk c : STANDARD_TRANSACTION_SCRIPT_CHUNKS) {
+                if(c.equals(chunk)) {
+                    chunk = c;
+                }
             }
             chunks.add(chunk);
         }
     }
 
-    /** Returns the serialized program as a newly created byte array. */
+    /**
+     * Returns the serialized program as a newly created byte array.
+     */
     public byte[] getProgram() {
         try {
             // Don't round-trip as Bitcoin Core doesn't and it would introduce a mismatch.
-            if (program != null)
+            if(program != null) {
                 return Arrays.copyOf(program, program.length);
+            }
             ByteArrayOutputStream bos = new ByteArrayOutputStream();
-            for (ScriptChunk chunk : chunks) {
+            for(ScriptChunk chunk : chunks) {
                 chunk.write(bos);
             }
             program = bos.toByteArray();
             return program;
-        } catch (IOException e) {
+        } catch(IOException e) {
             throw new RuntimeException(e);  // Cannot happen.
         }
     }
@@ -188,18 +200,18 @@ public class Script {
     public Address[] getToAddresses() throws NonStandardScriptException {
         for(ScriptType scriptType : SINGLE_HASH_TYPES) {
             if(scriptType.isScriptType(this)) {
-                return new Address[] { scriptType.getAddress(scriptType.getHashFromScript(this)) };
+                return new Address[]{scriptType.getAddress(scriptType.getHashFromScript(this))};
             }
         }
 
         //Special handling for taproot tweaked keys - we don't want to tweak them again
         if(P2TR.isScriptType(this)) {
-            return new Address[] { new P2TRAddress(P2TR.getPublicKeyFromScript(this).getPubKeyXCoord()) };
+            return new Address[]{new P2TRAddress(P2TR.getPublicKeyFromScript(this).getPubKeyXCoord())};
         }
 
         for(ScriptType scriptType : SINGLE_KEY_TYPES) {
             if(scriptType.isScriptType(this)) {
-                return new Address[] { scriptType.getAddress(PolicyType.SINGLE_HD, scriptType.getPublicKeyFromScript(this)) };
+                return new Address[]{scriptType.getAddress(PolicyType.SINGLE_HD, scriptType.getPublicKeyFromScript(this))};
             }
         }
 
@@ -214,7 +226,7 @@ public class Script {
         }
 
         if(P2A.isScriptType(this)) {
-            return new Address[] { P2A.getAddress(P2A.getDataFromScript(this)) };
+            return new Address[]{P2A.getAddress(P2A.getDataFromScript(this))};
         }
 
         throw new NonStandardScriptException("Cannot find addresses in non standard script: " + toString());
@@ -259,28 +271,30 @@ public class Script {
             throw new ProtocolException("decodeFromOpN called on non OP_N opcode: " + opcode);
         }
 
-        if (opcode == OP_0)
+        if(opcode == OP_0) {
             return 0;
-        else if (opcode == OP_1NEGATE)
+        } else if(opcode == OP_1NEGATE) {
             return -1;
-        else
+        } else {
             return opcode + 1 - OP_1;
+        }
     }
 
     public static int encodeToOpN(int value) {
         if(value < -1 || value > 16) {
             throw new ProtocolException("encodeToOpN called for " + value + " which we cannot encode in an opcode.");
         }
-        if (value == 0)
+        if(value == 0) {
             return OP_0;
-        else if (value == -1)
+        } else if(value == -1) {
             return OP_1NEGATE;
-        else
+        } else {
             return value - 1 + OP_1;
+        }
     }
 
     public static byte[] removeAllInstancesOfOp(byte[] inputScript, int opCode) {
-        return removeAllInstancesOf(inputScript, new byte[] {(byte)opCode});
+        return removeAllInstancesOf(inputScript, new byte[]{(byte)opCode});
     }
 
     public static byte[] removeAllInstancesOf(byte[] inputScript, byte[] chunkToRemove) {
@@ -288,7 +302,7 @@ public class Script {
         UnsafeByteArrayOutputStream bos = new UnsafeByteArrayOutputStream(inputScript.length);
 
         int cursor = 0;
-        while (cursor < inputScript.length) {
+        while(cursor < inputScript.length) {
             boolean skip = equalsRange(inputScript, cursor, chunkToRemove);
 
             int opcodeStart = cursor;
@@ -296,23 +310,23 @@ public class Script {
             // A length that cannot be read in full is signalled as -1. Held as a long so that a PUSHDATA4 length near
             // 2^32 compares as the oversized push it is, rather than wrapping on a cast to int.
             long additionalBytes = 0;
-            if (opcode >= 0 && opcode < OP_PUSHDATA1) {
+            if(opcode >= 0 && opcode < OP_PUSHDATA1) {
                 additionalBytes = opcode;
-            } else if (opcode == OP_PUSHDATA1) {
+            } else if(opcode == OP_PUSHDATA1) {
                 additionalBytes = inputScript.length - cursor < 1 ? -1 : (0xFF & inputScript[cursor]) + 1;
-            } else if (opcode == OP_PUSHDATA2) {
+            } else if(opcode == OP_PUSHDATA2) {
                 additionalBytes = inputScript.length - cursor < 2 ? -1 : Utils.readUint16(inputScript, cursor) + 2;
-            } else if (opcode == OP_PUSHDATA4) {
+            } else if(opcode == OP_PUSHDATA4) {
                 additionalBytes = inputScript.length - cursor < 4 ? -1 : Utils.readUint32(inputScript, cursor) + 4;
             }
-            if (additionalBytes < 0 || additionalBytes > inputScript.length - cursor) {
+            if(additionalBytes < 0 || additionalBytes > inputScript.length - cursor) {
                 // A push whose length prefix or data runs past the end of the script cannot be parsed. Bitcoin Core's
                 // FindAndDelete copies such a trailing fragment through unchanged, so do the same rather than reading
                 // out of bounds or zero padding the result.
                 bos.write(inputScript, opcodeStart, inputScript.length - opcodeStart);
                 break;
             }
-            if (!skip) {
+            if(!skip) {
                 bos.write(opcode);
                 bos.write(inputScript, cursor, (int)additionalBytes);
             }
@@ -322,11 +336,14 @@ public class Script {
     }
 
     private static boolean equalsRange(byte[] a, int start, byte[] b) {
-        if (start + b.length > a.length)
+        if(start + b.length > a.length) {
             return false;
-        for (int i = 0; i < b.length; i++)
-            if (a[i + start] != b[i])
+        }
+        for(int i = 0; i < b.length; i++) {
+            if(a[i + start] != b[i]) {
                 return false;
+            }
+        }
         return true;
     }
 
@@ -374,8 +391,12 @@ public class Script {
 
     @Override
     public boolean equals(Object o) {
-        if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
+        if(this == o) {
+            return true;
+        }
+        if(o == null || getClass() != o.getClass()) {
+            return false;
+        }
         return Arrays.equals(getQuickProgram(), ((Script)o).getQuickProgram());
     }
 
@@ -386,8 +407,9 @@ public class Script {
 
     // Utility that doesn't copy for internal use
     private byte[] getQuickProgram() {
-        if (program != null)
+        if(program != null) {
             return program;
+        }
         return getProgram();
     }
 }

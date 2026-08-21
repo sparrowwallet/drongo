@@ -16,7 +16,9 @@ import java.util.stream.IntStream;
 import static com.sparrowwallet.drongo.protocol.ScriptOpCodes.*;
 
 public class ScriptChunk {
-    /** Operation to be executed. Opcodes are defined in {@link ScriptOpCodes}. */
+    /**
+     * Operation to be executed. Opcodes are defined in {@link ScriptOpCodes}.
+     */
     public final int opcode;
 
     /**
@@ -41,20 +43,20 @@ public class ScriptChunk {
     public static ScriptChunk fromData(byte[] data) {
         byte[] copy = Arrays.copyOf(data, data.length);
         int opcode;
-        if (data.length == 0) {
+        if(data.length == 0) {
             opcode = OP_0;
-        } else if (data.length == 1) {
+        } else if(data.length == 1) {
             byte b = data[0];
-            if (b >= 1 && b <= 16) {
+            if(b >= 1 && b <= 16) {
                 opcode = Script.encodeToOpN(b);
             } else {
                 opcode = 1;
             }
-        } else if (data.length < OP_PUSHDATA1) {
+        } else if(data.length < OP_PUSHDATA1) {
             opcode = data.length;
-        } else if (data.length < 256) {
+        } else if(data.length < 256) {
             opcode = OP_PUSHDATA1;
-        } else if (data.length < 65536) {
+        } else if(data.length < 65536) {
             opcode = OP_PUSHDATA2;
         } else {
             opcode = OP_PUSHDATA4;
@@ -75,23 +77,33 @@ public class ScriptChunk {
     }
 
     public void write(OutputStream stream) throws IOException {
-        if (isOpCode() && opcode != ScriptOpCodes.OP_0) {
-            if(data != null) throw new IllegalStateException("Data must be null for opcode chunk");
+        if(isOpCode() && opcode != ScriptOpCodes.OP_0) {
+            if(data != null) {
+                throw new IllegalStateException("Data must be null for opcode chunk");
+            }
             stream.write(opcode);
-        } else if (data != null) {
-            if (opcode < OP_PUSHDATA1) {
-                if(data.length != opcode) throw new IllegalStateException("Data length must equal opcode value");
+        } else if(data != null) {
+            if(opcode < OP_PUSHDATA1) {
+                if(data.length != opcode) {
+                    throw new IllegalStateException("Data length must equal opcode value");
+                }
                 stream.write(opcode);
-            } else if (opcode == OP_PUSHDATA1) {
-                if(data.length > 0xFF) throw new IllegalStateException("Data length must be less than or equal to 256");
+            } else if(opcode == OP_PUSHDATA1) {
+                if(data.length > 0xFF) {
+                    throw new IllegalStateException("Data length must be less than or equal to 256");
+                }
                 stream.write(OP_PUSHDATA1);
                 stream.write(data.length);
-            } else if (opcode == OP_PUSHDATA2) {
-                if(data.length > 0xFFFF) throw new IllegalStateException("Data length must be less than or equal to 65536");
+            } else if(opcode == OP_PUSHDATA2) {
+                if(data.length > 0xFFFF) {
+                    throw new IllegalStateException("Data length must be less than or equal to 65536");
+                }
                 stream.write(OP_PUSHDATA2);
                 Utils.uint16ToByteStreamLE(data.length, stream);
-            } else if (opcode == OP_PUSHDATA4) {
-                if(data.length > Script.MAX_SCRIPT_ELEMENT_SIZE) throw new IllegalStateException("Data length must be less than or equal to " + Script.MAX_SCRIPT_ELEMENT_SIZE);
+            } else if(opcode == OP_PUSHDATA4) {
+                if(data.length > Script.MAX_SCRIPT_ELEMENT_SIZE) {
+                    throw new IllegalStateException("Data length must be less than or equal to " + Script.MAX_SCRIPT_ELEMENT_SIZE);
+                }
                 stream.write(OP_PUSHDATA4);
                 Utils.uint32ToByteStreamLE(data.length, stream);
             } else {
@@ -158,7 +170,7 @@ public class ScriptChunk {
         Script script = new Script(data, false);
         try {
             script.parse();
-        } catch (ProtocolException e) {
+        } catch(ProtocolException e) {
             return false;
         }
 
@@ -201,7 +213,7 @@ public class ScriptChunk {
         ByteArrayOutputStream stream = new ByteArrayOutputStream();
         try {
             write(stream);
-        } catch (IOException e) {
+        } catch(IOException e) {
             // Should not happen as ByteArrayOutputStream does not throw IOException on write
             throw new RuntimeException(e);
         }
@@ -215,9 +227,13 @@ public class ScriptChunk {
         final int opcodeLength = 1;
 
         int pushDataSizeLength = 0;
-        if (opcode == OP_PUSHDATA1) pushDataSizeLength = 1;
-        else if (opcode == OP_PUSHDATA2) pushDataSizeLength = 2;
-        else if (opcode == OP_PUSHDATA4) pushDataSizeLength = 4;
+        if(opcode == OP_PUSHDATA1) {
+            pushDataSizeLength = 1;
+        } else if(opcode == OP_PUSHDATA2) {
+            pushDataSizeLength = 2;
+        } else if(opcode == OP_PUSHDATA4) {
+            pushDataSizeLength = 4;
+        }
 
         final int dataLength = data == null ? 0 : data.length;
 
@@ -238,10 +254,10 @@ public class ScriptChunk {
     }
 
     public String toString() {
-        if (data == null) {
+        if(data == null) {
             return "OP_" + getOpCodeName(opcode);
         }
-        if (data.length == 0) {
+        if(data.length == 0) {
             return "OP_0";
         }
         if(Utils.isUtf8(data)) {
@@ -252,9 +268,13 @@ public class ScriptChunk {
     }
 
     public boolean equals(Object o) {
-        if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
-        ScriptChunk other = (ScriptChunk) o;
+        if(this == o) {
+            return true;
+        }
+        if(o == null || getClass() != o.getClass()) {
+            return false;
+        }
+        ScriptChunk other = (ScriptChunk)o;
         return opcode == other.opcode && Arrays.equals(data, other.data);
     }
 

@@ -35,7 +35,7 @@ public enum ScriptType {
 
         @Override
         public Address[] getAddresses(Script script) {
-            return new Address[] { getAddress(getPublicKeyFromScript(script).getPubKey()) };
+            return new Address[]{getAddress(getPublicKeyFromScript(script).getPubKey())};
         }
 
         @Override
@@ -75,17 +75,22 @@ public enum ScriptType {
         @Override
         public boolean isScriptType(Script script) {
             List<ScriptChunk> chunks = script.chunks;
-            if (chunks.size() != 2)
+            if(chunks.size() != 2) {
                 return false;
-            if (!chunks.get(0).equalsOpCode(0x21) && !chunks.get(0).equalsOpCode(0x41))
+            }
+            if(!chunks.get(0).equalsOpCode(0x21) && !chunks.get(0).equalsOpCode(0x41)) {
                 return false;
+            }
             byte[] chunk2data = chunks.get(0).data;
-            if (chunk2data == null)
+            if(chunk2data == null) {
                 return false;
-            if (chunk2data.length != 33 && chunk2data.length != 65)
+            }
+            if(chunk2data.length != 33 && chunk2data.length != 65) {
                 return false;
-            if (!chunks.get(1).equalsOpCode(OP_CHECKSIG))
+            }
+            if(!chunks.get(1).equalsOpCode(OP_CHECKSIG)) {
                 return false;
+            }
             return true;
         }
 
@@ -129,7 +134,9 @@ public enum ScriptType {
         @Override
         public TransactionSignature.Type getSignatureType() {
             return TransactionSignature.Type.ECDSA;
-        };
+        }
+
+        ;
 
         @Override
         public List<PolicyType> getAllowedPolicyTypes() {
@@ -192,21 +199,28 @@ public enum ScriptType {
         @Override
         public boolean isScriptType(Script script) {
             List<ScriptChunk> chunks = script.chunks;
-            if (chunks.size() != 5)
+            if(chunks.size() != 5) {
                 return false;
-            if (!chunks.get(0).equalsOpCode(OP_DUP))
+            }
+            if(!chunks.get(0).equalsOpCode(OP_DUP)) {
                 return false;
-            if (!chunks.get(1).equalsOpCode(OP_HASH160))
+            }
+            if(!chunks.get(1).equalsOpCode(OP_HASH160)) {
                 return false;
+            }
             byte[] chunk2data = chunks.get(2).data;
-            if (chunk2data == null)
+            if(chunk2data == null) {
                 return false;
-            if (chunk2data.length != 20)
+            }
+            if(chunk2data.length != 20) {
                 return false;
-            if (!chunks.get(3).equalsOpCode(OP_EQUALVERIFY))
+            }
+            if(!chunks.get(3).equalsOpCode(OP_EQUALVERIFY)) {
                 return false;
-            if (!chunks.get(4).equalsOpCode(OP_CHECKSIG))
+            }
+            if(!chunks.get(4).equalsOpCode(OP_CHECKSIG)) {
                 return false;
+            }
             return true;
         }
 
@@ -247,7 +261,9 @@ public enum ScriptType {
         @Override
         public TransactionSignature.Type getSignatureType() {
             return TransactionSignature.Type.ECDSA;
-        };
+        }
+
+        ;
 
         @Override
         public List<PolicyType> getAllowedPolicyTypes() {
@@ -352,23 +368,37 @@ public enum ScriptType {
         @Override
         public boolean isScriptType(Script script) {
             List<ScriptChunk> chunks = script.chunks;
-            if (chunks.size() < 4) return false;
+            if(chunks.size() < 4) {
+                return false;
+            }
             ScriptChunk chunk = chunks.get(chunks.size() - 1);
             // Must end in OP_CHECKMULTISIG[VERIFY].
-            if (!chunk.isOpCode()) return false;
-            if (!(chunk.equalsOpCode(OP_CHECKMULTISIG) || chunk.equalsOpCode(OP_CHECKMULTISIGVERIFY))) return false;
+            if(!chunk.isOpCode()) {
+                return false;
+            }
+            if(!(chunk.equalsOpCode(OP_CHECKMULTISIG) || chunk.equalsOpCode(OP_CHECKMULTISIGVERIFY))) {
+                return false;
+            }
             try {
                 // Second to last chunk must be an OP_N opcode and there should be that many data chunks (keys).
                 ScriptChunk m = chunks.get(chunks.size() - 2);
-                if (!m.isOpCode()) return false;
+                if(!m.isOpCode()) {
+                    return false;
+                }
                 int numKeys = Script.decodeFromOpN(m.opcode);
-                if (numKeys < 1 || chunks.size() != 3 + numKeys) return false;
-                for (int i = 1; i < chunks.size() - 2; i++) {
-                    if (chunks.get(i).isOpCode()) return false;
+                if(numKeys < 1 || chunks.size() != 3 + numKeys) {
+                    return false;
+                }
+                for(int i = 1; i < chunks.size() - 2; i++) {
+                    if(chunks.get(i).isOpCode()) {
+                        return false;
+                    }
                 }
                 // First chunk must be an OP_N opcode too.
-                if (Script.decodeFromOpN(chunks.get(0).opcode) < 1) return false;
-            } catch (IllegalStateException e) {
+                if(Script.decodeFromOpN(chunks.get(0).opcode) < 1) {
+                    return false;
+                }
+            } catch(IllegalStateException e) {
                 return false;   // Not an OP_N opcode.
             }
             return true;
@@ -384,7 +414,7 @@ public enum ScriptType {
             List<ECKey> pubKeys = new ArrayList<>();
 
             List<ScriptChunk> chunks = script.chunks;
-            for (int i = 1; i < chunks.size() - 2; i++) {
+            for(int i = 1; i < chunks.size() - 2; i++) {
                 byte[] pubKey = chunks.get(i).data;
                 pubKeys.add(ECKey.fromPublicOnly(pubKey));
             }
@@ -438,7 +468,9 @@ public enum ScriptType {
         @Override
         public TransactionSignature.Type getSignatureType() {
             return TransactionSignature.Type.ECDSA;
-        };
+        }
+
+        ;
 
         @Override
         public List<PolicyType> getAllowedPolicyTypes() {
@@ -517,20 +549,26 @@ public enum ScriptType {
             // printed out but one is a P2SH script and the other isn't! :(
             // We explicitly test that the op code used to load the 20 bytes is 0x14 and not something logically
             // equivalent like {@code OP_HASH160 OP_PUSHDATA1 0x14 <20 bytes of script hash> OP_EQUAL}
-            if (chunks.size() != 3)
+            if(chunks.size() != 3) {
                 return false;
-            if (!chunks.get(0).equalsOpCode(OP_HASH160))
+            }
+            if(!chunks.get(0).equalsOpCode(OP_HASH160)) {
                 return false;
+            }
             ScriptChunk chunk1 = chunks.get(1);
-            if (chunk1.opcode != 0x14)
+            if(chunk1.opcode != 0x14) {
                 return false;
+            }
             byte[] chunk1data = chunk1.data;
-            if (chunk1data == null)
+            if(chunk1data == null) {
                 return false;
-            if (chunk1data.length != 20)
+            }
+            if(chunk1data.length != 20) {
                 return false;
-            if (!chunks.get(2).equalsOpCode(OP_EQUAL))
+            }
+            if(!chunks.get(2).equalsOpCode(OP_EQUAL)) {
                 return false;
+            }
             return true;
         }
 
@@ -577,7 +615,9 @@ public enum ScriptType {
         @Override
         public TransactionSignature.Type getSignatureType() {
             return TransactionSignature.Type.ECDSA;
-        };
+        }
+
+        ;
 
         @Override
         public List<PolicyType> getAllowedPolicyTypes() {
@@ -692,7 +732,9 @@ public enum ScriptType {
         @Override
         public TransactionSignature.Type getSignatureType() {
             return TransactionSignature.Type.ECDSA;
-        };
+        }
+
+        ;
 
         @Override
         public List<PolicyType> getAllowedPolicyTypes() {
@@ -798,7 +840,9 @@ public enum ScriptType {
         @Override
         public TransactionSignature.Type getSignatureType() {
             return TransactionSignature.Type.ECDSA;
-        };
+        }
+
+        ;
 
         @Override
         public List<PolicyType> getAllowedPolicyTypes() {
@@ -858,15 +902,19 @@ public enum ScriptType {
         @Override
         public boolean isScriptType(Script script) {
             List<ScriptChunk> chunks = script.chunks;
-            if (chunks.size() != 2)
+            if(chunks.size() != 2) {
                 return false;
-            if (!chunks.get(0).equalsOpCode(OP_0))
+            }
+            if(!chunks.get(0).equalsOpCode(OP_0)) {
                 return false;
+            }
             byte[] chunk1data = chunks.get(1).data;
-            if (chunk1data == null)
+            if(chunk1data == null) {
                 return false;
-            if (chunk1data.length != 20)
+            }
+            if(chunk1data.length != 20) {
                 return false;
+            }
             return true;
         }
 
@@ -908,7 +956,9 @@ public enum ScriptType {
         @Override
         public TransactionSignature.Type getSignatureType() {
             return TransactionSignature.Type.ECDSA;
-        };
+        }
+
+        ;
 
         @Override
         public List<PolicyType> getAllowedPolicyTypes() {
@@ -972,15 +1022,19 @@ public enum ScriptType {
         @Override
         public boolean isScriptType(Script script) {
             List<ScriptChunk> chunks = script.chunks;
-            if (chunks.size() != 2)
+            if(chunks.size() != 2) {
                 return false;
-            if (!chunks.get(0).equalsOpCode(OP_0))
+            }
+            if(!chunks.get(0).equalsOpCode(OP_0)) {
                 return false;
+            }
             byte[] chunk1data = chunks.get(1).data;
-            if (chunk1data == null)
+            if(chunk1data == null) {
                 return false;
-            if (chunk1data.length != 32)
+            }
+            if(chunk1data.length != 32) {
                 return false;
+            }
             return true;
         }
 
@@ -1024,7 +1078,9 @@ public enum ScriptType {
         @Override
         public TransactionSignature.Type getSignatureType() {
             return TransactionSignature.Type.ECDSA;
-        };
+        }
+
+        ;
 
         @Override
         public List<PolicyType> getAllowedPolicyTypes() {
@@ -1089,15 +1145,19 @@ public enum ScriptType {
         @Override
         public boolean isScriptType(Script script) {
             List<ScriptChunk> chunks = script.chunks;
-            if (chunks.size() != 2)
+            if(chunks.size() != 2) {
                 return false;
-            if (!chunks.get(0).equalsOpCode(OP_1))
+            }
+            if(!chunks.get(0).equalsOpCode(OP_1)) {
                 return false;
+            }
             byte[] chunk1data = chunks.get(1).data;
-            if (chunk1data == null)
+            if(chunk1data == null) {
                 return false;
-            if (chunk1data.length != 32)
+            }
+            if(chunk1data.length != 32) {
                 return false;
+            }
             return true;
         }
 
@@ -1144,7 +1204,9 @@ public enum ScriptType {
         @Override
         public TransactionSignature.Type getSignatureType() {
             return TransactionSignature.Type.SCHNORR;
-        };
+        }
+
+        ;
 
         @Override
         public List<PolicyType> getAllowedPolicyTypes() {
@@ -1204,14 +1266,17 @@ public enum ScriptType {
         @Override
         public boolean isScriptType(Script script) {
             List<ScriptChunk> chunks = script.chunks;
-            if (chunks.size() != 2)
+            if(chunks.size() != 2) {
                 return false;
-            if (!chunks.get(0).equalsOpCode(OP_1))
+            }
+            if(!chunks.get(0).equalsOpCode(OP_1)) {
                 return false;
+            }
             byte[] chunk1data = chunks.get(1).data;
-            if (chunk1data == null)
+            if(chunk1data == null) {
                 return false;
-            if (!Arrays.equals(chunk1data, ANCHOR_WITNESS_PROGRAM)) {
+            }
+            if(!Arrays.equals(chunk1data, ANCHOR_WITNESS_PROGRAM)) {
                 return false;
             }
             return true;
@@ -1260,7 +1325,9 @@ public enum ScriptType {
         @Override
         public TransactionSignature.Type getSignatureType() {
             return TransactionSignature.Type.SCHNORR;
-        };
+        }
+
+        ;
 
         @Override
         public List<PolicyType> getAllowedPolicyTypes() {
@@ -1389,7 +1456,7 @@ public enum ScriptType {
     public abstract byte[] getHashFromScript(Script script);
 
     public Address[] getAddresses(Script script) {
-        return new Address[] { getAddress(getHashFromScript(script)) };
+        return new Address[]{getAddress(getHashFromScript(script))};
     }
 
     public ECKey getPublicKeyFromScript(Script script) {
@@ -1429,7 +1496,7 @@ public enum ScriptType {
 
     public static final ScriptType[] WITNESS_TYPES = {P2SH_P2WPKH, P2SH_P2WSH, P2WPKH, P2WSH, P2TR, P2A};
 
-    public static final byte[] ANCHOR_WITNESS_PROGRAM = new byte[] {78, 115};
+    public static final byte[] ANCHOR_WITNESS_PROGRAM = new byte[]{78, 115};
 
     public static List<ScriptType> getScriptTypesForPolicyType(PolicyType policyType) {
         return Arrays.stream(values()).filter(scriptType -> scriptType.isAllowed(policyType)).collect(Collectors.toList());
@@ -1477,8 +1544,8 @@ public enum ScriptType {
      * This is done by calculating the sum of multiplying the size of the output at the current fee rate,
      * and the size of the input needed to spend it in future at the long term fee rate
      *
-     * @param output The output to be added
-     * @param feeRate The transaction's fee rate
+     * @param output          The output to be added
+     * @param feeRate         The transaction's fee rate
      * @param longTermFeeRate The long term minimum fee rate
      * @return The fee that adding this output would add
      */

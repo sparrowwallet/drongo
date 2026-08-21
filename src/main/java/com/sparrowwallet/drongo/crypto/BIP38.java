@@ -1,17 +1,17 @@
 /**
  * Implementation of BIP38 encryption / decryption / key-address generation
  * Based on https://github.com/bitcoin/bips/blob/master/bip-0038.mediawiki
- *
+ * <p>
  * Tips much appreciated: 1EmwBbfgH7BPMoCpcFzyzgAN9Ya7jm8L1Z :)
- *
+ * <p>
  * Copyright 2014 Diego Basch
- *
+ * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- *
- *    http://www.apache.org/licenses/LICENSE-2.0
- *
+ * <p>
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * <p>
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -40,6 +40,7 @@ import static com.sparrowwallet.drongo.crypto.ECKey.CURVE;
 public class BIP38 {
     /**
      * Decrypts an encrypted key.
+     *
      * @param passphrase
      * @param encryptedKey
      * @throws UnsupportedEncodingException
@@ -49,18 +50,22 @@ public class BIP38 {
         byte[] encryptedKeyBytes = Base58.decodeChecked(encryptedKey);
         DumpedPrivateKey result;
         byte ec = encryptedKeyBytes[1];
-        switch (ec) {
-            case 0x43: result = decryptEC(passphrase, encryptedKeyBytes);
+        switch(ec) {
+            case 0x43:
+                result = decryptEC(passphrase, encryptedKeyBytes);
                 break;
-            case 0x42: result = decryptNoEC(passphrase, encryptedKeyBytes);
+            case 0x42:
+                result = decryptNoEC(passphrase, encryptedKeyBytes);
                 break;
-            default: throw new RuntimeException("Invalid key - second byte is: " + ec);
+            default:
+                throw new RuntimeException("Invalid key - second byte is: " + ec);
         }
         return result;
     }
 
     /**
      * Decrypts a key encrypted with EC multiplication
+     *
      * @param passphrase
      * @param encryptedKey
      * @throws UnsupportedEncodingException
@@ -72,10 +77,9 @@ public class BIP38 {
         byte[] passFactor;
         boolean hasLot = (flagByte & 4) == 4;
         byte[] ownerSalt = Arrays.copyOfRange(encryptedKey, 7, 15 - (flagByte & 4));
-        if (!hasLot) {
+        if(!hasLot) {
             passFactor = SCrypt.generate(passphrase.getBytes("UTF8"), ownerSalt, 16384, 8, 8, 32);
-        }
-        else {
+        } else {
             byte[] preFactor = SCrypt.generate(passphrase.getBytes("UTF8"), ownerSalt, 16384, 8, 8, 32);
             byte[] ownerEntropy = Arrays.copyOfRange(encryptedKey, 7, 15);
             byte[] tmp = Utils.concat(preFactor, ownerEntropy);
@@ -101,15 +105,15 @@ public class BIP38 {
 
         byte[] seedB = new byte[24];
 
-        for (int i = 0; i < 16; i++) {
-            m2[i] = (byte) (m2[i] ^ derivedHalf1[16 + i]);
+        for(int i = 0; i < 16; i++) {
+            m2[i] = (byte)(m2[i] ^ derivedHalf1[16 + i]);
         }
         System.arraycopy(m2, 0, encryptedPart1, 8, 8);
 
         byte[] m1 = decryptAES(encryptedPart1, derivedHalf2);
 
-        for (int i = 0; i < 16; i++) {
-            seedB[i] = (byte) (m1[i] ^ derivedHalf1[i]);
+        for(int i = 0; i < 16; i++) {
+            seedB[i] = (byte)(m1[i] ^ derivedHalf1[i]);
         }
 
         System.arraycopy(m2, 8, seedB, 16, 8);
@@ -123,6 +127,7 @@ public class BIP38 {
 
     /**
      * Decrypts a key that was encrypted without EC multiplication.
+     *
      * @param passphrase
      * @param encryptedKey
      * @throws UnsupportedEncodingException
@@ -130,7 +135,7 @@ public class BIP38 {
      */
     public static DumpedPrivateKey decryptNoEC(String passphrase, byte[] encryptedKey) throws UnsupportedEncodingException, GeneralSecurityException {
 
-        byte[] addressHash =  Arrays.copyOfRange(encryptedKey, 3, 7);
+        byte[] addressHash = Arrays.copyOfRange(encryptedKey, 3, 7);
         byte[] scryptKey = SCrypt.generate(passphrase.getBytes("UTF8"), addressHash, 16384, 8, 8, 64);
         byte[] derivedHalf1 = Arrays.copyOfRange(scryptKey, 0, 32);
         byte[] derivedHalf2 = Arrays.copyOfRange(scryptKey, 32, 64);
@@ -140,18 +145,19 @@ public class BIP38 {
         byte[] k1 = decryptAES(encryptedHalf1, derivedHalf2);
         byte[] k2 = decryptAES(encryptedHalf2, derivedHalf2);
         byte[] keyBytes = new byte[32];
-        for (int i = 0; i < 16; i++) {
-            keyBytes[i] = (byte) (k1[i] ^ derivedHalf1[i]);
-            keyBytes[i + 16] = (byte) (k2[i] ^ derivedHalf1[i + 16]);
+        for(int i = 0; i < 16; i++) {
+            keyBytes[i] = (byte)(k1[i] ^ derivedHalf1[i]);
+            keyBytes[i + 16] = (byte)(k2[i] ^ derivedHalf1[i + 16]);
         }
 
-        boolean compressed = (encryptedKey[2] & (byte) 0x20) == 0x20;
+        boolean compressed = (encryptedKey[2] & (byte)0x20) == 0x20;
         ECKey k = new ECKey(new BigInteger(1, keyBytes), null, compressed);
         return k.getPrivateKeyEncoded();
     }
 
     /**
      * Decrypts ciphertext with AES
+     *
      * @param ciphertext
      * @param key
      * @throws GeneralSecurityException

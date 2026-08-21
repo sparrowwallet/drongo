@@ -20,8 +20,9 @@ public class DeterministicHierarchy {
         // Update our tracking of what the next child in each branch of the tree should be. Just assume that keys are
         // inserted in order here.
         final DeterministicKey parent = key.getParent();
-        if (parent != null)
+        if(parent != null) {
             lastChildNumbers.put(parent.getPath(), key.getChildNumber());
+        }
         keys.put(path, key);
     }
 

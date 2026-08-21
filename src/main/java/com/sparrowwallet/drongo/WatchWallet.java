@@ -12,7 +12,7 @@ public class WatchWallet {
     private String name;
     private OutputDescriptor outputDescriptor;
 
-    private HashMap<Address,List<ChildNumber>> addresses = new HashMap<>(LOOK_AHEAD_LIMIT*2);
+    private HashMap<Address, List<ChildNumber>> addresses = new HashMap<>(LOOK_AHEAD_LIMIT * 2);
 
     public WatchWallet(String name, String descriptor) {
         this.name = name;

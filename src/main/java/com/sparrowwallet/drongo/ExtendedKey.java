@@ -60,7 +60,7 @@ public class ExtendedKey {
     public byte[] getExtendedKeyBytes(Header extendedKeyHeader) {
         ByteBuffer buffer = ByteBuffer.allocate(78);
         buffer.putInt(extendedKeyHeader.header);
-        buffer.put((byte) key.getDepth());
+        buffer.put((byte)key.getDepth());
         buffer.put(parentFingerprint);
         buffer.putInt(keyChildNumber.i());
         buffer.put(key.getChainCode());
@@ -97,7 +97,7 @@ public class ExtendedKey {
         if(depth == 0 && !header.isPrivateKey()) {
             //Poorly formatted public extended key, add first child path element
             childNumber = new ChildNumber(0, false);
-        } else if ((i & ChildNumber.HARDENED_BIT) != 0) {
+        } else if((i & ChildNumber.HARDENED_BIT) != 0) {
             childNumber = new ChildNumber(i ^ ChildNumber.HARDENED_BIT, true); //already hardened
         } else {
             childNumber = new ChildNumber(i, false);
@@ -124,7 +124,7 @@ public class ExtendedKey {
     public static boolean isValid(String extPubKey) {
         try {
             ExtendedKey.fromDescriptor(extPubKey);
-        } catch (Exception e) {
+        } catch(Exception e) {
             return false;
         }
 
@@ -138,9 +138,13 @@ public class ExtendedKey {
 
     @Override
     public boolean equals(Object o) {
-        if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
-        ExtendedKey that = (ExtendedKey) o;
+        if(this == o) {
+            return true;
+        }
+        if(o == null || getClass() != o.getClass()) {
+            return false;
+        }
+        ExtendedKey that = (ExtendedKey)o;
         return that.toString().equals(this.toString());
     }
 

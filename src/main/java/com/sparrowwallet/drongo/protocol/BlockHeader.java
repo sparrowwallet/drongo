@@ -89,7 +89,9 @@ public class BlockHeader extends Message {
         return Utils.decodeCompactBits(difficultyTarget);
     }
 
-    /** Checks the header hash meets its own claimed difficulty target, and that the target does not exceed the network proof of work limit. */
+    /**
+     * Checks the header hash meets its own claimed difficulty target, and that the target does not exceed the network proof of work limit.
+     */
     public boolean verifyProofOfWork() {
         BigInteger target = getDifficultyTargetAsInteger();
         if(target.signum() <= 0 || target.compareTo(Network.get().getProofOfWorkLimit()) > 0) {
@@ -104,7 +106,7 @@ public class BlockHeader extends Message {
             ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
             bitcoinSerializeToStream(outputStream);
             return outputStream.toByteArray();
-        } catch (IOException e) {
+        } catch(IOException e) {
             //can't happen
         }
 

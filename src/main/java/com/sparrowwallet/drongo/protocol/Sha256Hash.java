@@ -55,7 +55,7 @@ public class Sha256Hash implements Comparable<Sha256Hash> {
      * @param hexString a hash value represented as a hex string
      * @return a new instance
      * @throws IllegalArgumentException if the given string is not a valid
-     *         hex string, or if it does not represent exactly 32 bytes
+     *                                  hex string, or if it does not represent exactly 32 bytes
      */
     public static Sha256Hash wrap(String hexString) {
         return wrap(Utils.hexToBytes(hexString));
@@ -67,7 +67,7 @@ public class Sha256Hash implements Comparable<Sha256Hash> {
      * @param hexString a hash value represented as a hex string
      * @return a new instance
      * @throws IllegalArgumentException if the given string is not a valid
-     *         hex string, or if it does not represent exactly 32 bytes
+     *                                  hex string, or if it does not represent exactly 32 bytes
      */
     public static Sha256Hash fromString(String hexString) {
         return wrap(hexString);
@@ -117,7 +117,7 @@ public class Sha256Hash implements Comparable<Sha256Hash> {
 
     /**
      * Returns a new SHA-256 MessageDigest instance.
-     *
+     * <p>
      * This is a convenience method which wraps the checked
      * exception that can never occur with a RuntimeException.
      *
@@ -126,7 +126,7 @@ public class Sha256Hash implements Comparable<Sha256Hash> {
     public static MessageDigest newDigest() {
         try {
             return MessageDigest.getInstance("SHA-256");
-        } catch (NoSuchAlgorithmException e) {
+        } catch(NoSuchAlgorithmException e) {
             throw new RuntimeException(e);  // Can't happen.
         }
     }
@@ -144,7 +144,7 @@ public class Sha256Hash implements Comparable<Sha256Hash> {
     /**
      * Calculates the SHA-256 hash of the given byte range.
      *
-     * @param input the array containing the bytes to hash
+     * @param input  the array containing the bytes to hash
      * @param offset the offset within the array of the bytes to hash
      * @param length the number of bytes to hash
      * @return the hash (in big-endian order)
@@ -181,7 +181,7 @@ public class Sha256Hash implements Comparable<Sha256Hash> {
      * Calculates the SHA-256 hash of the given byte range,
      * and then hashes the resulting hash again.
      *
-     * @param input the array containing the bytes to hash
+     * @param input  the array containing the bytes to hash
      * @param offset the offset within the array of the bytes to hash
      * @param length the number of bytes to hash
      * @return the double-hash (in big-endian order)
@@ -206,8 +206,12 @@ public class Sha256Hash implements Comparable<Sha256Hash> {
 
     @Override
     public boolean equals(Object o) {
-        if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
+        if(this == o) {
+            return true;
+        }
+        if(o == null || getClass() != o.getClass()) {
+            return false;
+        }
         return Arrays.equals(bytes, ((Sha256Hash)o).bytes);
     }
 
@@ -260,13 +264,15 @@ public class Sha256Hash implements Comparable<Sha256Hash> {
 
     @Override
     public int compareTo(final Sha256Hash other) {
-        for (int i = LENGTH - 1; i >= 0; i--) {
+        for(int i = LENGTH - 1; i >= 0; i--) {
             final int thisByte = this.bytes[i] & 0xff;
             final int otherByte = other.bytes[i] & 0xff;
-            if (thisByte > otherByte)
+            if(thisByte > otherByte) {
                 return 1;
-            if (thisByte < otherByte)
+            }
+            if(thisByte < otherByte) {
                 return -1;
+            }
         }
         return 0;
     }

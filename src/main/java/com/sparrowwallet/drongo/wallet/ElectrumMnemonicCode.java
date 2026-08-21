@@ -51,7 +51,7 @@ public class ElectrumMnemonicCode {
     private String getPrefix(List<String> words) throws MnemonicException {
         String mnemonic = String.join(" ", words);
         mnemonic = Normalizer.normalize(mnemonic, Normalizer.Form.NFKD);
-        byte [] hash = Utils.getHmacSha512Hash("Seed version".getBytes(StandardCharsets.UTF_8), mnemonic.getBytes(StandardCharsets.UTF_8));
+        byte[] hash = Utils.getHmacSha512Hash("Seed version".getBytes(StandardCharsets.UTF_8), mnemonic.getBytes(StandardCharsets.UTF_8));
         String hex = Utils.bytesToHex(hash);
         try {
             int prefixLength = Integer.parseInt(hex.substring(0, 1)) + 2;

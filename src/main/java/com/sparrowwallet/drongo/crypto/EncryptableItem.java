@@ -6,18 +6,28 @@ package com.sparrowwallet.drongo.crypto;
  * which can have a creation time associated with it.
  */
 public interface EncryptableItem {
-    /** Returns whether the item is encrypted or not. If it is, then {@link #getSecretBytes()} will return null. */
+    /**
+     * Returns whether the item is encrypted or not. If it is, then {@link #getSecretBytes()} will return null.
+     */
     boolean isEncrypted();
 
-    /** Returns the raw bytes of the item, if not encrypted, or null if encrypted or the secret is missing. */
+    /**
+     * Returns the raw bytes of the item, if not encrypted, or null if encrypted or the secret is missing.
+     */
     byte[] getSecretBytes();
 
-    /** Returns the initialization vector and encrypted secret bytes, or null if not encrypted. */
+    /**
+     * Returns the initialization vector and encrypted secret bytes, or null if not encrypted.
+     */
     EncryptedData getEncryptedData();
 
-    /** Returns an object containing enums describing which algorithms are used to derive the key and encrypt the data. */
+    /**
+     * Returns an object containing enums describing which algorithms are used to derive the key and encrypt the data.
+     */
     EncryptionType getEncryptionType();
 
-    /** Returns the time in milliseconds since the UNIX epoch at which this encryptable item was first created/derived. */
+    /**
+     * Returns the time in milliseconds since the UNIX epoch at which this encryptable item was first created/derived.
+     */
     long getCreationTimeMillis();
 }

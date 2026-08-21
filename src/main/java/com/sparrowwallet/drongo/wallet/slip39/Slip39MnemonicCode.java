@@ -20,7 +20,7 @@ public class Slip39MnemonicCode {
     static {
         try {
             INSTANCE = new Slip39MnemonicCode();
-        } catch (RuntimeException e) {
+        } catch(RuntimeException e) {
             log.error("Failed to load word list", e);
         }
     }
@@ -56,7 +56,7 @@ public class Slip39MnemonicCode {
             for(int i = 0; i < wordList.size(); i++) {
                 this.wordIndexMap.put(i, wordList.get(i));
             }
-        } catch (IOException e) {
+        } catch(IOException e) {
             throw new RuntimeException("Error loading word list", e);
         }
     }

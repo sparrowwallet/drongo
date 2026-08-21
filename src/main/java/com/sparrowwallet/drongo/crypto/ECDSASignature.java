@@ -97,11 +97,11 @@ public class ECDSASignature {
             if(!(seqObj instanceof DLSequence)) {
                 throw new SignatureDecodeException("Read unexpected class: " + seqObj.getClass().getName());
             }
-            final DLSequence seq = (DLSequence) seqObj;
+            final DLSequence seq = (DLSequence)seqObj;
             ASN1Integer r, s;
             try {
-                r = (ASN1Integer) seq.getObjectAt(0);
-                s = (ASN1Integer) seq.getObjectAt(1);
+                r = (ASN1Integer)seq.getObjectAt(0);
+                s = (ASN1Integer)seq.getObjectAt(1);
             } catch(ClassCastException e) {
                 throw new SignatureDecodeException(e);
             }
@@ -127,8 +127,8 @@ public class ECDSASignature {
      * <p>When using native ECDSA verification, data must be 32 bytes, and no element may be
      * larger than 520 bytes.</p>
      *
-     * @param data      Hash of the data to verify.
-     * @param pub       The public key bytes to use.
+     * @param data Hash of the data to verify.
+     * @param pub  The public key bytes to use.
      */
     public boolean verify(byte[] data, byte[] pub) {
         ECDSASigner signer = new ECDSASigner();
@@ -136,7 +136,7 @@ public class ECDSASignature {
         signer.init(false, params);
         try {
             return signer.verifySignature(data, r, s);
-        } catch (NullPointerException e) {
+        } catch(NullPointerException e) {
             // Bouncy Castle contains a bug that can cause NPEs given specially crafted signatures. Those signatures
             // are inherently invalid/attack sigs so we just fail them here rather than crash the thread.
             log.error("Caught NPE inside bouncy castle", e);
@@ -167,7 +167,7 @@ public class ECDSASignature {
         if(o == null || getClass() != o.getClass()) {
             return false;
         }
-        ECDSASignature other = (ECDSASignature) o;
+        ECDSASignature other = (ECDSASignature)o;
         return r.equals(other.r) && s.equals(other.s);
     }
 
@@ -180,20 +180,22 @@ public class ECDSASignature {
      * Returns a decoded signature.
      *
      * @param requireCanonicalEncoding if the encoding of the signature must
-     * be canonical.
-     * @param requireCanonicalSValue if the S-value must be canonical (below half
-     * the order of the curve).
+     *                                 be canonical.
+     * @param requireCanonicalSValue   if the S-value must be canonical (below half
+     *                                 the order of the curve).
      * @throws SignatureDecodeException if the signature is unparseable in some way.
-     * @throws VerificationException if the signature is invalid.
+     * @throws VerificationException    if the signature is invalid.
      */
     public static TransactionSignature decodeFromBitcoin(byte[] bytes, boolean requireCanonicalEncoding,
                                                          boolean requireCanonicalSValue) throws SignatureDecodeException, VerificationException {
         // Bitcoin encoding is DER signature + sighash byte.
-        if (requireCanonicalEncoding && !isEncodingCanonical(bytes))
+        if(requireCanonicalEncoding && !isEncodingCanonical(bytes)) {
             throw new VerificationException.NoncanonicalSignature();
+        }
         ECDSASignature sig = ECDSASignature.decodeFromDER(bytes);
-        if (requireCanonicalSValue && !sig.isCanonical())
+        if(requireCanonicalSValue && !sig.isCanonical()) {
             throw new VerificationException("S-value is not canonical.");
+        }
 
         // In Bitcoin, any value of the final byte is valid, but not necessarily canonical. See javadocs for
         // isEncodingCanonical to learn more about this. So we must store the exact byte found.
@@ -216,38 +218,48 @@ public class ECDSASignature {
         // in which case a single 0 byte is necessary and even required).
 
         // Empty signatures, while not strictly DER encoded, are allowed.
-        if (signature.length == 0)
+        if(signature.length == 0) {
             return true;
+        }
 
-        if (signature.length < 9 || signature.length > 73)
+        if(signature.length < 9 || signature.length > 73) {
             return false;
+        }
 
-        int hashType = (signature[signature.length-1] & 0xff) & ~SigHash.ANYONECANPAY.value; // mask the byte to prevent sign-extension hurting us
-        if (hashType < SigHash.ALL.value || hashType > SigHash.SINGLE.value)
+        int hashType = (signature[signature.length - 1] & 0xff) & ~SigHash.ANYONECANPAY.value; // mask the byte to prevent sign-extension hurting us
+        if(hashType < SigHash.ALL.value || hashType > SigHash.SINGLE.value) {
             return false;
+        }
 
         //                   "wrong type"                  "wrong length marker"
-        if ((signature[0] & 0xff) != 0x30 || (signature[1] & 0xff) != signature.length-3)
+        if((signature[0] & 0xff) != 0x30 || (signature[1] & 0xff) != signature.length - 3) {
             return false;
+        }
 
         int lenR = signature[3] & 0xff;
-        if (5 + lenR >= signature.length || lenR == 0)
+        if(5 + lenR >= signature.length || lenR == 0) {
             return false;
-        int lenS = signature[5+lenR] & 0xff;
-        if (lenR + lenS + 7 != signature.length || lenS == 0)
+        }
+        int lenS = signature[5 + lenR] & 0xff;
+        if(lenR + lenS + 7 != signature.length || lenS == 0) {
             return false;
+        }
 
         //    R value type mismatch          R value negative
-        if (signature[4-2] != 0x02 || (signature[4] & 0x80) == 0x80)
+        if(signature[4 - 2] != 0x02 || (signature[4] & 0x80) == 0x80) {
             return false;
-        if (lenR > 1 && signature[4] == 0x00 && (signature[4+1] & 0x80) != 0x80)
+        }
+        if(lenR > 1 && signature[4] == 0x00 && (signature[4 + 1] & 0x80) != 0x80) {
             return false; // R value excessively padded
+        }
 
         //       S value type mismatch                    S value negative
-        if (signature[6 + lenR - 2] != 0x02 || (signature[6 + lenR] & 0x80) == 0x80)
+        if(signature[6 + lenR - 2] != 0x02 || (signature[6 + lenR] & 0x80) == 0x80) {
             return false;
-        if (lenS > 1 && signature[6 + lenR] == 0x00 && (signature[6 + lenR + 1] & 0x80) != 0x80)
+        }
+        if(lenS > 1 && signature[6 + lenR] == 0x00 && (signature[6 + lenR + 1] & 0x80) != 0x80) {
             return false; // S value excessively padded
+        }
 
         return true;
     }

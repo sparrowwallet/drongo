@@ -154,10 +154,10 @@ public class PSBTInput {
                     }
                     this.nonWitnessUtxo = nonWitnessTx;
                     log.debug("Found input non witness utxo with txid: " + nonWitnessTx.getTxId() + " version " + nonWitnessTx.getVersion() + " size " + nonWitnessTx.getMessageSize() + " locktime " + nonWitnessTx.getLocktime());
-                    for(TransactionInput input: nonWitnessTx.getInputs()) {
+                    for(TransactionInput input : nonWitnessTx.getInputs()) {
                         log.debug(" Transaction input references txid: " + input.getOutpoint().getHash() + " vout " + input.getOutpoint().getIndex() + " with script " + input.getScriptSig());
                     }
-                    for(TransactionOutput output: nonWitnessTx.getOutputs()) {
+                    for(TransactionOutput output : nonWitnessTx.getOutputs()) {
                         log.debug(" Transaction output value: " + output.getValue() + (output.getScript().getToAddress() != null ? " to address " + output.getScript().getToAddress() : "") + " with script hex " + Utils.bytesToHex(output.getScript().getProgram()) + " to script " + output.getScript());
                     }
                     break;

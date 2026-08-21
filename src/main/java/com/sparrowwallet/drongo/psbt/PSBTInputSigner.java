@@ -7,5 +7,6 @@ import com.sparrowwallet.drongo.protocol.TransactionSignature;
 
 public interface PSBTInputSigner {
     TransactionSignature sign(Sha256Hash hash, SigHash sigHash, TransactionSignature.Type signatureType);
+
     ECKey getPubKey();
 }

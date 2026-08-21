@@ -102,7 +102,7 @@ public abstract class Address {
                             return new P2SHAddress(hash);
                         }
                     }
-                } catch (Exception e) {
+                } catch(Exception e) {
                     nested = e;
                 }
             }
@@ -139,7 +139,7 @@ public abstract class Address {
                             }
                         }
                     }
-                } catch (Exception e) {
+                } catch(Exception e) {
                     nested = e;
                 }
             }

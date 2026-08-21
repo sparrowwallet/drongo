@@ -17,12 +17,15 @@ public class ChildNumber {
     public static final ChildNumber ONE = new ChildNumber(1);
     public static final ChildNumber ONE_HARDENED = new ChildNumber(1, true);
 
-    /** Integer i as per BIP 32 spec, including the MSB denoting derivation type (0 = public, 1 = private) **/
+    /**
+     * Integer i as per BIP 32 spec, including the MSB denoting derivation type (0 = public, 1 = private)
+     **/
     private final int i;
 
     public ChildNumber(int childNumber, boolean isHardened) {
-        if (hasHardenedBit(childNumber))
+        if(hasHardenedBit(childNumber)) {
             throw new IllegalArgumentException("Most significant bit is reserved and shouldn't be set: " + childNumber);
+        }
         i = isHardened ? (childNumber | HARDENED_BIT) : childNumber;
     }
 
@@ -42,8 +45,12 @@ public class ChildNumber {
         return i & (~HARDENED_BIT);
     }
 
-    /** Returns the uint32 encoded form of the path element, including the most significant bit. */
-    public int i() { return i; }
+    /**
+     * Returns the uint32 encoded form of the path element, including the most significant bit.
+     */
+    public int i() {
+        return i;
+    }
 
     public String toString() {
         return toString(true);
@@ -54,8 +61,12 @@ public class ChildNumber {
     }
 
     public boolean equals(Object o) {
-        if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
+        if(this == o) {
+            return true;
+        }
+        if(o == null || getClass() != o.getClass()) {
+            return false;
+        }
         return i == ((ChildNumber)o).i;
     }
 

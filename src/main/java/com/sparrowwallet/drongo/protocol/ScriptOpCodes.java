@@ -142,16 +142,22 @@ public class ScriptOpCodes {
     public static final int OP_CHECKMULTISIGVERIFY = 0xaf;
 
     // block state
-    /** Check lock time of the block. Introduced in BIP 65, replacing OP_NOP2 */
+    /**
+     * Check lock time of the block. Introduced in BIP 65, replacing OP_NOP2
+     */
     public static final int OP_CHECKLOCKTIMEVERIFY = 0xb1;
     public static final int OP_CHECKSEQUENCEVERIFY = 0xb2;
 
     // expansion
     public static final int OP_NOP1 = 0xb0;
-    /** Deprecated by BIP 65 */
+    /**
+     * Deprecated by BIP 65
+     */
     @Deprecated
     public static final int OP_NOP2 = OP_CHECKLOCKTIMEVERIFY;
-    /** Deprecated by BIP 112 */
+    /**
+     * Deprecated by BIP 112
+     */
     @Deprecated
     public static final int OP_NOP3 = OP_CHECKSEQUENCEVERIFY;
     public static final int OP_NOP4 = 0xb3;
@@ -296,7 +302,7 @@ public class ScriptOpCodes {
      * Converts the given OpCode into a string (eg "0", "PUSHDATA", or "RETURN_10")
      */
     public static String getOpCodeName(int opcode) {
-        if (opCodeNameMap.containsKey((Integer)opcode)) {
+        if(opCodeNameMap.containsKey((Integer)opcode)) {
             return opCodeNameMap.get(opcode);
         }
 
@@ -307,7 +313,7 @@ public class ScriptOpCodes {
      * Converts the given pushdata OpCode into a string (eg "PUSHDATA_2", or "PUSHDATA_23")
      */
     public static String getPushDataName(int opcode) {
-        if (opCodeNameMap.containsKey(opcode)) {
+        if(opCodeNameMap.containsKey(opcode)) {
             return opCodeNameMap.get(opcode);
         }
 
@@ -318,7 +324,7 @@ public class ScriptOpCodes {
      * Converts the given OpCodeName into an int
      */
     public static int getOpCode(String opCodeName) {
-        if (opCodeNameMap.containsKey(opCodeName)) {
+        if(opCodeNameMap.containsKey(opCodeName)) {
             return nameOpCodeMap.get(opCodeName);
         }
 

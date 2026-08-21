@@ -36,7 +36,7 @@ public class Rs1024 {
     public static List<Integer> createChecksum(List<Integer> data, byte[] customizationString) {
         List<Integer> values = new ArrayList<>();
         for(byte b : customizationString) {
-            values.add((int) b & 0xFF);
+            values.add((int)b & 0xFF);
         }
         values.addAll(data);
         for(int i = 0; i < CHECKSUM_LENGTH_WORDS; i++) {
@@ -54,7 +54,7 @@ public class Rs1024 {
     public static boolean verifyChecksum(List<Integer> data, byte[] customizationString) {
         List<Integer> values = new ArrayList<>();
         for(byte b : customizationString) {
-            values.add((int) b & 0xFF);
+            values.add((int)b & 0xFF);
         }
         values.addAll(data);
 

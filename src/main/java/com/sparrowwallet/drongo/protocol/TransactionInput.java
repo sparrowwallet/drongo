@@ -68,7 +68,7 @@ public class TransactionInput extends ChildMessage {
                 scriptSig = new Script(scriptBytes, false);
                 try {
                     scriptSig.parse();
-                } catch (ProtocolException e) {
+                } catch(ProtocolException e) {
                     scriptSig = new Script(scriptSig.getChunks());
                 }
             } else {

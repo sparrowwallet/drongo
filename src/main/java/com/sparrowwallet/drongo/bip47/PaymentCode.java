@@ -258,15 +258,15 @@ public class PaymentCode {
         byte[] payment_code = new byte[PAYLOAD_LEN + 1];
 
         for(int i = 0; i < payload.length; i++) {
-            payload[i] = (byte) 0x00;
+            payload[i] = (byte)0x00;
         }
 
         // byte 0: type.
-        payload[0] = (byte) type;
+        payload[0] = (byte)type;
         // byte 1: features bit field. All bits must be zero except where specified elsewhere in this specification
         //      bit 0: Bitmessage notification
         //      bits 1-7: reserved
-        payload[1] = (byte) 0x00;
+        payload[1] = (byte)0x00;
 
         // replace sign & x code (33 bytes)
         System.arraycopy(pubkey, 0, payload, PUBLIC_KEY_Y_OFFSET, pubkey.length);
@@ -274,7 +274,7 @@ public class PaymentCode {
         System.arraycopy(chain, 0, payload, CHAIN_OFFSET, chain.length);
 
         // add version byte
-        payment_code[0] = (byte) 0x47;
+        payment_code[0] = (byte)0x47;
         System.arraycopy(payload, 0, payment_code, 1, payload.length);
 
         // append checksum
@@ -287,7 +287,7 @@ public class PaymentCode {
         payload[SAMOURAI_FEATURE_BYTE] = setBit(payload[SAMOURAI_FEATURE_BYTE], SAMOURAI_SEGWIT_BIT);
         byte[] payment_code = new byte[PAYLOAD_LEN + 1];
         // add version byte
-        payment_code[0] = (byte) 0x47;
+        payment_code[0] = (byte)0x47;
         System.arraycopy(payload, 0, payment_code, 1, payload.length);
 
         // append checksum
@@ -309,7 +309,7 @@ public class PaymentCode {
     }
 
     private byte setBit(byte b, int pos) {
-        return (byte) (b | (1 << pos));
+        return (byte)(b | (1 << pos));
     }
 
     private DeterministicKey createMasterPubKeyFromBytes() {
@@ -369,7 +369,7 @@ public class PaymentCode {
             return false;
         }
 
-        PaymentCode that = (PaymentCode) o;
+        PaymentCode that = (PaymentCode)o;
         return strPaymentCode.equals(that.strPaymentCode);
     }
 

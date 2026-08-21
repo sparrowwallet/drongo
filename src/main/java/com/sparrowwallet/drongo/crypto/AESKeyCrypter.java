@@ -26,10 +26,10 @@ public class AESKeyCrypter implements KeyCrypter {
     /**
      * Decrypt bytes previously encrypted with this class.
      *
-     * @param dataToDecrypt    The data to decrypt
-     * @param aesKey           The AES key to use for decryption
-     * @return                 The decrypted bytes
-     * @throws                 KeyCrypterException if bytes could not be decrypted
+     * @param dataToDecrypt The data to decrypt
+     * @param aesKey        The AES key to use for decryption
+     * @return The decrypted bytes
+     * @throws KeyCrypterException if bytes could not be decrypted
      */
     @Override
     public byte[] decrypt(EncryptedData dataToDecrypt, Key aesKey) throws KeyCrypterException {
@@ -52,9 +52,9 @@ public class AESKeyCrypter implements KeyCrypter {
             byte[] decrypted = Arrays.copyOf(decryptedBytes, length1 + length2);
             Arrays.fill(decryptedBytes, (byte)0);
             return decrypted;
-        } catch (InvalidCipherTextException e) {
+        } catch(InvalidCipherTextException e) {
             throw new KeyCrypterException.InvalidCipherText("Could not decrypt bytes", e);
-        } catch (RuntimeException e) {
+        } catch(RuntimeException e) {
             throw new KeyCrypterException("Could not decrypt bytes", e);
         }
     }
@@ -86,7 +86,7 @@ public class AESKeyCrypter implements KeyCrypter {
             final int length2 = cipher.doFinal(encryptedBytes, length1);
 
             return new EncryptedData(iv, Arrays.copyOf(encryptedBytes, length1 + length2), aesKey.getSalt(), aesKey.getDeriver(), getCrypterType());
-        } catch (Exception e) {
+        } catch(Exception e) {
             throw new KeyCrypterException("Could not encrypt bytes.", e);
         }
     }

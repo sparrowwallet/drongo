@@ -122,6 +122,7 @@ public class WalletTransaction {
 
     /**
      * Fee percentage matches the Coldcard implementation of total fee as a percentage of total value out
+     *
      * @return the fee percentage
      */
     public double getFeePercentage() {

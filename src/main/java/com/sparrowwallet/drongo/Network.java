@@ -105,7 +105,9 @@ public enum Network {
         return defaultPort;
     }
 
-    /** The maximum (easiest) allowed difficulty target for this network, decoded from the consensus powLimit compact bits. */
+    /**
+     * The maximum (easiest) allowed difficulty target for this network, decoded from the consensus powLimit compact bits.
+     */
     public BigInteger getProofOfWorkLimit() {
         if(this == REGTEST) {
             return Utils.decodeCompactBits(0x207fffffL);

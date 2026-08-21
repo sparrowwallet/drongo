@@ -113,9 +113,13 @@ public class EncryptionType {
 
     @Override
     public boolean equals(Object o) {
-        if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
-        EncryptionType that = (EncryptionType) o;
+        if(this == o) {
+            return true;
+        }
+        if(o == null || getClass() != o.getClass()) {
+            return false;
+        }
+        EncryptionType that = (EncryptionType)o;
         return deriver == that.deriver &&
                 crypter == that.crypter;
     }

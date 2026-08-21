@@ -22,22 +22,30 @@ public class TransactionSignature {
      */
     public final byte sighashFlags;
 
-    /** Constructs a signature with the given components of the given type and SIGHASH_ALL. */
+    /**
+     * Constructs a signature with the given components of the given type and SIGHASH_ALL.
+     */
     public TransactionSignature(BigInteger r, BigInteger s, Type type) {
         this(r, s, type, type == Type.ECDSA ? SigHash.ALL.value : SigHash.DEFAULT.value);
     }
 
-    /** Constructs a transaction signature based on the ECDSA signature. */
+    /**
+     * Constructs a transaction signature based on the ECDSA signature.
+     */
     public TransactionSignature(ECDSASignature signature, SigHash sigHash) {
         this(signature.r, signature.s, Type.ECDSA, sigHash.value);
     }
 
-    /** Constructs a transaction signature based on the Schnorr signature. */
+    /**
+     * Constructs a transaction signature based on the Schnorr signature.
+     */
     public TransactionSignature(SchnorrSignature signature, SigHash sigHash) {
         this(signature.r, signature.s, Type.SCHNORR, sigHash.value);
     }
 
-    /** Constructs a signature with the given components, type and raw sighash flag bytes (needed for rule compatibility). */
+    /**
+     * Constructs a signature with the given components, type and raw sighash flag bytes (needed for rule compatibility).
+     */
     public TransactionSignature(BigInteger r, BigInteger s, Type type, byte sighashFlags) {
         ecdsaSignature = type == Type.ECDSA ? new ECDSASignature(r, s) : null;
         schnorrSignature = type == Type.SCHNORR ? new SchnorrSignature(r, s) : null;
@@ -66,9 +74,9 @@ public class TransactionSignature {
 
         boolean anyoneCanPay = anyoneCanPay();
         final int mode = sighashFlags & 0x1f;
-        if (mode == SigHash.NONE.value) {
+        if(mode == SigHash.NONE.value) {
             return anyoneCanPay ? SigHash.ANYONECANPAY_NONE : SigHash.NONE;
-        } else if (mode == SigHash.SINGLE.value) {
+        } else if(mode == SigHash.SINGLE.value) {
             return anyoneCanPay ? SigHash.ANYONECANPAY_SINGLE : SigHash.SINGLE;
         } else {
             return anyoneCanPay ? SigHash.ANYONECANPAY_ALL : SigHash.ALL;
@@ -86,7 +94,7 @@ public class TransactionSignature {
                 ByteArrayOutputStream bos = ecdsaSignature.derByteStream();
                 bos.write(sighashFlags);
                 return bos.toByteArray();
-            } catch (IOException e) {
+            } catch(IOException e) {
                 throw new RuntimeException(e);  // Cannot happen.
             }
         } else if(schnorrSignature != null) {
@@ -136,7 +144,7 @@ public class TransactionSignature {
         if(o == null || getClass() != o.getClass()) {
             return false;
         }
-        TransactionSignature that = (TransactionSignature) o;
+        TransactionSignature that = (TransactionSignature)o;
         return sighashFlags == that.sighashFlags && Objects.equals(ecdsaSignature, that.ecdsaSignature) && Objects.equals(schnorrSignature, that.schnorrSignature);
     }
 

@@ -70,7 +70,7 @@ public enum WalletModel {
 
     public boolean alwaysIncludeNonWitnessUtxo() {
         if(this == COLDCARD || this == COBO_VAULT || this == PASSPORT || this == KEYSTONE || this == GORDIAN_SEED_TOOL || this == SEEDSIGNER || this == KRUX || this == JADE ||
-           this == TAPSIGNER || this == SATOCHIP || this == KEYCARD_SHELL || this == KEYCARD || this == ERA_WALLET) {
+                this == TAPSIGNER || this == SATOCHIP || this == KEYCARD_SHELL || this == KEYCARD || this == ERA_WALLET) {
             return false;
         }
 

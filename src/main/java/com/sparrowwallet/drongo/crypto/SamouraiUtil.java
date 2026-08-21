@@ -70,12 +70,12 @@ public class SamouraiUtil {
 
         PBEParametersGenerator generator = new PKCS5S2ParametersGenerator();
         generator.init(PBEParametersGenerator.PKCS5PasswordToUTF8Bytes(password.toCharArray()), iv, iterations);
-        KeyParameter keyParam = (KeyParameter) generator.generateDerivedParameters(256);
+        KeyParameter keyParam = (KeyParameter)generator.generateDerivedParameters(256);
 
         CipherParameters params = new ParametersWithIV(keyParam, iv);
 
         BlockCipher cipherMode;
-        if (mode == MODE_CBC) {
+        if(mode == MODE_CBC) {
             cipherMode = new CBCBlockCipher(new AESEngine());
 
         } else {
@@ -84,7 +84,7 @@ public class SamouraiUtil {
         }
 
         org.bouncycastle.crypto.BufferedBlockCipher cipher;
-        if (padding != null) {
+        if(padding != null) {
             cipher = new PaddedBufferedBlockCipher(cipherMode, padding);
         } else {
             cipher = new BufferedBlockCipher(cipherMode);
@@ -108,7 +108,7 @@ public class SamouraiUtil {
 
         // return string representation of decoded bytes
         String result = new String(out, StandardCharsets.UTF_8);
-        if (result.isEmpty()) {
+        if(result.isEmpty()) {
             throw new IllegalArgumentException("Decrypted string is empty.");
         }
 
@@ -161,7 +161,7 @@ public class SamouraiUtil {
     private static SecretKeySpecAndIv getSecretKeyComponents(String password, byte[] salt, int hashIterations) {
         PKCS5S2ParametersGenerator generator = new PKCS5S2ParametersGenerator(new SHA256Digest());
         generator.init(password.getBytes(), salt, hashIterations);
-        KeyParameter secretKey = (KeyParameter) generator.generateDerivedMacParameters(48 * 8);
+        KeyParameter secretKey = (KeyParameter)generator.generateDerivedMacParameters(48 * 8);
 
         byte[] key = Arrays.copyOfRange(secretKey.getKey(), 0, 32);
         byte[] iv = Arrays.copyOfRange(secretKey.getKey(), 32, secretKey.getKey().length);
@@ -176,7 +176,7 @@ public class SamouraiUtil {
         try {
             StandardCharsets.UTF_8.newDecoder().decode(ByteBuffer.wrap(input));
             return true;
-        } catch (CharacterCodingException e) {
+        } catch(CharacterCodingException e) {
             return false;
         }
     }

@@ -350,9 +350,13 @@ public class WalletNode extends Persistable implements Comparable<WalletNode> {
 
     @Override
     public boolean equals(Object o) {
-        if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
-        WalletNode node = (WalletNode) o;
+        if(this == o) {
+            return true;
+        }
+        if(o == null || getClass() != o.getClass()) {
+            return false;
+        }
+        WalletNode node = (WalletNode)o;
         return Objects.equals(wallet, node.wallet) && derivationPath.equals(node.derivationPath);
     }
 
@@ -439,7 +443,7 @@ public class WalletNode extends Persistable implements Comparable<WalletNode> {
         int keyPurpose = getKeyPurpose(input.get(0));
         int index = getIndex(input.get(0));
 
-        for (int cur = 0; cur < input.size(); cur++) {
+        for(int cur = 0; cur < input.size(); cur++) {
             if(getKeyPurpose(input.get(cur)) != keyPurpose || getIndex(input.get(cur)) != index) {
                 result.add(input.subList(prev, cur));
                 prev = cur;

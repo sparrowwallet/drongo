@@ -76,9 +76,13 @@ public abstract class BlockTransactionHash extends Persistable {
 
     @Override
     public boolean equals(Object o) {
-        if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
-        BlockTransactionHash that = (BlockTransactionHash) o;
+        if(this == o) {
+            return true;
+        }
+        if(o == null || getClass() != o.getClass()) {
+            return false;
+        }
+        BlockTransactionHash that = (BlockTransactionHash)o;
         return hash.equals(that.hash) && height == that.height;
     }
 

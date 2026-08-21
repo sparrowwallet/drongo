@@ -16,7 +16,9 @@ public class DeterministicKey extends ECKey {
     private int depth;
     private byte[] parentFingerprint; // 0 if this key is root node of key hierarchy
 
-    /** 32 bytes */
+    /**
+     * 32 bytes
+     */
     private final byte[] chainCode;
 
     /**
@@ -85,7 +87,9 @@ public class DeterministicKey extends ECKey {
         return depth;
     }
 
-    /** Returns the first 32 bits of the result of {@link #getIdentifier()}. */
+    /**
+     * Returns the first 32 bits of the result of {@link #getIdentifier()}.
+     */
     public byte[] getFingerprint() {
         return Arrays.copyOfRange(getIdentifier(), 0, 4);
     }
@@ -120,6 +124,7 @@ public class DeterministicKey extends ECKey {
 
     /**
      * Returns private key bytes, padded with zeros to 33 bytes.
+     *
      * @throws java.lang.IllegalStateException if the private key bytes are missing.
      */
     public byte[] getPrivKeyBytes33() {
@@ -128,6 +133,7 @@ public class DeterministicKey extends ECKey {
         System.arraycopy(priv, 0, bytes33, 33 - priv.length, priv.length);
         return bytes33;
     }
+
     /**
      * Returns the same key with the private bytes removed. May return the same instance. The purpose of this is to save
      * memory: the private key can always be very efficiently rederived from a parent that a private key, so storing
@@ -136,7 +142,7 @@ public class DeterministicKey extends ECKey {
      * that then you should follow this call with a call to {@link #dropParent()}.
      */
     public DeterministicKey dropPrivateBytes() {
-        if (isPubKeyOnly()) {
+        if(isPubKeyOnly()) {
             return this;
         } else {
             return new DeterministicKey(getPath(), getChainCode(), pub, null, parent);
@@ -158,7 +164,9 @@ public class DeterministicKey extends ECKey {
         return key;
     }
 
-    /** Returns the last element of the path returned by {@link DeterministicKey#getPath()} */
+    /**
+     * Returns the last element of the path returned by {@link DeterministicKey#getPath()}
+     */
     public ChildNumber getChildNumber() {
         return childNumberPath.size() == 0 ? ChildNumber.ZERO : childNumberPath.get(childNumberPath.size() - 1);
     }

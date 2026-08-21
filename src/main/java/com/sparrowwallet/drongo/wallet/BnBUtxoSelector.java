@@ -44,8 +44,8 @@ public class BnBUtxoSelector extends SingleSetUtxoSelector {
         for(int i = 0; i < TOTAL_TRIES; i++) {
             boolean backtrack = false;
             if(currentValue + currentAvailableValue < actualTargetValue ||  // Cannot possibly reach target with the amount remaining in the currentAvailableValue
-                currentValue > actualTargetValue + costOfChangeValue ||     //  Selected value is out of range, go back and try other branch
-                (currentWasteValue > bestWasteValue && !utxoPool.isEmpty() && (utxoPool.get(0).getFee() - utxoPool.get(0).getLongTermFee() > 0))) {
+                    currentValue > actualTargetValue + costOfChangeValue ||     //  Selected value is out of range, go back and try other branch
+                    (currentWasteValue > bestWasteValue && !utxoPool.isEmpty() && (utxoPool.get(0).getFee() - utxoPool.get(0).getLongTermFee() > 0))) {
                 backtrack = true;
             } else if(currentValue >= actualTargetValue) {                  // Selected value is within range
                 currentWasteValue += (currentValue - actualTargetValue);    // This is the excess value which is added to the waste for the below comparison
@@ -89,8 +89,8 @@ public class BnBUtxoSelector extends SingleSetUtxoSelector {
                 // Avoid searching a branch if the previous UTXO has the same value and same waste and was excluded. Since the ratio of fee to
                 // long term fee is the same, we only need to check if one of those values match in order to know that the waste is the same.
                 if(!currentSelection.isEmpty() && !currentSelection.getLast() &&
-                    utxo.getEffectiveValue() == utxoPool.get(currentSelection.size() - 1).getEffectiveValue() &&
-                    utxo.getFee() == utxoPool.get(currentSelection.size() - 1).getFee()) {
+                        utxo.getEffectiveValue() == utxoPool.get(currentSelection.size() - 1).getEffectiveValue() &&
+                        utxo.getFee() == utxoPool.get(currentSelection.size() - 1).getFee()) {
                     currentSelection.add(Boolean.FALSE);
                 } else {
                     // Inclusion branch first (Largest First Exploration)

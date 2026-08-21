@@ -31,7 +31,7 @@ public class HashIndex {
             return false;
         }
 
-        HashIndex hashIndex = (HashIndex) o;
+        HashIndex hashIndex = (HashIndex)o;
 
         if(index != hashIndex.index) {
             return false;
@@ -42,7 +42,7 @@ public class HashIndex {
     @Override
     public int hashCode() {
         int result = hash.hashCode();
-        result = 31 * result + (int) (index ^ (index >>> 32));
+        result = 31 * result + (int)(index ^ (index >>> 32));
         return result;
     }
 }

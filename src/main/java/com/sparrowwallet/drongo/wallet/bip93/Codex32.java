@@ -78,7 +78,7 @@ public class Codex32 {
         for(byte b : checksum) {
             sb.append(Bech32.CHARSET.charAt(b));
         }
-        String result =  sb.toString();
+        String result = sb.toString();
         validate(result, 2);
         return result;
     }
@@ -156,7 +156,7 @@ public class Codex32 {
         byte[] buffer = new byte[checksumType.length];
         for(int i = 0; i < checksumType.length; i++) {
             byte[] intermediate = polymodInt.shiftRight(5 * (checksumType.length - 1 - i)).toByteArray();
-            buffer[i] = (byte) (intermediate[intermediate.length - 1] & (byte) 31);
+            buffer[i] = (byte)(intermediate[intermediate.length - 1] & (byte)31);
         }
         return buffer;
     }
@@ -178,11 +178,21 @@ public class Codex32 {
                     BigInteger b = residue.shiftRight(60);
                     residue = residue.and(sixtyOnes).shiftLeft(5);
                     residue = residue.xor(BigInteger.valueOf(v_i));
-                    if(b.shiftRight(0).and(BigInteger.ONE).equals(BigInteger.ONE)) residue = residue.xor(gen0);
-                    if(b.shiftRight(1).and(BigInteger.ONE).equals(BigInteger.ONE)) residue = residue.xor(gen1);
-                    if(b.shiftRight(2).and(BigInteger.ONE).equals(BigInteger.ONE)) residue = residue.xor(gen2);
-                    if(b.shiftRight(3).and(BigInteger.ONE).equals(BigInteger.ONE)) residue = residue.xor(gen3);
-                    if(b.shiftRight(4).and(BigInteger.ONE).equals(BigInteger.ONE)) residue = residue.xor(gen4);
+                    if(b.shiftRight(0).and(BigInteger.ONE).equals(BigInteger.ONE)) {
+                        residue = residue.xor(gen0);
+                    }
+                    if(b.shiftRight(1).and(BigInteger.ONE).equals(BigInteger.ONE)) {
+                        residue = residue.xor(gen1);
+                    }
+                    if(b.shiftRight(2).and(BigInteger.ONE).equals(BigInteger.ONE)) {
+                        residue = residue.xor(gen2);
+                    }
+                    if(b.shiftRight(3).and(BigInteger.ONE).equals(BigInteger.ONE)) {
+                        residue = residue.xor(gen3);
+                    }
+                    if(b.shiftRight(4).and(BigInteger.ONE).equals(BigInteger.ONE)) {
+                        residue = residue.xor(gen4);
+                    }
                 }
                 return residue;
             }
@@ -202,11 +212,21 @@ public class Codex32 {
                     BigInteger b = residue.shiftRight(70);
                     residue = residue.and(seventyOnes).shiftLeft(5);
                     residue = residue.xor(BigInteger.valueOf(v_i));
-                    if(b.shiftRight(0).and(BigInteger.ONE).equals(BigInteger.ONE)) residue = residue.xor(gen0);
-                    if(b.shiftRight(1).and(BigInteger.ONE).equals(BigInteger.ONE)) residue = residue.xor(gen1);
-                    if(b.shiftRight(2).and(BigInteger.ONE).equals(BigInteger.ONE)) residue = residue.xor(gen2);
-                    if(b.shiftRight(3).and(BigInteger.ONE).equals(BigInteger.ONE)) residue = residue.xor(gen3);
-                    if(b.shiftRight(4).and(BigInteger.ONE).equals(BigInteger.ONE)) residue = residue.xor(gen4);
+                    if(b.shiftRight(0).and(BigInteger.ONE).equals(BigInteger.ONE)) {
+                        residue = residue.xor(gen0);
+                    }
+                    if(b.shiftRight(1).and(BigInteger.ONE).equals(BigInteger.ONE)) {
+                        residue = residue.xor(gen1);
+                    }
+                    if(b.shiftRight(2).and(BigInteger.ONE).equals(BigInteger.ONE)) {
+                        residue = residue.xor(gen2);
+                    }
+                    if(b.shiftRight(3).and(BigInteger.ONE).equals(BigInteger.ONE)) {
+                        residue = residue.xor(gen3);
+                    }
+                    if(b.shiftRight(4).and(BigInteger.ONE).equals(BigInteger.ONE)) {
+                        residue = residue.xor(gen4);
+                    }
                 }
                 return residue;
             }

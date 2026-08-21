@@ -48,10 +48,10 @@ public class UnsafeByteArrayOutputStream extends ByteArrayOutputStream {
     @Override
     public void write(int b) {
         int newcount = count + 1;
-        if (newcount > buf.length) {
+        if(newcount > buf.length) {
             buf = copyOf(buf, Math.max(buf.length << 1, newcount));
         }
-        buf[count] = (byte) b;
+        buf[count] = (byte)b;
         count = newcount;
     }
 
@@ -65,14 +65,14 @@ public class UnsafeByteArrayOutputStream extends ByteArrayOutputStream {
      */
     @Override
     public void write(byte[] b, int off, int len) {
-        if ((off < 0) || (off > b.length) || (len < 0) ||
+        if((off < 0) || (off > b.length) || (len < 0) ||
                 ((off + len) > b.length) || ((off + len) < 0)) {
             throw new IndexOutOfBoundsException();
-        } else if (len == 0) {
+        } else if(len == 0) {
             return;
         }
         int newcount = count + len;
-        if (newcount > buf.length) {
+        if(newcount > buf.length) {
             buf = copyOf(buf, Math.max(buf.length << 1, newcount));
         }
         System.arraycopy(b, off, buf, count, len);
@@ -122,7 +122,7 @@ public class UnsafeByteArrayOutputStream extends ByteArrayOutputStream {
      * Returns the current size of the buffer.
      *
      * @return the value of the {@code count} field, which is the number
-     *         of valid bytes in this output stream.
+     * of valid bytes in this output stream.
      * @see java.io.ByteArrayOutputStream#count
      */
     @Override

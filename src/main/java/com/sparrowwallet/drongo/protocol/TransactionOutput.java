@@ -42,7 +42,7 @@ public class TransactionOutput extends ChildMessage {
             ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
             bitcoinSerializeToStream(outputStream);
             return outputStream.toByteArray();
-        } catch (IOException e) {
+        } catch(IOException e) {
             //can't happen
         }
 

@@ -328,7 +328,7 @@ public class OutputDescriptor {
         wallet.setPolicyType(isMultisig() || isCosigner() ? PolicyType.MULTI_HD : PolicyType.SINGLE_HD);
         wallet.setScriptType(scriptType);
 
-        for(Map.Entry<ExtendedKey,KeyDerivation> extKeyEntry : extendedPublicKeys.entrySet()) {
+        for(Map.Entry<ExtendedKey, KeyDerivation> extKeyEntry : extendedPublicKeys.entrySet()) {
             ExtendedKey xpub = extKeyEntry.getKey();
             Keystore keystore = new Keystore();
             if(extendedMasterPrivateKeys.containsKey(xpub)) {
@@ -641,7 +641,8 @@ public class OutputDescriptor {
         }
     }
 
-    private record KeyDerivationAndKey(KeyDerivation keyDerivation, String key) {}
+    private record KeyDerivationAndKey(KeyDerivation keyDerivation, String key) {
+    }
 
     private static KeyDerivationAndKey parseKeyOrigin(String arg) {
         KeyDerivation keyDerivation = new KeyDerivation(null, (String)null);
@@ -840,8 +841,7 @@ public class OutputDescriptor {
         return ret.toString();
     }
 
-    private static BigInteger polyMod(BigInteger c, int val)
-    {
+    private static BigInteger polyMod(BigInteger c, int val) {
         byte c0 = c.shiftRight(35).byteValue();
         c = c.and(new BigInteger("7ffffffff", 16)).shiftLeft(5).xor(BigInteger.valueOf(val));
 

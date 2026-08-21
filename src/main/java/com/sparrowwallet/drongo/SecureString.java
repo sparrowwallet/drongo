@@ -30,7 +30,7 @@ public class SecureString implements CharSequence {
 
     @Override
     public char charAt(final int i) {
-        return (char) (pad[i] ^ chars[i]);
+        return (char)(pad[i] ^ chars[i]);
     }
 
     @Override
@@ -49,7 +49,7 @@ public class SecureString implements CharSequence {
      */
     public String asString() {
         final char[] value = new char[chars.length];
-        for (int i = 0; i < value.length; i++) {
+        for(int i = 0; i < value.length; i++) {
             value[i] = charAt(i);
         }
         return new String(value);
@@ -76,13 +76,13 @@ public class SecureString implements CharSequence {
     /**
      * Randomly pad the characters to not store the real character in memory.
      *
-     * @param start start of the {@code CharSequence}
-     * @param length length of the {@code CharSequence}
+     * @param start      start of the {@code CharSequence}
+     * @param length     length of the {@code CharSequence}
      * @param characters the {@code CharSequence} to scramble
      */
     private void scramble(final int start, final int length, final CharSequence characters) {
         final SecureRandom random = new SecureRandom();
-        for (int i = start; i < length; i++) {
+        for(int i = start; i < length; i++) {
             final char charAt = characters.charAt(i);
             pad[i] = random.nextInt();
             chars[i] = pad[i] ^ charAt;
@@ -109,16 +109,16 @@ public class SecureString implements CharSequence {
         byte[] byteArray = new byte[charSequence.length() << 1];
         for(int i = 0; i < charSequence.length(); i++) {
             int bytePosition = i << 1;
-            byteArray[bytePosition] = (byte) ((charSequence.charAt(i)&0xFF00)>>8);
-            byteArray[bytePosition + 1] = (byte) (charSequence.charAt(i)&0x00FF);
+            byteArray[bytePosition] = (byte)((charSequence.charAt(i) & 0xFF00) >> 8);
+            byteArray[bytePosition + 1] = (byte)(charSequence.charAt(i) & 0x00FF);
         }
         return byteArray;
     }
 
     public static boolean isValidUTF16(CharSequence charSequence) {
-        for (int i = 0; i < charSequence.length(); i++) {
-            if (Character.isLowSurrogate(charSequence.charAt(i)) && (i == 0 || !Character.isHighSurrogate(charSequence.charAt(i - 1)))
-                    || Character.isHighSurrogate(charSequence.charAt(i)) && (i == charSequence.length() -1 || !Character.isLowSurrogate(charSequence.charAt(i + 1)))) {
+        for(int i = 0; i < charSequence.length(); i++) {
+            if(Character.isLowSurrogate(charSequence.charAt(i)) && (i == 0 || !Character.isHighSurrogate(charSequence.charAt(i - 1)))
+                    || Character.isHighSurrogate(charSequence.charAt(i)) && (i == charSequence.length() - 1 || !Character.isLowSurrogate(charSequence.charAt(i + 1)))) {
                 return false;
             }
         }

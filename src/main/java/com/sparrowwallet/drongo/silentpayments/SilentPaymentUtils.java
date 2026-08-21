@@ -27,9 +27,9 @@ public class SilentPaymentUtils {
 
     //Alternative generator point on the secp256k1 curve (x-coordinate) generated from the SHA256 hash of "The scalar for this x is unknown"
     private static final byte[] NUMS_H = {
-            (byte) 0x50, (byte) 0x92, (byte) 0x9b, (byte) 0x74, (byte) 0xc1, (byte) 0xa0, (byte) 0x49, (byte) 0x54, (byte) 0xb7, (byte) 0x8b, (byte) 0x4b, (byte) 0x60,
-            (byte) 0x35, (byte) 0xe9, (byte) 0x7a, (byte) 0x5e, (byte) 0x07, (byte) 0x8a, (byte) 0x5a, (byte) 0x0f, (byte) 0x28, (byte) 0xec, (byte) 0x96, (byte) 0xd5,
-            (byte) 0x47, (byte) 0xbf, (byte) 0xee, (byte) 0x9a, (byte) 0xce, (byte) 0x80, (byte) 0x3a, (byte) 0xc0
+            (byte)0x50, (byte)0x92, (byte)0x9b, (byte)0x74, (byte)0xc1, (byte)0xa0, (byte)0x49, (byte)0x54, (byte)0xb7, (byte)0x8b, (byte)0x4b, (byte)0x60,
+            (byte)0x35, (byte)0xe9, (byte)0x7a, (byte)0x5e, (byte)0x07, (byte)0x8a, (byte)0x5a, (byte)0x0f, (byte)0x28, (byte)0xec, (byte)0x96, (byte)0xd5,
+            (byte)0x47, (byte)0xbf, (byte)0xee, (byte)0x9a, (byte)0xce, (byte)0x80, (byte)0x3a, (byte)0xc0
     };
 
     public static final String BIP_0352_INPUTS_TAG = "BIP0352/Inputs";
@@ -179,7 +179,7 @@ public class SilentPaymentUtils {
         try {
             byte[][] inputPubKeys = new byte[inputKeys.size()][];
             int index = 0;
-            for (ECKey key : inputKeys.values()) {
+            for(ECKey key : inputKeys.values()) {
                 inputPubKeys[index++] = key.getPubKey(true);
             }
             byte[] combinedPubKey = NativeSecp256k1.pubKeyCombine(inputPubKeys, true);
@@ -200,8 +200,8 @@ public class SilentPaymentUtils {
      * Updates each silent payment instance with the corresponding address.
      *
      * @param silentPayments the list of silent payments containing silent payment addresses and metadata
-     * @param utxos a map of UTXOs (unspent transaction outputs) to wallet nodes, containing information
-     *              about inputs used to derive the summed private key
+     * @param utxos          a map of UTXOs (unspent transaction outputs) to wallet nodes, containing information
+     *                       about inputs used to derive the summed private key
      * @throws InvalidSilentPaymentException if the computed shared secrets or addresses are invalid
      */
     public static Map<ECKey, EcdhShareAndProof> computeOutputAddresses(List<SilentPayment> silentPayments, Map<HashIndex, WalletNode> utxos) throws InvalidSilentPaymentException {
@@ -393,11 +393,11 @@ public class SilentPaymentUtils {
      *
      * @param scanPrivateKey the receiver's scan private key (b_scan)
      * @param spendPublicKey the receiver's spend public key (B_spend), 33-byte compressed
-     * @param labelIndices additional positive label indices to scan for; m=0 (change) is always included
-     * @param tweakKey the 33-byte compressed pubkey input_hash * A_sum from the indexer
-     * @param outputs the full list of outputs in the transaction (non-P2TR outputs are ignored)
+     * @param labelIndices   additional positive label indices to scan for; m=0 (change) is always included
+     * @param tweakKey       the 33-byte compressed pubkey input_hash * A_sum from the indexer
+     * @param outputs        the full list of outputs in the transaction (non-P2TR outputs are ignored)
      * @return matches in ascending outputIndex order, or empty if none (including server false positives)
-     * @throws IllegalArgumentException if any required input is null or {@code tweakKey} is malformed
+     * @throws IllegalArgumentException      if any required input is null or {@code tweakKey} is malformed
      * @throws InvalidSilentPaymentException if a derived {@code t_k} scalar is invalid (zero or {@code >= n}), per BIP352
      */
     public static List<SilentPaymentScanMatch> scanTransactionOutputs(ECKey scanPrivateKey, ECKey spendPublicKey, Set<Integer> labelIndices, byte[] tweakKey, List<TransactionOutput> outputs) throws InvalidSilentPaymentException {
@@ -505,9 +505,12 @@ public class SilentPaymentUtils {
         return Utils.reverseBytes(key);
     }
 
-    public record EcdhShareAndProof(ECKey ecdhShare, SilentPaymentsDLEQProof dleqProof) {}
+    public record EcdhShareAndProof(ECKey ecdhShare, SilentPaymentsDLEQProof dleqProof) {
+    }
 
-    private record LabelEntry(int index, ECKey key) {}
+    private record LabelEntry(int index, ECKey key) {
+    }
 
-    private record ScanMatchCandidate(int index, byte[] xOnly) {}
+    private record ScanMatchCandidate(int index, byte[] xOnly) {
+    }
 }

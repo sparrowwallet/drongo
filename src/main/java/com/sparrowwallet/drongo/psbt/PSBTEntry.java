@@ -28,7 +28,7 @@ public class PSBTEntry {
     public PSBTEntry(ByteBuffer psbtByteBuffer) throws PSBTParseException {
         int keyLen = readCompactInt(psbtByteBuffer);
 
-        if (keyLen == 0x00) {
+        if(keyLen == 0x00) {
             key = null;
             keyType = 0x00;
             keyData = null;
@@ -221,13 +221,13 @@ public class PSBTEntry {
 
         byte b = psbtByteBuffer.get();
 
-        switch (b) {
-            case (byte) 0xfd: {
+        switch(b) {
+            case (byte)0xfd: {
                 ByteBuffer byteBuffer = ByteBuffer.wrap(readBytes(psbtByteBuffer, 2, "compact size integer"));
                 byteBuffer.order(ByteOrder.LITTLE_ENDIAN);
                 return Short.toUnsignedInt(byteBuffer.getShort());
             }
-            case (byte) 0xfe: {
+            case (byte)0xfe: {
                 ByteBuffer byteBuffer = ByteBuffer.wrap(readBytes(psbtByteBuffer, 4, "compact size integer"));
                 byteBuffer.order(ByteOrder.LITTLE_ENDIAN);
                 long value = Integer.toUnsignedLong(byteBuffer.getInt());
@@ -236,13 +236,13 @@ public class PSBTEntry {
                 }
                 return (int)value;
             }
-            case (byte) 0xff: {
+            case (byte)0xff: {
                 ByteBuffer byteBuffer = ByteBuffer.wrap(readBytes(psbtByteBuffer, 8, "compact size integer"));
                 byteBuffer.order(ByteOrder.LITTLE_ENDIAN);
                 throw new PSBTParseException("Data too long:" + byteBuffer.getLong());
             }
             default:
-                return (int) (b & 0xff);
+                return (int)(b & 0xff);
         }
     }
 
@@ -260,25 +260,25 @@ public class PSBTEntry {
     public static byte[] writeCompactInt(long val) {
         ByteBuffer bb = null;
 
-        if (val < 0xfdL) {
+        if(val < 0xfdL) {
             bb = ByteBuffer.allocate(1);
             bb.order(ByteOrder.LITTLE_ENDIAN);
-            bb.put((byte) val);
-        } else if (val <= 0xffffL) {
+            bb.put((byte)val);
+        } else if(val <= 0xffffL) {
             bb = ByteBuffer.allocate(3);
             bb.order(ByteOrder.LITTLE_ENDIAN);
-            bb.put((byte) 0xfd);
-            bb.put((byte) (val & 0xff));
-            bb.put((byte) ((val >> 8) & 0xff));
-        } else if (val <= 0xffffffffL) {
+            bb.put((byte)0xfd);
+            bb.put((byte)(val & 0xff));
+            bb.put((byte)((val >> 8) & 0xff));
+        } else if(val <= 0xffffffffL) {
             bb = ByteBuffer.allocate(5);
             bb.order(ByteOrder.LITTLE_ENDIAN);
-            bb.put((byte) 0xfe);
-            bb.putInt((int) val);
+            bb.put((byte)0xfe);
+            bb.putInt((int)val);
         } else {
             bb = ByteBuffer.allocate(9);
             bb.order(ByteOrder.LITTLE_ENDIAN);
-            bb.put((byte) 0xff);
+            bb.put((byte)0xff);
             bb.putLong(val);
         }
 

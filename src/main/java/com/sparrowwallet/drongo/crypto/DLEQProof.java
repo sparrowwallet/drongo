@@ -8,7 +8,7 @@ import java.nio.ByteBuffer;
 
 /**
  * Implementation of BIP-374 Discrete Log Equality Proofs.
- *
+ * <p>
  * This class provides methods to generate and verify zero-knowledge DLEQ proofs
  * that prove knowledge of a scalar a such that A = a⋅G and C = a⋅B without
  * revealing the value of a.
@@ -113,19 +113,19 @@ public class DLEQProof {
     /**
      * Verify a DLEQ proof according to BIP-374.
      *
-     * @param A The public key of the secret key used in proof generation
-     * @param B The public key used in proof generation
-     * @param C The result of multiplying the secret and public keys (a⋅B)
+     * @param A     The public key of the secret key used in proof generation
+     * @param B     The public key used in proof generation
+     * @param C     The result of multiplying the secret and public keys (a⋅B)
      * @param proof The proof (64 bytes)
-     * @param G The generator point (if null, uses secp256k1 generator)
-     * @param m Optional message (32 bytes or null)
+     * @param G     The generator point (if null, uses secp256k1 generator)
+     * @param m     Optional message (32 bytes or null)
      * @return true if the proof is valid, false otherwise
      * @throws IllegalArgumentException if m is not 32 bytes (when provided)
      */
     public static boolean verifyProof(ECKey A, ECKey B, ECKey C, byte[] proof, ECKey G, byte[] m) {
         // Fail if any of is_infinite(A), is_infinite(B), is_infinite(C), is_infinite(G)
         if(A.getPubKeyPoint().isInfinity() || B.getPubKeyPoint().isInfinity() ||
-           C.getPubKeyPoint().isInfinity()) {
+                C.getPubKeyPoint().isInfinity()) {
             return false;
         }
 
@@ -191,13 +191,13 @@ public class DLEQProof {
     /**
      * Calculate the DLEQ challenge hash according to BIP-374.
      *
-     * @param A The public key A = a⋅G
-     * @param B The public key B
-     * @param C The shared secret C = a⋅B
+     * @param A  The public key A = a⋅G
+     * @param B  The public key B
+     * @param C  The shared secret C = a⋅B
      * @param R1 The first commitment R1 = k⋅G
      * @param R2 The second commitment R2 = k⋅B
-     * @param m Optional message (32 bytes or null)
-     * @param G The generator point
+     * @param m  Optional message (32 bytes or null)
+     * @param G  The generator point
      * @return The challenge value e
      */
     private static BigInteger dleqChallenge(ECKey A, ECKey B, ECKey C, ECKey R1, ECKey R2, byte[] m, ECKey G) {

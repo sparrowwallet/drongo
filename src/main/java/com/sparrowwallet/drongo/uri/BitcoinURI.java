@@ -105,7 +105,7 @@ public class BitcoinURI {
         // URI is formed as  bitcoin:<address>?<query parameters>
         // blockchain.info generates URIs of non-BIP compliant form bitcoin://address?....
 
-        if (!BITCOIN_SCHEME.equalsIgnoreCase(uri.getScheme())) {
+        if(!BITCOIN_SCHEME.equalsIgnoreCase(uri.getScheme())) {
             throw new BitcoinURIParseException("Unsupported URI scheme: " + uri.getScheme());
         }
 

@@ -50,8 +50,9 @@ public class DeterministicSeed extends Persistable implements EncryptableItem {
     /**
      * Constructs a new BIP39 seed. See {@link Bip39MnemonicCode} for more
      * details on this scheme.
-     * @param random Entropy source
-     * @param bits number of bits, must be divisible by 32
+     *
+     * @param random     Entropy source
+     * @param bits       number of bits, must be divisible by 32
      * @param passphrase A user supplied passphrase, or an empty string if there is no passphrase
      */
     public DeterministicSeed(SecureRandom random, int bits, String passphrase) {
@@ -61,8 +62,9 @@ public class DeterministicSeed extends Persistable implements EncryptableItem {
     /**
      * Constructs a BIP39 seed from provided entropy. See {@link Bip39MnemonicCode} for more
      * details on this scheme.
-     * @param entropy entropy bits, length must be divisible by 32
-     * @param passphrase A user supplied passphrase, or an empty string if there is no passphrase
+     *
+     * @param entropy            entropy bits, length must be divisible by 32
+     * @param passphrase         A user supplied passphrase, or an empty string if there is no passphrase
      * @param creationTimeMillis When the seed was originally created, in milliseconds since the UNIX epoch.
      */
     public DeterministicSeed(byte[] entropy, String passphrase, long creationTimeMillis) {
@@ -138,7 +140,9 @@ public class DeterministicSeed extends Persistable implements EncryptableItem {
         return encryptedMnemonicCode != null;
     }
 
-    /** Returns the seed as hex or null if encrypted. */
+    /**
+     * Returns the seed as hex or null if encrypted.
+     */
     public String toHexString() throws MnemonicException {
         byte[] seed = getSeedBytes();
         return seed != null ? Utils.bytesToHex(seed) : null;
@@ -192,7 +196,7 @@ public class DeterministicSeed extends Persistable implements EncryptableItem {
         byte[] mnemonicBytes = getMnemonicAsBytes();
         EncryptedData encryptedMnemonic = keyCrypter.encrypt(mnemonicBytes, null, key);
         Arrays.fill(mnemonicBytes != null ? mnemonicBytes : new byte[0], (byte)0);
-        
+
         DeterministicSeed seed = new DeterministicSeed(encryptedMnemonic, needsPassphrase, creationTimeMillis, type);
         seed.setId(getId());
         seed.setPassphrase(passphrase);
@@ -255,12 +259,16 @@ public class DeterministicSeed extends Persistable implements EncryptableItem {
 
     @Override
     public boolean equals(Object o) {
-        if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
-        DeterministicSeed other = (DeterministicSeed) o;
+        if(this == o) {
+            return true;
+        }
+        if(o == null || getClass() != o.getClass()) {
+            return false;
+        }
+        DeterministicSeed other = (DeterministicSeed)o;
         return creationTimeMillis == other.creationTimeMillis
-            && Objects.equals(encryptedMnemonicCode, other.encryptedMnemonicCode)
-            && Objects.equals(mnemonicCode, other.mnemonicCode);
+                && Objects.equals(encryptedMnemonicCode, other.encryptedMnemonicCode)
+                && Objects.equals(mnemonicCode, other.mnemonicCode);
     }
 
     @Override
@@ -293,12 +301,16 @@ public class DeterministicSeed extends Persistable implements EncryptableItem {
         return type.getEntropyBytes(mnemonicCode);
     }
 
-    /** Get the mnemonic code, or null if unknown. */
+    /**
+     * Get the mnemonic code, or null if unknown.
+     */
     public List<String> getMnemonicCode() {
         return mnemonicCode;
     }
 
-    /** Get the mnemonic code as string, or null if unknown. */
+    /**
+     * Get the mnemonic code as string, or null if unknown.
+     */
     public SecureString getMnemonicString() {
         return getMnemonicString(false);
     }

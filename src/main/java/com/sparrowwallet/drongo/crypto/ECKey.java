@@ -68,7 +68,9 @@ public class ECKey {
     // The parameters of the secp256k1 curve that Bitcoin uses.
     private static final X9ECParameters CURVE_PARAMS = CustomNamedCurves.getByName("secp256k1");
 
-    /** The parameters of the secp256k1 curve that Bitcoin uses. */
+    /**
+     * The parameters of the secp256k1 curve that Bitcoin uses.
+     */
     public static final ECDomainParameters CURVE;
 
     /**
@@ -111,8 +113,8 @@ public class ECKey {
         ECKeyGenerationParameters keygenParams = new ECKeyGenerationParameters(CURVE, secureRandom);
         generator.init(keygenParams);
         AsymmetricCipherKeyPair keypair = generator.generateKeyPair();
-        ECPrivateKeyParameters privParams = (ECPrivateKeyParameters) keypair.getPrivate();
-        ECPublicKeyParameters pubParams = (ECPublicKeyParameters) keypair.getPublic();
+        ECPrivateKeyParameters privParams = (ECPrivateKeyParameters)keypair.getPrivate();
+        ECPublicKeyParameters pubParams = (ECPublicKeyParameters)keypair.getPublic();
         priv = privParams.getD();
         pub = getPointWithCompression(pubParams.getQ(), true);
     }
@@ -174,6 +176,7 @@ public class ECKey {
 
     /**
      * Creates an ECKey given the private key only. The public key is calculated from it (this is slow).
+     *
      * @param compressed Determines whether the resulting ECKey will use a compressed encoding for the public key.
      */
     public static ECKey fromPrivate(BigInteger privKey, boolean compressed) {
@@ -191,6 +194,7 @@ public class ECKey {
 
     /**
      * Creates an ECKey given the private key only. The public key is calculated from it (this is slow).
+     *
      * @param compressed Determines whether the resulting ECKey will use a compressed encoding for the public key.
      */
     public static ECKey fromPrivate(byte[] privKeyBytes, boolean compressed) {
@@ -199,6 +203,7 @@ public class ECKey {
 
     /**
      * Creates an ECKey that cannot be used for signing, only verifying signatures, from the given point.
+     *
      * @param compressed Determines whether the resulting ECKey will use a compressed encoding for the public key.
      */
     public static ECKey fromPublicOnly(ECPoint pub, boolean compressed) {
@@ -236,6 +241,7 @@ public class ECKey {
     /**
      * Output this ECKey as an ASN.1 encoded private key, as understood by OpenSSL or used by Bitcoin Core
      * in its wallet storage format.
+     *
      * @throws MissingPrivateKeyException if the private key is missing or encrypted.
      */
     public byte[] toASN1() {
@@ -256,7 +262,7 @@ public class ECKey {
             seq.addObject(new DERTaggedObject(1, new DERBitString(getPubKey())));
             seq.close();
             return baos.toByteArray();
-        } catch (IOException e) {
+        } catch(IOException e) {
             throw new RuntimeException(e);  // Cannot happen, writing to memory stream.
         }
     }
@@ -275,7 +281,7 @@ public class ECKey {
      * use {@code new BigInteger(1, bytes);}
      */
     public static ECPoint publicPointFromPrivate(BigInteger privKey) {
-        if (privKey.bitLength() > CURVE.getN().bitLength()) {
+        if(privKey.bitLength() > CURVE.getN().bitLength()) {
             privKey = privKey.mod(CURVE.getN());
         }
 
@@ -292,10 +298,13 @@ public class ECKey {
         return new FixedPointCombMultiplier().multiply(CURVE.getG(), privKey);
     }
 
-    /** Gets the hash160 form of the public key (as seen in addresses). */
+    /**
+     * Gets the hash160 form of the public key (as seen in addresses).
+     */
     public byte[] getPubKeyHash() {
-        if (pubKeyHash == null)
+        if(pubKeyHash == null) {
             pubKeyHash = Utils.sha256hash160(this.pub.getEncoded());
+        }
         return pubKeyHash;
     }
 
@@ -321,49 +330,67 @@ public class ECKey {
         return pub.getEncodedXCoord();
     }
 
-    /** Gets the public key in the form of an elliptic curve point object from Bouncy Castle. */
+    /**
+     * Gets the public key in the form of an elliptic curve point object from Bouncy Castle.
+     */
     public ECPoint getPubKeyPoint() {
         return pub.get();
     }
 
-    /** Returns true if the Y coordinate of the public key is odd. */
+    /**
+     * Returns true if the Y coordinate of the public key is odd.
+     */
     public boolean hasOddYCoord() {
         return pub.hasOddYCoord();
     }
 
-    /** Multiply the public point by the provided private key */
+    /**
+     * Multiply the public point by the provided private key
+     */
     public ECKey multiply(BigInteger privKey) {
         return multiply(privKey, false);
     }
 
-    /** Multiply the public point by the provided private key */
+    /**
+     * Multiply the public point by the provided private key
+     */
     public ECKey multiply(BigInteger privKey, boolean compressed) {
         ECPoint point = pub.get().multiply(privKey);
         return ECKey.fromPublicOnly(point, compressed);
     }
 
-    /** Add to the public point by the provided public key */
+    /**
+     * Add to the public point by the provided public key
+     */
     public ECKey add(ECKey pubKey) {
         return add(pubKey, false);
     }
 
-    /** Add to the public point by the provided public key */
+    /**
+     * Add to the public point by the provided public key
+     */
     public ECKey add(ECKey pubKey, boolean compressed) {
         ECPoint point = pub.get().add(pubKey.getPubKeyPoint());
         return ECKey.fromPublicOnly(point, compressed);
     }
 
-    /** Negate the provided public key */
+    /**
+     * Negate the provided public key
+     */
     public ECKey negate() {
         return ECKey.fromPublicOnly(getPubKeyPoint().negate().normalize(), isCompressed());
     }
 
-    /** Add to the private key by the provided private key using modular arithmetic */
+    /**
+     * Add to the private key by the provided private key using modular arithmetic
+     */
     public ECKey addPrivate(ECKey privKey) {
         return addPrivate(privKey, true);
     }
 
-    /** Add to the private key by the provided private key using modular arithmetic */
+    /**
+     * Add to the private key by the provided private key using modular arithmetic
+     */
     public ECKey addPrivate(ECKey privKey, boolean compressed) {
         if(this.priv == null || privKey.priv == null) {
             throw new IllegalStateException("Key did not contain a private key");
@@ -372,7 +399,9 @@ public class ECKey {
         return ECKey.fromPrivate(this.priv.add(privKey.priv).mod(CURVE.getN()), compressed);
     }
 
-    /** Negate the provided private key */
+    /**
+     * Negate the provided private key
+     */
     public ECKey negatePrivate() {
         if(priv == null) {
             throw new IllegalStateException("Key did not contain a private key");
@@ -382,7 +411,9 @@ public class ECKey {
         return ECKey.fromPrivate(negatedPrivKey, isCompressed());
     }
 
-    /** Calculate the value of the public key point modulo the secp256k1 curve order */
+    /**
+     * Calculate the value of the public key point modulo the secp256k1 curve order
+     */
     public BigInteger moduloCurveOrder() {
         BigInteger xCoordinate = pub.get().normalize().getAffineXCoord().toBigInteger();
         return xCoordinate.mod(CURVE_PARAMS.getCurve().getOrder());
@@ -395,7 +426,7 @@ public class ECKey {
      * @throws java.lang.IllegalStateException if the private key bytes are not available.
      */
     public BigInteger getPrivKey() {
-        if (priv == null) {
+        if(priv == null) {
             throw new MissingPrivateKeyException();
         }
 
@@ -455,7 +486,7 @@ public class ECKey {
             signer.init(true, privKey);
             BigInteger[] components = signer.generateSignature(input.getBytes());
             signature = new ECDSASignature(components[0], components[1]).toCanonicalised();
-            counter = (counter == null ? 1 : counter+1);
+            counter = (counter == null ? 1 : counter + 1);
         } while(!signature.hasLowR());
 
         return signature;
@@ -517,20 +548,25 @@ public class ECKey {
      * Returns true if the given pubkey is canonical, i.e. the correct length taking into account compression.
      */
     public static boolean isPubKeyCanonical(byte[] pubkey) {
-        if (pubkey.length < 32)
+        if(pubkey.length < 32) {
             return false;
-        if (pubkey.length == 32)
+        }
+        if(pubkey.length == 32) {
             return true;
-        if (pubkey[0] == 0x04) {
+        }
+        if(pubkey[0] == 0x04) {
             // Uncompressed pubkey
-            if (pubkey.length != 65)
+            if(pubkey.length != 65) {
                 return false;
-        } else if (pubkey[0] == 0x02 || pubkey[0] == 0x03) {
+            }
+        } else if(pubkey[0] == 0x02 || pubkey[0] == 0x03) {
             // Compressed pubkey
-            if (pubkey.length != 33)
+            if(pubkey.length != 33) {
                 return false;
-        } else
+            }
+        } else {
             return false;
+        }
         return true;
     }
 
@@ -538,12 +574,13 @@ public class ECKey {
      * Returns true if the given pubkey is in its compressed form.
      */
     public static boolean isPubKeyCompressed(byte[] encoded) {
-        if (encoded.length == 32 || (encoded.length == 33 && (encoded[0] == 0x02 || encoded[0] == 0x03)))
+        if(encoded.length == 32 || (encoded.length == 33 && (encoded[0] == 0x02 || encoded[0] == 0x03))) {
             return true;
-        else if (encoded.length == 65 && encoded[0] == 0x04)
+        } else if(encoded.length == 65 && encoded[0] == 0x04) {
             return false;
-        else
+        } else {
             throw new IllegalArgumentException(Hex.toHexString(encoded));
+        }
     }
 
     private static ECKey extractKeyFromASN1(byte[] asn1privkey) {
@@ -569,14 +606,14 @@ public class ECKey {
                 throw new IllegalArgumentException("Input does not appear to be an ASN.1 OpenSSL EC private key");
             }
 
-            if(!((ASN1Integer) seq.getObjectAt(0)).getValue().equals(BigInteger.ONE)) {
+            if(!((ASN1Integer)seq.getObjectAt(0)).getValue().equals(BigInteger.ONE)) {
                 throw new IllegalArgumentException("Input is of wrong version");
             }
 
-            byte[] privbits = ((ASN1OctetString) seq.getObjectAt(1)).getOctets();
+            byte[] privbits = ((ASN1OctetString)seq.getObjectAt(1)).getOctets();
             BigInteger privkey = new BigInteger(1, privbits);
 
-            ASN1TaggedObject pubkey = (ASN1TaggedObject) seq.getObjectAt(3);
+            ASN1TaggedObject pubkey = (ASN1TaggedObject)seq.getObjectAt(3);
             if(pubkey.getTagNo() != 1) {
                 throw new IllegalArgumentException("Input has 'publicKey' with bad tag number");
             }
@@ -584,7 +621,8 @@ public class ECKey {
             byte[] pubbits = ((DERBitString)pubkey.getBaseObject()).getBytes();
             if(pubbits.length != 33 && pubbits.length != 65) {
                 throw new IllegalArgumentException("Input has 'publicKey' with invalid length");
-            };
+            }
+            ;
 
             int encoding = pubbits[0] & 0xFF;
             // Only allow compressed(2,3) and uncompressed(4), not infinity(0) or hybrid(6,7)
@@ -600,7 +638,7 @@ public class ECKey {
             }
 
             return key;
-        } catch (IOException e) {
+        } catch(IOException e) {
             throw new RuntimeException(e);  // Cannot happen, reading from memory stream.
         }
     }
@@ -622,7 +660,7 @@ public class ECKey {
         byte recId = findRecoveryId(hash, sig);
         int headerByte = recId + getSigningTypeConstant(scriptType);
         byte[] sigData = new byte[65];  // 1 header + 32 bytes for R + 32 bytes for S
-        sigData[0] = (byte) headerByte;
+        sigData[0] = (byte)headerByte;
         System.arraycopy(Utils.bigIntegerToBytes(sig.r, 32), 0, sigData, 1, 32);
         System.arraycopy(Utils.bigIntegerToBytes(sig.s, 32), 0, sigData, 33, 32);
         return new String(Base64.getEncoder().encode(sigData), StandardCharsets.UTF_8);
@@ -693,12 +731,10 @@ public class ECKey {
         if(header >= 39) { // this is a bech32 signature
             header -= 12;
             compressed = true;
-        }
-        else if(header >= 35 && !electrumFormat) { // this is a segwit p2sh signature
+        } else if(header >= 35 && !electrumFormat) { // this is a segwit p2sh signature
             compressed = true;
             header -= 8;
-        }
-        else if(header >= 31) { // this is a compressed key signature
+        } else if(header >= 31) { // this is a compressed key signature
             compressed = true;
             header -= 4;
         }
@@ -776,7 +812,7 @@ public class ECKey {
         // 1.0 For j from 0 to h   (h == recId here and the loop is outside this function)
         //   1.1 Let x = r + jn
         BigInteger n = CURVE.getN();  // Curve order.
-        BigInteger i = BigInteger.valueOf((long) recId / 2);
+        BigInteger i = BigInteger.valueOf((long)recId / 2);
         BigInteger x = sig.r.add(i.multiply(n));
         //   1.2. Convert the integer x to an octet string X of length mlen using the conversion routine
         //        specified in Section 2.3.7, where mlen = ⌈(log2 p)/8⌉ or mlen = ⌈m/8⌉.
@@ -824,12 +860,13 @@ public class ECKey {
     private static ECPoint decompressKey(BigInteger xBN, boolean yBit) {
         X9IntegerConverter x9 = new X9IntegerConverter();
         byte[] compEnc = x9.integerToBytes(xBN, 1 + x9.getByteLength(CURVE.getCurve()));
-        compEnc[0] = (byte) (yBit ? 0x03 : 0x02);
+        compEnc[0] = (byte)(yBit ? 0x03 : 0x02);
         return CURVE.getCurve().decodePoint(compEnc);
     }
 
     /**
      * Returns a 32 byte array containing the private key.
+     *
      * @throws MissingPrivateKeyException if the private key bytes are missing/encrypted.
      */
     public byte[] getPrivKeyBytes() {
@@ -841,9 +878,13 @@ public class ECKey {
 
     @Override
     public boolean equals(Object o) {
-        if (this == o) return true;
-        if (!(o instanceof ECKey)) return false;
-        ECKey other = (ECKey) o;
+        if(this == o) {
+            return true;
+        }
+        if(!(o instanceof ECKey)) {
+            return false;
+        }
+        ECKey other = (ECKey)o;
         return Objects.equals(this.priv, other.priv)
                 && Objects.equals(this.pub, other.pub);
     }
@@ -865,9 +906,9 @@ public class ECKey {
             byte[] right = rightKey.getPubKey();
 
             int minLength = Math.min(left.length, right.length);
-            for (int i = 0; i < minLength; i++) {
+            for(int i = 0; i < minLength; i++) {
                 int result = compare(left[i], right[i]);
-                if (result != 0) {
+                if(result != 0) {
                     return result;
                 }
             }
@@ -880,7 +921,9 @@ public class ECKey {
         }
     }
 
-    /** The string that prefixes all text messages signed using Bitcoin keys. */
+    /**
+     * The string that prefixes all text messages signed using Bitcoin keys.
+     */
     private static final String BITCOIN_SIGNED_MESSAGE_HEADER = "Bitcoin Signed Message:\n";
     private static final byte[] BITCOIN_SIGNED_MESSAGE_HEADER_BYTES = BITCOIN_SIGNED_MESSAGE_HEADER.getBytes(StandardCharsets.UTF_8);
 
@@ -898,7 +941,7 @@ public class ECKey {
             bos.write(size.encode());
             bos.write(messageBytes);
             return bos.toByteArray();
-        } catch (IOException e) {
+        } catch(IOException e) {
             throw new RuntimeException(e);  // Cannot happen.
         }
     }

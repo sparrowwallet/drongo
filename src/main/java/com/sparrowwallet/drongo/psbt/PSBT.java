@@ -262,12 +262,12 @@ public class PSBT {
 
         byte[] magicBuf = new byte[4];
         psbtByteBuffer.get(magicBuf);
-        if (!PSBT_MAGIC_HEX.equalsIgnoreCase(Utils.bytesToHex(magicBuf))) {
+        if(!PSBT_MAGIC_HEX.equalsIgnoreCase(Utils.bytesToHex(magicBuf))) {
             throw new PSBTParseException("PSBT has invalid magic value");
         }
 
         byte sep = psbtByteBuffer.get();
-        if (sep != (byte) 0xff) {
+        if(sep != (byte)0xff) {
             throw new PSBTParseException("PSBT has bad initial separator: " + Utils.bytesToHex(new byte[]{sep}));
         }
 
@@ -279,11 +279,11 @@ public class PSBT {
         List<PSBTEntry> inputEntries = new ArrayList<>();
         List<PSBTEntry> outputEntries = new ArrayList<>();
 
-        while (psbtByteBuffer.hasRemaining()) {
+        while(psbtByteBuffer.hasRemaining()) {
             PSBTEntry entry = new PSBTEntry(psbtByteBuffer);
 
             if(entry.getKey() == null) {         // length == 0
-                switch (currentState) {
+                switch(currentState) {
                     case STATE_GLOBALS:
                         currentState = STATE_INPUTS;
                         parseGlobalEntries(globalEntries);
@@ -293,7 +293,7 @@ public class PSBT {
                         inputEntries = new ArrayList<>();
 
                         seenInputs++;
-                        if (seenInputs == inputs) {
+                        if(seenInputs == inputs) {
                             currentState = STATE_OUTPUTS;
                             parseInputEntries(inputEntryLists);
                         }
@@ -303,7 +303,7 @@ public class PSBT {
                         outputEntries = new ArrayList<>();
 
                         seenOutputs++;
-                        if (seenOutputs == outputs) {
+                        if(seenOutputs == outputs) {
                             currentState = STATE_END;
                             parseOutputEntries(outputEntryLists);
                         }
@@ -313,11 +313,11 @@ public class PSBT {
                     default:
                         throw new PSBTParseException("PSBT structure invalid");
                 }
-            } else if (currentState == STATE_GLOBALS) {
+            } else if(currentState == STATE_GLOBALS) {
                 globalEntries.add(entry);
-            } else if (currentState == STATE_INPUTS) {
+            } else if(currentState == STATE_INPUTS) {
                 inputEntries.add(entry);
-            } else if (currentState == STATE_OUTPUTS) {
+            } else if(currentState == STATE_OUTPUTS) {
                 outputEntries.add(entry);
             } else {
                 throw new PSBTParseException("PSBT structure invalid");
@@ -356,13 +356,13 @@ public class PSBT {
                     inputs = transaction.getInputs().size();
                     outputs = transaction.getOutputs().size();
                     log.debug("Transaction with txid: " + transaction.getTxId() + " version " + transaction.getVersion() + " size " + transaction.getMessageSize() + " locktime " + transaction.getLocktime());
-                    for(TransactionInput input: transaction.getInputs()) {
+                    for(TransactionInput input : transaction.getInputs()) {
                         if(input.getScriptSig().getProgram().length != 0) {
                             throw new PSBTParseException("Unsigned tx input does not have empty scriptSig");
                         }
                         log.debug(" Transaction input references txid: " + input.getOutpoint().getHash() + " vout " + input.getOutpoint().getIndex() + " with script " + input.getScriptSig());
                     }
-                    for(TransactionOutput output: transaction.getOutputs()) {
+                    for(TransactionOutput output : transaction.getOutputs()) {
                         try {
                             log.debug(" Transaction output value: " + output.getValue() + " to addresses " + Arrays.asList(output.getScript().getToAddresses()) + " with script hex " + Utils.bytesToHex(output.getScript().getProgram()) + " to script " + output.getScript());
                         } catch(NonStandardScriptException e) {
@@ -611,8 +611,8 @@ public class PSBT {
 
     private PSBTEntry findDuplicateKey(List<PSBTEntry> entries) {
         Set<String> checkSet = new HashSet<>();
-        for(PSBTEntry entry: entries) {
-            if(!checkSet.add(Utils.bytesToHex(entry.getKey())) ) {
+        for(PSBTEntry entry : entries) {
+            if(!checkSet.add(Utils.bytesToHex(entry.getKey()))) {
                 return entry;
             }
         }
@@ -743,7 +743,7 @@ public class PSBT {
 
     /**
      * Validates silent payment ECDH shares and DLEQ proofs according to BIP-375.
-     *
+     * <p>
      * For each silent payment output, validates that:
      * 1. Either global or per-input ECDH shares and DLEQ proofs are provided for Taproot inputs
      * 2. The DLEQ proofs are cryptographically valid
@@ -930,7 +930,7 @@ public class PSBT {
                 entries.add(populateEntry(PSBT_GLOBAL_OUTPUT_COUNT, null, varIntOutputCount.encode()));
             }
             if(modifiable != null) {
-                entries.add(populateEntry(PSBT_GLOBAL_TX_MODIFIABLE, null, new byte[] { modifiable }));
+                entries.add(populateEntry(PSBT_GLOBAL_TX_MODIFIABLE, null, new byte[]{modifiable}));
             }
             for(Map.Entry<ECKey, ECKey> entry : silentPaymentsEcdhShares.entrySet()) {
                 entries.add(populateEntry(PSBT_GLOBAL_SP_ECDH_SHARE, entry.getKey().getPubKey(), entry.getValue().getPubKey()));
@@ -965,7 +965,7 @@ public class PSBT {
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
 
         baos.writeBytes(Utils.hexToBytes(PSBT_MAGIC_HEX));
-        baos.writeBytes(new byte[] {(byte)0xff});
+        baos.writeBytes(new byte[]{(byte)0xff});
 
         List<PSBTEntry> globalEntries = getGlobalEntries();
         for(PSBTEntry entry : globalEntries) {
@@ -973,7 +973,7 @@ public class PSBT {
                 entry.serializeToStream(baos);
             }
         }
-        baos.writeBytes(new byte[] {(byte)0x00});
+        baos.writeBytes(new byte[]{(byte)0x00});
 
         for(PSBTInput psbtInput : getPsbtInputs()) {
             List<PSBTEntry> inputEntries = psbtInput.getInputEntries(getPsbtVersion());
@@ -985,7 +985,7 @@ public class PSBT {
                     entry.serializeToStream(baos);
                 }
             }
-            baos.writeBytes(new byte[] {(byte)0x00});
+            baos.writeBytes(new byte[]{(byte)0x00});
         }
 
         for(PSBTOutput psbtOutput : getPsbtOutputs()) {
@@ -997,7 +997,7 @@ public class PSBT {
                     entry.serializeToStream(baos);
                 }
             }
-            baos.writeBytes(new byte[] {(byte)0x00});
+            baos.writeBytes(new byte[]{(byte)0x00});
         }
 
         return baos.toByteArray();
@@ -1470,7 +1470,7 @@ public class PSBT {
             ByteBuffer buffer = ByteBuffer.wrap(b);
             int header = buffer.getInt();
             return header == PSBT_MAGIC_INT;
-        } catch (Exception e) {
+        } catch(Exception e) {
             //ignore
         }
 
@@ -1496,11 +1496,11 @@ public class PSBT {
     }
 
     public static PSBT fromString(String strPSBT, boolean verifySignatures) throws PSBTParseException {
-        if (!isPSBT(strPSBT)) {
+        if(!isPSBT(strPSBT)) {
             throw new PSBTParseException("Provided string is not a PSBT");
         }
 
-        if (Utils.isBase64(strPSBT) && !Utils.isHex(strPSBT)) {
+        if(Utils.isBase64(strPSBT) && !Utils.isHex(strPSBT)) {
             strPSBT = Utils.bytesToHex(Base64.getDecoder().decode(strPSBT));
         }
 

@@ -46,13 +46,13 @@ public class PriorityUtxoSelector extends SingleSetUtxoSelector {
             BigInteger coinDepthB = BigInteger.valueOf(depthB).multiply(BigInteger.valueOf(valueB));
 
             int coinDepthCompare = coinDepthB.compareTo(coinDepthA);
-            if (coinDepthCompare != 0) {
+            if(coinDepthCompare != 0) {
                 return coinDepthCompare;
             }
 
             // The "coin*days" destroyed are equal, sort by value alone to get the lowest transaction size.
             int coinValueCompare = valueB.compareTo(valueA);
-            if (coinValueCompare != 0) {
+            if(coinValueCompare != 0) {
                 return coinValueCompare;
             }
 

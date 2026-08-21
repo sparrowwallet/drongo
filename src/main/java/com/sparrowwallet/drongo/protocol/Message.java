@@ -48,7 +48,7 @@ public abstract class Message {
      * This returns a correct value by parsing the message.
      */
     public final int getMessageSize() {
-        if (length == UNKNOWN_LENGTH) {
+        if(length == UNKNOWN_LENGTH) {
             throw new ProtocolException();
         }
 
@@ -60,7 +60,7 @@ public abstract class Message {
             long u = Utils.readUint32(payload, cursor);
             cursor += 4;
             return u;
-        } catch (ArrayIndexOutOfBoundsException e) {
+        } catch(ArrayIndexOutOfBoundsException e) {
             throw new ProtocolException(e);
         }
     }
@@ -70,13 +70,13 @@ public abstract class Message {
             long u = Utils.readInt64(payload, cursor);
             cursor += 8;
             return u;
-        } catch (ArrayIndexOutOfBoundsException e) {
+        } catch(ArrayIndexOutOfBoundsException e) {
             throw new ProtocolException(e);
         }
     }
 
     protected byte[] readBytes(long length) throws ProtocolException {
-        if (length < 0 || length > MAX_SIZE || cursor + length > payload.length) {
+        if(length < 0 || length > MAX_SIZE || cursor + length > payload.length) {
             throw new ProtocolException("Claimed value length too large: " + length);
         }
         try {
@@ -84,7 +84,7 @@ public abstract class Message {
             System.arraycopy(payload, cursor, b, 0, (int)length);
             cursor += (int)length;
             return b;
-        } catch (IndexOutOfBoundsException e) {
+        } catch(IndexOutOfBoundsException e) {
             throw new ProtocolException(e);
         }
     }
@@ -98,7 +98,7 @@ public abstract class Message {
             VarInt varint = new VarInt(payload, cursor + offset);
             cursor += offset + varint.getOriginalSizeInBytes();
             return varint.value;
-        } catch (ArrayIndexOutOfBoundsException e) {
+        } catch(ArrayIndexOutOfBoundsException e) {
             throw new ProtocolException(e);
         }
     }
@@ -118,18 +118,20 @@ public abstract class Message {
     }
 
     protected void adjustLength(int newArraySize, int adjustment) {
-        if (length == UNKNOWN_LENGTH)
+        if(length == UNKNOWN_LENGTH) {
             return;
+        }
         // Our own length is now unknown if we have an unknown length adjustment.
-        if (adjustment == UNKNOWN_LENGTH) {
+        if(adjustment == UNKNOWN_LENGTH) {
             length = UNKNOWN_LENGTH;
             return;
         }
         length += adjustment;
         // Check if we will need more bytes to encode the length prefix.
-        if (newArraySize == 1)
+        if(newArraySize == 1) {
             length++;  // The assumption here is we never call adjustLength with the same arraySize as before.
-        else if (newArraySize != 0)
+        } else if(newArraySize != 0) {
             length += VarInt.sizeOf(newArraySize) - VarInt.sizeOf(newArraySize - 1);
+        }
     }
 }

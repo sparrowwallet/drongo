@@ -22,7 +22,9 @@ public class Bip39MnemonicCode {
     private static final String BIP39_ENGLISH_RESOURCE_NAME = "/wordlist/bip39-english.txt";
     private static final String BIP39_ENGLISH_SHA256 = "ad90bf3beb7b0eb7e5acd74727dc0da96e0a280a258354e7293fb7e211ac03db";
 
-    /** UNIX time for when the BIP39 standard was finalised. This can be used as a default seed birthday. */
+    /**
+     * UNIX time for when the BIP39 standard was finalised. This can be used as a default seed birthday.
+     */
     public static long BIP39_STANDARDISATION_TIME_SECS = 1381276800;
 
     private static final int PBKDF2_ROUNDS = 2048;
@@ -32,12 +34,14 @@ public class Bip39MnemonicCode {
     static {
         try {
             INSTANCE = new Bip39MnemonicCode();
-        } catch (RuntimeException e) {
+        } catch(RuntimeException e) {
             log.error("Failed to load word list", e);
         }
     }
 
-    /** Initialise from the included word list. Won't work on Android. */
+    /**
+     * Initialise from the included word list. Won't work on Android.
+     */
     public Bip39MnemonicCode() {
         this(openDefaultWords(), BIP39_ENGLISH_SHA256);
     }
@@ -61,25 +65,25 @@ public class Bip39MnemonicCode {
             this.wordList = new ArrayList<>(2048);
             MessageDigest md = Sha256Hash.newDigest();
             String word;
-            while ((word = br.readLine()) != null) {
+            while((word = br.readLine()) != null) {
                 md.update(word.getBytes());
                 this.wordList.add(word);
             }
             br.close();
 
-            if (this.wordList.size() != 2048) {
+            if(this.wordList.size() != 2048) {
                 throw new IllegalArgumentException("Input stream did not contain 2048 words");
             }
 
             // If a wordListDigest is supplied check to make sure it matches.
-            if (wordListDigest != null) {
+            if(wordListDigest != null) {
                 byte[] digest = md.digest();
                 String hexdigest = Utils.bytesToHex(digest);
-                if (!hexdigest.equals(wordListDigest)) {
+                if(!hexdigest.equals(wordListDigest)) {
                     throw new IllegalArgumentException("Wordlist digest mismatch");
                 }
             }
-        } catch (IOException e) {
+        } catch(IOException e) {
             throw new RuntimeException("Error loading word list", e);
         }
     }
@@ -117,11 +121,11 @@ public class Bip39MnemonicCode {
      * Convert mnemonic word list to original entropy value.
      */
     public byte[] toEntropy(List<String> words) throws MnemonicException.MnemonicLengthException, MnemonicException.MnemonicWordException, MnemonicException.MnemonicChecksumException {
-        if (words.size() % 3 > 0) {
+        if(words.size() % 3 > 0) {
             throw new MnemonicException.MnemonicLengthException("Word list size must be multiple of three words.");
         }
 
-        if (words.size() == 0) {
+        if(words.size() == 0) {
             throw new MnemonicException.MnemonicLengthException("Word list is empty.");
         }
 
@@ -131,14 +135,14 @@ public class Bip39MnemonicCode {
         int concatLenBits = words.size() * 11;
         boolean[] concatBits = new boolean[concatLenBits];
         int wordindex = 0;
-        for (String word : words) {
+        for(String word : words) {
             // Find the words index in the wordlist.
             int ndx = Collections.binarySearch(this.wordList, word);
-            if (ndx < 0) {
+            if(ndx < 0) {
                 throw new MnemonicException.MnemonicWordException(word);
             }
             // Set the next 11 bits to the value of the index.
-            for (int ii = 0; ii < 11; ++ii) {
+            for(int ii = 0; ii < 11; ++ii) {
                 concatBits[(wordindex * 11) + ii] = (ndx & (1 << (10 - ii))) != 0;
             }
             ++wordindex;
@@ -149,9 +153,9 @@ public class Bip39MnemonicCode {
 
         // Extract original entropy as bytes.
         byte[] entropy = new byte[entropyLengthBits / 8];
-        for (int ii = 0; ii < entropy.length; ++ii) {
-            for (int jj = 0; jj < 8; ++jj) {
-                if (concatBits[(ii * 8) + jj]) {
+        for(int ii = 0; ii < entropy.length; ++ii) {
+            for(int jj = 0; jj < 8; ++jj) {
+                if(concatBits[(ii * 8) + jj]) {
                     entropy[ii] |= 1 << (7 - jj);
                 }
             }
@@ -162,8 +166,8 @@ public class Bip39MnemonicCode {
         boolean[] hashBits = bytesToBits(hash);
 
         // Check all the checksum bits.
-        for (int i = 0; i < checksumLengthBits; ++i) {
-            if (concatBits[entropyLengthBits + i] != hashBits[i]) {
+        for(int i = 0; i < checksumLengthBits; ++i) {
+            if(concatBits[entropyLengthBits + i] != hashBits[i]) {
                 throw new MnemonicException.MnemonicChecksumException();
             }
         }
@@ -174,10 +178,10 @@ public class Bip39MnemonicCode {
      * Convert entropy data to mnemonic word list.
      */
     public List<String> toMnemonic(byte[] entropy) throws MnemonicException.MnemonicLengthException {
-        if (entropy.length % 4 > 0) {
+        if(entropy.length % 4 > 0) {
             throw new MnemonicException.MnemonicLengthException("Entropy length not multiple of 32 bits.");
         }
-        if (entropy.length == 0) {
+        if(entropy.length == 0) {
             throw new MnemonicException.MnemonicLengthException("Entropy is empty.");
         }
         // We take initial entropy of ENT bits and compute its
@@ -201,11 +205,11 @@ public class Bip39MnemonicCode {
 
         ArrayList<String> words = new ArrayList<>();
         int nwords = concatBits.length / 11;
-        for (int i = 0; i < nwords; ++i) {
+        for(int i = 0; i < nwords; ++i) {
             int index = 0;
-            for (int j = 0; j < 11; ++j) {
+            for(int j = 0; j < 11; ++j) {
                 index <<= 1;
-                if (concatBits[(i * 11) + j]) {
+                if(concatBits[(i * 11) + j]) {
                     index |= 0x1;
                 }
             }
@@ -224,9 +228,11 @@ public class Bip39MnemonicCode {
 
     private static boolean[] bytesToBits(byte[] data) {
         boolean[] bits = new boolean[data.length * 8];
-        for (int i = 0; i < data.length; ++i)
-            for (int j = 0; j < 8; ++j)
+        for(int i = 0; i < data.length; ++i) {
+            for(int j = 0; j < 8; ++j) {
                 bits[(i * 8) + j] = (data[i] & (1 << (7 - j))) != 0;
+            }
+        }
         return bits;
     }
 
@@ -241,14 +247,14 @@ public class Bip39MnemonicCode {
         int concatLenBits = previousWords.size() * 11;
         boolean[] concatBits = new boolean[concatLenBits];
         int wordindex = 0;
-        for (String word : previousWords) {
+        for(String word : previousWords) {
             // Find the words index in the wordlist.
             int ndx = Collections.binarySearch(this.wordList, word);
-            if (ndx < 0) {
+            if(ndx < 0) {
                 throw new MnemonicException.MnemonicWordException(word);
             }
             // Set the next 11 bits to the value of the index.
-            for (int ii = 0; ii < 11; ++ii) {
+            for(int ii = 0; ii < 11; ++ii) {
                 concatBits[(wordindex * 11) + ii] = (ndx & (1 << (10 - ii))) != 0;
             }
             ++wordindex;
@@ -299,11 +305,11 @@ public class Bip39MnemonicCode {
     }
 
     public static boolean[][] getBitPermutations(int length) {
-        int numPermutations = (int) Math.pow(2, length);
+        int numPermutations = (int)Math.pow(2, length);
         boolean[][] permutations = new boolean[numPermutations][length];
 
-        for (int i = 0; i < numPermutations; i++) {
-            for (int j = 0; j < length; j++) {
+        for(int i = 0; i < numPermutations; i++) {
+            for(int j = 0; j < length; j++) {
                 permutations[i][j] = ((i >> j) & 1) == 1;
             }
         }

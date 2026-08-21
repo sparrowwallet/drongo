@@ -45,9 +45,13 @@ public final class EncryptedData {
 
     @Override
     public boolean equals(Object o) {
-        if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
-        EncryptedData other = (EncryptedData) o;
+        if(this == o) {
+            return true;
+        }
+        if(o == null || getClass() != o.getClass()) {
+            return false;
+        }
+        EncryptedData other = (EncryptedData)o;
         return Arrays.equals(encryptedBytes, other.encryptedBytes) &&
                 Arrays.equals(initialisationVector, other.initialisationVector) &&
                 Arrays.equals(keySalt, other.keySalt) &&

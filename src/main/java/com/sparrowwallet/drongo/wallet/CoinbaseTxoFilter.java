@@ -14,7 +14,7 @@ public class CoinbaseTxoFilter implements TxoFilter {
         //Disallow immature coinbase outputs
         BlockTransaction blockTransaction = wallet.getWalletTransaction(candidate.getHash());
         if(blockTransaction != null && blockTransaction.getTransaction() != null && blockTransaction.getTransaction().isCoinBase()
-            && wallet.getStoredBlockHeight() != null && candidate.getConfirmations(wallet.getStoredBlockHeight()) < Transaction.COINBASE_MATURITY_THRESHOLD) {
+                && wallet.getStoredBlockHeight() != null && candidate.getConfirmations(wallet.getStoredBlockHeight()) < Transaction.COINBASE_MATURITY_THRESHOLD) {
             return false;
         }
 

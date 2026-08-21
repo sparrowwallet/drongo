@@ -40,21 +40,21 @@ public class NativeUtils {
 
     /**
      * Loads library from current JAR archive
-     *
+     * <p>
      * The file from JAR is copied into system temporary directory and then loaded. The temporary file is deleted after
      * exiting.
      * Method uses String as filename because the pathname is "abstract", not system-dependent.
      *
      * @param path The path of file inside JAR as absolute path (beginning with '/'), e.g. /package/File.ext
-     * @throws IOException If temporary file creation or read/write operation fails
+     * @throws IOException              If temporary file creation or read/write operation fails
      * @throws IllegalArgumentException If source file (param path) does not exist
      * @throws IllegalArgumentException If the path is not absolute or if the filename is shorter than three characters
-     * (restriction of {@link File#createTempFile(String, String)}).
-     * @throws FileNotFoundException If the file could not be found inside the JAR.
+     *                                  (restriction of {@link File#createTempFile(String, String)}).
+     * @throws FileNotFoundException    If the file could not be found inside the JAR.
      */
     public static void loadLibraryFromJar(String path) throws IOException {
 
-        if (null == path || !path.startsWith("/")) {
+        if(null == path || !path.startsWith("/")) {
             throw new IllegalArgumentException("The path has to be absolute (start with '/').");
         }
 
@@ -63,24 +63,24 @@ public class NativeUtils {
         String filename = (parts.length > 1) ? parts[parts.length - 1] : null;
 
         // Check if the filename is okay
-        if (filename == null || filename.length() < MIN_PREFIX_LENGTH) {
+        if(filename == null || filename.length() < MIN_PREFIX_LENGTH) {
             throw new IllegalArgumentException("The filename has to be at least 3 characters long.");
         }
 
         // Prepare temporary file
-        if (temporaryDir == null) {
+        if(temporaryDir == null) {
             temporaryDir = createTempDirectory(NATIVE_FOLDER_PATH_PREFIX);
             temporaryDir.deleteOnExit();
         }
 
         File temp = new File(temporaryDir, filename);
 
-        try (InputStream is = NativeUtils.class.getResourceAsStream(path)) {
+        try(InputStream is = NativeUtils.class.getResourceAsStream(path)) {
             Files.copy(is, temp.toPath(), StandardCopyOption.REPLACE_EXISTING);
-        } catch (IOException e) {
+        } catch(IOException e) {
             temp.delete();
             throw e;
-        } catch (NullPointerException e) {
+        } catch(NullPointerException e) {
             temp.delete();
             throw new FileNotFoundException("File " + path + " was not found inside JAR.");
         }
@@ -88,7 +88,7 @@ public class NativeUtils {
         try {
             System.load(temp.getAbsolutePath());
         } finally {
-            if (isPosixCompliant()) {
+            if(isPosixCompliant()) {
                 // Assume POSIX compliant file system, can be deleted after loading
                 temp.delete();
             } else {
@@ -103,7 +103,7 @@ public class NativeUtils {
             return FileSystems.getDefault()
                     .supportedFileAttributeViews()
                     .contains("posix");
-        } catch (FileSystemNotFoundException
+        } catch(FileSystemNotFoundException
                 | ProviderNotFoundException
                 | SecurityException e) {
             return false;
