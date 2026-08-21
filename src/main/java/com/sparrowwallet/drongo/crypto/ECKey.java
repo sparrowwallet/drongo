@@ -74,6 +74,11 @@ public class ECKey {
     public static final ECDomainParameters CURVE;
 
     /**
+     * Equal to CURVE.getN(), the order of the secp256k1 curve.
+     */
+    public static final BigInteger CURVE_ORDER;
+
+    /**
      * Equal to CURVE.getN().shiftRight(1), used for canonicalising the S value of a signature. If you aren't
      * sure what this is about, you can ignore it.
      */
@@ -86,6 +91,7 @@ public class ECKey {
         FixedPointUtil.precompute(CURVE_PARAMS.getG());
         CURVE = new ECDomainParameters(CURVE_PARAMS.getCurve(), CURVE_PARAMS.getG(), CURVE_PARAMS.getN(),
                 CURVE_PARAMS.getH());
+        CURVE_ORDER = CURVE_PARAMS.getN();
         HALF_CURVE_ORDER = CURVE_PARAMS.getN().shiftRight(1);
         secureRandom = new SecureRandom();
     }
