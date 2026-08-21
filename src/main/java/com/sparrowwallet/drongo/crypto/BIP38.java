@@ -22,7 +22,9 @@
 package com.sparrowwallet.drongo.crypto;
 
 import com.sparrowwallet.drongo.Drongo;
+import com.sparrowwallet.drongo.Network;
 import com.sparrowwallet.drongo.Utils;
+import com.sparrowwallet.drongo.address.P2PKHAddress;
 import com.sparrowwallet.drongo.protocol.Base58;
 import com.sparrowwallet.drongo.protocol.Sha256Hash;
 import org.bouncycastle.crypto.generators.SCrypt;
@@ -32,22 +34,28 @@ import javax.crypto.Cipher;
 import javax.crypto.spec.SecretKeySpec;
 import java.io.UnsupportedEncodingException;
 import java.math.BigInteger;
+import java.nio.charset.StandardCharsets;
 import java.security.GeneralSecurityException;
 import java.util.Arrays;
 
 import static com.sparrowwallet.drongo.crypto.ECKey.CURVE;
 
 public class BIP38 {
+    private static final int ENCRYPTED_KEY_LENGTH = 39;
+
     /**
      * Decrypts an encrypted key.
      *
      * @param passphrase
      * @param encryptedKey
      * @throws UnsupportedEncodingException
-     * @throws GeneralSecurityException
+     * @throws GeneralSecurityException if the key is not a well formed BIP38 key
+     * @throws InvalidPasswordException if the passphrase is incorrect (unchecked)
      */
     public static DumpedPrivateKey decrypt(String passphrase, String encryptedKey) throws UnsupportedEncodingException, GeneralSecurityException {
         byte[] encryptedKeyBytes = Base58.decodeChecked(encryptedKey);
+        verifyLength(encryptedKeyBytes);
+
         DumpedPrivateKey result;
         byte ec = encryptedKeyBytes[1];
         switch(ec) {
@@ -58,7 +66,7 @@ public class BIP38 {
                 result = decryptNoEC(passphrase, encryptedKeyBytes);
                 break;
             default:
-                throw new RuntimeException("Invalid key - second byte is: " + ec);
+                throw new GeneralSecurityException("Invalid key - second byte is: " + ec);
         }
         return result;
     }
@@ -69,9 +77,11 @@ public class BIP38 {
      * @param passphrase
      * @param encryptedKey
      * @throws UnsupportedEncodingException
-     * @throws GeneralSecurityException
+     * @throws GeneralSecurityException if the key is not a well formed BIP38 key
+     * @throws InvalidPasswordException if the passphrase is incorrect (unchecked)
      */
     public static DumpedPrivateKey decryptEC(String passphrase, byte[] encryptedKey) throws UnsupportedEncodingException, GeneralSecurityException {
+        verifyLength(encryptedKey);
 
         byte flagByte = encryptedKey[2];
         byte[] passFactor;
@@ -121,7 +131,9 @@ public class BIP38 {
         BigInteger n = CURVE.getN();
         BigInteger pk = new BigInteger(1, passFactor).multiply(new BigInteger(1, factorB)).remainder(n);
 
-        ECKey privKey = ECKey.fromPrivate(pk, false);
+        ECKey privKey = ECKey.fromPrivate(pk, (flagByte & 0x20) == 0x20);
+        verifyAddressHash(privKey, addressHash);
+
         return privKey.getPrivateKeyEncoded();
     }
 
@@ -131,9 +143,11 @@ public class BIP38 {
      * @param passphrase
      * @param encryptedKey
      * @throws UnsupportedEncodingException
-     * @throws GeneralSecurityException
+     * @throws GeneralSecurityException if the key is not a well formed BIP38 key
+     * @throws InvalidPasswordException if the passphrase is incorrect (unchecked)
      */
     public static DumpedPrivateKey decryptNoEC(String passphrase, byte[] encryptedKey) throws UnsupportedEncodingException, GeneralSecurityException {
+        verifyLength(encryptedKey);
 
         byte[] addressHash = Arrays.copyOfRange(encryptedKey, 3, 7);
         byte[] scryptKey = SCrypt.generate(passphrase.getBytes("UTF8"), addressHash, 16384, 8, 8, 64);
@@ -151,8 +165,39 @@ public class BIP38 {
         }
 
         boolean compressed = (encryptedKey[2] & (byte)0x20) == 0x20;
-        ECKey k = new ECKey(new BigInteger(1, keyBytes), null, compressed);
+        ECKey k = ECKey.fromPrivate(new BigInteger(1, keyBytes), compressed);
+        verifyAddressHash(k, addressHash);
+
         return k.getPrivateKeyEncoded();
+    }
+
+    /**
+     * Verifies the encrypted key is the length every BIP38 key has. Both decryption paths index fixed offsets up to this length.
+     *
+     * @param encryptedKey the encrypted key
+     * @throws GeneralSecurityException if the length is wrong
+     */
+    private static void verifyLength(byte[] encryptedKey) throws GeneralSecurityException {
+        if(encryptedKey.length != ENCRYPTED_KEY_LENGTH) {
+            throw new GeneralSecurityException("Invalid key - length is " + encryptedKey.length + " bytes, expected " + ENCRYPTED_KEY_LENGTH);
+        }
+    }
+
+    /**
+     * Verifies the decrypted key produces the address the encrypted key was created from. BIP38 defines this as the first four bytes
+     * of the double SHA256 of the mainnet P2PKH address, and it is the only check that the supplied passphrase was the correct one -
+     * without it any passphrase yields a valid but unrelated key.
+     *
+     * @param privKey the decrypted key
+     * @param addressHash the address hash carried in the encrypted key
+     * @throws InvalidPasswordException if the address hash does not match
+     */
+    private static void verifyAddressHash(ECKey privKey, byte[] addressHash) {
+        String address = new P2PKHAddress(privKey.getPubKeyHash()).getAddress(Network.MAINNET);
+        byte[] hash = Sha256Hash.hashTwice(address.getBytes(StandardCharsets.US_ASCII));
+        if(!Arrays.equals(addressHash, Arrays.copyOfRange(hash, 0, 4))) {
+            throw new InvalidPasswordException("Incorrect passphrase - the decrypted key does not match the address this key was created from");
+        }
     }
 
     /**
