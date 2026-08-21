@@ -18,6 +18,7 @@ import java.nio.charset.StandardCharsets;
 import java.text.DecimalFormat;
 import java.text.DecimalFormatSymbols;
 import java.util.*;
+import java.util.regex.Pattern;
 
 import static com.sparrowwallet.drongo.protocol.Transaction.*;
 
@@ -49,8 +50,8 @@ import static com.sparrowwallet.drongo.protocol.Transaction.*;
  *
  * <p>The following names are known and have the following formats:</p>
  * <ul>
- * <li>{@code amount} decimal value to 8 dp (e.g. 0.12345678) <b>Note that the
- * exponent notation is not supported any more</b></li>
+ * <li>{@code amount} decimal value to 8 dp (e.g. 0.12345678), where either {@code .} or {@code ,} may be used as the
+ * decimal separator <b>Note that the exponent notation is not supported any more</b></li>
  * <li>{@code label} any URL encoded alphanumeric</li>
  * <li>{@code message} any URL encoded alphanumeric</li>
  * </ul>
@@ -76,6 +77,7 @@ public class BitcoinURI {
     private static final String ENCODED_SPACE_CHARACTER = "%20";
     private static final String AMPERSAND_SEPARATOR = "&";
     private static final String QUESTION_MARK_SEPARATOR = "?";
+    private static final Pattern AMOUNT_PATTERN = Pattern.compile("\\d+(?:[.,]\\d*)?|[.,]\\d+");
 
     public static final DecimalFormat BTC_FORMAT = new DecimalFormat("0", DecimalFormatSymbols.getInstance(Locale.ENGLISH));
     public static final int SMALLEST_UNIT_EXPONENT = 8;
@@ -165,6 +167,10 @@ public class BitcoinURI {
             // Parse the amount.
             if(FIELD_AMOUNT.equals(nameToken) && !valueToken.isEmpty()) {
                 // Decode the amount (contains an optional decimal component to 8dp).
+                if(!AMOUNT_PATTERN.matcher(valueToken).matches()) {
+                    throw new OptionalFieldValidationException(String.format(Locale.US, "'%s' is not a valid amount", valueToken));
+                }
+
                 try {
                     long amount = new BigDecimal(valueToken.replace(',', '.')).movePointRight(SMALLEST_UNIT_EXPONENT).longValueExact();
                     if(amount > MAX_BITCOIN * SATOSHIS_PER_BITCOIN) {

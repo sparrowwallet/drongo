@@ -45,6 +45,37 @@ public class BitcoinUriTest {
         Assertions.assertNull(bitcoinURI.getPayjoinUrl());
     }
 
+    @Test
+    public void rejectsExponentAmount() {
+        Assertions.assertThrows(OptionalFieldValidationException.class, () -> amountUri("1e2"));
+        Assertions.assertThrows(OptionalFieldValidationException.class, () -> amountUri("1E-8"));
+    }
+
+    @Test
+    public void rejectsNonDecimalAmount() {
+        Assertions.assertThrows(OptionalFieldValidationException.class, () -> amountUri("+1"));
+        Assertions.assertThrows(OptionalFieldValidationException.class, () -> amountUri("-1"));
+        Assertions.assertThrows(OptionalFieldValidationException.class, () -> amountUri("1.2.3"));
+        Assertions.assertThrows(OptionalFieldValidationException.class, () -> amountUri("\u0663"));
+    }
+
+    @Test
+    public void acceptsDecimalAmount() throws BitcoinURIParseException {
+        Assertions.assertEquals(Long.valueOf(12345678), amountUri("0.12345678").getAmount());
+        Assertions.assertEquals(Long.valueOf(50000000), amountUri("0,5").getAmount());
+        Assertions.assertEquals(Long.valueOf(100000000), amountUri("1.").getAmount());
+        Assertions.assertEquals(Long.valueOf(50000000), amountUri(".5").getAmount());
+    }
+
+    @Test
+    public void rejectsTooManyDecimalPlaces() {
+        Assertions.assertThrows(OptionalFieldValidationException.class, () -> amountUri("0.123456789"));
+    }
+
+    private static BitcoinURI amountUri(String amount) throws BitcoinURIParseException {
+        return new BitcoinURI("bitcoin:" + ADDRESS + "?amount=" + amount);
+    }
+
     private static BitcoinURI payjoinUri(String payjoinUrl) throws BitcoinURIParseException {
         return new BitcoinURI("bitcoin:" + ADDRESS + "?pj=" + URLEncoder.encode(payjoinUrl, StandardCharsets.UTF_8));
     }
