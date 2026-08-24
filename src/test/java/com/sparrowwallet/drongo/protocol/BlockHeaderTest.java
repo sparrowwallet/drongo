@@ -22,6 +22,37 @@ public class BlockHeaderTest {
     }
 
     @Test
+    public void testEncodeCompactBits() {
+        //Bitcoin Core's arith_uint256 round trip vectors, as lifted by Electrum: the compact form a target encodes back to is not always the one it decoded from
+        Assertions.assertEquals(0x00000000L, Utils.encodeCompactBits(Utils.decodeCompactBits(0x00123456L)));
+        Assertions.assertEquals(0x00000000L, Utils.encodeCompactBits(Utils.decodeCompactBits(0x01003456L)));
+        Assertions.assertEquals(0x00000000L, Utils.encodeCompactBits(Utils.decodeCompactBits(0x02000056L)));
+        Assertions.assertEquals(0x00000000L, Utils.encodeCompactBits(Utils.decodeCompactBits(0x03000000L)));
+        Assertions.assertEquals(0x00000000L, Utils.encodeCompactBits(Utils.decodeCompactBits(0x04000000L)));
+        Assertions.assertEquals(0x01120000L, Utils.encodeCompactBits(Utils.decodeCompactBits(0x01123456L)));
+        Assertions.assertEquals(0x02123400L, Utils.encodeCompactBits(Utils.decodeCompactBits(0x02123456L)));
+        Assertions.assertEquals(0x03123456L, Utils.encodeCompactBits(Utils.decodeCompactBits(0x03123456L)));
+        Assertions.assertEquals(0x04123456L, Utils.encodeCompactBits(Utils.decodeCompactBits(0x04123456L)));
+        Assertions.assertEquals(0x05009234L, Utils.encodeCompactBits(Utils.decodeCompactBits(0x05009234L)));
+        Assertions.assertEquals(0x20123456L, Utils.encodeCompactBits(Utils.decodeCompactBits(0x20123456L)));
+        Assertions.assertEquals(0x05123456L, Utils.encodeCompactBits(new BigInteger("1234560000", 16)));
+        Assertions.assertEquals(0x0600c0deL, Utils.encodeCompactBits(new BigInteger("c0de000000", 16)));
+
+        //A mantissa whose top bit is set must not be encoded as the negative flag
+        Assertions.assertEquals(0x02008000L, Utils.encodeCompactBits(BigInteger.valueOf(0x80)));
+        Assertions.assertEquals(0x00000000L, Utils.encodeCompactBits(BigInteger.ZERO));
+
+        //decodeCompactBits returns a negative value for the compact forms that set the sign bit, which are not encodable difficulty targets
+        Assertions.assertThrows(IllegalArgumentException.class, () -> Utils.encodeCompactBits(Utils.decodeCompactBits(0x1d80ffffL)));
+
+        //The consensus targets of every network Sparrow supports round trip unchanged
+        Assertions.assertEquals(0x1d00ffffL, Utils.encodeCompactBits(Utils.decodeCompactBits(0x1d00ffffL)));
+        Assertions.assertEquals(0x207fffffL, Utils.encodeCompactBits(Utils.decodeCompactBits(0x207fffffL)));
+        Assertions.assertEquals(0x1e0377aeL, Utils.encodeCompactBits(Utils.decodeCompactBits(0x1e0377aeL)));
+        Assertions.assertEquals(0x17053894L, Utils.encodeCompactBits(Utils.decodeCompactBits(0x17053894L)));
+    }
+
+    @Test
     public void testGenesisHeader() {
         Network.set(Network.MAINNET);
 

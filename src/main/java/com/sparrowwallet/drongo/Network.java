@@ -1,7 +1,13 @@
 package com.sparrowwallet.drongo;
 
+import com.sparrowwallet.drongo.protocol.BlockHeader;
+import com.sparrowwallet.drongo.protocol.HeaderCheckpoints;
+import com.sparrowwallet.drongo.protocol.Sha256Hash;
+
 import java.math.BigInteger;
+import java.util.EnumMap;
 import java.util.Locale;
+import java.util.Map;
 
 public enum Network {
     MAINNET("mainnet", "Mainnet", "mainnet", 0, "1", 5, "3", "bc", "sp", "spscan", "spspend", ExtendedKey.Header.xprv, ExtendedKey.Header.xpub, 128, 8332),
@@ -48,6 +54,7 @@ public enum Network {
     private final int defaultPort;
 
     private static Network currentNetwork;
+    private static final Map<Network, BlockHeader> GENESIS_HEADERS = new EnumMap<>(Network.class);
 
     public String getName() {
         return name;
@@ -116,6 +123,36 @@ public enum Network {
         }
 
         return Utils.decodeCompactBits(0x1d00ffffL);
+    }
+
+    /**
+     * The network's genesis block header, parsed from its compiled-in serialization on first use.
+     */
+    public BlockHeader getGenesisHeader() {
+        synchronized(GENESIS_HEADERS) {
+            return GENESIS_HEADERS.computeIfAbsent(this, network -> new BlockHeader(Utils.hexToBytes(network.getGenesisHeaderHex())));
+        }
+    }
+
+    public Sha256Hash getGenesisHash() {
+        return getGenesisHeader().getHash();
+    }
+
+    private String getGenesisHeaderHex() {
+        return switch(this) {
+            case MAINNET -> "0100000000000000000000000000000000000000000000000000000000000000000000003ba3edfd7a7b12b27ac72c3e67768f617fc81bc3888a51323a9fb8aa4b1e5e4a29ab5f49ffff001d1dac2b7c";
+            case TESTNET -> "0100000000000000000000000000000000000000000000000000000000000000000000003ba3edfd7a7b12b27ac72c3e67768f617fc81bc3888a51323a9fb8aa4b1e5e4adae5494dffff001d1aa4ae18";
+            case REGTEST -> "0100000000000000000000000000000000000000000000000000000000000000000000003ba3edfd7a7b12b27ac72c3e67768f617fc81bc3888a51323a9fb8aa4b1e5e4adae5494dffff7f2002000000";
+            case SIGNET -> "0100000000000000000000000000000000000000000000000000000000000000000000003ba3edfd7a7b12b27ac72c3e67768f617fc81bc3888a51323a9fb8aa4b1e5e4a008f4d5fae77031e8ad22203";
+            case TESTNET4 -> "0100000000000000000000000000000000000000000000000000000000000000000000004e7b2b9128fe0291db0693af2ae418b767e657cd407e80cb1434221eaea7a07a046f3566ffff001dbb0c7817";
+        };
+    }
+
+    /**
+     * The pinned header hashes compiled in for this network, one per difficulty period. Regtest has none, anchoring at its genesis header instead.
+     */
+    public HeaderCheckpoints getHeaderCheckpoints() {
+        return HeaderCheckpoints.get(this);
     }
 
     public boolean hasP2PKHAddressPrefix(String address) {

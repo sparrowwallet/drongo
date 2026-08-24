@@ -237,6 +237,26 @@ public class Utils {
     }
 
     /**
+     * Encode a difficulty target to the compact "nBits" representation used in block headers, following Bitcoin Core's arith_uint256::GetCompact.
+     * Core encodes an unsigned 256 bit value, so this is only a partial inverse of decodeCompactBits, which returns a negative value
+     * for the compact forms that set the sign bit. Those are not difficulty targets and are rejected here rather than encoded to nonsense.
+     */
+    public static long encodeCompactBits(BigInteger value) {
+        if(value.signum() < 0) {
+            throw new IllegalArgumentException("Cannot encode a negative difficulty target: " + value.toString(16));
+        }
+
+        int size = (value.bitLength() + 7) / 8;
+        long result = size <= 3 ? value.longValueExact() << (8 * (3 - size)) : value.shiftRight(8 * (size - 3)).longValueExact();
+        if((result & 0x00800000L) != 0) {
+            result >>= 8;
+            size++;
+        }
+
+        return result | ((long)size << 24);
+    }
+
+    /**
      * Parse 8 bytes from the byte array (starting at the offset) as signed 64-bit integer in little endian format.
      */
     public static long readInt64(byte[] bytes, int offset) {
