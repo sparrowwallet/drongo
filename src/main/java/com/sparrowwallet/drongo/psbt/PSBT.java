@@ -1124,11 +1124,17 @@ public class PSBT {
         PSBT publicCopy = this.copy();
         publicCopy.extendedPublicKeys.clear();
         publicCopy.globalProprietary.clear();
+        publicCopy.silentPaymentsEcdhShares.clear();
+        publicCopy.silentPaymentsDLEQProofs.clear();
         for(PSBTInput psbtInput : publicCopy.getPsbtInputs()) {
             psbtInput.getDerivedPublicKeys().clear();
             psbtInput.getTapDerivedPublicKeys().clear();
             psbtInput.setTapInternalKey(null);
             psbtInput.getProprietary().clear();
+            psbtInput.getSilentPaymentsSpendDerivations().clear();
+            psbtInput.setSilentPaymentsTweak(null);
+            psbtInput.getSilentPaymentsEcdhShares().clear();
+            psbtInput.getSilentPaymentsDLEQProofs().clear();
         }
         for(PSBTOutput psbtOutput : publicCopy.getPsbtOutputs()) {
             psbtOutput.getDerivedPublicKeys().clear();
