@@ -1146,6 +1146,37 @@ public class PSBTTest {
     }
 
     @Test
+    public void publicCopyClearsOutputDnssecProof() throws PSBTParseException {
+        Transaction transaction = new Transaction();
+        transaction.setVersion(2);
+        transaction.addInput(Sha256Hash.wrap("75ddabb27b8845f5247975c8a5ba7c6f336c4570708ebe230caf6db5217ae858"), 0, new Script(new byte[0]));
+        transaction.addOutput(100000L, new Script(Utils.hexToBytes("0014d85c2b71d0060b09c9886aeb815e50991dda124d")));
+
+        PSBT psbt = new PSBT(transaction);
+        psbt.getPsbtOutputs().getFirst().setDnssecProof(Map.of("bob@example.com", Utils.hexToBytes("aabbccdd")));
+
+        //The proof is serialized regardless of PSBT version, so it survives an ordinary copy
+        Assertions.assertNotNull(PSBT.fromString(psbt.toBase64String()).getPsbtOutputs().getFirst().getDnssecProof());
+
+        PSBT publicCopy = PSBT.fromString(psbt.getPublicCopy().toBase64String());
+        Assertions.assertNull(publicCopy.getPsbtOutputs().getFirst().getDnssecProof());
+        Assertions.assertNotNull(psbt.getPsbtOutputs().getFirst().getDnssecProof());
+    }
+
+    @Test
+    public void publicCopyClearsOutputSilentPaymentInfo() throws PSBTParseException {
+        String strPsbt = "cHNidP8B+wQCAAAAAQIEAgAAAAEEBAEAAAABBQQCAAAAAQYBAwABDiAlbK6m2hWAb7hW7a50mI1EDHqxtcCGHsgR0ZCSdHudHAEPBAAAAAABAR+ghgEAAAAAABYAFPja92rYA7DvqV1s/4ruCJHTrxyMARAE/v///yIGA9NX98BxjyR44/2PjMwnKd3YwMyusfArGBpvRNQ7n42NAAEDBAEAAAAiHQLQKf+W3iy894K+Q1nEhiDqkrzda+8DK5UVi5GhaT+0+CECVRZOeSbVDVKgn/mQZHpelcHbG/xophb7wtohOSf5i/8iHgLQKf+W3iy894K+Q1nEhiDqkrzda+8DK5UVi5GhaT+0+EDB1n84eIK/gXkV6hWCHWTVs4NcH8BcVYzj2CSSoX2QjBBIfbub3cEIDIwtnBlxsmYIPGkFTiIZPyRBKKxmc35gAAEDCFDDAAAAAAAAAQQiUSBVuRZLw33Ib1uJNhaCqjCItbP6U9rbQ+lfG9ETm7HANQEJQgLQKf+W3iy894K+Q1nEhiDqkrzda+8DK5UVi5GhaT+0+AP1JENIUgFlZrxF0fpqXFoYYs3ZM/FchDtCcjgi9SUyNwEKBAEAAAAAAQMIyK8AAAAAAAABBBYAFOPDEMwq86xuYsrkvSPj7lK54clZIgID01f3wHGPJHjj/Y+MzCcp3djAzK6x8CsYGm9E1DufjY0MAAAAAAAAAAAAAAABAA==";
+        PSBT psbt = PSBT.fromString(strPsbt);
+        Assertions.assertNotNull(psbt.getPsbtOutputs().getFirst().getSilentPaymentAddress());
+        Assertions.assertNotNull(psbt.getPsbtOutputs().getFirst().getSilentPaymentLabel());
+
+        PSBT publicCopy = PSBT.fromString(psbt.getPublicCopy().toBase64String());
+        Assertions.assertNull(publicCopy.getPsbtOutputs().getFirst().getSilentPaymentAddress());
+        Assertions.assertNull(publicCopy.getPsbtOutputs().getFirst().getSilentPaymentLabel());
+        Assertions.assertNotNull(psbt.getPsbtOutputs().getFirst().getSilentPaymentAddress());
+    }
+
+    @Test
     public void sighashSingleLegacyMagicOneBugRefusedAtSignTime() {
         ECKey victimKey = new ECKey();
         P2PKHAddress victimAddr = new P2PKHAddress(victimKey.getPubKeyHash());

@@ -1135,6 +1135,9 @@ public class PSBT {
             psbtOutput.getTapDerivedPublicKeys().clear();
             psbtOutput.setTapInternalKey(null);
             psbtOutput.getProprietary().clear();
+            psbtOutput.setSilentPaymentAddress(null);
+            psbtOutput.setSilentPaymentLabel(null);
+            psbtOutput.setDnssecProof(null);
         }
 
         return publicCopy;
