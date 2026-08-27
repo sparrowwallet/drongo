@@ -85,8 +85,9 @@ public enum ApplicationDir {
             return null;
         }
 
-        //Relative paths in the environment variable are invalid and must be ignored
-        File baseDir = configuredBase != null && !configuredBase.isBlank() && new File(configuredBase).isAbsolute() ?
+        //Relative paths in the environment variable are invalid and must be ignored. The leading slash is tested directly because File.isAbsolute()
+        //answers for the host platform rather than the given OsType
+        File baseDir = configuredBase != null && configuredBase.startsWith("/") ?
                 new File(configuredBase) : new File(System.getProperty("user.home"), defaultBasePath);
 
         return new File(baseDir, application.toLowerCase(Locale.ROOT));
