@@ -1262,7 +1262,8 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
     }
 
     private void applySequenceAntiFeeSniping(Transaction transaction, Map<BlockTransactionHashIndex, WalletNode> selectedUtxos, int currentBlockHeight) {
-        boolean locktime = SECURE_RANDOM.nextInt(2) == 0 || getScriptType() != P2TR || selectedUtxos.keySet().stream().anyMatch(utxo -> utxo.getConfirmations(currentBlockHeight) > 65535);
+        boolean locktime = SECURE_RANDOM.nextInt(2) == 0 || getScriptType() != P2TR
+                || selectedUtxos.keySet().stream().anyMatch(utxo -> utxo.getConfirmations(currentBlockHeight) > 65535 || utxo.getConfirmations(currentBlockHeight) <= 0);
 
         if(locktime) {
             transaction.setLocktime(currentBlockHeight);
@@ -1276,7 +1277,7 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
             BlockTransactionHashIndex utxo = selectedUtxos.keySet().stream().filter(ref -> ref.getHash().equals(txInput.getOutpoint().getHash()) && ref.getIndex() == txInput.getOutpoint().getIndex()).findFirst().orElseThrow();
             txInput.setSequenceNumber(utxo.getConfirmations(currentBlockHeight));
             if(SECURE_RANDOM.nextInt(10) == 0) {
-                txInput.setSequenceNumber(Math.max(0, txInput.getSequenceNumber() - SECURE_RANDOM.nextInt(100)));
+                txInput.setSequenceNumber(Math.max(1, txInput.getSequenceNumber() - SECURE_RANDOM.nextInt(100)));
             }
         }
     }
