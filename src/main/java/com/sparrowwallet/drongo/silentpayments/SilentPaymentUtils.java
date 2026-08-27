@@ -275,9 +275,20 @@ public class SilentPaymentUtils {
         }
     }
 
+    /**
+     * Groups the supplied silent payments by scan key, ordering each group as BIP375 requires for k assignment:
+     * codes sharing a scan key are sorted lexicographically ascending, and codes sharing both scan and spend keys
+     * are ordered by ascending output index. The supplied collection is in output order, so the stable sort below
+     * provides the second ordering without needing the indices themselves.
+     * <p>
+     * Codes are compared as the scan and spend key bytes carried in PSBT_OUT_SP_V0_INFO.
+     */
     public static Map<ECKey, List<SilentPayment>> getScanKeyGroups(Collection<SilentPayment> silentPayments) {
+        List<SilentPayment> ordered = new ArrayList<>(silentPayments);
+        ordered.sort(Comparator.comparing(silentPayment -> silentPayment.getSilentPaymentAddress().getKeyBytes(), new Utils.LexicographicByteArrayComparator()));
+
         Map<ECKey, List<SilentPayment>> scanKeyGroups = new LinkedHashMap<>();
-        for(SilentPayment silentPayment : silentPayments) {
+        for(SilentPayment silentPayment : ordered) {
             SilentPaymentAddress address = silentPayment.getSilentPaymentAddress();
             List<SilentPayment> scanKeyGroup = scanKeyGroups.computeIfAbsent(address.getScanKey(), _ -> new ArrayList<>());
             scanKeyGroup.add(silentPayment);

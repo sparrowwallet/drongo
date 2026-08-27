@@ -623,6 +623,33 @@ public class SilentPaymentUtilsTest {
         Assertions.assertEquals("2e847bb01d1b491da512ddd760b8509617ee38057003d6115d00ba562451323a", Utils.bytesToHex(silentPayments.getLast().getAddress().getData()));
     }
 
+    @Test
+    public void testBip375ThreeOutputsSameScanKey() throws InvalidSilentPaymentException {
+        // BIP375 test vectors v1.1.1, https://github.com/bitcoin/bips/pull/2207
+        // "can finalize: three sp outputs (same scan key) - output 0 uses label=1, outputs 1 and 2 uses label=2 (same spend key)"
+        // Ascending code order places the two 032193ad... outputs ahead of 03d43158..., so outputs 1 and 2 take
+        // k=0 and k=1 in output index order and output 0 takes k=2, inverting the output ordering entirely.
+        ECKey scanKey = ECKey.fromPublicOnly(Utils.hexToBytes("028b790e0987fde9f0d12398eb6be30c7376793c647865a2a02f2efc960d966568"));
+        ECKey spendKeyLabel1 = ECKey.fromPublicOnly(Utils.hexToBytes("03d431588dee61ab3a39725b299c3742dc66a0861decf591b423b0e527070f8234"));
+        ECKey spendKeyLabel2 = ECKey.fromPublicOnly(Utils.hexToBytes("032193ad0c875fac5243738022900a7724c6175ddac9944165aab457aadf9c4f3c"));
+
+        List<SilentPayment> silentPayments = List.of(new SilentPayment(new SilentPaymentAddress(scanKey, spendKeyLabel1), "Output 0", 0, false),
+                new SilentPayment(new SilentPaymentAddress(scanKey, spendKeyLabel2), "Output 1", 0, false),
+                new SilentPayment(new SilentPaymentAddress(scanKey, spendKeyLabel2), "Output 2", 0, false));
+
+        ECKey summedPrivateKey = ECKey.fromPrivate(Utils.hexToBytes("7e31eeeb1aa2597b6d63b357541461d75ddae76b7603d24619f5ebed9e88ec31"));
+        Set<HashIndex> outpoints = Set.of(new HashIndex(Sha256Hash.wrap("4a9800c78110ea283ed15d2e53dd79401eff2313771a2ab114ab0b3b6617a718"), 0));
+
+        SilentPaymentUtils.computeOutputAddresses(silentPayments, summedPrivateKey, outpoints);
+        Assertions.assertEquals(3, silentPayments.size());
+        Assertions.assertEquals("Output 0", silentPayments.getFirst().getLabel());
+        Assertions.assertEquals("1bffa10fdaa2502c2f0c9285fe0af19a50f8515e3b6dfbf56de850d999014400", Utils.bytesToHex(silentPayments.getFirst().getAddress().getData()));
+        Assertions.assertEquals("Output 1", silentPayments.get(1).getLabel());
+        Assertions.assertEquals("884da6708c82b9b56c98bd3be6e5f53894bb1bfd90bfacf894025570f6bd5305", Utils.bytesToHex(silentPayments.get(1).getAddress().getData()));
+        Assertions.assertEquals("Output 2", silentPayments.getLast().getLabel());
+        Assertions.assertEquals("d291d339280e0c86e2c708a591f8e8e2f892d12a7cfe8510b667799b71131c86", Utils.bytesToHex(silentPayments.getLast().getAddress().getData()));
+    }
+
     // BIP352 key sum tests.
 
     @Test

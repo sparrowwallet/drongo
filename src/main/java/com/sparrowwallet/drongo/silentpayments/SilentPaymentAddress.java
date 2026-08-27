@@ -27,9 +27,12 @@ public class SilentPaymentAddress {
         return spendAddress;
     }
 
+    public byte[] getKeyBytes() {
+        return Utils.concat(scanAddress.getPubKey(), spendAddress.getPubKey());
+    }
+
     public String getAddress() {
-        byte[] keys = Utils.concat(scanAddress.getPubKey(), spendAddress.getPubKey());
-        return Bech32.encode(Network.get().getSilentPaymentsAddressHrp(), VERSION, Bech32.Encoding.BECH32M, keys);
+        return Bech32.encode(Network.get().getSilentPaymentsAddressHrp(), VERSION, Bech32.Encoding.BECH32M, getKeyBytes());
     }
 
     public static SilentPaymentAddress from(String address) {
