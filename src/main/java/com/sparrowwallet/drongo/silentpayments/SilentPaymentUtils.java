@@ -275,12 +275,18 @@ public class SilentPaymentUtils {
         }
     }
 
-    public static Map<ECKey, List<SilentPayment>> getScanKeyGroups(Collection<SilentPayment> silentPayments) {
+    public static Map<ECKey, List<SilentPayment>> getScanKeyGroups(List<SilentPayment> silentPayments) {
         Map<ECKey, List<SilentPayment>> scanKeyGroups = new LinkedHashMap<>();
         for(SilentPayment silentPayment : silentPayments) {
             SilentPaymentAddress address = silentPayment.getSilentPaymentAddress();
             List<SilentPayment> scanKeyGroup = scanKeyGroups.computeIfAbsent(address.getScanKey(), _ -> new ArrayList<>());
             scanKeyGroup.add(silentPayment);
+        }
+
+        //BIP375 assigns k by ascending silent payment code, with outputs sharing a code ordered by output index, which the stable sort preserves
+        Utils.LexicographicByteArrayComparator codeComparator = new Utils.LexicographicByteArrayComparator();
+        for(List<SilentPayment> scanKeyGroup : scanKeyGroups.values()) {
+            scanKeyGroup.sort(Comparator.comparing(silentPayment -> silentPayment.getSilentPaymentAddress().serialize(), codeComparator));
         }
 
         return scanKeyGroups;
