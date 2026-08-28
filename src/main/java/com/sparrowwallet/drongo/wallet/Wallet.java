@@ -1541,18 +1541,30 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
                 TransactionOutput spentTxo = blockTransaction.getTransaction().getOutputs().get((int)txInput.getOutpoint().getIndex());
 
                 Script signingScript = getSigningScript(txInput, spentTxo);
-                Sha256Hash hash;
-                if(signingWallet.getScriptType() == P2TR) {
-                    List<TransactionOutput> spentOutputs = transaction.getInputs().stream().map(input -> signingWallet.transactions.get(input.getOutpoint().getHash()).getTransaction().getOutputs().get((int)input.getOutpoint().getIndex())).collect(Collectors.toList());
-                    hash = transaction.hashForTaprootSignature(spentOutputs, txInput.getIndex(), !P2TR.isScriptType(signingScript), signingScript, SigHash.DEFAULT, null);
-                } else if(txInput.hasWitness()) {
-                    hash = transaction.hashForWitnessSignature(txInput.getIndex(), signingScript, spentTxo.getValue(), SigHash.ALL);
-                } else {
-                    hash = transaction.hashForLegacySignature(txInput.getIndex(), signingScript, SigHash.ALL);
-                }
 
                 for(ECKey sigPublicKey : keystoreKeysForNode.keySet()) {
                     for(TransactionSignature signature : txInput.hasWitness() ? txInput.getWitness().getSignatures() : txInput.getScriptSig().getSignatures()) {
+                        //Recomputed per signature: the hash type is part of what was signed, so a fixed
+                        //value only verifies signatures that happen to have used it. A signature off the
+                        //wire can carry flags that are not a defined hash type, and one of those cannot
+                        //have been produced by a key here, so it is skipped rather than thrown on.
+                        SigHash sigHash;
+                        try {
+                            sigHash = SigHash.fromByte(signature.sighashFlags);
+                        } catch(IllegalArgumentException e) {
+                            continue;
+                        }
+
+                        Sha256Hash hash;
+                        if(signingWallet.getScriptType() == P2TR) {
+                            List<TransactionOutput> spentOutputs = transaction.getInputs().stream().map(input -> signingWallet.transactions.get(input.getOutpoint().getHash()).getTransaction().getOutputs().get((int)input.getOutpoint().getIndex())).collect(Collectors.toList());
+                            hash = transaction.hashForTaprootSignature(spentOutputs, txInput.getIndex(), !P2TR.isScriptType(signingScript), signingScript, sigHash, null);
+                        } else if(txInput.hasWitness()) {
+                            hash = transaction.hashForWitnessSignature(txInput.getIndex(), signingScript, spentTxo.getValue(), sigHash);
+                        } else {
+                            hash = transaction.hashForLegacySignature(txInput.getIndex(), signingScript, sigHash);
+                        }
+
                         if(sigPublicKey.verify(hash, signature)) {
                             keySignatureMap.put(sigPublicKey, signature);
                         }
