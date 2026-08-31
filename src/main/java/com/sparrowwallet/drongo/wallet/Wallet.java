@@ -1541,18 +1541,22 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
                 TransactionOutput spentTxo = blockTransaction.getTransaction().getOutputs().get((int)txInput.getOutpoint().getIndex());
 
                 Script signingScript = getSigningScript(txInput, spentTxo);
-                Sha256Hash hash;
-                if(signingWallet.getScriptType() == P2TR) {
-                    List<TransactionOutput> spentOutputs = transaction.getInputs().stream().map(input -> signingWallet.transactions.get(input.getOutpoint().getHash()).getTransaction().getOutputs().get((int)input.getOutpoint().getIndex())).collect(Collectors.toList());
-                    hash = transaction.hashForTaprootSignature(spentOutputs, txInput.getIndex(), !P2TR.isScriptType(signingScript), signingScript, SigHash.DEFAULT, null);
-                } else if(txInput.hasWitness()) {
-                    hash = transaction.hashForWitnessSignature(txInput.getIndex(), signingScript, spentTxo.getValue(), SigHash.ALL);
-                } else {
-                    hash = transaction.hashForLegacySignature(txInput.getIndex(), signingScript, SigHash.ALL);
-                }
+                List<TransactionSignature> signatures = txInput.hasWitness() ? txInput.getWitness().getSignatures() : txInput.getScriptSig().getSignatures();
+                Map<Byte, Sha256Hash> sigHashes = new HashMap<>();
 
                 for(ECKey sigPublicKey : keystoreKeysForNode.keySet()) {
-                    for(TransactionSignature signature : txInput.hasWitness() ? txInput.getWitness().getSignatures() : txInput.getScriptSig().getSignatures()) {
+                    for(TransactionSignature signature : signatures) {
+                        Sha256Hash hash = sigHashes.computeIfAbsent(signature.sighashFlags, sigHashType -> {
+                            if(signingWallet.getScriptType() == P2TR) {
+                                List<TransactionOutput> spentOutputs = transaction.getInputs().stream().map(input -> signingWallet.transactions.get(input.getOutpoint().getHash()).getTransaction().getOutputs().get((int)input.getOutpoint().getIndex())).collect(Collectors.toList());
+                                return transaction.hashForTaprootSignature(spentOutputs, txInput.getIndex(), !P2TR.isScriptType(signingScript), signingScript, sigHashType, null);
+                            } else if(txInput.hasWitness()) {
+                                return transaction.hashForWitnessSignature(txInput.getIndex(), signingScript.getProgram(), spentTxo.getValue(), sigHashType);
+                            } else {
+                                return transaction.hashForLegacySignature(txInput.getIndex(), signingScript.getProgram(), sigHashType);
+                            }
+                        });
+
                         if(sigPublicKey.verify(hash, signature)) {
                             keySignatureMap.put(sigPublicKey, signature);
                         }

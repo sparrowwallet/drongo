@@ -1048,10 +1048,12 @@ public class PSBTInput {
 
         Map<ECKey, TransactionSignature> signingKeys = new LinkedHashMap<>();
         if(signingScript != null) {
-            Sha256Hash hash = getHashForSignature(signingScript, getSigHash() == null ? getDefaultSigHash() : getSigHash());
+            Map<Byte, Sha256Hash> sigHashes = new HashMap<>();
 
             for(ECKey sigPublicKey : availableKeys) {
                 for(TransactionSignature signature : signatures) {
+                    Sha256Hash hash = sigHashes.computeIfAbsent(signature.sighashFlags, sigHashType -> getHashForSignature(signingScript, sigHashType));
+
                     if(sigPublicKey.verify(hash, signature)) {
                         signingKeys.put(sigPublicKey, signature);
                     }
@@ -1165,17 +1167,21 @@ public class PSBTInput {
     }
 
     private Sha256Hash getHashForSignature(Script connectedScript, SigHash localSigHash) {
+        return getHashForSignature(connectedScript, localSigHash.value);
+    }
+
+    private Sha256Hash getHashForSignature(Script connectedScript, byte sigHashType) {
         Sha256Hash hash;
 
         ScriptType scriptType = getScriptType();
         if(scriptType == ScriptType.P2TR) {
             List<TransactionOutput> spentUtxos = psbt.getPsbtInputs().stream().map(PSBTInput::getUtxo).collect(Collectors.toList());
-            hash = psbt.getTransaction().hashForTaprootSignature(spentUtxos, index, !P2TR.isScriptType(connectedScript), connectedScript, localSigHash, null);
+            hash = psbt.getTransaction().hashForTaprootSignature(spentUtxos, index, !P2TR.isScriptType(connectedScript), connectedScript, sigHashType, null);
         } else if(Arrays.asList(WITNESS_TYPES).contains(scriptType)) {
             long prevValue = getUtxo().getValue();
-            hash = psbt.getTransaction().hashForWitnessSignature(index, connectedScript, prevValue, localSigHash);
+            hash = psbt.getTransaction().hashForWitnessSignature(index, connectedScript.getProgram(), prevValue, sigHashType);
         } else {
-            hash = psbt.getTransaction().hashForLegacySignature(index, connectedScript, localSigHash);
+            hash = psbt.getTransaction().hashForLegacySignature(index, connectedScript.getProgram(), sigHashType);
         }
 
         return hash;

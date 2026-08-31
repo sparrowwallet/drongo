@@ -514,4 +514,92 @@ public class WalletTest {
 
         return wallet;
     }
+
+    @Test
+    public void testSignedKeystoresSigHashAll() throws MnemonicException {
+        Wallet wallet = buildSigningWallet(ScriptType.P2WPKH);
+        Transaction transaction = signInput(wallet, SigHash.ALL.value);
+        Assertions.assertEquals(1, wallet.getSignedKeystores(transaction).values().stream().mapToInt(Map::size).sum());
+    }
+
+    @Test
+    public void testSignedKeystoresSigHashSingle() throws MnemonicException {
+        Wallet wallet = buildSigningWallet(ScriptType.P2WPKH);
+        Transaction transaction = signInput(wallet, SigHash.SINGLE.value);
+        Assertions.assertEquals(1, wallet.getSignedKeystores(transaction).values().stream().mapToInt(Map::size).sum());
+    }
+
+    @Test
+    public void testSignedKeystoresNonCanonicalSigHashFlags() throws MnemonicException {
+        Wallet wallet = buildSigningWallet(ScriptType.P2WPKH);
+        //Not a defined SigHash value, but SIGHASH_ALL under Bitcoin Core's bit testing
+        Transaction transaction = signInput(wallet, (byte)0x41);
+        Assertions.assertEquals(1, wallet.getSignedKeystores(transaction).values().stream().mapToInt(Map::size).sum());
+    }
+
+    @Test
+    public void testSignedKeystoresTaprootSigHashDefault() throws MnemonicException {
+        Wallet wallet = buildSigningWallet(ScriptType.P2TR);
+        Transaction transaction = signInput(wallet, SigHash.DEFAULT.value);
+        Assertions.assertEquals(1, wallet.getSignedKeystores(transaction).values().stream().mapToInt(Map::size).sum());
+    }
+
+    @Test
+    public void testSignedKeystoresTaprootSigHashAll() throws MnemonicException {
+        Wallet wallet = buildSigningWallet(ScriptType.P2TR);
+        //A 65 byte key path signature carrying an explicit SIGHASH_ALL, rather than the 64 byte SIGHASH_DEFAULT form
+        Transaction transaction = signInput(wallet, SigHash.ALL.value);
+        Assertions.assertEquals(1, wallet.getSignedKeystores(transaction).values().stream().mapToInt(Map::size).sum());
+    }
+
+    @Test
+    public void testSignedKeystoresTaprootSigHashSingle() throws MnemonicException {
+        Wallet wallet = buildSigningWallet(ScriptType.P2TR);
+        Transaction transaction = signInput(wallet, SigHash.SINGLE.value);
+        Assertions.assertEquals(1, wallet.getSignedKeystores(transaction).values().stream().mapToInt(Map::size).sum());
+    }
+
+    private Wallet buildSigningWallet(ScriptType scriptType) throws MnemonicException {
+        String words = "absent essay fox snake vast pumpkin height crouch silent bulb excuse razor";
+        DeterministicSeed seed = new DeterministicSeed(words, "", 0, DeterministicSeed.Type.BIP39);
+        Wallet wallet = new Wallet();
+        wallet.setPolicyType(PolicyType.SINGLE_HD);
+        wallet.setScriptType(scriptType);
+        wallet.getKeystores().add(Keystore.fromSeed(seed, PolicyType.SINGLE_HD, scriptType.getDefaultDerivation()));
+        wallet.setDefaultPolicy(Policy.getPolicy(PolicyType.SINGLE_HD, scriptType, wallet.getKeystores(), 1));
+        wallet.getNode(KeyPurpose.RECEIVE).fillToIndex(0);
+
+        return wallet;
+    }
+
+    private Transaction signInput(Wallet wallet, byte sigHashFlags) throws MnemonicException {
+        WalletNode addressNode = wallet.getNode(KeyPurpose.RECEIVE).getChildren().iterator().next();
+        Script outputScript = wallet.getOutputScript(addressNode);
+
+        Transaction funding = new Transaction();
+        funding.addInput(Sha256Hash.ZERO_HASH, 0, new Script(new byte[0]));
+        funding.addOutput(100000, outputScript);
+        wallet.updateTransactions(Map.of(funding.getTxId(), new BlockTransaction(funding.getTxId(), 800000, new Date(), 0L, funding)));
+
+        Transaction transaction = new Transaction();
+        transaction.setVersion(2);
+        transaction.addInput(funding.getTxId(), 0, new Script(new byte[0]));
+        transaction.addOutput(90000, outputScript);
+
+        ECKey key = wallet.getKeystores().getFirst().getKey(addressNode);
+        if(wallet.getScriptType() == ScriptType.P2TR) {
+            Sha256Hash hash = transaction.hashForTaprootSignature(List.of(funding.getOutputs().getFirst()), 0, false, outputScript, sigHashFlags, null);
+            SchnorrSignature schnorrSignature = key.getTweakedOutputKey().signSchnorr(hash);
+            TransactionSignature signature = new TransactionSignature(schnorrSignature.r, schnorrSignature.s, TransactionSignature.Type.SCHNORR, sigHashFlags);
+            transaction.getInputs().getFirst().setWitness(new TransactionWitness(transaction, signature));
+        } else {
+            Script scriptCode = ScriptType.P2PKH.getOutputScript(key.getPubKeyHash());
+            Sha256Hash hash = transaction.hashForWitnessSignature(0, scriptCode.getProgram(), 100000, sigHashFlags);
+            ECDSASignature ecdsaSignature = key.signEcdsa(hash);
+            TransactionSignature signature = new TransactionSignature(ecdsaSignature.r, ecdsaSignature.s, TransactionSignature.Type.ECDSA, sigHashFlags);
+            transaction.getInputs().getFirst().setWitness(new TransactionWitness(transaction, key, signature));
+        }
+
+        return transaction;
+    }
 }
