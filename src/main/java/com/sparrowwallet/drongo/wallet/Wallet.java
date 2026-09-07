@@ -1863,24 +1863,7 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
         }
 
         try {
-            Map<PSBTInput, WalletNode> signingNodes = getSigningNodes(psbt);
-            if(psbt.getPsbtInputs().size() != signingNodes.size()) {
-                return verified;
-            }
-
-            Map<TransactionInput, ECKey> inputPublicKeys = new LinkedHashMap<>();
-            Transaction transaction = psbt.getTransaction();
-            for(int i = 0; i < psbt.getPsbtInputs().size(); i++) {
-                PSBTInput psbtInput = psbt.getPsbtInputs().get(i);
-                WalletNode node = signingNodes.get(psbtInput);
-                ECKey publicKey = SilentPaymentUtils.getInputPublicKey(node);
-                if(publicKey == null) {
-                    return verified;
-                }
-                inputPublicKeys.put(transaction.getInputs().get(i), publicKey);
-            }
-
-            psbt.validateSilentPayments(inputPublicKeys);
+            verifySilentPaymentScripts(psbt, getSigningNodes(psbt));
 
             for(PSBTOutput psbtOutput : spOutputs) {
                 verified.put(psbtOutput.getScript().getToAddress(), psbtOutput.getSilentPaymentAddress());
@@ -1890,6 +1873,65 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
         }
 
         return verified;
+    }
+
+    /**
+     * Verifies the silent payment output scripts already resolved in the given PSBT against the nodes of this wallet providing its inputs.
+     *
+     * @param psbt the PSBT to verify
+     * @throws InvalidSilentPaymentException if a resolved silent payment output script cannot be verified
+     */
+    public void verifySilentPaymentScripts(PSBT psbt) throws InvalidSilentPaymentException {
+        if(psbt == null || !psbt.hasSilentPaymentOutputs()) {
+            return;
+        }
+
+        verifySilentPaymentScripts(psbt, getSigningNodes(psbt));
+    }
+
+    /**
+     * Verifies that the silent payment output scripts already resolved in the given PSBT are derived from the claimed silent payment addresses,
+     * as proven by the PSBT's BIP-375 ECDH shares and DLEQ proofs against the public keys of this wallet's inputs.
+     * Verification is skipped only while every silent payment output is still unresolved, since the BIP-352 index of the outputs sharing a scan key is
+     * taken from the resolved scripts alone - a partially resolved set is rejected rather than verified.
+     * Since a resolved script is not part of the transaction the PSBT represents, an unproven script must be rejected before a signature commits to it.
+     *
+     * @param psbt the PSBT to verify
+     * @param signingNodes the wallet nodes providing the PSBT inputs
+     * @throws InvalidSilentPaymentException if a resolved silent payment output script cannot be verified
+     */
+    public void verifySilentPaymentScripts(PSBT psbt, Map<PSBTInput, WalletNode> signingNodes) throws InvalidSilentPaymentException {
+        List<PSBTOutput> silentOutputs = psbt.getPsbtOutputs().stream().filter(psbtOutput -> psbtOutput.getSilentPaymentAddress() != null).collect(Collectors.toList());
+        //An unresolved silent payment output has an omitted or empty script, and any other script must be proven whether or not it parses as an address
+        long resolved = silentOutputs.stream().filter(psbtOutput -> psbtOutput.getScript() != null && !psbtOutput.getScript().isEmpty()).count();
+        if(resolved == 0) {
+            return;
+        }
+
+        if(resolved != silentOutputs.size()) {
+            throw new InvalidSilentPaymentException("Silent payment outputs must be all resolved or all unresolved to verify the BIP-352 output index");
+        }
+
+        if(psbt.getPsbtInputs().size() != signingNodes.size()) {
+            throw new InvalidSilentPaymentException("The silent payment outputs cannot be verified because not all of the inputs are from this wallet");
+        }
+
+        Map<TransactionInput, ECKey> inputPublicKeys = new LinkedHashMap<>();
+        Transaction transaction = psbt.getTransaction();
+        for(int i = 0; i < psbt.getPsbtInputs().size(); i++) {
+            PSBTInput psbtInput = psbt.getPsbtInputs().get(i);
+            ECKey publicKey = SilentPaymentUtils.getInputPublicKey(signingNodes.get(psbtInput));
+            if(publicKey == null) {
+                throw new InvalidSilentPaymentException("The silent payment outputs cannot be verified because an input public key could not be derived");
+            }
+            inputPublicKeys.put(transaction.getInputs().get(i), publicKey);
+        }
+
+        try {
+            psbt.validateSilentPayments(inputPublicKeys);
+        } catch(PSBTProofException e) {
+            throw new InvalidSilentPaymentException("Silent payment metadata in PSBT failed BIP-375 verification: " + e.getMessage());
+        }
     }
 
     public List<SilentPayment> computeSilentPaymentOutputs(PSBT psbt, Map<PSBTInput, WalletNode> signingNodes) throws InvalidSilentPaymentException {
@@ -1906,7 +1948,8 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
         List<PSBTOutput> computeOutputs = new ArrayList<>();
         for(PSBTOutput silentOutput : silentOutputs) {
             Script script = silentOutput.getScript();
-            if(script != null && script.getToAddress() != null) {
+            //Only an unresolved output has an empty script, so any other script must be proven rather than replaced by the computed one
+            if(script != null && !script.isEmpty()) {
                 preComputedOutputs.add(silentOutput);
             } else {
                 computeOutputs.add(silentOutput);
@@ -1916,21 +1959,7 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
         List<SilentPayment> results = new ArrayList<>();
 
         if(!preComputedOutputs.isEmpty()) {
-            Map<TransactionInput, ECKey> inputPublicKeys = new LinkedHashMap<>();
-            Transaction transaction = psbt.getTransaction();
-            for(int i = 0; i < psbt.getPsbtInputs().size(); i++) {
-                PSBTInput psbtInput = psbt.getPsbtInputs().get(i);
-                ECKey publicKey = SilentPaymentUtils.getInputPublicKey(signingNodes.get(psbtInput));
-                if(publicKey == null) {
-                    throw new InvalidSilentPaymentException("Cannot derive input public key for silent payment verification");
-                }
-                inputPublicKeys.put(transaction.getInputs().get(i), publicKey);
-            }
-            try {
-                psbt.validateSilentPayments(inputPublicKeys);
-            } catch(PSBTProofException e) {
-                throw new InvalidSilentPaymentException("Silent payment metadata in PSBT failed BIP-375 verification: " + e.getMessage());
-            }
+            verifySilentPaymentScripts(psbt, signingNodes);
             for(PSBTOutput silentOutput : preComputedOutputs) {
                 results.add(new SilentPayment(silentOutput.getSilentPaymentAddress(), silentOutput.getScript().getToAddress(), null, silentOutput.getAmount(), false));
             }

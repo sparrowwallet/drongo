@@ -1004,11 +1004,33 @@ public class PSBT {
         return baos.toByteArray();
     }
 
-    public void verifyCombinedSignatures(PSBT psbt) throws PSBTSignatureException {
+    /**
+     * Verifies that combining the given PSBT with this one is safe, by checking the signatures it provides, that it does not introduce a more dangerous
+     * sighash type, and that it does not change an output script this PSBT has already resolved.
+     *
+     * @param psbt the PSBT to be combined with this one
+     * @return the verified result of the combine, which can be inspected further before the combine is applied to this PSBT
+     * @throws PSBTSignatureException if the provided PSBT cannot be safely combined
+     */
+    public PSBT verifyCombinedSignatures(PSBT psbt) throws PSBTSignatureException {
+        verifyCombinedOutputScripts(psbt);
         PSBT verificationCopy = this.copy();
         verificationCopy.combine(psbt);
         verificationCopy.verifySignatures();
         verifyCombinedSigHashes(verificationCopy);
+
+        return verificationCopy;
+    }
+
+    private void verifyCombinedOutputScripts(PSBT psbt) throws PSBTSignatureException {
+        for(int i = 0; i < getPsbtOutputs().size() && i < psbt.getPsbtOutputs().size(); i++) {
+            Script script = getPsbtOutputs().get(i).getScript();
+            Script combinedScript = psbt.getPsbtOutputs().get(i).getScript();
+            //A silent payment output is identified by its address rather than its resolved script, so a combine must not change a script already resolved
+            if(script != null && !script.isEmpty() && combinedScript != null && !script.equals(combinedScript)) {
+                throw new PSBTSignatureException("Combined PSBT would change the script of the output at index " + i);
+            }
+        }
     }
 
     private void verifyCombinedSigHashes(PSBT verificationCopy) throws PSBTSignatureException {

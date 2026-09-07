@@ -104,6 +104,11 @@ public class FinalizingPSBTWallet extends Wallet {
     }
 
     @Override
+    public void verifySilentPaymentScripts(PSBT psbt) {
+        //Nothing to verify, proofs get validated at extract time
+    }
+
+    @Override
     public ECKey getPubKey(WalletNode node) {
         return signedNodeKeys.get(node).get(0);
     }

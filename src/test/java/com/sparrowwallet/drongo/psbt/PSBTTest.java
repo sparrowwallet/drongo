@@ -1515,6 +1515,61 @@ public class PSBTTest {
     }
 
     @Test
+    public void verifyCombinedSignaturesRejectsSilentPaymentScriptReplacement() {
+        SilentPaymentAddress silentPaymentAddress = new SilentPaymentAddress(new ECKey(), new ECKey());
+        Script resolvedScript = new Script(Utils.hexToBytes("5120aa00000000000000000000000000000000000000000000000000000000000011"));
+        Script replacementScript = new Script(Utils.hexToBytes("5120bb00000000000000000000000000000000000000000000000000000000000022"));
+
+        PSBT localPsbt = buildSilentPaymentPsbt(silentPaymentAddress, resolvedScript);
+        PSBT replacementPsbt = buildSilentPaymentPsbt(silentPaymentAddress, replacementScript);
+
+        //Both PSBTs represent the same transaction, since a silent payment output is identified by its address rather than its resolved script
+        Assertions.assertTrue(localPsbt.matches(replacementPsbt));
+
+        PSBTSignatureException ex = Assertions.assertThrows(PSBTSignatureException.class,
+                () -> localPsbt.verifyCombinedSignatures(replacementPsbt));
+        Assertions.assertTrue(ex.getMessage().contains("Combined PSBT would change the script of the output at index 0"));
+
+        Assertions.assertEquals(resolvedScript, localPsbt.getPsbtOutputs().getFirst().getScript(),
+                "local PSBT must be unchanged when verifyCombinedSignatures rejects the combine");
+    }
+
+    @Test
+    public void verifyCombinedSignaturesAcceptsSilentPaymentScriptResolution() throws PSBTSignatureException {
+        SilentPaymentAddress silentPaymentAddress = new SilentPaymentAddress(new ECKey(), new ECKey());
+        Script resolvedScript = new Script(Utils.hexToBytes("5120aa00000000000000000000000000000000000000000000000000000000000011"));
+
+        PSBT localPsbt = buildSilentPaymentPsbt(silentPaymentAddress, null);
+        PSBT resolvedPsbt = buildSilentPaymentPsbt(silentPaymentAddress, resolvedScript);
+
+        localPsbt.verifyCombinedSignatures(resolvedPsbt);
+        localPsbt.combine(resolvedPsbt);
+
+        Assertions.assertEquals(resolvedScript, localPsbt.getPsbtOutputs().getFirst().getScript());
+    }
+
+    private PSBT buildSilentPaymentPsbt(SilentPaymentAddress silentPaymentAddress, Script outputScript) {
+        Script spk = new P2PKHAddress(Utils.hexToBytes("aa00000000000000000000000000000000000011")).getOutputScript();
+        Transaction prior = new Transaction();
+        prior.addInput(Sha256Hash.ZERO_HASH, 0L, new Script(new byte[0]));
+        prior.addOutput(100_000L, spk);
+
+        Transaction tx = new Transaction();
+        tx.addInput(prior.getTxId(), 0, new Script(new byte[0]));
+        tx.addOutput(90_000L, new Script(new byte[0]));
+
+        PSBT psbt = new PSBT(tx);
+        psbt.getPsbtInputs().getFirst().setNonWitnessUtxo(prior);
+        psbt.getPsbtOutputs().getFirst().setSilentPaymentAddress(silentPaymentAddress);
+        //An unresolved silent payment output keeps the empty script the transaction was created with
+        if(outputScript != null) {
+            psbt.getPsbtOutputs().getFirst().setScript(outputScript);
+        }
+
+        return psbt;
+    }
+
+    @Test
     public void verifySigHashesRejectsPlainSighashSingle() {
         ECKey key = new ECKey();
         Script spk = new P2PKHAddress(key.getPubKeyHash()).getOutputScript();
