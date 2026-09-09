@@ -1047,6 +1047,43 @@ public class PSBT {
         }
     }
 
+    /**
+     * Verifies that copying the finalized fields of the given PSBT into this one is safe, by checking that the signatures they contain verify against
+     * the transaction this PSBT represents, using the signing scripts and keys it already provides.
+     *
+     * @param finalizedPsbt the finalized PSBT providing the fields to be copied
+     * @throws PSBTSignatureException if the finalized fields cannot be safely copied
+     */
+    public void verifyFinalizedSignatures(PSBT finalizedPsbt) throws PSBTSignatureException {
+        if(!matches(finalizedPsbt)) {
+            throw new PSBTSignatureException("Provided PSBT does not represent a matching transaction");
+        }
+
+        PSBT verificationCopy = this.copy();
+        for(int i = 0; i < verificationCopy.getPsbtInputs().size(); i++) {
+            PSBTInput verificationInput = verificationCopy.getPsbtInputs().get(i);
+            PSBTInput finalizedInput = finalizedPsbt.getPsbtInputs().get(i);
+            //The non final fields are retained here, so the finalized signatures are verified against the signing scripts and keys already provided
+            verificationInput.setFinalScriptSig(finalizedInput.getFinalScriptSig());
+            verificationInput.setFinalScriptWitness(finalizedInput.getFinalScriptWitness());
+            verifyFinalizedSigHashes(verificationInput, verificationInput.verifyFinalizedSignatures());
+        }
+    }
+
+    private void verifyFinalizedSigHashes(PSBTInput verificationInput, Collection<TransactionSignature> signatures) throws PSBTSignatureException {
+        for(TransactionSignature signature : signatures) {
+            //Finalizing clears PSBT_IN_SIGHASH_TYPE, so the type a finalized signature commits to can only be read from the signature itself
+            SigHash sigHash = signature.getSigHash();
+            if(sigHashSeverity(sigHash) > sigHashSeverity(verificationInput.getSigHash())) {
+                try {
+                    verificationInput.verifySigHash(sigHash);
+                } catch(PSBTSignatureException e) {
+                    throw new PSBTSignatureException("Finalized PSBT would change sighash: " + e.getMessage());
+                }
+            }
+        }
+    }
+
     public void combine(PSBT... psbts) {
         for(PSBT psbt : psbts) {
             combine(psbt);

@@ -24,6 +24,7 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Date;
@@ -32,6 +33,10 @@ import java.util.List;
 import java.util.Map;
 
 public class PSBTTest {
+    //The BIP174 combiner and finalizer test vectors, which represent the same transaction with input 0 P2SH and input 1 P2SH-P2WSH
+    private static final String COMBINER_PSBT = "cHNidP8BAJoCAAAAAljoeiG1ba8MI76OcHBFbDNvfLqlyHV5JPVFiHuyq911AAAAAAD/////g40EJ9DsZQpoqka7CwmK6kQiwHGyyng1Kgd5WdB86h0BAAAAAP////8CcKrwCAAAAAAWABTYXCtx0AYLCcmIauuBXlCZHdoSTQDh9QUAAAAAFgAUAK6pouXw+HaliN9VRuh0LR2HAI8AAAAAAAEAuwIAAAABqtc5MQGL0l+ErkALaISL4J23BurCrBgpi6vucatlb4sAAAAASEcwRAIgWPb8fGoz4bMVSNSByCbAFb0wE1qtQs1neQ2rZtKtJDsCIEoc7SYExnNbY5PltBaR3XiwDwxZQvufdRhW+qk4FX26Af7///8CgPD6AgAAAAAXqRQPuUY0IWlrgsgzryQceMF9295JNIfQ8gonAQAAABepFCnKdPigj4GZlCgYXJe12FLkBj9hh2UAAAAiAgKVg785rgpgl0etGZrd1jT6YQhVnWxc05tMIYPxq5bgf0cwRAIgdAGK1BgAl7hzMjwAFXILNoTMgSOJEEjn282bVa1nnJkCIHPTabdA4+tT3O+jOCPIBwUUylWn3ZVE8VfBZ5EyYRGMASICAtq2H/SaFNtqfQKwzR+7ePxLGDErW05U2uTbovv+9TbXSDBFAiEA9hA4swjcHahlo0hSdG8BV3KTQgjG0kRUOTzZm98iF3cCIAVuZ1pnWm0KArhbFOXikHTYolqbV2C+ooFvZhkQoAbqAQEDBAEAAAABBEdSIQKVg785rgpgl0etGZrd1jT6YQhVnWxc05tMIYPxq5bgfyEC2rYf9JoU22p9ArDNH7t4/EsYMStbTlTa5Nui+/71NtdSriIGApWDvzmuCmCXR60Zmt3WNPphCFWdbFzTm0whg/GrluB/ENkMak8AAACAAAAAgAAAAIAiBgLath/0mhTban0CsM0fu3j8SxgxK1tOVNrk26L7/vU21xDZDGpPAAAAgAAAAIABAACAAAEBIADC6wsAAAAAF6kUt/X69A49QKWkWbHbNTXyty+pIeiHIgIDCJ3BDHrG21T5EymvYXMz2ziM6tDCMfcjN50bmQMLAtxHMEQCIGLrelVhB6fHP0WsSrWh3d9vcHX7EnWWmn84Pv/3hLyyAiAMBdu3Rw2/LwhVfdNWxzJcHtMJE+mWzThAlF2xIijaXwEiAgI63ZBPPW3PWd25BrDe4jUpt/+57VDl6GFRkmhgIh8Oc0cwRAIgZfRbpZmLWaJ//hp77QFq8fH5DVSzqo90UKpfVqJRA70CIH9yRwOtHtuWaAsoS1bU/8uI9/t1nqu+CKow8puFE4PSAQEDBAEAAAABBCIAIIwjUxc3Q7WV37Sge3K6jkLjeX2nTof+fZ10l+OyAokDAQVHUiEDCJ3BDHrG21T5EymvYXMz2ziM6tDCMfcjN50bmQMLAtwhAjrdkE89bc9Z3bkGsN7iNSm3/7ntUOXoYVGSaGAiHw5zUq4iBgI63ZBPPW3PWd25BrDe4jUpt/+57VDl6GFRkmhgIh8OcxDZDGpPAAAAgAAAAIADAACAIgYDCJ3BDHrG21T5EymvYXMz2ziM6tDCMfcjN50bmQMLAtwQ2QxqTwAAAIAAAACAAgAAgAAiAgOppMN/WZbTqiXbrGtXCvBlA5RJKUJGCzVHU+2e7KWHcRDZDGpPAAAAgAAAAIAEAACAACICAn9jmXV9Lv9VoTatAsaEsYOLZVbl8bazQoKpS2tQBRCWENkMak8AAACAAAAAgAUAAIAA";
+    private static final String FINALIZER_PSBT = "cHNidP8BAJoCAAAAAljoeiG1ba8MI76OcHBFbDNvfLqlyHV5JPVFiHuyq911AAAAAAD/////g40EJ9DsZQpoqka7CwmK6kQiwHGyyng1Kgd5WdB86h0BAAAAAP////8CcKrwCAAAAAAWABTYXCtx0AYLCcmIauuBXlCZHdoSTQDh9QUAAAAAFgAUAK6pouXw+HaliN9VRuh0LR2HAI8AAAAAAAEAuwIAAAABqtc5MQGL0l+ErkALaISL4J23BurCrBgpi6vucatlb4sAAAAASEcwRAIgWPb8fGoz4bMVSNSByCbAFb0wE1qtQs1neQ2rZtKtJDsCIEoc7SYExnNbY5PltBaR3XiwDwxZQvufdRhW+qk4FX26Af7///8CgPD6AgAAAAAXqRQPuUY0IWlrgsgzryQceMF9295JNIfQ8gonAQAAABepFCnKdPigj4GZlCgYXJe12FLkBj9hh2UAAAABB9oARzBEAiB0AYrUGACXuHMyPAAVcgs2hMyBI4kQSOfbzZtVrWecmQIgc9Npt0Dj61Pc76M4I8gHBRTKVafdlUTxV8FnkTJhEYwBSDBFAiEA9hA4swjcHahlo0hSdG8BV3KTQgjG0kRUOTzZm98iF3cCIAVuZ1pnWm0KArhbFOXikHTYolqbV2C+ooFvZhkQoAbqAUdSIQKVg785rgpgl0etGZrd1jT6YQhVnWxc05tMIYPxq5bgfyEC2rYf9JoU22p9ArDNH7t4/EsYMStbTlTa5Nui+/71NtdSrgABASAAwusLAAAAABepFLf1+vQOPUClpFmx2zU18rcvqSHohwEHIyIAIIwjUxc3Q7WV37Sge3K6jkLjeX2nTof+fZ10l+OyAokDAQjaBABHMEQCIGLrelVhB6fHP0WsSrWh3d9vcHX7EnWWmn84Pv/3hLyyAiAMBdu3Rw2/LwhVfdNWxzJcHtMJE+mWzThAlF2xIijaXwFHMEQCIGX0W6WZi1mif/4ae+0BavHx+Q1Us6qPdFCqX1aiUQO9AiB/ckcDrR7blmgLKEtW1P/LiPf7dZ6rvgiqMPKbhROD0gFHUiEDCJ3BDHrG21T5EymvYXMz2ziM6tDCMfcjN50bmQMLAtwhAjrdkE89bc9Z3bkGsN7iNSm3/7ntUOXoYVGSaGAiHw5zUq4AIgIDqaTDf1mW06ol26xrVwrwZQOUSSlCRgs1R1Ptnuylh3EQ2QxqTwAAAIAAAACABAAAgAAiAgJ/Y5l1fS7/VaE2rQLGhLGDi2VW5fG2s0KCqUtrUAUQlhDZDGpPAAAAgAAAAIAFAACAAA==";
+
 
     @Test
     public void invalidNotPSBT() throws PSBTParseException {
@@ -311,6 +316,89 @@ public class PSBTTest {
     }
 
     @Test
+    public void verifyFinalizedSignaturesAgainstUnfinalizedPsbt() throws PSBTParseException {
+        PSBT unfinalized = PSBT.fromString(COMBINER_PSBT);
+        PSBT finalized = PSBT.fromString(FINALIZER_PSBT);
+
+        Assertions.assertDoesNotThrow(() -> unfinalized.verifyFinalizedSignatures(finalized));
+        unfinalized.copyFinalizedFields(finalized);
+        Assertions.assertTrue(unfinalized.isFinalized(), "Both inputs should be finalised");
+    }
+
+    @Test
+    public void verifyFinalizedSignaturesAcceptsHashCommittedNestedScripts() throws PSBTParseException {
+        PSBT partiallyFinalized = PSBT.fromString(COMBINER_PSBT);
+        PSBT finalized = PSBT.fromString(FINALIZER_PSBT);
+
+        //Input 1 is already finalized in the open PSBT, so clearNonFinalFields() has dropped the redeem and witness scripts it was signed against
+        PSBTInput finalizedInput = partiallyFinalized.getPsbtInputs().get(1);
+        finalizedInput.setFinalScriptSig(finalized.getPsbtInputs().get(1).getFinalScriptSig());
+        finalizedInput.setFinalScriptWitness(finalized.getPsbtInputs().get(1).getFinalScriptWitness());
+        finalizedInput.clearNonFinalFields();
+
+        Assertions.assertFalse(partiallyFinalized.isFinalized());
+        Assertions.assertNull(finalizedInput.getRedeemScript());
+        Assertions.assertNull(finalizedInput.getWitnessScript());
+
+        //Both scripts are recovered from the finalized fields, which the UTXO commits to the hash of, so the merge that completes input 0 is not refused
+        Assertions.assertDoesNotThrow(() -> partiallyFinalized.verifyFinalizedSignatures(finalized));
+    }
+
+    @Test
+    public void verifyFinalizedSignaturesRejectsSubstitutedScripts() throws PSBTParseException {
+        PSBT combiner = PSBT.fromString(COMBINER_PSBT);
+        Script otherRedeemScript = combiner.getPsbtInputs().get(1).getWitnessScript();
+        Script otherWitnessScript = combiner.getPsbtInputs().get(0).getRedeemScript();
+
+        //Input 0 is P2SH, so the redeem script nested in the finalized scriptSig must hash to the script hash the UTXO pays to.
+        //The open PSBT keeps its own redeem script here, since the finalized fields are what a copy applies over it.
+        PSBT substitutedRedeemScript = PSBT.fromString(COMBINER_PSBT);
+        Assertions.assertNotNull(substitutedRedeemScript.getPsbtInputs().get(0).getRedeemScript());
+        PSBT finalizedRedeemScript = PSBT.fromString(FINALIZER_PSBT);
+        PSBTInput redeemScriptInput = finalizedRedeemScript.getPsbtInputs().get(0);
+        List<ScriptChunk> chunks = new ArrayList<>(redeemScriptInput.getFinalScriptSig().getChunks());
+        ScriptChunk redeemScriptChunk = chunks.getLast();
+        //Both are 2 of 2 multisig scripts of the same length, so the push opcode of the script being replaced still applies
+        Assertions.assertEquals(redeemScriptChunk.getData().length, otherRedeemScript.getProgram().length);
+        chunks.set(chunks.size() - 1, new ScriptChunk(redeemScriptChunk.getOpcode(), otherRedeemScript.getProgram()));
+        redeemScriptInput.setFinalScriptSig(new Script(chunks));
+
+        PSBTSignatureException redeemScriptException = Assertions.assertThrows(PSBTSignatureException.class,
+                () -> substitutedRedeemScript.verifyFinalizedSignatures(finalizedRedeemScript));
+        Assertions.assertEquals("Input 0 is not finalized with the redeem script its UTXO commits to, so its signatures cannot be verified", redeemScriptException.getMessage());
+
+        //Input 1 is P2SH-P2WSH, so the witness script nested in the finalized witness must hash to the witness program the redeem script pays to
+        PSBT substitutedWitnessScript = PSBT.fromString(COMBINER_PSBT);
+        Assertions.assertNotNull(substitutedWitnessScript.getPsbtInputs().get(1).getWitnessScript());
+        PSBT finalizedWitnessScript = PSBT.fromString(FINALIZER_PSBT);
+        PSBTInput witnessScriptInput = finalizedWitnessScript.getPsbtInputs().get(1);
+        List<byte[]> pushes = new ArrayList<>(witnessScriptInput.getFinalScriptWitness().getPushes());
+        pushes.set(pushes.size() - 1, otherWitnessScript.getProgram());
+        witnessScriptInput.setFinalScriptWitness(new TransactionWitness(null, pushes));
+
+        PSBTSignatureException witnessScriptException = Assertions.assertThrows(PSBTSignatureException.class,
+                () -> substitutedWitnessScript.verifyFinalizedSignatures(finalizedWitnessScript));
+        Assertions.assertEquals("Input 1 is not finalized with the witness script its UTXO commits to, so its signatures cannot be verified", witnessScriptException.getMessage());
+    }
+
+    @Test
+    public void verifyFinalizedSignaturesRejectsInvalidSignature() throws PSBTParseException {
+        PSBT unfinalized = PSBT.fromString(COMBINER_PSBT);
+        PSBT tampered = PSBT.fromString(FINALIZER_PSBT);
+
+        //Alter the last byte of the first signature in the finalized witness of input 1, leaving a well formed but invalid signature
+        PSBTInput tamperedInput = tampered.getPsbtInputs().get(1);
+        List<byte[]> pushes = new ArrayList<>(tamperedInput.getFinalScriptWitness().getPushes());
+        byte[] signature = pushes.get(1).clone();
+        signature[signature.length - 2] ^= 0x01;
+        pushes.set(1, signature);
+        tamperedInput.setFinalScriptWitness(new TransactionWitness(null, pushes));
+
+        PSBTSignatureException e = Assertions.assertThrows(PSBTSignatureException.class, () -> unfinalized.verifyFinalizedSignatures(tampered));
+        Assertions.assertEquals("Input 1 provides 1 valid signature(s) in its finalized scriptSig or witness, but 2 are required to spend it", e.getMessage());
+    }
+
+    @Test
     public void finaliseExternalMultisigInput() throws PSBTParseException {
         Network.set(Network.REGTEST);
         String psbtBase64 = "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";
@@ -403,9 +491,11 @@ public class PSBTTest {
                 return java.util.Collections.emptyMap();
             }
         };
+        PSBT unfinalized = psbt.copy();
         wallet.finalise(psbt);
 
         Assertions.assertTrue(psbt.isFinalized(), "Taproot keypath input should be finalised");
+        Assertions.assertDoesNotThrow(() -> unfinalized.verifyFinalizedSignatures(psbt), "Taproot keypath signature should verify against the output key");
         Assertions.assertEquals(0, psbt.getPsbtInputs().getFirst().getFinalScriptSig().getProgram().length);
 
         TransactionWitness finalWitness = psbt.getPsbtInputs().getFirst().getFinalScriptWitness();
@@ -2135,20 +2225,27 @@ public class PSBTTest {
         Assertions.assertEquals(1, wallet.getSignedKeystores(psbt).values().stream().mapToInt(Map::size).sum());
     }
 
-    private Wallet buildSigningWallet() throws MnemonicException {
-        String words = "absent essay fox snake vast pumpkin height crouch silent bulb excuse razor";
-        DeterministicSeed seed = new DeterministicSeed(words, "", 0, DeterministicSeed.Type.BIP39);
-        Wallet wallet = new Wallet();
-        wallet.setPolicyType(PolicyType.SINGLE_HD);
-        wallet.setScriptType(ScriptType.P2WPKH);
-        wallet.getKeystores().add(Keystore.fromSeed(seed, PolicyType.SINGLE_HD, ScriptType.P2WPKH.getDefaultDerivation()));
-        wallet.setDefaultPolicy(Policy.getPolicy(PolicyType.SINGLE_HD, ScriptType.P2WPKH, wallet.getKeystores(), 1));
-        wallet.getNode(KeyPurpose.RECEIVE).fillToIndex(0);
+    @Test
+    public void verifyFinalizedSignaturesRejectsPartiallyFinalizedPsbt() throws MnemonicException {
+        Wallet wallet = buildSigningWallet();
+        PSBT unfinalized = buildSpendPsbt(wallet, SigHash.ALL);
+        wallet.sign(unfinalized);
 
-        return wallet;
+        PSBT finalized = buildSpendPsbt(wallet, SigHash.ALL);
+        wallet.sign(finalized);
+        wallet.finalise(finalized);
+
+        //An input the provided PSBT does not finalize would have the fields it already holds cleared by copyFinalizedFields()
+        finalized.getPsbtInputs().getFirst().setFinalScriptSig(null);
+        finalized.getPsbtInputs().getFirst().setFinalScriptWitness(null);
+
+        PSBTSignatureException e = Assertions.assertThrows(PSBTSignatureException.class, () -> unfinalized.verifyFinalizedSignatures(finalized));
+        Assertions.assertEquals("Input 0 is not finalized by the provided PSBT", e.getMessage());
     }
 
-    private PSBT signAndFinalise(Wallet wallet, SigHash sigHash) throws MnemonicException {
+    @Test
+    public void verifyFinalizedSignaturesSingleSigWithoutDerivations() throws MnemonicException {
+        Wallet wallet = buildSigningWallet();
         WalletNode addressNode = wallet.getNode(KeyPurpose.RECEIVE).getChildren().iterator().next();
         Script outputScript = wallet.getOutputScript(addressNode);
 
@@ -2164,9 +2261,127 @@ public class PSBTTest {
 
         PSBT psbt = new PSBT(spend);
         psbt.getPsbtInputs().getFirst().setWitnessUtxo(funding.getOutputs().getFirst());
-        psbt.getPsbtInputs().getFirst().setSigHash(sigHash);
+        wallet.sign(psbt);
+
+        PSBT unfinalized = psbt.copy();
+        wallet.finalise(psbt);
+
+        //This input carries no BIP32 derivation, so the candidate key is taken from the finalized witness and checked against the hash the script commits to
+        Assertions.assertTrue(unfinalized.getPsbtInputs().getFirst().getDerivedPublicKeys().isEmpty());
+        Assertions.assertDoesNotThrow(() -> unfinalized.verifyFinalizedSignatures(psbt));
+
+        List<byte[]> pushes = new ArrayList<>(psbt.getPsbtInputs().getFirst().getFinalScriptWitness().getPushes());
+        byte[] pubKey = pushes.get(1).clone();
+        pubKey[pubKey.length - 1] ^= 0x01;
+        pushes.set(1, pubKey);
+        psbt.getPsbtInputs().getFirst().setFinalScriptWitness(new TransactionWitness(null, pushes));
+        Assertions.assertThrows(PSBTSignatureException.class, () -> unfinalized.verifyFinalizedSignatures(psbt));
+    }
+
+    @Test
+    public void verifyFinalizedSignaturesLegacySingleSig() throws MnemonicException {
+        Wallet wallet = buildSigningWallet(ScriptType.P2PKH);
+        PSBT psbt = buildSpendPsbt(wallet, SigHash.ALL);
+        wallet.sign(psbt);
+
+        PSBT unfinalized = psbt.copy();
+        wallet.finalise(psbt);
+
+        //A legacy input is finalized into a scriptSig with no witness, so the candidate key comes from the scriptSig chunks
+        PSBTInput finalizedInput = psbt.getPsbtInputs().getFirst();
+        Assertions.assertNull(finalizedInput.getFinalScriptWitness());
+        Assertions.assertNotNull(finalizedInput.getFinalScriptSig());
+        Assertions.assertDoesNotThrow(() -> unfinalized.verifyFinalizedSignatures(psbt));
+
+        List<ScriptChunk> chunks = new ArrayList<>(finalizedInput.getFinalScriptSig().getChunks());
+        ScriptChunk pubKeyChunk = chunks.getLast();
+        Assertions.assertTrue(pubKeyChunk.isPubKey());
+        byte[] pubKey = pubKeyChunk.getData().clone();
+        pubKey[pubKey.length - 1] ^= 0x01;
+        chunks.set(chunks.size() - 1, new ScriptChunk(pubKeyChunk.getOpcode(), pubKey));
+        finalizedInput.setFinalScriptSig(new Script(chunks));
+
+        PSBTSignatureException e = Assertions.assertThrows(PSBTSignatureException.class, () -> unfinalized.verifyFinalizedSignatures(psbt));
+        Assertions.assertEquals("Input 0 provides 0 valid signature(s) in its finalized scriptSig or witness, but 1 are required to spend it", e.getMessage());
+    }
+
+    @Test
+    public void verifyFinalizedSignaturesRejectsEscalatedSigHash() throws MnemonicException {
+        Wallet wallet = buildSigningWallet();
+        PSBT unfinalized = buildSpendPsbt(wallet, SigHash.ALL);
+        wallet.sign(unfinalized);
+
+        PSBT finalized = buildSpendPsbt(wallet, SigHash.NONE);
+        wallet.sign(finalized);
+        wallet.finalise(finalized);
+
+        //Finalising clears the declared sighash type, so this signature commits to none of the outputs while the PSBT declares nothing
+        Assertions.assertNull(finalized.getPsbtInputs().getFirst().getSigHash());
+
+        PSBTSignatureException e = Assertions.assertThrows(PSBTSignatureException.class, () -> unfinalized.verifyFinalizedSignatures(finalized));
+        Assertions.assertTrue(e.getMessage().startsWith("Finalized PSBT would change sighash: Input 0 requests SIGHASH_NONE"), e.getMessage());
+    }
+
+    @Test
+    public void verifyFinalizedSignaturesAcceptsDeclaredSigHash() throws MnemonicException {
+        Wallet wallet = buildSigningWallet();
+        PSBT unfinalized = buildSpendPsbt(wallet, SigHash.SINGLE);
+        wallet.sign(unfinalized);
+
+        PSBT finalized = buildSpendPsbt(wallet, SigHash.SINGLE);
+        wallet.sign(finalized);
+        wallet.finalise(finalized);
+
+        //A sighash type the PSBT already asks for is not an escalation, whatever its severity
+        Assertions.assertDoesNotThrow(() -> unfinalized.verifyFinalizedSignatures(finalized));
+    }
+
+    private Wallet buildSigningWallet() throws MnemonicException {
+        return buildSigningWallet(ScriptType.P2WPKH);
+    }
+
+    private Wallet buildSigningWallet(ScriptType scriptType) throws MnemonicException {
+        String words = "absent essay fox snake vast pumpkin height crouch silent bulb excuse razor";
+        DeterministicSeed seed = new DeterministicSeed(words, "", 0, DeterministicSeed.Type.BIP39);
+        Wallet wallet = new Wallet();
+        wallet.setPolicyType(PolicyType.SINGLE_HD);
+        wallet.setScriptType(scriptType);
+        wallet.getKeystores().add(Keystore.fromSeed(seed, PolicyType.SINGLE_HD, scriptType.getDefaultDerivation()));
+        wallet.setDefaultPolicy(Policy.getPolicy(PolicyType.SINGLE_HD, scriptType, wallet.getKeystores(), 1));
+        wallet.getNode(KeyPurpose.RECEIVE).fillToIndex(0);
+
+        return wallet;
+    }
+
+    private PSBT signAndFinalise(Wallet wallet, SigHash sigHash) throws MnemonicException {
+        PSBT psbt = buildSpendPsbt(wallet, sigHash);
         wallet.sign(psbt);
         wallet.finalise(psbt);
+
+        return psbt;
+    }
+
+    private PSBT buildSpendPsbt(Wallet wallet, SigHash sigHash) {
+        WalletNode addressNode = wallet.getNode(KeyPurpose.RECEIVE).getChildren().iterator().next();
+        Script outputScript = wallet.getOutputScript(addressNode);
+
+        Transaction funding = new Transaction();
+        funding.addInput(Sha256Hash.ZERO_HASH, 0, new Script(new byte[0]));
+        funding.addOutput(100000, outputScript);
+        wallet.updateTransactions(Map.of(funding.getTxId(), new BlockTransaction(funding.getTxId(), 800000, new Date(), 0L, funding)));
+
+        Transaction spend = new Transaction();
+        spend.setVersion(2);
+        spend.addInput(funding.getTxId(), 0, new Script(new byte[0]));
+        spend.addOutput(90000, outputScript);
+
+        PSBT psbt = new PSBT(spend);
+        if(ScriptType.P2PKH.isScriptType(outputScript)) {
+            psbt.getPsbtInputs().getFirst().setNonWitnessUtxo(funding);
+        } else {
+            psbt.getPsbtInputs().getFirst().setWitnessUtxo(funding.getOutputs().getFirst());
+        }
+        psbt.getPsbtInputs().getFirst().setSigHash(sigHash);
 
         return psbt;
     }
