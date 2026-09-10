@@ -168,9 +168,7 @@ public class PSBT {
             Map<ECKey, KeyDerivation> spSpendDerivations = new LinkedHashMap<>();
             for(Keystore keystore : signingWallet.getKeystores()) {
                 if(silentPaymentsTweak != null && keystore.getSilentPaymentScanAddress() != null && signingWallet.getPolicyType() == PolicyType.SINGLE_SP) {
-                    ECKey spendPubKey = keystore.getSilentPaymentScanAddress().getSpendKey();
-                    KeyDerivation spendKeyDerivation = new KeyDerivation(keystore.getKeyDerivation().getMasterFingerprint(), KeyDerivation.writePath(KeyDerivation.getBip352SpendDerivation(keystore.getKeyDerivation().getDerivation())));
-                    spSpendDerivations.put(spendPubKey, spendKeyDerivation);
+                    putSilentPaymentsSpendDerivation(keystore, spSpendDerivations);
                 } else {
                     derivedPublicKeys.put(signingWallet.getScriptType().getOutputKey(signingWallet.getPolicyType(), keystore.getPubKey(walletNode)), keystore.getKeyDerivation().extend(walletNode.getDerivation()));
                     if(signingWallet.getScriptType() == ScriptType.P2TR) {
@@ -647,6 +645,12 @@ public class PSBT {
         return fee;
     }
 
+    private static void putSilentPaymentsSpendDerivation(Keystore keystore, Map<ECKey, KeyDerivation> spendDerivations) {
+        ECKey spendPubKey = keystore.getSilentPaymentScanAddress().getSpendKey();
+        KeyDerivation spendKeyDerivation = new KeyDerivation(keystore.getKeyDerivation().getMasterFingerprint(), KeyDerivation.writePath(KeyDerivation.getBip352SpendDerivation(keystore.getKeyDerivation().getDerivation())));
+        spendDerivations.put(spendPubKey, spendKeyDerivation);
+    }
+
     public void addKeyPathInformation(Wallet signingWallet) {
         List<PSBTInput> missingKeyPathInputs = new ArrayList<>();
         for(PSBTInput psbtInput : getPsbtInputs()) {
@@ -663,11 +667,11 @@ public class PSBT {
             for(PSBTInput psbtInput : missingKeyPathInputs) {
                 WalletNode walletNode = signingNodes.get(psbtInput);
                 if(walletNode != null && walletNode.getWallet() != null) {
+                    byte[] silentPaymentsTweak = walletNode.getSilentPaymentTweak() != null ? walletNode.getSilentPaymentTweak() : psbtInput.getSilentPaymentsTweak();
                     for(Keystore keystore : signingWallet.getKeystores()) {
-                        if(psbtInput.getSilentPaymentsTweak() != null && keystore.getSilentPaymentScanAddress() != null && signingWallet.getPolicyType() == PolicyType.SINGLE_SP) {
-                            ECKey spendPubKey = keystore.getSilentPaymentScanAddress().getSpendKey();
-                            KeyDerivation spendKeyDerivation = new KeyDerivation(keystore.getKeyDerivation().getMasterFingerprint(), KeyDerivation.writePath(KeyDerivation.getBip352SpendDerivation(keystore.getKeyDerivation().getDerivation())));
-                            psbtInput.getSilentPaymentsSpendDerivations().put(spendPubKey, spendKeyDerivation);
+                        if(silentPaymentsTweak != null && keystore.getSilentPaymentScanAddress() != null && signingWallet.getPolicyType() == PolicyType.SINGLE_SP) {
+                            psbtInput.setSilentPaymentsTweak(silentPaymentsTweak);
+                            putSilentPaymentsSpendDerivation(keystore, psbtInput.getSilentPaymentsSpendDerivations());
                         } else {
                             ScriptType scriptType = walletNode.getWallet().getScriptType();
                             ECKey pubKey = keystore.getPubKey(walletNode);

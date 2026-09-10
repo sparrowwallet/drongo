@@ -2336,6 +2336,101 @@ public class PSBTTest {
         Assertions.assertDoesNotThrow(() -> unfinalized.verifyFinalizedSignatures(finalized));
     }
 
+    @Test
+    public void addKeyPathInformationSilentPaymentsWithoutTweak() throws MnemonicException {
+        Network.set(Network.MAINNET);
+        Wallet wallet = buildSilentPaymentsSigningWallet();
+        WalletNode addressNode = wallet.getNode(KeyPurpose.RECEIVE).getChildren().iterator().next();
+        PSBT psbt = buildSilentPaymentsSpendPsbt(wallet, addressNode);
+
+        PSBTInput psbtInput = psbt.getPsbtInputs().getFirst();
+        Assertions.assertNull(psbtInput.getSilentPaymentsTweak(), "A PSBT built elsewhere carries no tweak");
+
+        psbt.addKeyPathInformation(wallet);
+
+        Assertions.assertArrayEquals(addressNode.getSilentPaymentTweak(), psbtInput.getSilentPaymentsTweak(), "The tweak should be recovered from the node holding the output");
+        Assertions.assertNull(psbtInput.getTapInternalKey(), "The output key must not be written as an internal key it does not derive");
+        Assertions.assertTrue(psbtInput.getTapDerivedPublicKeys().isEmpty());
+
+        Keystore keystore = wallet.getKeystores().getFirst();
+        Assertions.assertEquals(Map.of(keystore.getSilentPaymentScanAddress().getSpendKey(),
+                        new KeyDerivation(keystore.getKeyDerivation().getMasterFingerprint(), "m/352'/0'/0'/0'/0")),
+                psbtInput.getSilentPaymentsSpendDerivations());
+
+        wallet.sign(psbt);
+        wallet.finalise(psbt);
+        Assertions.assertTrue(psbt.isFinalized());
+        Assertions.assertDoesNotThrow(psbt::verifySignatures);
+    }
+
+    @Test
+    public void addKeyPathInformationSilentPaymentsOverridesWrongTweak() throws MnemonicException {
+        Network.set(Network.MAINNET);
+        Wallet wallet = buildSilentPaymentsSigningWallet();
+        WalletNode addressNode = wallet.getNode(KeyPurpose.RECEIVE).getChildren().iterator().next();
+        PSBT psbt = buildSilentPaymentsSpendPsbt(wallet, addressNode);
+
+        PSBTInput psbtInput = psbt.getPsbtInputs().getFirst();
+        psbtInput.setSilentPaymentsTweak(Utils.hexToBytes("2222222222222222222222222222222222222222222222222222222222222222"));
+
+        psbt.addKeyPathInformation(wallet);
+
+        Assertions.assertArrayEquals(addressNode.getSilentPaymentTweak(), psbtInput.getSilentPaymentsTweak(), "A tweak that does not derive the output must not survive");
+
+        wallet.sign(psbt);
+        wallet.finalise(psbt);
+        Assertions.assertDoesNotThrow(psbt::verifySignatures);
+    }
+
+    @Test
+    public void addKeyPathInformationSilentPaymentsWithTweak() throws MnemonicException {
+        Network.set(Network.MAINNET);
+        Wallet wallet = buildSilentPaymentsSigningWallet();
+        WalletNode addressNode = wallet.getNode(KeyPurpose.RECEIVE).getChildren().iterator().next();
+        PSBT psbt = buildSilentPaymentsSpendPsbt(wallet, addressNode);
+
+        PSBTInput psbtInput = psbt.getPsbtInputs().getFirst();
+        psbtInput.setSilentPaymentsTweak(addressNode.getSilentPaymentTweak());
+
+        psbt.addKeyPathInformation(wallet);
+
+        Assertions.assertArrayEquals(addressNode.getSilentPaymentTweak(), psbtInput.getSilentPaymentsTweak());
+        Assertions.assertNull(psbtInput.getTapInternalKey());
+        Assertions.assertEquals(1, psbtInput.getSilentPaymentsSpendDerivations().size());
+    }
+
+    private Wallet buildSilentPaymentsSigningWallet() throws MnemonicException {
+        String words = "absent essay fox snake vast pumpkin height crouch silent bulb excuse razor";
+        DeterministicSeed seed = new DeterministicSeed(words, "", 0, DeterministicSeed.Type.BIP39);
+        Wallet wallet = new Wallet();
+        wallet.setPolicyType(PolicyType.SINGLE_SP);
+        wallet.setScriptType(ScriptType.P2TR);
+        wallet.getKeystores().add(Keystore.fromSeed(seed, PolicyType.SINGLE_SP, KeyDerivation.getBip352Derivation(0)));
+        wallet.setDefaultPolicy(Policy.getPolicy(PolicyType.SINGLE_SP, ScriptType.P2TR, wallet.getKeystores(), 1));
+        wallet.getNode(KeyPurpose.RECEIVE).addSilentPaymentChild(wallet, 0, Utils.hexToBytes("1111111111111111111111111111111111111111111111111111111111111111"));
+
+        return wallet;
+    }
+
+    private PSBT buildSilentPaymentsSpendPsbt(Wallet wallet, WalletNode addressNode) {
+        Script outputScript = wallet.getOutputScript(addressNode);
+
+        Transaction funding = new Transaction();
+        funding.addInput(Sha256Hash.ZERO_HASH, 0, new Script(new byte[0]));
+        funding.addOutput(100000, outputScript);
+        wallet.updateTransactions(Map.of(funding.getTxId(), new BlockTransaction(funding.getTxId(), 800000, new Date(), 0L, funding)));
+
+        Transaction spend = new Transaction();
+        spend.setVersion(2);
+        spend.addInput(funding.getTxId(), 0, new Script(new byte[0]));
+        spend.addOutput(90000, outputScript);
+
+        PSBT psbt = new PSBT(spend);
+        psbt.getPsbtInputs().getFirst().setWitnessUtxo(funding.getOutputs().getFirst());
+
+        return psbt;
+    }
+
     private Wallet buildSigningWallet() throws MnemonicException {
         return buildSigningWallet(ScriptType.P2WPKH);
     }
