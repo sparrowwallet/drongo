@@ -130,6 +130,8 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
         childWallet.purposeNodes.clear();
         childWallet.transactions.clear();
         childWallet.detachedLabels.clear();
+        childWallet.silentPaymentAddresses.clear();
+        childWallet.walletTables.clear();
         childWallet.childWallets.clear();
         childWallet.storedBlockHeight = null;
         childWallet.gapLimit = standardAccount.getMinimumGapLimit();
@@ -2410,11 +2412,13 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
         }
         copy.setWalletConfig(walletConfig == null ? null : walletConfig.copy());
         copy.setMixConfig(mixConfig == null ? null : mixConfig.copy());
+        copy.walletTables.putAll(walletTables);
         copy.setStoredBlockHeight(getStoredBlockHeight());
         copy.gapLimit = gapLimit;
         copy.watchLast = watchLast;
         copy.birthDate = birthDate;
         copy.birthHeight = birthHeight;
+        copy.silentPaymentAddresses.putAll(silentPaymentAddresses);
 
         return copy;
     }
