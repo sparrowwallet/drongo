@@ -1167,7 +1167,7 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
                 outputs.add(new WalletTransaction.NonAddressOutput(output));
             }
 
-            double noChangeVSize = transaction.getVirtualSize();
+            double noChangeVSize = WalletTransaction.getVirtualSize(transaction, outputs);
             long noChangeFeeRequiredAmt = params.getRequiredFeeAmount(noChangeVSize);
 
             //Add 1 satoshi to accommodate longer signatures when feeRate equals the current or common min relay fee to ensure fee is sufficient for maximum "relayability"
@@ -1205,12 +1205,12 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
 
             //Determine if a change output is required by checking if its value exceeds both the cost of change and the relay dust threshold
             List<Long> setChangeAmts = getSetChangeAmounts(selectedUtxoSets, totalPaymentAmount, noChangeFeeRequiredAmt);
-            double noChangeFeeRate = (params.fee() == null ? params.feeRate() : noChangeFeeRequiredAmt / transaction.getVirtualSize());
+            double noChangeFeeRate = (params.fee() == null ? params.feeRate() : noChangeFeeRequiredAmt / noChangeVSize);
             TransactionOutput changeOutput = new TransactionOutput(transaction, setChangeAmts.getFirst(), getNode(KeyPurpose.CHANGE).getOutputScript());
             long costOfChangeAmt = getCostOfChange(noChangeFeeRate, params.longTermFeeRate());
             long dustThresholdAmt = getDustThreshold(changeOutput, Transaction.DUST_RELAY_TX_FEE);
             long minChangeAmt = Math.max(costOfChangeAmt, dustThresholdAmt);
-            if(setChangeAmts.stream().allMatch(amt -> amt > minChangeAmt) || (numSets > 1 && differenceAmt / transaction.getVirtualSize() > noChangeFeeRate * 2)) {
+            if(setChangeAmts.stream().allMatch(amt -> amt > minChangeAmt) || (numSets > 1 && differenceAmt / noChangeVSize > noChangeFeeRate * 2)) {
                 //Change output is required, determine new fee once change output has been added
                 double changeVSize = noChangeVSize + changeOutput.getLength() * numSets;
                 long changeFeeRequiredAmt = params.getRequiredFeeAmount(changeVSize);
@@ -1246,7 +1246,8 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
 
                 if(setChangeAmts.stream().anyMatch(amt -> amt < minChangeAmt)) {
                     //The new fee has meant that one of the change outputs is now dust. We pay too high a fee without change, but change is dust when added.
-                    if(numSets > 1 && differenceAmt / transaction.getVirtualSize() < noChangeFeeRate * 2) {
+                    //Recomputed rather than reusing noChangeVSize above, the change outputs having since been added
+                    if(numSets > 1 && differenceAmt / WalletTransaction.getVirtualSize(transaction, outputs) < noChangeFeeRate * 2) {
                         //Maximize privacy. Pay a higher fee to keep multiple output sets.
                         return new WalletTransaction(this, transaction, params.utxoSelectors(), selectedUtxoSets, txPayments, outputs, differenceAmt);
                     } else {

@@ -5,11 +5,16 @@ import com.sparrowwallet.drongo.KeyDerivation;
 import com.sparrowwallet.drongo.KeyPurpose;
 import com.sparrowwallet.drongo.Utils;
 import com.sparrowwallet.drongo.address.Address;
+import com.sparrowwallet.drongo.address.InvalidAddressException;
 import com.sparrowwallet.drongo.bip47.PaymentCodeTest;
 import com.sparrowwallet.drongo.crypto.*;
 import com.sparrowwallet.drongo.policy.Policy;
+import com.sparrowwallet.drongo.psbt.PSBT;
+import com.sparrowwallet.drongo.psbt.PSBTOutput;
 import com.sparrowwallet.drongo.policy.PolicyType;
 import com.sparrowwallet.drongo.protocol.*;
+import com.sparrowwallet.drongo.silentpayments.SilentPayment;
+import com.sparrowwallet.drongo.silentpayments.SilentPaymentAddress;
 import com.sparrowwallet.drongo.silentpayments.SilentPaymentScanAddress;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -21,6 +26,9 @@ import java.util.Map;
 import java.util.TreeSet;
 
 public class WalletTest {
+    //An unrelated silent payments wallet to send to
+    private static final String SP_SCAN_ADDRESS = "spscan1qu6d9s9lfd3a99nckpjw7as602lg0950wvcfwg7g4kakhsp32r57qx4853d0ylm42uewydgx6xgz0v20hgthsk2kr84f96jls3q0jywktrv8us5";
+
     @Test
     public void encryptTest() throws MnemonicException {
         String words = "absent essay fox snake vast pumpkin height crouch silent bulb excuse razor";
@@ -467,6 +475,138 @@ public class WalletTest {
 
         wallet.setDefaultPolicy(Policy.getPolicy(PolicyType.MULTI_HD, scriptType, wallet.getKeystores(), 2));
         return wallet;
+    }
+
+    @Test
+    public void testSilentPaymentOutputIsSizedForFee() throws InsufficientFundsException {
+        Wallet wallet = buildSpendingWallet();
+        SilentPaymentAddress spAddress = buildValidSpWallet().getSilentPaymentScanAddress().getSilentPaymentAddress();
+        WalletTransaction walletTransaction = createSpendingTransaction(wallet, new SilentPayment(spAddress, "SP payment", 100000L, false), 10.0d);
+
+        TransactionOutput spOutput = walletTransaction.getTransaction().getOutputs().stream()
+                .filter(txOutput -> txOutput.getValue() == 100000L).findFirst().orElseThrow();
+        Assertions.assertEquals(0, spOutput.getScriptBytes().length, "A silent payment output script is only computed when the transaction is signed");
+
+        double estimatedVSize = walletTransaction.getVirtualSize();
+        Assertions.assertEquals(10.0d, walletTransaction.getFeeRate(), 0.1d, "The transaction must pay the chosen fee rate");
+
+        //Computing the output script, as computeSilentPaymentOutputs does after signing, must arrive at the size the fee was derived from
+        spOutput.setScriptBytes(ScriptType.P2TR.getOutputScript(Utils.hexToBytes("1111111111111111111111111111111111111111111111111111111111111111")).getProgram());
+        Assertions.assertEquals(estimatedVSize, walletTransaction.getTransaction().getVirtualSize(), "The estimate must be the size of the broadcast transaction");
+    }
+
+    @Test
+    public void testSilentPaymentChangeOutputIsSizedForFee() throws InsufficientFundsException {
+        //A silent payments wallet sending to another silent payment address has two placeholder outputs, the payment and its own change
+        Wallet wallet = buildFundedSpWallet();
+        SilentPaymentAddress spAddress = SilentPaymentScanAddress.fromKeyString(SP_SCAN_ADDRESS).getSilentPaymentAddress();
+        WalletTransaction walletTransaction = createSpendingTransaction(wallet, new SilentPayment(spAddress, "SP payment", 100000L, false), 10.0d);
+        Assertions.assertEquals(2, walletTransaction.getTransaction().getOutputs().size(), "The payment should require a change output");
+        Assertions.assertTrue(walletTransaction.getTransaction().getOutputs().stream().allMatch(txOutput -> txOutput.getScriptBytes().length == 0), "Both outputs should be placeholders");
+
+        double estimatedVSize = walletTransaction.getVirtualSize();
+        Assertions.assertEquals(10.0d, walletTransaction.getFeeRate(), 0.1d);
+
+        for(TransactionOutput txOutput : walletTransaction.getTransaction().getOutputs()) {
+            if(txOutput.getScriptBytes().length == 0) {
+                txOutput.setScriptBytes(ScriptType.P2TR.getOutputScript(Utils.hexToBytes("1111111111111111111111111111111111111111111111111111111111111111")).getProgram());
+            }
+        }
+
+        Assertions.assertEquals(estimatedVSize, walletTransaction.getTransaction().getVirtualSize());
+    }
+
+    @Test
+    public void testUnresolvedSilentPaymentOutputVSize() throws InsufficientFundsException {
+        Wallet wallet = buildSpendingWallet();
+        SilentPaymentAddress spAddress = SilentPaymentScanAddress.fromKeyString(SP_SCAN_ADDRESS).getSilentPaymentAddress();
+        WalletTransaction walletTransaction = createSpendingTransaction(wallet, new SilentPayment(spAddress, "SP payment", 100000L, false), 10.0d);
+
+        //A transaction sized from an unsigned PSBT is short of what computing the silent payment output scripts adds to it
+        PSBT psbt = walletTransaction.createPSBT();
+        double unsignedVSize = psbt.getTransaction().getVirtualSize();
+        for(PSBTOutput psbtOutput : psbt.getPsbtOutputs()) {
+            if(psbtOutput.getSilentPaymentAddress() != null) {
+                psbtOutput.setScript(ScriptType.P2TR.getOutputScript(Utils.hexToBytes("1111111111111111111111111111111111111111111111111111111111111111")));
+            }
+        }
+
+        Assertions.assertEquals(unsignedVSize + SilentPayment.OUTPUT_SCRIPT_LENGTH, psbt.getTransaction().getVirtualSize());
+    }
+
+    @Test
+    public void testComputedSilentPaymentOutputIsNotSizedTwice() throws InsufficientFundsException {
+        //A wallet transaction read back from a signed PSBT holds silent payment outputs whose scripts have been computed, and is sized as it stands
+        Wallet wallet = buildSpendingWallet();
+        SilentPaymentAddress spAddress = SilentPaymentScanAddress.fromKeyString(SP_SCAN_ADDRESS).getSilentPaymentAddress();
+        WalletTransaction walletTransaction = createSpendingTransaction(wallet, new SilentPayment(spAddress, "SP payment", 100000L, false), 10.0d);
+
+        TransactionOutput spOutput = walletTransaction.getTransaction().getOutputs().stream()
+                .filter(txOutput -> txOutput.getValue() == 100000L).findFirst().orElseThrow();
+        Script computedScript = ScriptType.P2TR.getOutputScript(Utils.hexToBytes("1111111111111111111111111111111111111111111111111111111111111111"));
+        spOutput.setScriptBytes(computedScript.getProgram());
+
+        List<WalletTransaction.Output> outputs = walletTransaction.getOutputs();
+        WalletTransaction computed = new WalletTransaction(wallet, walletTransaction.getTransaction(), Collections.emptyList(), walletTransaction.getSelectedUtxoSets(),
+                walletTransaction.getPayments(), outputs, walletTransaction.getFee());
+
+        Assertions.assertTrue(outputs.stream().anyMatch(output -> output instanceof WalletTransaction.SilentPaymentOutput));
+        Assertions.assertEquals(computed.getTransaction().getVirtualSize(), computed.getVirtualSize(), "A computed silent payment output must not be sized twice");
+        Assertions.assertEquals(10.0d, computed.getFeeRate(), 0.1d);
+    }
+
+    @Test
+    public void testHdOutputSizeIsUnchanged() throws InsufficientFundsException, InvalidAddressException {
+        Wallet wallet = buildSpendingWallet();
+        WalletTransaction walletTransaction = createSpendingTransaction(wallet, new Payment(Address.fromString("bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4"), "Payment", 100000L, false), 10.0d);
+
+        Assertions.assertEquals(walletTransaction.getTransaction().getVirtualSize(), walletTransaction.getVirtualSize(), "A transaction without silent payment outputs needs no adjustment");
+        Assertions.assertEquals(10.0d, walletTransaction.getFeeRate(), 0.1d);
+    }
+
+    private Wallet buildFundedSpWallet() {
+        Wallet wallet = buildValidSpWallet();
+        wallet.setStoredBlockHeight(800006);
+        WalletNode addressNode = wallet.getNode(KeyPurpose.RECEIVE).addSilentPaymentChild(wallet, 0, Utils.hexToBytes("c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4"));
+
+        Transaction funding = new Transaction();
+        funding.addInput(Sha256Hash.ZERO_HASH, 0, new Script(new byte[0]));
+        funding.addOutput(1000000L, wallet.getAddress(addressNode));
+        wallet.updateTransactions(Map.of(funding.getTxId(), new BlockTransaction(funding.getTxId(), 800000, new Date(), 0L, funding)));
+        addressNode.getTransactionOutputs().add(new BlockTransactionHashIndex(funding.getTxId(), 800000, new Date(), 0L, 0, 1000000L));
+
+        return wallet;
+    }
+
+    private Wallet buildSpendingWallet() {
+        Wallet wallet = new Wallet();
+        wallet.setPolicyType(PolicyType.SINGLE_HD);
+        wallet.setScriptType(ScriptType.P2WPKH);
+        Keystore keystore = new Keystore();
+        keystore.setKeyDerivation(new KeyDerivation("00000000", "m/84'/0'/0'"));
+        keystore.setExtendedPublicKey(ExtendedKey.fromDescriptor("xpub6BosfCnifzxcFwrSzQiqu2DBVTshkCXacvNsWGYJVVhhawA7d4R5WSWGFNbi8Aw6ZRc1brxMyWMzG3DSSSSoekkudhUd9yLb6qx39T9nMdj"));
+        wallet.getKeystores().add(keystore);
+        wallet.setDefaultPolicy(Policy.getPolicy(PolicyType.SINGLE_HD, ScriptType.P2WPKH, wallet.getKeystores(), 1));
+        wallet.setStoredBlockHeight(800006);
+
+        WalletNode receiveNode = wallet.getNode(KeyPurpose.RECEIVE);
+        receiveNode.fillToIndex(0);
+        WalletNode addressNode = receiveNode.getChildren().iterator().next();
+
+        Transaction funding = new Transaction();
+        funding.addInput(Sha256Hash.ZERO_HASH, 0, new Script(new byte[0]));
+        funding.addOutput(1000000L, wallet.getAddress(addressNode));
+        wallet.updateTransactions(Map.of(funding.getTxId(), new BlockTransaction(funding.getTxId(), 800000, new Date(), 0L, funding)));
+        addressNode.getTransactionOutputs().add(new BlockTransactionHashIndex(funding.getTxId(), 800000, new Date(), 0L, 0, 1000000L));
+
+        return wallet;
+    }
+
+    private WalletTransaction createSpendingTransaction(Wallet wallet, Payment payment, double feeRate) throws InsufficientFundsException {
+        TransactionParameters params = new TransactionParameters(List.of(new PriorityUtxoSelector(800006)), Collections.emptyList(), List.of(payment), Collections.emptyList(),
+                Collections.emptySet(), feeRate, 1.0d, 1.0d, null, 800006, false, false, true);
+
+        return wallet.createWalletTransaction(params);
     }
 
     private Wallet buildValidSpWallet() {

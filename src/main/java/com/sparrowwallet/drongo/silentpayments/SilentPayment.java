@@ -9,6 +9,7 @@ import java.util.Set;
 
 public class SilentPayment extends Payment {
     public static final Set<ScriptType> VALID_INPUT_SCRIPT_TYPES = Set.of(ScriptType.P2PKH, ScriptType.P2SH_P2WPKH, ScriptType.P2WPKH, ScriptType.P2TR);
+    public static final int OUTPUT_SCRIPT_LENGTH = 34;
 
     private final SilentPaymentAddress silentPaymentAddress;
 

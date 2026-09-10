@@ -101,7 +101,16 @@ public class WalletTransaction {
     }
 
     public double getFeeRate() {
-        return (double)fee / transaction.getVirtualSize();
+        return (double)fee / getVirtualSize();
+    }
+
+    public double getVirtualSize() {
+        return getVirtualSize(transaction, outputs);
+    }
+
+    static double getVirtualSize(Transaction transaction, List<Output> outputs) {
+        long unresolvedSilentPaymentOutputs = outputs.stream().filter(output -> output instanceof SilentPaymentOutput && output.getTransactionOutput().getScriptBytes().length == 0).count();
+        return transaction.getVirtualSize() + unresolvedSilentPaymentOutputs * SilentPayment.OUTPUT_SCRIPT_LENGTH;
     }
 
     public long getTotal() {
