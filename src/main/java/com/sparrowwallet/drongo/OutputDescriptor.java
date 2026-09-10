@@ -526,7 +526,7 @@ public class OutputDescriptor {
             descriptor = descriptor.substring(0, annotationStart);
         }
 
-        if(descriptor.toLowerCase(Locale.ROOT).startsWith("sp(")) {
+        if(isSilentPaymentDescriptor(descriptor)) {
             return parseSilentPaymentDescriptor(descriptor, annotations);
         }
 
@@ -627,8 +627,12 @@ public class OutputDescriptor {
         return new OutputDescriptor(scriptType, Math.max(multisigThreshold, 1), keyDerivationMap, keyChildDerivationMap, mapExtendedPublicKeyLabels, masterPrivateKeyMap, annotations);
     }
 
+    public static boolean isSilentPaymentDescriptor(String descriptor) {
+        return descriptor.toLowerCase(Locale.ROOT).startsWith("sp(");
+    }
+
     private static OutputDescriptor parseSilentPaymentDescriptor(String descriptor, Map<String, Integer> annotations) {
-        if(!descriptor.startsWith("sp(") || !descriptor.endsWith(")")) {
+        if(!isSilentPaymentDescriptor(descriptor) || !descriptor.endsWith(")")) {
             throw new IllegalArgumentException("Invalid sp() descriptor format");
         }
         String inner = descriptor.substring(3, descriptor.length() - 1);
