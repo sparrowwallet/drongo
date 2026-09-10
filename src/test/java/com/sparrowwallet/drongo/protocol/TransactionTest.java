@@ -76,6 +76,81 @@ public class TransactionTest {
         Assertions.assertThrows(VerificationException.ExcessiveValue.class, tx::verify);
     }
 
+    @Test
+    public void feeIsDerivedFromTheFundingTransactions() {
+        Transaction funding = fundingTransaction(60000L, 40000L);
+        Transaction spending = new Transaction();
+        spending.addInput(funding.getTxId(), 0, new Script(new byte[0]));
+        spending.addInput(funding.getTxId(), 1, new Script(new byte[0]));
+        spending.addOutput(99800L, new Script(Utils.hexToBytes(P2PKH_SCRIPT)));
+
+        Assertions.assertEquals(200L, spending.getFee(Map.of(funding.getTxId(), funding)::get));
+    }
+
+    @Test
+    public void feeIsNullWhereAFundingTransactionIsMissing() {
+        Transaction funding = fundingTransaction(60000L, 40000L);
+        Transaction spending = new Transaction();
+        spending.addInput(funding.getTxId(), 0, new Script(new byte[0]));
+        spending.addInput(Sha256Hash.wrap(PREV_TXID), 0, new Script(new byte[0]));
+        spending.addOutput(59800L, new Script(Utils.hexToBytes(P2PKH_SCRIPT)));
+
+        //A fee that is asserted rather than worked out is what this replaces, so a partly known input set must not produce one
+        Assertions.assertNull(spending.getFee(Map.of(funding.getTxId(), funding)::get));
+    }
+
+    @Test
+    public void feeIsNullWhereAFundingTransactionDoesNotHaveTheOutput() {
+        Transaction funding = fundingTransaction(60000L, 40000L);
+        Transaction spending = new Transaction();
+        spending.addInput(funding.getTxId(), 2, new Script(new byte[0]));
+        spending.addOutput(59800L, new Script(Utils.hexToBytes(P2PKH_SCRIPT)));
+
+        Assertions.assertNull(spending.getFee(Map.of(funding.getTxId(), funding)::get));
+    }
+
+    @Test
+    public void feeIsNullWhereTheOutputsExceedTheInputs() {
+        Transaction funding = fundingTransaction(60000L, 40000L);
+        Transaction spending = new Transaction();
+        spending.addInput(funding.getTxId(), 0, new Script(new byte[0]));
+        spending.addOutput(60001L, new Script(Utils.hexToBytes(P2PKH_SCRIPT)));
+
+        //Only a funding transaction that is not the one the input names can produce this, so there is no fee to report
+        Assertions.assertNull(spending.getFee(Map.of(funding.getTxId(), funding)::get));
+    }
+
+    @Test
+    public void feeIsNullWhereTheInputValuesOverflow() {
+        Transaction funding = fundingTransaction(Long.MAX_VALUE, Long.MAX_VALUE);
+        Transaction spending = new Transaction();
+        spending.addInput(funding.getTxId(), 0, new Script(new byte[0]));
+        spending.addInput(funding.getTxId(), 1, new Script(new byte[0]));
+        spending.addOutput(1000L, new Script(Utils.hexToBytes(P2PKH_SCRIPT)));
+
+        Assertions.assertNull(spending.getFee(Map.of(funding.getTxId(), funding)::get));
+    }
+
+    @Test
+    public void coinbaseTransactionPaysNoFee() {
+        Transaction coinbase = new Transaction();
+        coinbase.addInput(Sha256Hash.ZERO_HASH, 0xFFFFFFFFL, new Script(new byte[0]));
+        coinbase.addOutput(312500000L, new Script(Utils.hexToBytes(P2PKH_SCRIPT)));
+
+        //Nothing funds a coinbase input, so the derivation must not read its absence as an unknown fee
+        Assertions.assertEquals(0L, coinbase.getFee(txid -> null));
+    }
+
+    private Transaction fundingTransaction(long... values) {
+        Transaction funding = new Transaction();
+        funding.addInput(Sha256Hash.wrap(PREV_TXID), 0, new Script(new byte[0]));
+        for(long value : values) {
+            funding.addOutput(value, new Script(Utils.hexToBytes(P2PKH_SCRIPT)));
+        }
+
+        return funding;
+    }
+
     private static final String P2PKH_SCRIPT = "76a914000000000000000000000000000000000000000088ac";
     private static final String PREV_TXID = "aa00000000000000000000000000000000000000000000000000000000000011";
     private static final String TWO_OUTPUT_TX = "0100000002fff7f7881a8099afa6940d42d1e7f6362bec38171ea3edf433541db4e4ad969f0000000000eeffffffef51e1b804cc89d182d279655c3aa89e815b1b309fe287d9b2b55d57b90ec68a0100000000ffffffff02202cb206000000001976a9148280b37df378db99f66f85c95a783a76ac7a6d5988ac9093510d000000001976a9143bde42dbee7e4dbe6a21b2d50ce2f0167faa815988ac11000000";

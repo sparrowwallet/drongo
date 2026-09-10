@@ -10,6 +10,7 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.math.BigInteger;
 import java.util.*;
+import java.util.function.Function;
 
 import static com.sparrowwallet.drongo.Utils.uint32ToByteStreamLE;
 import static com.sparrowwallet.drongo.Utils.uint64ToByteStreamLE;
@@ -359,6 +360,39 @@ public class Transaction extends ChildMessage {
         wu += 4 * WITNESS_SCALE_FACTOR;
 
         return wu;
+    }
+
+    /**
+     * Calculates the fee this transaction pays from the transactions funding its inputs, which is the only way to know it: a transaction does not carry
+     * its own fee, and a fee supplied alongside one is an assertion by whoever supplied it.
+     *
+     * @param inputTransactions a lookup from txid to the transaction funding one of this transaction's inputs, returning null for one it does not have
+     * @return the fee in satoshis, or null where a funding transaction is absent or the amounts do not add up
+     */
+    public Long getFee(Function<Sha256Hash, Transaction> inputTransactions) {
+        if(isCoinBase()) {
+            return 0L;
+        }
+
+        try {
+            long fee = 0L;
+            for(TransactionInput input : inputs) {
+                Transaction inputTransaction = inputTransactions.apply(input.getOutpoint().getHash());
+                if(inputTransaction == null || input.getOutpoint().getIndex() >= inputTransaction.getOutputs().size()) {
+                    return null;
+                }
+
+                fee = Math.addExact(fee, inputTransaction.getOutputs().get((int)input.getOutpoint().getIndex()).getValue());
+            }
+
+            for(TransactionOutput output : outputs) {
+                fee = Math.subtractExact(fee, output.getValue());
+            }
+
+            return fee < 0 ? null : fee;
+        } catch(ArithmeticException e) {
+            return null;
+        }
     }
 
     public List<TransactionInput> getInputs() {
