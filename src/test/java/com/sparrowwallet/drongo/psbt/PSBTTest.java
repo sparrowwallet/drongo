@@ -11,7 +11,9 @@ import com.sparrowwallet.drongo.policy.Miniscript;
 import com.sparrowwallet.drongo.policy.Policy;
 import com.sparrowwallet.drongo.policy.PolicyType;
 import com.sparrowwallet.drongo.protocol.*;
+import com.sparrowwallet.drongo.silentpayments.SilentPayment;
 import com.sparrowwallet.drongo.silentpayments.SilentPaymentAddress;
+import com.sparrowwallet.drongo.silentpayments.SilentPaymentUtils;
 import com.sparrowwallet.drongo.wallet.BlockTransaction;
 import com.sparrowwallet.drongo.wallet.DeterministicSeed;
 import com.sparrowwallet.drongo.wallet.Keystore;
@@ -29,6 +31,8 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.Date;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
+import java.util.Set;
 import java.util.List;
 import java.util.Map;
 
@@ -2397,6 +2401,46 @@ public class PSBTTest {
         Assertions.assertArrayEquals(addressNode.getSilentPaymentTweak(), psbtInput.getSilentPaymentsTweak());
         Assertions.assertNull(psbtInput.getTapInternalKey());
         Assertions.assertEquals(1, psbtInput.getSilentPaymentsSpendDerivations().size());
+    }
+
+    @Test
+    public void validateSilentPaymentsTakesSmallestOutpointOverAllInputs() throws Exception {
+        Network.set(Network.MAINNET);
+        ECKey eligiblePrivKey = ECKey.fromPrivate(Utils.hexToBytes("a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2"));
+        ECKey scanPrivKey = ECKey.fromPrivate(Utils.hexToBytes("b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3"));
+        ECKey spendPrivKey = ECKey.fromPrivate(Utils.hexToBytes("c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4"));
+        SilentPaymentAddress spAddress = new SilentPaymentAddress(ECKey.fromPublicOnly(scanPrivKey), ECKey.fromPublicOnly(spendPrivKey));
+
+        //The ineligible input contributes no public key, and its outpoint is the smallest of the two
+        Sha256Hash ineligibleTxid = Sha256Hash.wrap("0000000000000000000000000000000000000000000000000000000000000001");
+        Sha256Hash eligibleTxid = Sha256Hash.wrap("ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
+        Transaction transaction = new Transaction();
+        transaction.setVersion(2);
+        transaction.addInput(ineligibleTxid, 0, new Script(new byte[0]));
+        transaction.addInput(eligibleTxid, 0, new Script(new byte[0]));
+        transaction.addOutput(100000L, ScriptType.P2TR.getOutputScript(new byte[32]));
+
+        //The sender computes the output over every outpoint, as BIP-352 requires and as SilentPaymentUtils.getTweak does when scanning
+        Set<HashIndex> allOutpoints = new LinkedHashSet<>(List.of(new HashIndex(ineligibleTxid, 0), new HashIndex(eligibleTxid, 0)));
+        SilentPayment silentPayment = new SilentPayment(spAddress, null, 100000L, false);
+        Map<ECKey, SilentPaymentUtils.EcdhShareAndProof> scanKeyProofs =
+                SilentPaymentUtils.computeOutputAddresses(List.of(silentPayment), eligiblePrivKey, allOutpoints);
+        transaction.getOutputs().getFirst().setScriptBytes(silentPayment.getAddress().getOutputScript().getProgram());
+
+        PSBT psbt = new PSBT(transaction);
+        psbt.convertVersion(2);
+        scanKeyProofs.forEach((scanKey, shareAndProof) -> {
+            psbt.getSilentPaymentsEcdhShares().put(scanKey, shareAndProof.ecdhShare());
+            psbt.getSilentPaymentsDLEQProofs().put(scanKey, shareAndProof.dleqProof());
+        });
+        PSBTOutput psbtOutput = psbt.getPsbtOutputs().getFirst();
+        psbtOutput.setSilentPaymentAddress(spAddress);
+        psbtOutput.setScript(silentPayment.getAddress().getOutputScript());
+
+        //Only the eligible input provides a public key, which is what the validator is given
+        Map<TransactionInput, ECKey> inputPublicKeys = Map.of(psbt.getTransaction().getInputs().get(1), ECKey.fromPublicOnly(eligiblePrivKey));
+
+        Assertions.assertDoesNotThrow(() -> psbt.validateSilentPayments(inputPublicKeys));
     }
 
     private Wallet buildSilentPaymentsSigningWallet() throws MnemonicException {

@@ -244,7 +244,7 @@ public class SilentPaymentUtils {
      * @param silentPayments  List of silent payments sending to a common scan key
      * @param ecdhShare       The ECDH share (a * B_scan), either global or summed from per-input
      * @param summedPublicKey The sum of all eligible input public keys
-     * @param outpoints       Set of outpoints for eligible inputs
+     * @param outpoints       Set of outpoints for every input of the transaction
      * @throws InvalidSilentPaymentException if validation fails or scripts don't match
      */
     public static void validateOutputAddresses(List<SilentPayment> silentPayments, ECKey ecdhShare, ECKey summedPublicKey, Set<HashIndex> outpoints) throws InvalidSilentPaymentException {

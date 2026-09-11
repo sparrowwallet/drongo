@@ -771,8 +771,8 @@ public class PSBT {
             }
         }
 
-        Set<HashIndex> outpoints = inputPublicKeys.keySet().stream()
-                .map(input -> new HashIndex(input.getOutpoint().getHash(), input.getOutpoint().getIndex()))
+        Set<HashIndex> outpoints = getPsbtInputs().stream()
+                .map(psbtInput -> new HashIndex(psbtInput.getPrevTxid(), psbtInput.getPrevIndex()))
                 .collect(Collectors.toCollection(LinkedHashSet::new));
         ECKey summedPublicKey = SilentPaymentUtils.getSummedPublicKey(inputPublicKeys.values());
         if(summedPublicKey == null) {
