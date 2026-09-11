@@ -10,9 +10,11 @@ import com.sparrowwallet.drongo.bip47.PaymentCodeTest;
 import com.sparrowwallet.drongo.crypto.*;
 import com.sparrowwallet.drongo.policy.Policy;
 import com.sparrowwallet.drongo.psbt.PSBT;
+import com.sparrowwallet.drongo.psbt.PSBTInput;
 import com.sparrowwallet.drongo.psbt.PSBTOutput;
 import com.sparrowwallet.drongo.policy.PolicyType;
 import com.sparrowwallet.drongo.protocol.*;
+import com.sparrowwallet.drongo.silentpayments.InvalidSilentPaymentException;
 import com.sparrowwallet.drongo.silentpayments.SilentPayment;
 import com.sparrowwallet.drongo.silentpayments.SilentPaymentAddress;
 import com.sparrowwallet.drongo.silentpayments.SilentPaymentScanAddress;
@@ -588,6 +590,38 @@ public class WalletTest {
         Assertions.assertEquals("tr(" + Utils.bytesToHex(addressNode.getPubKey().getPubKeyXCoord()) + ")", outputDescriptor);
         Assertions.assertNotEquals(Utils.bytesToHex(addressNode.getPubKey().getPubKeyXCoord()),
                 Utils.bytesToHex(ScriptType.P2TR.getPublicKeyFromScript(wallet.getOutputScript(addressNode)).getPubKeyXCoord()));
+    }
+
+    @Test
+    public void testSignatureOverUnresolvedSilentPaymentOutputIsRejected() throws InsufficientFundsException {
+        Wallet wallet = buildSpendingWallet();
+        SilentPaymentAddress spAddress = SilentPaymentScanAddress.fromKeyString(SP_SCAN_ADDRESS).getSilentPaymentAddress();
+        WalletTransaction walletTransaction = createSpendingTransaction(wallet, new SilentPayment(spAddress, "SP payment", 100000L, false), 10.0d);
+        PSBT psbt = walletTransaction.createPSBT();
+
+        //Unresolved outputs are not themselves a problem, being what the wallet hands a signer to compute
+        Assertions.assertDoesNotThrow(() -> wallet.verifySilentPaymentScripts(psbt));
+
+        //A signer that returns signatures without computing them has committed to an empty output script
+        PSBTInput psbtInput = psbt.getPsbtInputs().getFirst();
+        psbtInput.getPartialSignatures().put(ECKey.fromPublicOnly(ECKey.fromPrivate(Utils.hexToBytes("a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2")).getPubKey()),
+                TransactionSignature.dummy(ScriptType.P2WPKH.getSignatureType()));
+
+        Assertions.assertThrows(InvalidSilentPaymentException.class, () -> wallet.verifySilentPaymentScripts(psbt));
+    }
+
+    @Test
+    public void testSignatureWithoutSilentPaymentOutputsIsAccepted() throws InsufficientFundsException, InvalidAddressException {
+        Wallet wallet = buildSpendingWallet();
+        WalletTransaction walletTransaction = createSpendingTransaction(wallet, new Payment(Address.fromString("bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4"), "Payment", 100000L, false), 10.0d);
+        PSBT psbt = walletTransaction.createPSBT();
+
+        psbt.getPsbtInputs().getFirst().getPartialSignatures().put(ECKey.fromPublicOnly(ECKey.fromPrivate(Utils.hexToBytes("a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2")).getPubKey()),
+                TransactionSignature.dummy(ScriptType.P2WPKH.getSignatureType()));
+
+        //Called directly rather than through the single argument overload, which returns before reaching the check for
+        //a PSBT carrying no silent payment outputs. A caller bypassing that wrapper must still not have its signatures refused
+        Assertions.assertDoesNotThrow(() -> wallet.verifySilentPaymentScripts(psbt, wallet.getSigningNodes(psbt)));
     }
 
     private Wallet buildFundedSpWallet() {
