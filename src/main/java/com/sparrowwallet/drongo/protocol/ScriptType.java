@@ -1133,6 +1133,11 @@ public enum ScriptType {
         }
 
         @Override
+        public String getOutputDescriptor(PolicyType policyType, ECKey derivedKey) {
+            return policyType == SINGLE_SP ? "rawtr(" + Utils.bytesToHex(derivedKey.getPubKeyXCoord()) + ")" : getOutputDescriptor(derivedKey);
+        }
+
+        @Override
         public String getOutputDescriptor(Script script) {
             throw new ProtocolException("Cannot create a taproot output descriptor without a keypath");
         }
@@ -1438,6 +1443,10 @@ public enum ScriptType {
     }
 
     public abstract String getOutputDescriptor(ECKey key);
+
+    public String getOutputDescriptor(PolicyType policyType, ECKey key) {
+        return getOutputDescriptor(key);
+    }
 
     public abstract String getOutputDescriptor(Script script);
 

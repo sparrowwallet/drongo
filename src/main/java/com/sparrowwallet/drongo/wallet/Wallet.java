@@ -756,7 +756,7 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
     public String getOutputDescriptor(WalletNode node) {
         if(policyType == PolicyType.SINGLE_HD || policyType == PolicyType.SINGLE_SP) {
             ECKey pubKey = node.getPubKey();
-            return scriptType.getOutputDescriptor(pubKey);
+            return scriptType.getOutputDescriptor(policyType, pubKey);
         } else if(policyType == PolicyType.MULTI_HD) {
             List<ECKey> pubKeys = node.getPubKeys();
             Script script = ScriptType.MULTISIG.getOutputScript(defaultPolicy.getNumSignaturesRequired(), pubKeys);

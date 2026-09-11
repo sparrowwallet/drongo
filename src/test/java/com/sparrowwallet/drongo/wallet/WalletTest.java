@@ -564,6 +564,32 @@ public class WalletTest {
         Assertions.assertEquals(10.0d, walletTransaction.getFeeRate(), 0.1d);
     }
 
+    @Test
+    public void testSilentPaymentNodeOutputDescriptor() {
+        Wallet wallet = buildValidSpWallet();
+        WalletNode addressNode = wallet.getNode(KeyPurpose.RECEIVE).addSilentPaymentChild(wallet, 0, Utils.hexToBytes("c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4"));
+
+        //The node key is already the output key, so the descriptor must be the raw form that does not tweak it again
+        String outputDescriptor = wallet.getOutputDescriptor(addressNode);
+        String outputKey = Utils.bytesToHex(addressNode.getPubKey().getPubKeyXCoord());
+        Assertions.assertEquals("rawtr(" + outputKey + ")", outputDescriptor);
+
+        //The key the descriptor names must be the one the address pays to
+        Assertions.assertEquals(outputKey, Utils.bytesToHex(ScriptType.P2TR.getPublicKeyFromScript(wallet.getOutputScript(addressNode)).getPubKeyXCoord()));
+    }
+
+    @Test
+    public void testHdNodeOutputDescriptorIsUnchanged() throws MnemonicException {
+        Wallet wallet = buildSigningWallet(ScriptType.P2TR);
+        WalletNode addressNode = wallet.getNode(KeyPurpose.RECEIVE).getChildren().iterator().next();
+
+        //A taproot key is the internal key, which tr() tweaks to arrive at the address
+        String outputDescriptor = wallet.getOutputDescriptor(addressNode);
+        Assertions.assertEquals("tr(" + Utils.bytesToHex(addressNode.getPubKey().getPubKeyXCoord()) + ")", outputDescriptor);
+        Assertions.assertNotEquals(Utils.bytesToHex(addressNode.getPubKey().getPubKeyXCoord()),
+                Utils.bytesToHex(ScriptType.P2TR.getPublicKeyFromScript(wallet.getOutputScript(addressNode)).getPubKeyXCoord()));
+    }
+
     private Wallet buildFundedSpWallet() {
         Wallet wallet = buildValidSpWallet();
         wallet.setStoredBlockHeight(800006);
