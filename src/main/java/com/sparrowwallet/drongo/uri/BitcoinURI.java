@@ -7,6 +7,7 @@ import com.sparrowwallet.drongo.address.InvalidAddressException;
 import com.sparrowwallet.drongo.silentpayments.SilentPayment;
 import com.sparrowwallet.drongo.silentpayments.SilentPaymentAddress;
 import com.sparrowwallet.drongo.wallet.Payment;
+import com.sparrowwallet.drongo.wallet.Wallet;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -346,12 +347,20 @@ public class BitcoinURI {
         return uriString;
     }
 
-    public Payment toPayment() {
+    /**
+     * Returns the payment this URI describes, preferring its silent payment address wherever the given wallet can pay one. BIP-321 carries newer
+     * address formats in query parameters so that the address in the body can serve as a fallback for senders that do not understand them, so a
+     * recipient publishing both intends a capable sender to use the silent payment address rather than reuse the static one.
+     *
+     * @param wallet the wallet the payment will be sent from, or null where the sending wallet is not yet known
+     */
+    public Payment toPayment(Wallet wallet) {
         long amount = getAmount() == null ? -1 : getAmount();
         SilentPaymentAddress silentPaymentAddress = getSilentPaymentAddress();
-        if(getAddress() == null && silentPaymentAddress != null) {
+        if(silentPaymentAddress != null && (getAddress() == null || (wallet != null && wallet.canSendSilentPayments()))) {
             return new SilentPayment(silentPaymentAddress, getLabel(), amount, false);
         }
+
         return new Payment(getAddress(), getLabel(), amount, false);
     }
 

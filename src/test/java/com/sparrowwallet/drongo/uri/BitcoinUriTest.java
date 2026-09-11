@@ -1,5 +1,11 @@
 package com.sparrowwallet.drongo.uri;
 
+import com.sparrowwallet.drongo.policy.PolicyType;
+import com.sparrowwallet.drongo.protocol.ScriptType;
+import com.sparrowwallet.drongo.silentpayments.SilentPayment;
+import com.sparrowwallet.drongo.wallet.Keystore;
+import com.sparrowwallet.drongo.wallet.Payment;
+import com.sparrowwallet.drongo.wallet.Wallet;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -9,6 +15,48 @@ import java.util.Locale;
 
 public class BitcoinUriTest {
     private static final String ADDRESS = "bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4";
+    private static final String SP_ADDRESS = "sp1qqgste7k9hx0qftg6qmwlkqtwuy6cycyavzmzj85c6qdfhjdpdjtdgqjuexzk6murw56suy3e0rd2cgqvycxttddwsvgxe2usfpxumr70xc9pkqwv";
+
+    @Test
+    public void fallbackAddressIsPreferredOnlyWhereSilentPaymentsCannotBeSent() throws BitcoinURIParseException {
+        BitcoinURI bitcoinURI = new BitcoinURI("bitcoin:" + ADDRESS + "?sp=" + SP_ADDRESS);
+        Assertions.assertNotNull(bitcoinURI.getAddress());
+        Assertions.assertNotNull(bitcoinURI.getSilentPaymentAddress());
+
+        //The address in the body is a fallback for a sender that cannot pay the silent payment address in the query
+        Payment fallbackPayment = bitcoinURI.toPayment(buildWallet(PolicyType.MULTI_HD, ScriptType.P2WSH));
+        Assertions.assertFalse(fallbackPayment instanceof SilentPayment);
+        Assertions.assertEquals(ADDRESS, fallbackPayment.getAddress().toString());
+
+        Payment silentPayment = bitcoinURI.toPayment(buildWallet(PolicyType.SINGLE_HD, ScriptType.P2WPKH));
+        Assertions.assertInstanceOf(SilentPayment.class, silentPayment);
+        Assertions.assertEquals(SP_ADDRESS, ((SilentPayment)silentPayment).getSilentPaymentAddress().toString());
+
+        //Without a wallet to ask, the fallback is taken as it was before the sending wallet could be considered
+        Assertions.assertFalse(bitcoinURI.toPayment(null) instanceof SilentPayment);
+    }
+
+    @Test
+    public void silentPaymentAddressIsTakenWithoutAFallback() throws BitcoinURIParseException {
+        BitcoinURI bitcoinURI = new BitcoinURI("bitcoin:?sp=" + SP_ADDRESS);
+        Assertions.assertNull(bitcoinURI.getAddress());
+
+        //With nothing to fall back to, a wallet that cannot send silent payments is still given the silent payment address to refuse
+        Assertions.assertInstanceOf(SilentPayment.class, bitcoinURI.toPayment(buildWallet(PolicyType.MULTI_HD, ScriptType.P2WSH)));
+        Assertions.assertInstanceOf(SilentPayment.class, bitcoinURI.toPayment(null));
+    }
+
+    private Wallet buildWallet(PolicyType policyType, ScriptType scriptType) {
+        Wallet wallet = new Wallet("test");
+        wallet.setPolicyType(policyType);
+        wallet.setScriptType(scriptType);
+        wallet.getKeystores().add(new Keystore());
+        if(policyType == PolicyType.MULTI_HD) {
+            wallet.getKeystores().add(new Keystore());
+        }
+
+        return wallet;
+    }
 
     @Test
     public void testSamourai() throws BitcoinURIParseException {
