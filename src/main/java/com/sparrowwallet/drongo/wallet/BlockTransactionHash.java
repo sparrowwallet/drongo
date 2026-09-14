@@ -50,7 +50,8 @@ public abstract class BlockTransactionHash extends Persistable {
             return 0;
         }
 
-        return currentBlockHeight - height + 1;
+        //A block above the current tip is not in the chain being followed, so a transaction recorded there has no confirmations until its history is refreshed
+        return Math.max(0, currentBlockHeight - height + 1);
     }
 
     public Date getDate() {
