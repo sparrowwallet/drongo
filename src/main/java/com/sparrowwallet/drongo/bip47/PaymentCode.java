@@ -224,8 +224,18 @@ public class PaymentCode {
     }
 
     private Map<byte[], byte[]> parse() throws InvalidPaymentCodeException {
-        byte[] pcBytes = Base58.decodeChecked(strPaymentCode);
+        if(strPaymentCode == null) {
+            throw new InvalidPaymentCodeException("Payment code is null");
+        }
 
+        try {
+            return parse(Base58.decodeChecked(strPaymentCode));
+        } catch(ProtocolException | BufferUnderflowException e) {
+            throw new InvalidPaymentCodeException("Invalid payment code", e);
+        }
+    }
+
+    private Map<byte[], byte[]> parse(byte[] pcBytes) throws InvalidPaymentCodeException {
         ByteBuffer bb = ByteBuffer.wrap(pcBytes);
         if(bb.get() != 0x47) {
             throw new InvalidPaymentCodeException("Invalid payment code version");

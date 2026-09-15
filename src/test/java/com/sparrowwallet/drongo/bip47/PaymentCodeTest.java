@@ -246,6 +246,18 @@ public class PaymentCodeTest {
         Assertions.assertThrows(IllegalArgumentException.class, () -> PaymentCode.getOpReturnData(shortTransaction));
     }
 
+    @Test
+    public void testMalformedPaymentCodeIsInvalid() throws InvalidPaymentCodeException {
+        String strPaymentCode = "PM8TJTLJbPRGxSbc8EJi42Wrr6QbNSaSSVJ5Y3E4pbCYiTHUskHg13935Ubb7q8tx9GVbh2UuRnBc3WSyJHhUrw8KhprKnn9eDznYGieTzFcwQRya4GA";
+        Assertions.assertTrue(new PaymentCode(strPaymentCode).isValid());
+
+        String corruptedChecksum = strPaymentCode.substring(0, strPaymentCode.length() - 1) + "B";
+        String truncated = Base58.encodeChecked(Arrays.copyOf(Base58.decodeChecked(strPaymentCode), 40));
+        for(String malformed : Arrays.asList("not-a-payment-code", corruptedChecksum, truncated, null)) {
+            Assertions.assertThrows(InvalidPaymentCodeException.class, () -> new PaymentCode(malformed), String.valueOf(malformed));
+        }
+    }
+
     public static byte[] getNotificationPayload() {
         byte[] payload = new byte[80];
         payload[0] = 0x01;
