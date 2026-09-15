@@ -69,12 +69,20 @@ public enum WalletModel {
     }
 
     public boolean alwaysIncludeNonWitnessUtxo() {
-        if(this == COLDCARD || this == COBO_VAULT || this == PASSPORT || this == KEYSTONE || this == GORDIAN_SEED_TOOL || this == SEEDSIGNER || this == KRUX || this == JADE ||
+        if(this == COLDCARD || this == COBO_VAULT || this == PASSPORT || this == KEYSTONE || this == GORDIAN_SEED_TOOL || this == SEEDSIGNER || this == JADE ||
                 this == TAPSIGNER || this == SATOCHIP || this == KEYCARD_SHELL || this == KEYCARD || this == ERA_WALLET) {
             return false;
         }
 
         return true;
+    }
+
+    public boolean includeNonWitnessUtxoForQR() {
+        if(this == KRUX) {
+            return true;
+        } else {
+            return false;
+        }
     }
 
     public boolean requiresPinPrompt() {
