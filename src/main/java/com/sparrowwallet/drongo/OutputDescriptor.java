@@ -531,6 +531,10 @@ public class OutputDescriptor {
         }
 
         ScriptType scriptType = ScriptType.fromDescriptor(descriptor);
+        if(scriptType == ScriptType.P2TR && descriptor.substring(scriptType.getDescriptor().length()).matches("(?s).*[,(].*")) {
+            //Only key path taproot wallets are supported, and a key expression cannot contain a comma or parenthesis, so anything else is a script tree or expression
+            throw new IllegalArgumentException("Taproot descriptors with script path spends are not supported");
+        }
         if(scriptType == null) {
             ExtendedKey.Header header = ExtendedKey.Header.fromExtendedKey(descriptor);
             scriptType = header.getDefaultScriptType();
