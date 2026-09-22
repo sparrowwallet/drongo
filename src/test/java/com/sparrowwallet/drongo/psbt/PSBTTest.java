@@ -15,11 +15,17 @@ import com.sparrowwallet.drongo.silentpayments.SilentPayment;
 import com.sparrowwallet.drongo.silentpayments.SilentPaymentAddress;
 import com.sparrowwallet.drongo.silentpayments.SilentPaymentUtils;
 import com.sparrowwallet.drongo.wallet.BlockTransaction;
+import com.sparrowwallet.drongo.wallet.BlockTransactionHashIndex;
 import com.sparrowwallet.drongo.wallet.DeterministicSeed;
 import com.sparrowwallet.drongo.wallet.Keystore;
 import com.sparrowwallet.drongo.wallet.MnemonicException;
+import com.sparrowwallet.drongo.wallet.Payment;
+import com.sparrowwallet.drongo.wallet.PriorityUtxoSelector;
+import com.sparrowwallet.drongo.wallet.TransactionParameters;
 import com.sparrowwallet.drongo.wallet.Wallet;
+import com.sparrowwallet.drongo.wallet.WalletModel;
 import com.sparrowwallet.drongo.wallet.WalletNode;
+import com.sparrowwallet.drongo.wallet.WalletTransaction;
 import org.bouncycastle.util.encoders.Hex;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
@@ -40,6 +46,16 @@ public class PSBTTest {
     //The BIP174 combiner and finalizer test vectors, which represent the same transaction with input 0 P2SH and input 1 P2SH-P2WSH
     private static final String COMBINER_PSBT = "cHNidP8BAJoCAAAAAljoeiG1ba8MI76OcHBFbDNvfLqlyHV5JPVFiHuyq911AAAAAAD/////g40EJ9DsZQpoqka7CwmK6kQiwHGyyng1Kgd5WdB86h0BAAAAAP////8CcKrwCAAAAAAWABTYXCtx0AYLCcmIauuBXlCZHdoSTQDh9QUAAAAAFgAUAK6pouXw+HaliN9VRuh0LR2HAI8AAAAAAAEAuwIAAAABqtc5MQGL0l+ErkALaISL4J23BurCrBgpi6vucatlb4sAAAAASEcwRAIgWPb8fGoz4bMVSNSByCbAFb0wE1qtQs1neQ2rZtKtJDsCIEoc7SYExnNbY5PltBaR3XiwDwxZQvufdRhW+qk4FX26Af7///8CgPD6AgAAAAAXqRQPuUY0IWlrgsgzryQceMF9295JNIfQ8gonAQAAABepFCnKdPigj4GZlCgYXJe12FLkBj9hh2UAAAAiAgKVg785rgpgl0etGZrd1jT6YQhVnWxc05tMIYPxq5bgf0cwRAIgdAGK1BgAl7hzMjwAFXILNoTMgSOJEEjn282bVa1nnJkCIHPTabdA4+tT3O+jOCPIBwUUylWn3ZVE8VfBZ5EyYRGMASICAtq2H/SaFNtqfQKwzR+7ePxLGDErW05U2uTbovv+9TbXSDBFAiEA9hA4swjcHahlo0hSdG8BV3KTQgjG0kRUOTzZm98iF3cCIAVuZ1pnWm0KArhbFOXikHTYolqbV2C+ooFvZhkQoAbqAQEDBAEAAAABBEdSIQKVg785rgpgl0etGZrd1jT6YQhVnWxc05tMIYPxq5bgfyEC2rYf9JoU22p9ArDNH7t4/EsYMStbTlTa5Nui+/71NtdSriIGApWDvzmuCmCXR60Zmt3WNPphCFWdbFzTm0whg/GrluB/ENkMak8AAACAAAAAgAAAAIAiBgLath/0mhTban0CsM0fu3j8SxgxK1tOVNrk26L7/vU21xDZDGpPAAAAgAAAAIABAACAAAEBIADC6wsAAAAAF6kUt/X69A49QKWkWbHbNTXyty+pIeiHIgIDCJ3BDHrG21T5EymvYXMz2ziM6tDCMfcjN50bmQMLAtxHMEQCIGLrelVhB6fHP0WsSrWh3d9vcHX7EnWWmn84Pv/3hLyyAiAMBdu3Rw2/LwhVfdNWxzJcHtMJE+mWzThAlF2xIijaXwEiAgI63ZBPPW3PWd25BrDe4jUpt/+57VDl6GFRkmhgIh8Oc0cwRAIgZfRbpZmLWaJ//hp77QFq8fH5DVSzqo90UKpfVqJRA70CIH9yRwOtHtuWaAsoS1bU/8uI9/t1nqu+CKow8puFE4PSAQEDBAEAAAABBCIAIIwjUxc3Q7WV37Sge3K6jkLjeX2nTof+fZ10l+OyAokDAQVHUiEDCJ3BDHrG21T5EymvYXMz2ziM6tDCMfcjN50bmQMLAtwhAjrdkE89bc9Z3bkGsN7iNSm3/7ntUOXoYVGSaGAiHw5zUq4iBgI63ZBPPW3PWd25BrDe4jUpt/+57VDl6GFRkmhgIh8OcxDZDGpPAAAAgAAAAIADAACAIgYDCJ3BDHrG21T5EymvYXMz2ziM6tDCMfcjN50bmQMLAtwQ2QxqTwAAAIAAAACAAgAAgAAiAgOppMN/WZbTqiXbrGtXCvBlA5RJKUJGCzVHU+2e7KWHcRDZDGpPAAAAgAAAAIAEAACAACICAn9jmXV9Lv9VoTatAsaEsYOLZVbl8bazQoKpS2tQBRCWENkMak8AAACAAAAAgAUAAIAA";
     private static final String FINALIZER_PSBT = "cHNidP8BAJoCAAAAAljoeiG1ba8MI76OcHBFbDNvfLqlyHV5JPVFiHuyq911AAAAAAD/////g40EJ9DsZQpoqka7CwmK6kQiwHGyyng1Kgd5WdB86h0BAAAAAP////8CcKrwCAAAAAAWABTYXCtx0AYLCcmIauuBXlCZHdoSTQDh9QUAAAAAFgAUAK6pouXw+HaliN9VRuh0LR2HAI8AAAAAAAEAuwIAAAABqtc5MQGL0l+ErkALaISL4J23BurCrBgpi6vucatlb4sAAAAASEcwRAIgWPb8fGoz4bMVSNSByCbAFb0wE1qtQs1neQ2rZtKtJDsCIEoc7SYExnNbY5PltBaR3XiwDwxZQvufdRhW+qk4FX26Af7///8CgPD6AgAAAAAXqRQPuUY0IWlrgsgzryQceMF9295JNIfQ8gonAQAAABepFCnKdPigj4GZlCgYXJe12FLkBj9hh2UAAAABB9oARzBEAiB0AYrUGACXuHMyPAAVcgs2hMyBI4kQSOfbzZtVrWecmQIgc9Npt0Dj61Pc76M4I8gHBRTKVafdlUTxV8FnkTJhEYwBSDBFAiEA9hA4swjcHahlo0hSdG8BV3KTQgjG0kRUOTzZm98iF3cCIAVuZ1pnWm0KArhbFOXikHTYolqbV2C+ooFvZhkQoAbqAUdSIQKVg785rgpgl0etGZrd1jT6YQhVnWxc05tMIYPxq5bgfyEC2rYf9JoU22p9ArDNH7t4/EsYMStbTlTa5Nui+/71NtdSrgABASAAwusLAAAAABepFLf1+vQOPUClpFmx2zU18rcvqSHohwEHIyIAIIwjUxc3Q7WV37Sge3K6jkLjeX2nTof+fZ10l+OyAokDAQjaBABHMEQCIGLrelVhB6fHP0WsSrWh3d9vcHX7EnWWmn84Pv/3hLyyAiAMBdu3Rw2/LwhVfdNWxzJcHtMJE+mWzThAlF2xIijaXwFHMEQCIGX0W6WZi1mif/4ae+0BavHx+Q1Us6qPdFCqX1aiUQO9AiB/ckcDrR7blmgLKEtW1P/LiPf7dZ6rvgiqMPKbhROD0gFHUiEDCJ3BDHrG21T5EymvYXMz2ziM6tDCMfcjN50bmQMLAtwhAjrdkE89bc9Z3bkGsN7iNSm3/7ntUOXoYVGSaGAiHw5zUq4AIgIDqaTDf1mW06ol26xrVwrwZQOUSSlCRgs1R1Ptnuylh3EQ2QxqTwAAAIAAAACABAAAgAAiAgJ/Y5l1fS7/VaE2rQLGhLGDi2VW5fG2s0KCqUtrUAUQlhDZDGpPAAAAgAAAAIAFAACAAA==";
+
+    //A 2 of 3 quorum, and a second quorum sharing only its first key, for the combine verification tests
+    private static final ECKey MULTISIG_KEY_1 = ECKey.fromPrivate(Utils.hexToBytes("1111111111111111111111111111111111111111111111111111111111111111"));
+    private static final ECKey MULTISIG_KEY_2 = ECKey.fromPrivate(Utils.hexToBytes("2222222222222222222222222222222222222222222222222222222222222222"));
+    private static final ECKey MULTISIG_KEY_3 = ECKey.fromPrivate(Utils.hexToBytes("3333333333333333333333333333333333333333333333333333333333333333"));
+    private static final ECKey FOREIGN_KEY_1 = ECKey.fromPrivate(Utils.hexToBytes("4444444444444444444444444444444444444444444444444444444444444444"));
+    private static final ECKey FOREIGN_KEY_2 = ECKey.fromPrivate(Utils.hexToBytes("5555555555555555555555555555555555555555555555555555555555555555"));
+    private static final Script WALLET_WITNESS_SCRIPT = ScriptType.MULTISIG.getOutputScript(2, List.of(ECKey.fromPublicOnly(MULTISIG_KEY_1), ECKey.fromPublicOnly(MULTISIG_KEY_2), ECKey.fromPublicOnly(MULTISIG_KEY_3)));
+    private static final Script FOREIGN_WITNESS_SCRIPT = ScriptType.MULTISIG.getOutputScript(2, List.of(ECKey.fromPublicOnly(MULTISIG_KEY_1), ECKey.fromPublicOnly(FOREIGN_KEY_1), ECKey.fromPublicOnly(FOREIGN_KEY_2)));
+    private static final Long MULTISIG_UTXO_VALUE = 100_000L;
 
 
     @Test
@@ -1659,6 +1675,238 @@ public class PSBTTest {
         if(outputScript != null) {
             psbt.getPsbtOutputs().getFirst().setScript(outputScript);
         }
+
+        return psbt;
+    }
+
+    @Test
+    public void verifyCombinedSignaturesRejectsSignedWitnessScriptReplacement() throws PSBTParseException {
+        PSBT localPsbt = buildMultisigPsbt(WALLET_WITNESS_SCRIPT, MULTISIG_UTXO_VALUE, WALLET_WITNESS_SCRIPT);
+
+        //The co-signer returns a different quorum's witness script and a signature made over it, and omits the utxo that would bind the script it provides
+        PSBT replacementPsbt = buildMultisigPsbt(WALLET_WITNESS_SCRIPT, MULTISIG_UTXO_VALUE, FOREIGN_WITNESS_SCRIPT);
+        Assertions.assertTrue(replacementPsbt.getPsbtInputs().getFirst().sign(MULTISIG_KEY_1));
+        replacementPsbt.getPsbtInputs().getFirst().setWitnessUtxo(null);
+        //Sparrow parses provided PSBTs without verifying signatures, since the utxo they are made against may only be found when combining
+        PSBT parsedReplacementPsbt = PSBT.fromString(replacementPsbt.toBase64String(), false);
+
+        PSBTSignatureException ex = Assertions.assertThrows(PSBTSignatureException.class,
+                () -> localPsbt.verifyCombinedSignatures(parsedReplacementPsbt));
+        Assertions.assertTrue(ex.getMessage().contains("Combined PSBT would change the witness script of input 0"));
+
+        Assertions.assertEquals(WALLET_WITNESS_SCRIPT, localPsbt.getPsbtInputs().getFirst().getWitnessScript(),
+                "local PSBT must be unchanged when verifyCombinedSignatures rejects the combine");
+    }
+
+    @Test
+    public void verifyCombinedSignaturesRejectsUnsignedWitnessScriptReplacement() throws PSBTParseException {
+        PSBT localPsbt = buildMultisigPsbt(WALLET_WITNESS_SCRIPT, MULTISIG_UTXO_VALUE, WALLET_WITNESS_SCRIPT);
+
+        //No signature is required to replace the script the remaining signers will sign over
+        PSBT replacementPsbt = PSBT.fromString(buildMultisigPsbt(null, null, FOREIGN_WITNESS_SCRIPT).toBase64String());
+
+        PSBTSignatureException ex = Assertions.assertThrows(PSBTSignatureException.class,
+                () -> localPsbt.verifyCombinedSignatures(replacementPsbt));
+        Assertions.assertTrue(ex.getMessage().contains("Combined PSBT would change the witness script of input 0"));
+    }
+
+    @Test
+    public void verifyCombinedSignaturesRejectsUtxoCommittedWitnessScriptReplacement() throws PSBTParseException {
+        PSBT localPsbt = buildMultisigPsbt(WALLET_WITNESS_SCRIPT, MULTISIG_UTXO_VALUE, WALLET_WITNESS_SCRIPT);
+
+        //The foreign witness script is provided with a witness utxo that commits to it, so the replacement is internally consistent once combined, and
+        //keeping the amount leaves the fee the PSBT reports unchanged
+        PSBT replacementPsbt = buildMultisigPsbt(FOREIGN_WITNESS_SCRIPT, MULTISIG_UTXO_VALUE, FOREIGN_WITNESS_SCRIPT);
+        Assertions.assertTrue(replacementPsbt.getPsbtInputs().getFirst().sign(MULTISIG_KEY_1));
+        PSBT parsedReplacementPsbt = PSBT.fromString(replacementPsbt.toBase64String());
+
+        PSBTSignatureException ex = Assertions.assertThrows(PSBTSignatureException.class,
+                () -> localPsbt.verifyCombinedSignatures(parsedReplacementPsbt));
+        Assertions.assertTrue(ex.getMessage().contains("Combined PSBT would change the utxo script of input 0"));
+
+        Assertions.assertEquals(MULTISIG_UTXO_VALUE, localPsbt.getPsbtInputs().getFirst().getWitnessUtxo().getValue());
+        Assertions.assertEquals(WALLET_WITNESS_SCRIPT, localPsbt.getPsbtInputs().getFirst().getWitnessScript(),
+                "local PSBT must be unchanged when verifyCombinedSignatures rejects the combine");
+    }
+
+    @Test
+    public void verifyCombinedSignaturesRejectsWitnessUtxoAmountReplacement() throws PSBTParseException {
+        PSBT localPsbt = buildMultisigPsbt(WALLET_WITNESS_SCRIPT, MULTISIG_UTXO_VALUE, WALLET_WITNESS_SCRIPT);
+
+        //The witness script is unchanged here, but the restated amount is the one the sighash of every remaining signature commits to
+        PSBT replacementPsbt = PSBT.fromString(buildMultisigPsbt(WALLET_WITNESS_SCRIPT, 5_000_000L, WALLET_WITNESS_SCRIPT).toBase64String());
+
+        PSBTSignatureException ex = Assertions.assertThrows(PSBTSignatureException.class,
+                () -> localPsbt.verifyCombinedSignatures(replacementPsbt));
+        Assertions.assertTrue(ex.getMessage().contains("Combined PSBT would change the amount of input 0 from 100000 sats to 5000000 sats"));
+        Assertions.assertEquals(MULTISIG_UTXO_VALUE, localPsbt.getPsbtInputs().getFirst().getWitnessUtxo().getValue());
+    }
+
+    @Test
+    public void verifyCombinedSignaturesRejectsRedeemScriptReplacement() throws PSBTParseException {
+        Script walletRedeemScript = ScriptType.P2WSH.getOutputScript(WALLET_WITNESS_SCRIPT);
+        Script foreignRedeemScript = ScriptType.P2WSH.getOutputScript(FOREIGN_WITNESS_SCRIPT);
+
+        PSBT localPsbt = buildNestedMultisigPsbt(walletRedeemScript, WALLET_WITNESS_SCRIPT, true);
+        //The redeem script the combine provides arrives without the utxo that would bind it, exactly as the witness script replacement does
+        PSBT replacementPsbt = PSBT.fromString(buildNestedMultisigPsbt(foreignRedeemScript, FOREIGN_WITNESS_SCRIPT, false).toBase64String());
+
+        PSBTSignatureException ex = Assertions.assertThrows(PSBTSignatureException.class,
+                () -> localPsbt.verifyCombinedSignatures(replacementPsbt));
+        Assertions.assertTrue(ex.getMessage().contains("Combined PSBT would change the redeem script of input 0"));
+    }
+
+    @Test
+    public void verifyCombinedSignaturesRejectsUnboundWitnessScript() throws PSBTParseException {
+        //The local PSBT provides no script of its own, so the combined witness script is only verified against the utxo it must hash to once combined
+        PSBT localPsbt = buildMultisigPsbt(WALLET_WITNESS_SCRIPT, MULTISIG_UTXO_VALUE, null);
+        PSBT replacementPsbt = PSBT.fromString(buildMultisigPsbt(null, null, FOREIGN_WITNESS_SCRIPT).toBase64String());
+
+        PSBTSignatureException ex = Assertions.assertThrows(PSBTSignatureException.class,
+                () -> localPsbt.verifyCombinedSignatures(replacementPsbt));
+        Assertions.assertTrue(ex.getMessage().contains("Combined PSBT would provide an inconsistent utxo"));
+        Assertions.assertTrue(ex.getMessage().contains("Witness script hash does not match provided pay to script hash"));
+    }
+
+    @Test
+    public void verifyCombinedSignaturesAcceptsCosignerSignature() throws PSBTParseException, PSBTSignatureException {
+        PSBT localPsbt = buildMultisigPsbt(WALLET_WITNESS_SCRIPT, MULTISIG_UTXO_VALUE, WALLET_WITNESS_SCRIPT);
+
+        PSBT signedPsbt = buildMultisigPsbt(WALLET_WITNESS_SCRIPT, MULTISIG_UTXO_VALUE, WALLET_WITNESS_SCRIPT);
+        Assertions.assertTrue(signedPsbt.getPsbtInputs().getFirst().sign(MULTISIG_KEY_1));
+        PSBT parsedSignedPsbt = PSBT.fromString(signedPsbt.toBase64String());
+
+        localPsbt.verifyCombinedSignatures(parsedSignedPsbt);
+        localPsbt.combine(parsedSignedPsbt);
+
+        Assertions.assertEquals(WALLET_WITNESS_SCRIPT, localPsbt.getPsbtInputs().getFirst().getWitnessScript());
+        Assertions.assertEquals(1, localPsbt.getPsbtInputs().getFirst().getPartialSignatures().size());
+    }
+
+    @Test
+    public void verifyCombinedSignaturesAcceptsUtxoResolution() throws PSBTParseException, PSBTSignatureException {
+        //A PSBT may omit the utxo data a combine provides, so a combine that resolves the utxo and the script it commits to must still be accepted
+        PSBT localPsbt = buildMultisigPsbt(null, null, null);
+
+        PSBT resolvedPsbt = buildMultisigPsbt(WALLET_WITNESS_SCRIPT, MULTISIG_UTXO_VALUE, WALLET_WITNESS_SCRIPT);
+        Assertions.assertTrue(resolvedPsbt.getPsbtInputs().getFirst().sign(MULTISIG_KEY_1));
+        PSBT parsedResolvedPsbt = PSBT.fromString(resolvedPsbt.toBase64String());
+
+        localPsbt.verifyCombinedSignatures(parsedResolvedPsbt);
+        localPsbt.combine(parsedResolvedPsbt);
+
+        Assertions.assertEquals(WALLET_WITNESS_SCRIPT, localPsbt.getPsbtInputs().getFirst().getWitnessScript());
+        Assertions.assertEquals(MULTISIG_UTXO_VALUE, localPsbt.getPsbtInputs().getFirst().getWitnessUtxo().getValue());
+    }
+
+    @Test
+    public void verifyCombinedSignaturesAcceptsEverySigningFlow() throws Exception {
+        for(ScriptType scriptType : List.of(ScriptType.P2PKH, ScriptType.P2SH_P2WPKH, ScriptType.P2WPKH, ScriptType.P2TR)) {
+            verifyCombinedSignaturesAcceptsSigningFlow(scriptType, PolicyType.SINGLE_HD, 1, false);
+            verifyCombinedSignaturesAcceptsSigningFlow(scriptType, PolicyType.SINGLE_HD, 1, true);
+        }
+        for(ScriptType scriptType : List.of(ScriptType.P2SH, ScriptType.P2SH_P2WSH, ScriptType.P2WSH)) {
+            verifyCombinedSignaturesAcceptsSigningFlow(scriptType, PolicyType.MULTI_HD, 3, false);
+            verifyCombinedSignaturesAcceptsSigningFlow(scriptType, PolicyType.MULTI_HD, 3, true);
+        }
+    }
+
+    private void verifyCombinedSignaturesAcceptsSigningFlow(ScriptType scriptType, PolicyType policyType, int keystoreCount, boolean alwaysIncludeNonWitnessUtxo) throws Exception {
+        Wallet wallet = buildCombiningWallet(scriptType, policyType, keystoreCount, alwaysIncludeNonWitnessUtxo);
+        WalletNode addressNode = wallet.getNode(KeyPurpose.RECEIVE).getChildren().iterator().next();
+
+        Transaction funding = new Transaction();
+        funding.addInput(Sha256Hash.ZERO_HASH, 0, new Script(new byte[0]));
+        funding.addOutput(1_000_000L, wallet.getAddress(addressNode));
+        wallet.updateTransactions(Map.of(funding.getTxId(), new BlockTransaction(funding.getTxId(), 800000, new Date(), 0L, funding)));
+        addressNode.getTransactionOutputs().add(new BlockTransactionHashIndex(funding.getTxId(), 800000, new Date(), 0L, 0, 1_000_000L));
+
+        TransactionParameters params = new TransactionParameters(List.of(new PriorityUtxoSelector(800006)), Collections.emptyList(),
+                List.of(new Payment(wallet.getAddress(addressNode), "test", 500_000L, false)), Collections.emptyList(),
+                Collections.emptySet(), 10.0d, 1.0d, 1.0d, null, 800006, false, false, true);
+        WalletTransaction walletTransaction = wallet.createWalletTransaction(params);
+
+        //The PSBT constructor shuffles outputs, so every local copy here must be the same PSBT
+        String localPsbt = walletTransaction.createPSBT().toBase64String();
+        String flow = scriptType + (alwaysIncludeNonWitnessUtxo ? " with the non witness utxo always included" : "");
+
+        PSBT signedPsbt = PSBT.fromString(localPsbt, false);
+        wallet.sign(signedPsbt);
+        String signedReply = signedPsbt.toBase64String();
+
+        PSBT signatureCombine = PSBT.fromString(localPsbt, false);
+        Assertions.assertDoesNotThrow(() -> signatureCombine.verifyCombinedSignatures(PSBT.fromString(signedReply, false)),
+                "a signed reply for " + flow + " must combine");
+
+        //A signer may return the PSBT in the other version, which the combine converts
+        PSBT convertedReply = PSBT.fromString(signedReply, false);
+        convertedReply.convertVersion(signatureCombine.getPsbtVersion() == 0 ? 2 : 0);
+        String convertedSignedReply = convertedReply.toBase64String();
+        PSBT versionCombine = PSBT.fromString(localPsbt, false);
+        Assertions.assertDoesNotThrow(() -> versionCombine.verifyCombinedSignatures(PSBT.fromString(convertedSignedReply, false)),
+                "a signed reply for " + flow + " in PSBT version " + convertedReply.getPsbtVersion() + " must combine");
+
+        //A signer may also return only the signatures it added, leaving the utxo and the scripts to the PSBT they are combined with
+        PSBT strippedPsbt = PSBT.fromString(signedReply, false);
+        for(PSBTInput psbtInput : strippedPsbt.getPsbtInputs()) {
+            psbtInput.setWitnessUtxo(null);
+            psbtInput.setNonWitnessUtxo(null);
+            psbtInput.setRedeemScript(null);
+            psbtInput.setWitnessScript(null);
+        }
+        String strippedReply = strippedPsbt.toBase64String();
+        PSBT strippedCombine = PSBT.fromString(localPsbt, false);
+        Assertions.assertDoesNotThrow(() -> strippedCombine.verifyCombinedSignatures(PSBT.fromString(strippedReply, false)),
+                "a reply for " + flow + " providing only signatures must combine");
+    }
+
+    private Wallet buildCombiningWallet(ScriptType scriptType, PolicyType policyType, int keystoreCount, boolean alwaysIncludeNonWitnessUtxo) throws MnemonicException {
+        Wallet wallet = new Wallet();
+        wallet.setPolicyType(policyType);
+        wallet.setScriptType(scriptType);
+
+        for(int i = 0; i < keystoreCount; i++) {
+            DeterministicSeed seed = new DeterministicSeed(Utils.hexToBytes(String.format("%032x", i + 1)), "", 0);
+            Keystore keystore = Keystore.fromSeed(seed, policyType, scriptType.getDefaultDerivation());
+            keystore.setLabel("Keystore " + (i + 1));
+            //Trezor, Bitbox and Ledger are the wallet models that require the non witness utxo alongside the witness utxo
+            keystore.setWalletModel(alwaysIncludeNonWitnessUtxo ? WalletModel.TREZOR_1 : WalletModel.SEED);
+            wallet.getKeystores().add(keystore);
+        }
+
+        wallet.setDefaultPolicy(Policy.getPolicy(policyType, scriptType, wallet.getKeystores(), keystoreCount > 1 ? 2 : null));
+        wallet.setStoredBlockHeight(800006);
+        wallet.getNode(KeyPurpose.RECEIVE).fillToIndex(0);
+
+        return wallet;
+    }
+
+    private PSBT buildMultisigPsbt(Script utxoWitnessScript, Long utxoValue, Script witnessScript) {
+        Transaction transaction = new Transaction();
+        transaction.setVersion(2);
+        transaction.addInput(Sha256Hash.wrap("1000000000000000000000000000000000000000000000000000000000000000"), 0, new Script(new byte[0]));
+        transaction.addOutput(90_000L, ScriptType.P2WPKH.getOutputScript(Utils.hexToBytes("bb00000000000000000000000000000000000022")));
+
+        PSBT psbt = new PSBT(transaction);
+        PSBTInput psbtInput = psbt.getPsbtInputs().getFirst();
+        //The utxo pays to the witness script it commits to, which is not necessarily the one the PSBT provides
+        if(utxoWitnessScript != null) {
+            psbtInput.setWitnessUtxo(new TransactionOutput(null, utxoValue, ScriptType.P2WSH.getOutputScript(utxoWitnessScript)));
+        }
+        if(witnessScript != null) {
+            psbtInput.setWitnessScript(witnessScript);
+        }
+
+        return psbt;
+    }
+
+    private PSBT buildNestedMultisigPsbt(Script redeemScript, Script witnessScript, boolean provideUtxo) {
+        PSBT psbt = buildMultisigPsbt(null, null, witnessScript);
+        PSBTInput psbtInput = psbt.getPsbtInputs().getFirst();
+        if(provideUtxo) {
+            psbtInput.setWitnessUtxo(new TransactionOutput(null, MULTISIG_UTXO_VALUE, ScriptType.P2SH.getOutputScript(redeemScript)));
+        }
+        psbtInput.setRedeemScript(redeemScript);
 
         return psbt;
     }

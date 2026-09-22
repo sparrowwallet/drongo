@@ -1010,7 +1010,8 @@ public class PSBT {
 
     /**
      * Verifies that combining the given PSBT with this one is safe, by checking the signatures it provides, that it does not introduce a more dangerous
-     * sighash type, and that it does not change an output script this PSBT has already resolved.
+     * sighash type, that it does not change an output script this PSBT has already resolved, and that it does not change the utxo or the scripts that
+     * utxo commits to for any input.
      *
      * @param psbt the PSBT to be combined with this one
      * @return the verified result of the combine, which can be inspected further before the combine is applied to this PSBT
@@ -1018,8 +1019,10 @@ public class PSBT {
      */
     public PSBT verifyCombinedSignatures(PSBT psbt) throws PSBTSignatureException {
         verifyCombinedOutputScripts(psbt);
+        verifyCombinedInputScripts(psbt);
         PSBT verificationCopy = this.copy();
         verificationCopy.combine(psbt);
+        verifyCombinedUtxos(verificationCopy);
         verificationCopy.verifySignatures();
         verifyCombinedSigHashes(verificationCopy);
 
@@ -1033,6 +1036,48 @@ public class PSBT {
             //A silent payment output is identified by its address rather than its resolved script, so a combine must not change a script already resolved
             if(script != null && !script.isEmpty() && combinedScript != null && !script.equals(combinedScript)) {
                 throw new PSBTSignatureException("Combined PSBT would change the script of the output at index " + i);
+            }
+        }
+    }
+
+    private void verifyCombinedInputScripts(PSBT psbt) throws PSBTSignatureException {
+        for(int i = 0; i < getPsbtInputs().size() && i < psbt.getPsbtInputs().size(); i++) {
+            PSBTInput psbtInput = getPsbtInputs().get(i);
+            PSBTInput combinedInput = psbt.getPsbtInputs().get(i);
+
+            //Only the non witness utxo is verified against the outpoint txid, so the amount and script a witness input is already spending must not be restated by a combine
+            TransactionOutput witnessUtxo = psbtInput.getWitnessUtxo();
+            TransactionOutput combinedWitnessUtxo = combinedInput.getWitnessUtxo();
+            if(witnessUtxo != null && combinedWitnessUtxo != null) {
+                if(witnessUtxo.getValue() != combinedWitnessUtxo.getValue()) {
+                    throw new PSBTSignatureException("Combined PSBT would change the amount of input " + i + " from " + witnessUtxo.getValue() + " sats to " + combinedWitnessUtxo.getValue() + " sats");
+                }
+                if(!witnessUtxo.getScript().equals(combinedWitnessUtxo.getScript())) {
+                    throw new PSBTSignatureException("Combined PSBT would change the utxo script of input " + i);
+                }
+            }
+
+            //The utxo commits to the hash of these scripts, so a combine that replaced one would have every signature still to be collected made over a script that cannot spend it
+            if(isReplacement(psbtInput.getRedeemScript(), combinedInput.getRedeemScript())) {
+                throw new PSBTSignatureException("Combined PSBT would change the redeem script of input " + i);
+            }
+            if(isReplacement(psbtInput.getWitnessScript(), combinedInput.getWitnessScript())) {
+                throw new PSBTSignatureException("Combined PSBT would change the witness script of input " + i);
+            }
+        }
+    }
+
+    private boolean isReplacement(Script script, Script combinedScript) {
+        return script != null && combinedScript != null && !script.equals(combinedScript);
+    }
+
+    private void verifyCombinedUtxos(PSBT verificationCopy) throws PSBTSignatureException {
+        for(PSBTInput verificationInput : verificationCopy.getPsbtInputs()) {
+            //A script this PSBT did not already provide arrives unverified, since verifyUtxo() is only applied to the entries a PSBT is parsed from
+            try {
+                verificationInput.verifyUtxo();
+            } catch(PSBTParseException e) {
+                throw new PSBTSignatureException("Combined PSBT would provide an inconsistent utxo: " + e.getMessage());
             }
         }
     }
