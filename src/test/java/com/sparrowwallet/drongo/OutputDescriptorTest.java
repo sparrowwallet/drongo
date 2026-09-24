@@ -155,6 +155,18 @@ public class OutputDescriptorTest {
     }
 
     @Test
+    public void testKeylessDescriptorRejected() {
+        IllegalArgumentException e = Assertions.assertThrows(IllegalArgumentException.class, () -> OutputDescriptor.getOutputDescriptor("addr(bc1qfrqwk9ltzet5ssul4yq7uave43ngykmf9ds3gk)#zr7ru4eh"));
+        Assertions.assertTrue(e.getMessage().contains("Address descriptors"), e.getMessage());
+
+        e = Assertions.assertThrows(IllegalArgumentException.class, () -> OutputDescriptor.getOutputDescriptor("wpkh()"));
+        Assertions.assertTrue(e.getMessage().contains("No extended public keys"), e.getMessage());
+
+        OutputDescriptor singleKey = OutputDescriptor.getOutputDescriptor("wpkh([73c5da0a/84h/0h/0h]xpub6CatWdiZiodmUeTDp8LT5or8nmbKNcuyvz7WyksVFkKB4RHwCD3XyuvPEbvqAQY3rAPshWcMLoP2fMFMKHPJ4ZeZXYVUhLv1VMrjPC7PW6V/<0;1>/*)");
+        Assertions.assertEquals(PolicyType.SINGLE_HD, singleKey.toWallet().getPolicyType());
+    }
+
+    @Test
     public void testMultisigThresholdOutOfRange() {
         Assertions.assertThrows(IllegalArgumentException.class, () -> OutputDescriptor.getOutputDescriptor(multisigDescriptor("sortedmulti", "0")));
         Assertions.assertThrows(IllegalArgumentException.class, () -> OutputDescriptor.getOutputDescriptor(multisigDescriptor("sortedmulti", "4")));

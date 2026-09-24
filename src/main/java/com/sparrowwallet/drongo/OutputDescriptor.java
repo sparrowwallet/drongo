@@ -617,6 +617,10 @@ public class OutputDescriptor {
             Matcher pubKeyMatcher = PUBKEY_PATTERN.matcher(descriptor);
             if(pubKeyMatcher.find()) {
                 throw new IllegalArgumentException("Descriptors with single public keys are not supported - use descriptors with xpubs");
+            } else if(scriptType == ScriptType.P2A) {
+                throw new IllegalArgumentException("Address descriptors are not supported - use descriptors with xpubs");
+            } else {
+                throw new IllegalArgumentException("No extended public keys found in descriptor");
             }
         }
 
