@@ -96,7 +96,7 @@ public enum ScriptType {
 
         @Override
         public byte[] getHashFromScript(Script script) {
-            throw new ProtocolException("P2PK script does contain hash, use getPublicKeyFromScript(script) to retreive public key");
+            throw new ProtocolException("P2PK script does not contain a hash, use getPublicKeyFromScript(script) to retrieve public key");
         }
 
         @Override

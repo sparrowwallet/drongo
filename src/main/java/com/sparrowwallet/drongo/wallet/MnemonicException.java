@@ -63,7 +63,7 @@ public class MnemonicException extends Exception {
     }
 
     /**
-     * Thrown when the mnemonic is valid, but for for the expected standard
+     * Thrown when the mnemonic is valid, but not for the expected standard
      */
     public static class MnemonicTypeException extends MnemonicException {
         public final DeterministicSeed.Type invalidType;
