@@ -20,6 +20,7 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
@@ -30,8 +31,9 @@ public class PGPUtils {
     public static final String APPLICATION_KEYRING_DIR = "gpg/";
     public static final String PUBRING_GPG = "pubring.gpg";
     public static final String PUBRING_KBX = "pubring.kbx";
+    private static final String ARMORED_MESSAGE_HEADER = "-----BEGIN PGP MESSAGE-----";
 
-    public static PGPVerificationResult verify(InputStream publicKeyStream, InputStream contentStream, InputStream detachedSignatureStream) throws IOException, PGPVerificationException {
+    public static PGPVerificationResult verify(InputStream publicKeyStream, InputStream contentStream, InputStream detachedSignatureStream, OutputStream signedContentStream) throws IOException, PGPVerificationException {
         PGPPublicKeyRing publicKeyRing = null;
         if(publicKeyStream != null) {
             publicKeyRing = PGPainless.readKeyRing().publicKeyRing(publicKeyStream);
@@ -60,7 +62,11 @@ public class PGPUtils {
                     .onInputStream(contentStream)
                     .withOptions(options);
 
-            Streams.drain(verificationStream);
+            if(signedContentStream != null) {
+                Streams.pipeAll(verificationStream, signedContentStream);
+            } else {
+                Streams.drain(verificationStream);
+            }
             verificationStream.close();
 
             MessageMetadata result = verificationStream.getMetadata();
@@ -209,7 +215,8 @@ public class PGPUtils {
 
             if(openPgpInputStream.isAsciiArmored()) {
                 ArmoredInputStream armorIn = ArmoredInputStreamFactory.get(openPgpInputStream);
-                if(armorIn.isClearText()) {
+                String armorHeaderLine = armorIn.getArmorHeaderLine();
+                if(armorIn.isClearText() || (armorHeaderLine != null && ARMORED_MESSAGE_HEADER.equals(armorHeaderLine.strip()))) {
                     return true;
                 }
             }
