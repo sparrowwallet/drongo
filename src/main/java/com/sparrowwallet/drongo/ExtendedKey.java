@@ -136,6 +136,10 @@ public class ExtendedKey {
         return new ExtendedKey(key, Arrays.copyOf(parentFingerprint, parentFingerprint.length), keyChildNumber);
     }
 
+    public boolean hasSameKey(ExtendedKey other) {
+        return other != null && Arrays.equals(key.getPubKey(), other.key.getPubKey()) && Arrays.equals(key.getChainCode(), other.key.getChainCode());
+    }
+
     @Override
     public boolean equals(Object o) {
         if(this == o) {

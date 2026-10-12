@@ -2335,7 +2335,14 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
             return false;
         }
 
-        return !keystores.stream().map(Keystore::getExtendedPublicKey).allMatch(new HashSet<>()::add);
+        for(int i = 0; i < keystores.size(); i++) {
+            ExtendedKey extendedPublicKey = keystores.get(i).getExtendedPublicKey();
+            if(extendedPublicKey != null && keystores.subList(i + 1, keystores.size()).stream().anyMatch(k -> extendedPublicKey.hasSameKey(k.getExtendedPublicKey()))) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     public List<Keystore> makeLabelsUnique(Keystore newKeystore) {

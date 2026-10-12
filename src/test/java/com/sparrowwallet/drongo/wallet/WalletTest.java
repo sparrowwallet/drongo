@@ -436,6 +436,27 @@ public class WalletTest {
     }
 
     @Test
+    public void duplicateExtendedKeysTest() throws MnemonicException, InvalidWalletException {
+        Wallet wallet = buildMultisigWallet(ScriptType.P2WSH, 3);
+        wallet.checkWallet();
+        Assertions.assertFalse(wallet.containsDuplicateExtendedKeys());
+
+        Keystore original = wallet.getKeystores().get(1);
+        ExtendedKey xpub = original.getExtendedPublicKey();
+        Keystore duplicate = new Keystore("Keystore 3");
+        duplicate.setSource(KeystoreSource.SW_WATCH);
+        duplicate.setWalletModel(WalletModel.SPARROW);
+        duplicate.setKeyDerivation(original.getKeyDerivation().copy());
+        duplicate.setExtendedPublicKey(new ExtendedKey(xpub.getKey(), new byte[] {1, 2, 3, 4}, xpub.getKeyChildNumber()));
+        Assertions.assertNotEquals(xpub.toString(), duplicate.getExtendedPublicKey().toString());
+        wallet.getKeystores().set(2, duplicate);
+
+        Assertions.assertTrue(wallet.containsDuplicateExtendedKeys());
+        InvalidWalletException e = Assertions.assertThrows(InvalidWalletException.class, wallet::checkWallet);
+        Assertions.assertTrue(e.getMessage().contains("duplicate extended public keys"));
+    }
+
+    @Test
     public void testMalformedOpReturnDoesNotBreakCoinSelection() {
         Wallet wallet = buildFundedWallet(new Script(List.of(ScriptChunk.fromOpcode(ScriptOpCodes.OP_RETURN), ScriptChunk.fromOpcode(ScriptOpCodes.OP_1))), true);
 
