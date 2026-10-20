@@ -5,6 +5,7 @@ import java.nio.CharBuffer;
 import java.nio.charset.StandardCharsets;
 import java.security.SecureRandom;
 import java.util.Arrays;
+import java.util.Objects;
 
 /**
  * This is not a string but a CharSequence that can be cleared of its memory.
@@ -22,6 +23,7 @@ public class SecureString implements CharSequence {
     }
 
     public SecureString(final int start, final int end, final CharSequence original) {
+        Objects.checkFromToIndex(start, end, original.length());
         final int length = end - start;
         pad = new int[length];
         chars = new int[length];
@@ -82,8 +84,8 @@ public class SecureString implements CharSequence {
      */
     private void scramble(final int start, final int length, final CharSequence characters) {
         final SecureRandom random = new SecureRandom();
-        for(int i = start; i < length; i++) {
-            final char charAt = characters.charAt(i);
+        for(int i = 0; i < length; i++) {
+            final char charAt = characters.charAt(start + i);
             pad[i] = random.nextInt();
             chars[i] = pad[i] ^ charAt;
         }
