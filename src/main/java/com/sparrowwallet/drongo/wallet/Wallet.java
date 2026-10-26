@@ -1496,13 +1496,30 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
      * @return A map if the PSBT inputs and the nodes that can sign them
      */
     public Map<TransactionInput, WalletNode> getSigningNodes(Transaction transaction) {
+        return getSigningNodes(transaction, this::getWalletTransactionBody);
+    }
+
+    public Map<TransactionInput, WalletNode> getSigningNodes(Transaction transaction, Function<Sha256Hash, Transaction> inputTransactions) {
+        return getSigningNodes(transaction, inputTransactions, getWalletOutputScripts());
+    }
+
+    /**
+     * Determines the nodes in this wallet that can sign a transaction, against output scripts built once for several transactions, since building
+     * them visits every address node of the wallet
+     *
+     * @param transaction The transaction to be signed, or that has been signed
+     * @param inputTransactions Returns the transaction with the given txid, or null where it is not known
+     * @param walletOutputScripts This wallet's output scripts, as returned by getWalletOutputScripts()
+     * @return A map of the transaction inputs and the nodes that can sign them
+     */
+    public Map<TransactionInput, WalletNode> getSigningNodes(Transaction transaction, Function<Sha256Hash, Transaction> inputTransactions,
+                                                             Map<Script, WalletNode> walletOutputScripts) {
         Map<TransactionInput, WalletNode> signingNodes = new LinkedHashMap<>();
-        Map<Script, WalletNode> walletOutputScripts = getWalletOutputScripts();
 
         for(TransactionInput txInput : transaction.getInputs()) {
-            BlockTransaction blockTransaction = getWalletTransaction(txInput.getOutpoint().getHash());
-            if(blockTransaction != null && blockTransaction.getTransaction().getOutputs().size() > txInput.getOutpoint().getIndex()) {
-                TransactionOutput utxo = blockTransaction.getTransaction().getOutputs().get((int)txInput.getOutpoint().getIndex());
+            Transaction inputTransaction = inputTransactions.apply(txInput.getOutpoint().getHash());
+            if(inputTransaction != null && inputTransaction.getOutputs().size() > txInput.getOutpoint().getIndex()) {
+                TransactionOutput utxo = inputTransaction.getOutputs().get((int)txInput.getOutpoint().getIndex());
 
                 if(utxo != null) {
                     Script scriptPubKey = utxo.getScript();
@@ -1524,8 +1541,27 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
      * @return A map keyed with the transactionInput mapped to a map of the signatures and associated keystores that signed it
      */
     public Map<TransactionInput, Map<TransactionSignature, Keystore>> getSignedKeystores(Transaction transaction) {
-        Map<TransactionInput, WalletNode> signingNodes = getSigningNodes(transaction);
+        return getSignedKeystores(transaction, this::getWalletTransactionBody);
+    }
+
+    /**
+     * Determines which keystores have signed a transaction, looking up the transactions its inputs spend with the given function
+     *
+     * @param transaction The signed transaction
+     * @param inputTransactions Returns the transaction with the given txid, or null where it is not known
+     * @return A map keyed with the transactionInput mapped to a map of the signatures and associated keystores that signed it. A taproot input is absent
+     * where any transaction spent by the inputs is unknown, since its signature hash commits to all of their outputs
+     */
+    public Map<TransactionInput, Map<TransactionSignature, Keystore>> getSignedKeystores(Transaction transaction, Function<Sha256Hash, Transaction> inputTransactions) {
+        return getSignedKeystores(transaction, inputTransactions, getSigningNodes(transaction, inputTransactions));
+    }
+
+    private Map<TransactionInput, Map<TransactionSignature, Keystore>> getSignedKeystores(Transaction transaction, Function<Sha256Hash, Transaction> inputTransactions,
+                                                                                         Map<TransactionInput, WalletNode> signingNodes) {
         Map<TransactionInput, Map<TransactionSignature, Keystore>> signedKeystores = new LinkedHashMap<>();
+
+        boolean anyTaproot = signingNodes.values().stream().anyMatch(node -> node.getWallet().getScriptType() == P2TR);
+        List<TransactionOutput> spentOutputs = anyTaproot ? getSpentOutputs(transaction, inputTransactions) : null;
 
         for(TransactionInput txInput : signingNodes.keySet()) {
             WalletNode walletNode = signingNodes.get(txInput);
@@ -1539,9 +1575,10 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
 
             Map<ECKey, TransactionSignature> keySignatureMap = new LinkedHashMap<>();
 
-            BlockTransaction blockTransaction = signingWallet.transactions.get(txInput.getOutpoint().getHash());
-            if(blockTransaction != null && blockTransaction.getTransaction().getOutputs().size() > txInput.getOutpoint().getIndex()) {
-                TransactionOutput spentTxo = blockTransaction.getTransaction().getOutputs().get((int)txInput.getOutpoint().getIndex());
+            Transaction inputTransaction = inputTransactions.apply(txInput.getOutpoint().getHash());
+            boolean taproot = signingWallet.getScriptType() == P2TR;
+            if(inputTransaction != null && inputTransaction.getOutputs().size() > txInput.getOutpoint().getIndex() && (!taproot || spentOutputs != null)) {
+                TransactionOutput spentTxo = inputTransaction.getOutputs().get((int)txInput.getOutpoint().getIndex());
 
                 Script signingScript = getSigningScript(txInput, spentTxo);
                 List<TransactionSignature> signatures = txInput.hasWitness() ? txInput.getWitness().getSignatures() : txInput.getScriptSig().getSignatures();
@@ -1551,7 +1588,6 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
                     for(TransactionSignature signature : signatures) {
                         Sha256Hash hash = sigHashes.computeIfAbsent(signature.sighashFlags, sigHashType -> {
                             if(signingWallet.getScriptType() == P2TR) {
-                                List<TransactionOutput> spentOutputs = transaction.getInputs().stream().map(input -> signingWallet.transactions.get(input.getOutpoint().getHash()).getTransaction().getOutputs().get((int)input.getOutpoint().getIndex())).collect(Collectors.toList());
                                 return transaction.hashForTaprootSignature(spentOutputs, txInput.getIndex(), !P2TR.isScriptType(signingScript), signingScript, sigHashType, null);
                             } else if(txInput.hasWitness()) {
                                 return transaction.hashForWitnessSignature(txInput.getIndex(), signingScript.getProgram(), spentTxo.getValue(), sigHashType);
@@ -1578,6 +1614,60 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
         }
 
         return signedKeystores;
+    }
+
+    /**
+     * Determines which inputs of a signed transaction spend this wallet's outputs without valid signatures from enough of its keystores to do so,
+     * including those that cannot be checked because a transaction their signature hash commits to is unknown
+     *
+     * @param transaction The signed transaction
+     * @param inputTransactions Returns the transaction with the given txid, or null where it is not known
+     * @return The inputs spending this wallet's outputs that are not shown to be signed by it
+     */
+    public Set<TransactionInput> getUnsignedInputs(Transaction transaction, Function<Sha256Hash, Transaction> inputTransactions) {
+        return getUnsignedInputs(transaction, inputTransactions, getWalletOutputScripts());
+    }
+
+    /**
+     * Determines which inputs of a signed transaction spend this wallet's outputs without valid signatures from enough of its keystores to do so,
+     * against output scripts built once for several transactions
+     *
+     * @param transaction The signed transaction
+     * @param inputTransactions Returns the transaction with the given txid, or null where it is not known
+     * @param walletOutputScripts This wallet's output scripts, as returned by getWalletOutputScripts()
+     * @return The inputs spending this wallet's outputs that are not shown to be signed by it
+     */
+    public Set<TransactionInput> getUnsignedInputs(Transaction transaction, Function<Sha256Hash, Transaction> inputTransactions, Map<Script, WalletNode> walletOutputScripts) {
+        Map<TransactionInput, WalletNode> signingNodes = getSigningNodes(transaction, inputTransactions, walletOutputScripts);
+        Map<TransactionInput, Map<TransactionSignature, Keystore>> signedKeystores = getSignedKeystores(transaction, inputTransactions, signingNodes);
+        Set<TransactionInput> unsignedInputs = new LinkedHashSet<>();
+        for(Map.Entry<TransactionInput, WalletNode> entry : signingNodes.entrySet()) {
+            Map<TransactionSignature, Keystore> signatures = signedKeystores.get(entry.getKey());
+            int threshold = entry.getValue().getWallet().getDefaultPolicy().getNumSignaturesRequired();
+            if(signatures == null || new HashSet<>(signatures.values()).size() < threshold) {
+                unsignedInputs.add(entry.getKey());
+            }
+        }
+
+        return unsignedInputs;
+    }
+
+    private List<TransactionOutput> getSpentOutputs(Transaction transaction, Function<Sha256Hash, Transaction> inputTransactions) {
+        List<TransactionOutput> spentOutputs = new ArrayList<>(transaction.getInputs().size());
+        for(TransactionInput input : transaction.getInputs()) {
+            Transaction inputTransaction = inputTransactions.apply(input.getOutpoint().getHash());
+            if(inputTransaction == null || inputTransaction.getOutputs().size() <= input.getOutpoint().getIndex()) {
+                return null;
+            }
+            spentOutputs.add(inputTransaction.getOutputs().get((int)input.getOutpoint().getIndex()));
+        }
+
+        return spentOutputs;
+    }
+
+    private Transaction getWalletTransactionBody(Sha256Hash txid) {
+        BlockTransaction blockTransaction = getWalletTransaction(txid);
+        return blockTransaction == null ? null : blockTransaction.getTransaction();
     }
 
     private Script getSigningScript(TransactionInput txInput, TransactionOutput spentTxo) {
