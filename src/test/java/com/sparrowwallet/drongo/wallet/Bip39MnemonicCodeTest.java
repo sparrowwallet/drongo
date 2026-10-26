@@ -1,6 +1,11 @@
 package com.sparrowwallet.drongo.wallet;
 
+import com.sparrowwallet.drongo.ExtendedKey;
 import com.sparrowwallet.drongo.Utils;
+import com.sparrowwallet.drongo.crypto.DeterministicKey;
+import com.sparrowwallet.drongo.crypto.HDKeyDerivation;
+import com.sparrowwallet.drongo.policy.PolicyType;
+import com.sparrowwallet.drongo.protocol.ScriptType;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -113,5 +118,111 @@ public class Bip39MnemonicCodeTest {
         byte[] seed = Bip39MnemonicCode.toSeed(wordlist, "TREZOR");
 
         Assertions.assertEquals("628c3827a8823298ee685db84f55caa34b5cc195a778e52d45f59bcf75aba68e4d7590e101dc414bc1bbd5737666fbbef35d1f1903953b66624f910feef245ac", Utils.bytesToHex(seed));
+    }
+
+    @Test
+    public void invalidBip85WordsRejected() throws MnemonicException {
+        DeterministicSeed parentSeed = new DeterministicSeed("abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about", "", 0, DeterministicSeed.Type.BIP39);
+        DeterministicKey parentMasterKey = HDKeyDerivation.createMasterPrivateKey(parentSeed.getSeedBytes());
+        Assertions.assertThrows(IllegalArgumentException.class, () -> Bip85.deriveBip39Child(parentMasterKey, 13, 0, 0));
+    }
+
+    @Test
+    public void negativeBip85IndexRejected() throws MnemonicException {
+        DeterministicSeed parentSeed = new DeterministicSeed("abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about", "", 0, DeterministicSeed.Type.BIP39);
+        DeterministicKey parentMasterKey = HDKeyDerivation.createMasterPrivateKey(parentSeed.getSeedBytes());
+        Assertions.assertThrows(IllegalArgumentException.class, () -> Bip85.deriveBip39Child(parentMasterKey, 12, -1, 0));
+    }
+
+    @Test
+    public void nullBip85ParentMasterKeyRejected() {
+        Assertions.assertThrows(IllegalArgumentException.class, () -> Bip85.deriveBip39Child(null, 12, 0, 0));
+    }
+
+    @Test
+    public void bip85DerivesExpectedChildMnemonic() throws MnemonicException {
+        DeterministicSeed parentSeed = new DeterministicSeed("abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about", "", 0, DeterministicSeed.Type.BIP39);
+        DeterministicKey parentMasterKey = HDKeyDerivation.createMasterPrivateKey(parentSeed.getSeedBytes());
+        DeterministicSeed firstChild = Bip85.deriveBip39Child(parentMasterKey, 12, 0, 0);
+        DeterministicSeed secondChild = Bip85.deriveBip39Child(parentMasterKey, 12, 1, 0);
+
+        Assertions.assertEquals(DeterministicSeed.Type.BIP39, firstChild.getType());
+        Assertions.assertFalse(firstChild.needsPassphrase());
+        Assertions.assertEquals("prosper short ramp prepare exchange stove life snack client enough purpose fold", firstChild.getMnemonicString().asString());
+        Assertions.assertEquals("sing slogan bar group gauge sphere rescue fossil loyal vital model desert", secondChild.getMnemonicString().asString());
+    }
+
+    @Test
+    public void bip85MatchesPublishedBip39Vectors() throws MnemonicException {
+        ExtendedKey rootXprv = ExtendedKey.fromDescriptor("xprv9s21ZrQH143K2LBWUUQRFXhucrQqBpKdRRxNVq2zBqsx8HVqFk2uYo8kmbaLLHRdqtQpUm98uKfu3vca1LqdGhUtyoFnCNkfmXRyPXLjbKb", true);
+
+        DeterministicSeed twelveWords = Bip85.deriveBip39Child(rootXprv.getKey(), 12, 0, 0);
+        DeterministicSeed eighteenWords = Bip85.deriveBip39Child(rootXprv.getKey(), 18, 0, 0);
+        DeterministicSeed twentyFourWords = Bip85.deriveBip39Child(rootXprv.getKey(), 24, 0, 0);
+
+        Assertions.assertEquals("6250b68daf746d12a24d58b4787a714b", Utils.bytesToHex(twelveWords.getEntropyBytes()));
+        Assertions.assertEquals("girl mad pet galaxy egg matter matrix prison refuse sense ordinary nose", twelveWords.getMnemonicString().asString());
+        Assertions.assertEquals("938033ed8b12698449d4bbca3c853c66b293ea1b1ce9d9dc", Utils.bytesToHex(eighteenWords.getEntropyBytes()));
+        Assertions.assertEquals("near account window bike charge season chef number sketch tomorrow excuse sniff circle vital hockey outdoor supply token", eighteenWords.getMnemonicString().asString());
+        Assertions.assertEquals("ae131e2312cdc61331542efe0d1077bac5ea803adf24b313a4f0e48e9c51f37f", Utils.bytesToHex(twentyFourWords.getEntropyBytes()));
+        Assertions.assertEquals("puppy ocean match cereal symbol another shed magic wrap hammer bulb intact gadget divorce twin tonight reason outdoor destroy simple truth cigar social volcano", twentyFourWords.getMnemonicString().asString());
+    }
+
+    @Test
+    public void bip85UsesParentPassphrase() throws MnemonicException {
+        DeterministicSeed parentSeed = new DeterministicSeed("abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about", "", 0, DeterministicSeed.Type.BIP39);
+        DeterministicKey parentMasterKey = HDKeyDerivation.createMasterPrivateKey(parentSeed.getSeedBytes());
+        DeterministicSeed parentSeedWithPassphrase = new DeterministicSeed("abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about", "TREZOR", 0, DeterministicSeed.Type.BIP39);
+        byte[] passphrasedParentSeedBytes = parentSeedWithPassphrase.getSeedBytes();
+        DeterministicKey parentMasterKeyWithPassphrase = HDKeyDerivation.createMasterPrivateKey(passphrasedParentSeedBytes);
+        List<String> unpassphrasedChild = Bip85.deriveBip39Child(parentMasterKey, 12, 0, 0).getMnemonicCode();
+        List<String> passphrasedChild = Bip85.deriveBip39Child(parentMasterKeyWithPassphrase, 12, 0, 0).getMnemonicCode();
+
+        Assertions.assertEquals("prosper short ramp prepare exchange stove life snack client enough purpose fold", String.join(" ", unpassphrasedChild));
+        Assertions.assertEquals("climb typical because giraffe beach wool fit ship common chapter hotel arm", String.join(" ", passphrasedChild));
+        Assertions.assertNotEquals(unpassphrasedChild, passphrasedChild);
+    }
+
+    @Test
+    public void allSupportedBip85WordCountsProduceValidBip39Mnemonics() throws MnemonicException {
+        DeterministicSeed parentSeed = new DeterministicSeed("abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about", "", 0, DeterministicSeed.Type.BIP39);
+        DeterministicKey parentMasterKey = HDKeyDerivation.createMasterPrivateKey(parentSeed.getSeedBytes());
+        for(int words : List.of(12, 15, 18, 21, 24)) {
+            List<String> childMnemonic = Bip85.deriveBip39Child(parentMasterKey, words, 0, 0).getMnemonicCode();
+            Assertions.assertEquals(words, childMnemonic.size());
+            Bip39MnemonicCode.INSTANCE.check(childMnemonic);
+        }
+
+        Assertions.assertEquals("fruit chest ozone danger skirt worth regret atom dish figure party crater unaware armor insect", Bip85.deriveBip39Child(parentMasterKey, 15, 0, 0).getMnemonicString().asString());
+        Assertions.assertEquals("produce guess spy course diesel weasel iron issue ozone sound alcohol glass huge dad because word vanish fit young color champion", Bip85.deriveBip39Child(parentMasterKey, 21, 0, 0).getMnemonicString().asString());
+    }
+
+    @Test
+    public void bip85DerivedChildSeedProducesExpectedWalletKeystores() throws MnemonicException {
+        DeterministicSeed parentSeed = new DeterministicSeed("abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about", "", 0, DeterministicSeed.Type.BIP39);
+        DeterministicKey parentMasterKey = HDKeyDerivation.createMasterPrivateKey(parentSeed.getSeedBytes());
+        DeterministicSeed childSeed = Bip85.deriveBip39Child(parentMasterKey, 12, 0, 0);
+
+        Keystore p2wpkhKeystore = Keystore.fromSeed(childSeed, PolicyType.SINGLE_HD, ScriptType.P2WPKH.getDefaultDerivation());
+        Keystore p2trKeystore = Keystore.fromSeed(childSeed, PolicyType.SINGLE_HD, ScriptType.P2TR.getDefaultDerivation());
+
+        Assertions.assertEquals("xprv9s21ZrQH143K2WsKAKjxbcpwauNXbTPhwMK3idULUZKUF9KBKu3bLGYXSBBytH2AGUvB93uVqSm2w9E53j7fUvzXfWLfBaqKZYbxY4okA6y", p2wpkhKeystore.getExtendedMasterPrivateKey().toString());
+        Assertions.assertEquals("02e8bff2", p2wpkhKeystore.getKeyDerivation().getMasterFingerprint());
+        Assertions.assertEquals("m/84'/0'/0'", p2wpkhKeystore.getKeyDerivation().getDerivationPath());
+        Assertions.assertEquals("xpub6C3ABzRgTzxLdfwBA9phiSKpvx6aV251txaGgBVCinxBoCdF1ec5L8AgpbAQ1zH2zfgsGQ5GFoJ1L6jZNNLtmpSUasKEVuFrbgdJAYacaEp", p2wpkhKeystore.getExtendedPublicKey().toString());
+
+        Assertions.assertEquals("02e8bff2", p2trKeystore.getKeyDerivation().getMasterFingerprint());
+        Assertions.assertEquals("m/86'/0'/0'", p2trKeystore.getKeyDerivation().getDerivationPath());
+        Assertions.assertEquals("xpub6DLdFKeBhjghPHuf3WXbEgTp6x6bi8mmzpQFf7JfKfbQ81DShYYHis74wt5rbdjxFUxKQ2o7zkkQfi2VoUkqRqEB6Z8r9WsQ5HPumjrFFBf", p2trKeystore.getExtendedPublicKey().toString());
+    }
+
+    @Test
+    public void maxBip85ChildIndexAccepted() throws MnemonicException {
+        DeterministicSeed parentSeed = new DeterministicSeed("abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about", "", 0, DeterministicSeed.Type.BIP39);
+        DeterministicKey parentMasterKey = HDKeyDerivation.createMasterPrivateKey(parentSeed.getSeedBytes());
+        List<String> childMnemonic = Bip85.deriveBip39Child(parentMasterKey, 12, Integer.MAX_VALUE, 0).getMnemonicCode();
+
+        Assertions.assertEquals(12, childMnemonic.size());
+        Bip39MnemonicCode.INSTANCE.check(childMnemonic);
     }
 }
