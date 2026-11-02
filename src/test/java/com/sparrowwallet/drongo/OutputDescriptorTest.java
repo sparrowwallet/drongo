@@ -6,6 +6,7 @@ import com.sparrowwallet.drongo.policy.PolicyType;
 import com.sparrowwallet.drongo.protocol.ScriptType;
 import com.sparrowwallet.drongo.silentpayments.SilentPaymentScanAddress;
 import com.sparrowwallet.drongo.wallet.Wallet;
+import com.sparrowwallet.drongo.wallet.WalletNode;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -241,6 +242,7 @@ public class OutputDescriptorTest {
         Assertions.assertEquals("fe05631b", wallet.getKeystores().get(0).getKeyDerivation().getMasterFingerprint());
         Assertions.assertEquals("m/84'/0'/0'", wallet.getKeystores().get(0).getKeyDerivation().getDerivationPath());
         Assertions.assertEquals("xpub6DTvSp2zaQ3DHrB19BnXTPEsMhnsVPKFgb47x8tkg1VjuwkKvyEeL3Jc4ojgiVUit2ron1SqkQph1hVPtGfREGkiZ8KCbN2TGXnoXHnQ12E", wallet.getKeystores().get(0).getExtendedPublicKey().toString());
+        Assertions.assertTrue(wallet.getKeystores().get(0).hasMasterPrivateExtendedKey());
     }
 
     @Test
@@ -251,6 +253,7 @@ public class OutputDescriptorTest {
         Assertions.assertEquals("fe05631b", wallet.getKeystores().get(0).getKeyDerivation().getMasterFingerprint());
         Assertions.assertEquals("m/84'/1'/0'", wallet.getKeystores().get(0).getKeyDerivation().getDerivationPath());
         Assertions.assertEquals("xpub6BwAZuXFhV4oufDPGLi89BXMWkFSWDY8EGjLN7GReoKcBQC2MV9A6siCKefwMitca3YnvRCWKWp2RJoDeG9djtucWkH2EibPEvpm2fyNLK3", wallet.getKeystores().get(0).getExtendedPublicKey().toString());
+        Assertions.assertTrue(wallet.getKeystores().get(0).hasMasterPrivateExtendedKey());
     }
 
     @Test
@@ -261,6 +264,18 @@ public class OutputDescriptorTest {
         Assertions.assertEquals("fe05631b", wallet.getKeystores().get(0).getKeyDerivation().getMasterFingerprint());
         Assertions.assertEquals("m/84'/1'/0'", wallet.getKeystores().get(0).getKeyDerivation().getDerivationPath());
         Assertions.assertEquals("xpub6BwAZuXFhV4oufDPGLi89BXMWkFSWDY8EGjLN7GReoKcBQC2MV9A6siCKefwMitca3YnvRCWKWp2RJoDeG9djtucWkH2EibPEvpm2fyNLK3", wallet.getKeystores().get(0).getExtendedPublicKey().toString());
+        Assertions.assertTrue(wallet.getKeystores().get(0).hasMasterPrivateExtendedKey());
+    }
+
+    @Test
+    public void testMasterPrivateKeyWithMultipathChildDerivation() {
+        String desc = "tr(xprv9s21ZrQH143K2x63uS9B5XiQqBKDs5ke5jF7dH7cwKaAycKs72VyR7zfBAqQFAnWMwpW6w2eJKc4pKfkMebXv1qi5cs5eQ1N9n2rwbsp94g/86h/0h/0h/<0;1>/*)";
+        OutputDescriptor outputDescriptor = OutputDescriptor.getOutputDescriptor(desc);
+        Wallet wallet = outputDescriptor.toWallet();
+        Assertions.assertTrue(wallet.getKeystores().get(0).hasMasterPrivateExtendedKey());
+        Assertions.assertEquals("m/86'/0'/0'", wallet.getKeystores().get(0).getKeyDerivation().getDerivationPath());
+        Assertions.assertEquals("xpub6DAMcC7Gpoq3N8itqWSdUCGicN31VVggEsK2bQiwFSuDZBZkGLC3qPmdRRyNdZ1NG1GiuoiVQea8qg6jLHoFZdtik7rJb2DapQfNAUfGMhS", wallet.getKeystores().get(0).getExtendedPublicKey().toString());
+        Assertions.assertEquals("bc1pywcze8n59kjxnmwek69nf646m292pl767dzdm7upc6k040dydxjqkcxzg9", new WalletNode(wallet, KeyPurpose.RECEIVE, 0).getAddress().toString());
     }
 
     @Test
