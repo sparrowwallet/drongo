@@ -1412,7 +1412,7 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
         return allInputsFromWallet(allTransactions, allTxos, txId);
     }
 
-    private boolean allInputsFromWallet(Map<Sha256Hash, BlockTransaction> walletTransactions, Map<BlockTransactionHashIndex, WalletNode> walletTxos, Sha256Hash txId) {
+    public boolean allInputsFromWallet(Map<Sha256Hash, BlockTransaction> walletTransactions, Map<BlockTransactionHashIndex, WalletNode> walletTxos, Sha256Hash txId) {
         BlockTransaction utxoBlkTx = walletTransactions.get(txId);
         if(utxoBlkTx == null) {
             //Provided txId was not a wallet transaction
