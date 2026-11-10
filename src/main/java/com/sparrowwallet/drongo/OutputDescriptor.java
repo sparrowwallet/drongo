@@ -334,14 +334,9 @@ public class OutputDescriptor {
             if(extendedMasterPrivateKeys.containsKey(xpub)) {
                 ExtendedKey xprv = extendedMasterPrivateKeys.get(xpub);
                 MasterPrivateExtendedKey masterPrivateExtendedKey = new MasterPrivateExtendedKey(xprv.getKey().getPrivKeyBytes(), xprv.getKey().getChainCode());
-                String childDerivation = mapChildrenDerivations.get(xpub) == null ? scriptType.getDefaultDerivationPath() : mapChildrenDerivations.get(xpub);
-                if(childDerivation.endsWith("/<0;1>/*")) {
-                    childDerivation = childDerivation.substring(0, childDerivation.length() - 8);
-                } else if(childDerivation.endsWith("/0/*") || childDerivation.endsWith("/1/*")) {
-                    childDerivation = childDerivation.substring(0, childDerivation.length() - 4);
-                }
+                List<ChildNumber> derivation = mapChildrenDerivations.get(xpub) == null ? scriptType.getDefaultDerivation() : extKeyEntry.getValue().getDerivation();
                 try {
-                    keystore = Keystore.fromMasterPrivateExtendedKey(masterPrivateExtendedKey, wallet.getPolicyType(), KeyDerivation.parsePath(childDerivation));
+                    keystore = Keystore.fromMasterPrivateExtendedKey(masterPrivateExtendedKey, wallet.getPolicyType(), derivation);
                 } catch(MnemonicException e) {
                     throw new RuntimeException(e);
                 }
@@ -575,6 +570,7 @@ public class OutputDescriptor {
             String childDerivationPath = matcher.group(3);
             try {
                 ExtendedKey extendedKey = ExtendedKey.fromDescriptor(extKey);
+                ExtendedKey masterPrivateKey = extendedKey.getKey().hasPrivKey() && keyDerivation.getDerivation().isEmpty() ? extendedKey : null;
                 if(childDerivationPath != null) {
                     try {
                         List<ChildNumber> childPath = KeyDerivation.parsePath(childDerivationPath.replace("<0;1>", "0"));
@@ -595,16 +591,14 @@ public class OutputDescriptor {
                     }
                 }
                 if(extendedKey.getKey().hasPrivKey()) {
-                    ExtendedKey privateExtendedKey = extendedKey;
                     List<ChildNumber> derivation = keyDerivation.getDerivation();
                     int depth = derivation.isEmpty() ? scriptType.getDefaultDerivation().size() : derivation.size();
                     DeterministicKey prvKey = extendedKey.getKey();
                     DeterministicKey pubKey = new DeterministicKey(List.of(prvKey.getPath().getLast()), prvKey.getChainCode(), prvKey.getPubKey(), depth, extendedKey.getParentFingerprint());
                     extendedKey = new ExtendedKey(pubKey, pubKey.getParentFingerprint(), extendedKey.getKeyChildNumber());
-
-                    if(derivation.isEmpty()) {
-                        masterPrivateKeyMap.put(extendedKey, privateExtendedKey);
-                    }
+                }
+                if(masterPrivateKey != null) {
+                    masterPrivateKeyMap.put(extendedKey, masterPrivateKey);
                 }
                 keyDerivationMap.put(extendedKey, keyDerivation);
                 keyChildDerivationMap.put(extendedKey, childDerivationPath);
