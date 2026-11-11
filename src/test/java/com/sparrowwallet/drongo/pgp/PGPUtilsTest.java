@@ -127,4 +127,27 @@ public class PGPUtilsTest {
         Assertions.assertThrows(PGPVerificationException.class,
                 () -> PGPUtils.verify(new ByteArrayInputStream(publicKeys.getEncoded()), new ByteArrayInputStream(content), new ByteArrayInputStream(signature), new ByteArrayOutputStream()));
     }
+
+    @Test
+    public void detachedArmoredAndBinaryContent() throws Exception {
+        byte[] content = MANIFEST.getBytes(StandardCharsets.UTF_8);
+        byte[] signature = signDetached(content).getEncoded();
+
+        for(boolean armored : new boolean[] { true, false }) {
+            ByteArrayOutputStream out = new ByteArrayOutputStream();
+            sign(content, ProducerOptions.noEncryptionNoSigning().setAsciiArmor(armored), out);
+            out.write(TRAILER.getBytes(StandardCharsets.UTF_8));
+            byte[] message = out.toByteArray();
+
+            Assertions.assertThrows(PGPVerificationException.class,
+                    () -> PGPUtils.verify(new ByteArrayInputStream(publicKeys.getEncoded()), new ByteArrayInputStream(message), new ByteArrayInputStream(signature), new ByteArrayOutputStream()));
+
+            byte[] messageSignature = signDetached(message).getEncoded();
+            ByteArrayOutputStream signedContent = new ByteArrayOutputStream();
+            PGPVerificationResult result = PGPUtils.verify(new ByteArrayInputStream(publicKeys.getEncoded()), new ByteArrayInputStream(message), new ByteArrayInputStream(messageSignature), signedContent);
+
+            Assertions.assertEquals(PGPKeySource.USER, result.keySource());
+            Assertions.assertArrayEquals(message, signedContent.toByteArray());
+        }
+    }
 }
