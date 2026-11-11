@@ -74,7 +74,7 @@ public class BlockTransaction extends BlockTransactionHash implements Comparable
 
     public int compareBlockOrder(BlockTransaction blkTx) {
         if(getHeight() != blkTx.getHeight()) {
-            return getComparisonHeight() - blkTx.getComparisonHeight();
+            return compareHeight(blkTx);
         }
 
         if(!Collections.disjoint(spending, blkTx.funding)) {
