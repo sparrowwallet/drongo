@@ -4,6 +4,7 @@ import com.sparrowwallet.drongo.Utils;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
@@ -38,7 +39,7 @@ public class SeedQR {
         StringBuilder builder = new StringBuilder();
         for(String word : seed.getMnemonicCode()) {
             int index = Bip39MnemonicCode.INSTANCE.getWordList().indexOf(word);
-            builder.append(String.format("%04d", index));
+            builder.append(String.format(Locale.ROOT, "%04d", index));
         }
 
         return builder.toString();
