@@ -144,9 +144,8 @@ public class SilentPaymentUtils {
             if(scriptPubKey == null) {
                 throw new IllegalStateException("No scriptPubKey found for input " + input.getOutpoint().getHash() + ":" + input.getOutpoint().getIndex());
             }
-            List<ScriptChunk> chunks = scriptPubKey.getChunks();
-            if(chunks.size() == 2 && chunks.getFirst().isOpCode() && chunks.get(1).getData() != null
-                    && chunks.getFirst().getOpcode() >= ScriptOpCodes.OP_2 && chunks.getFirst().getOpcode() <= ScriptOpCodes.OP_16) {
+            byte[] program = scriptPubKey.getProgram();
+            if(program.length >= 4 && program.length <= 42 && program[0] >= ScriptOpCodes.OP_2 && program[0] <= ScriptOpCodes.OP_16 && program[1] + 2 == program.length) {
                 return true;
             }
         }

@@ -406,7 +406,7 @@ public class Script {
     }
 
     // Utility that doesn't copy for internal use
-    private byte[] getQuickProgram() {
+    byte[] getQuickProgram() {
         if(program != null) {
             return program;
         }

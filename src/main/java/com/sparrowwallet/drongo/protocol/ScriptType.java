@@ -91,7 +91,7 @@ public enum ScriptType {
             if(!chunks.get(1).equalsOpCode(OP_CHECKSIG)) {
                 return false;
             }
-            return true;
+            return script.getQuickProgram().length == chunk2data.length + 2;
         }
 
         @Override
@@ -221,7 +221,7 @@ public enum ScriptType {
             if(!chunks.get(4).equalsOpCode(OP_CHECKSIG)) {
                 return false;
             }
-            return true;
+            return script.getQuickProgram().length == 25;
         }
 
         @Override
@@ -401,7 +401,7 @@ public enum ScriptType {
             } catch(IllegalStateException e) {
                 return false;   // Not an OP_N opcode.
             }
-            return true;
+            return script.getQuickProgram().length == chunks.stream().mapToInt(ScriptChunk::size).sum();
         }
 
         @Override
@@ -569,7 +569,7 @@ public enum ScriptType {
             if(!chunks.get(2).equalsOpCode(OP_EQUAL)) {
                 return false;
             }
-            return true;
+            return script.getQuickProgram().length == 23;
         }
 
         @Override
@@ -915,7 +915,7 @@ public enum ScriptType {
             if(chunk1data.length != 20) {
                 return false;
             }
-            return true;
+            return script.getQuickProgram().length == 22;
         }
 
         @Override
@@ -1035,7 +1035,7 @@ public enum ScriptType {
             if(chunk1data.length != 32) {
                 return false;
             }
-            return true;
+            return script.getQuickProgram().length == 34;
         }
 
         @Override
@@ -1163,7 +1163,7 @@ public enum ScriptType {
             if(chunk1data.length != 32) {
                 return false;
             }
-            return true;
+            return script.getQuickProgram().length == 34;
         }
 
         @Override
@@ -1284,7 +1284,7 @@ public enum ScriptType {
             if(!Arrays.equals(chunk1data, ANCHOR_WITNESS_PROGRAM)) {
                 return false;
             }
-            return true;
+            return script.getQuickProgram().length == 4;
         }
 
         @Override

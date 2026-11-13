@@ -1,6 +1,7 @@
 package com.sparrowwallet.drongo.protocol;
 
 import com.sparrowwallet.drongo.Utils;
+import com.sparrowwallet.drongo.address.Address;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -92,6 +93,53 @@ public class ScriptTest {
         assertRemovalRemovesLeadingSeparator("ab884efbffffff");
         //A length of 0xffffffff wraps the other way - as an int it is -1, so +4 gave a silently mis-parsed 3 byte push
         assertRemovalRemovesLeadingSeparator("ab884effffffff0102");
+    }
+
+    private static final String HASH160 = "e8df018c7e326cc253faac7e46cdc51e68542c42";
+    private static final String HASH256 = "79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798";
+    private static final String PUBKEY = "02" + HASH256;
+    //P2PK, P2PKH, P2SH, P2WPKH, P2WSH, P2TR and P2A
+    private static final String[] OUTPUT_TEMPLATES = {"21" + PUBKEY + "ac", "76a914" + HASH160 + "88ac", "a914" + HASH160 + "87",
+            "0014" + HASH160, "0020" + HASH256, "5120" + HASH256, "51024e73"};
+    private static final String BARE_MULTISIG = "5121" + PUBKEY + "51ae";
+
+    @Test
+    public void outputTemplatesResolveToAddress() {
+        for(String scriptHex : OUTPUT_TEMPLATES) {
+            Script script = new Script(Utils.hexToBytes(scriptHex));
+            Address address = script.getToAddress();
+            Assertions.assertNotNull(address, scriptHex);
+            Assertions.assertEquals(scriptHex, address.getOutputScript().getProgramAsHex());
+            Assertions.assertEquals(address, address.getOutputScript().getToAddress(), scriptHex);
+            Assertions.assertEquals(ScriptType.getType(script), ScriptType.getType(new Script(script.getChunks())), scriptHex);
+        }
+
+        Assertions.assertTrue(ScriptType.MULTISIG.isScriptType(new Script(Utils.hexToBytes(BARE_MULTISIG))));
+        Assertions.assertTrue(ScriptType.MULTISIG.isScriptType(new Script(new Script(Utils.hexToBytes(BARE_MULTISIG)).getChunks())));
+    }
+
+    @Test
+    public void nonMinimalPushTemplates() {
+        String[] scripts = {"76a94c14" + HASH160 + "88ac", "a94c14" + HASH160 + "87", "004c14" + HASH160, "004d1400" + HASH160, "004e14000000" + HASH160,
+                "004c20" + HASH256, "514c20" + HASH256, "514c024e73"};
+        for(String scriptHex : scripts) {
+            Script script = new Script(Utils.hexToBytes(scriptHex));
+            Assertions.assertNull(ScriptType.getType(script), scriptHex);
+            Assertions.assertNull(script.getToAddress(), scriptHex);
+        }
+    }
+
+    @Test
+    public void trailingBytesTemplates() {
+        for(String scriptHex : OUTPUT_TEMPLATES) {
+            Script script = new Script(Utils.hexToBytes(scriptHex + "4c"));
+            Assertions.assertNull(ScriptType.getType(script), scriptHex + "4c");
+            Assertions.assertNull(script.getToAddress(), scriptHex + "4c");
+        }
+
+        Script script = new Script(Utils.hexToBytes(BARE_MULTISIG + "4c"));
+        Assertions.assertFalse(ScriptType.MULTISIG.isScriptType(script));
+        Assertions.assertNull(script.getToAddress());
     }
 
     private void assertRemovalRemovesLeadingSeparator(String scriptHex) {

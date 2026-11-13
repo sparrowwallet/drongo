@@ -148,6 +148,20 @@ public class SilentPaymentUtilsTest {
         Assertions.assertFalse(SilentPaymentUtils.containsTaprootOutput(transaction));
     }
 
+    @Test
+    public void testSpendsSegwitVersionTwoOrHigher() {
+        String h40 = "00".repeat(40);
+        Map<String, Boolean> scripts = Map.of("5202abcd", true, "6028" + h40, true, "5201ab", false, "5229" + h40 + "00", false, "524c02abcd", false,
+                "5202abcd4c", false, "5120" + "00".repeat(32), false, "0014" + "00".repeat(20), false);
+        for(Map.Entry<String, Boolean> entry : scripts.entrySet()) {
+            Transaction transaction = new Transaction();
+            transaction.addInput(Sha256Hash.wrap("f4184fc596403b9d638783cf57adfe4c75c605f6356fbc91338530e9831e9e16"), 0, new Script(new byte[0]));
+            Map<HashIndex, Script> spentScriptPubKeys = Map.of(new HashIndex(transaction.getInputs().getFirst().getOutpoint().getHash(), 0),
+                    new Script(Utils.hexToBytes(entry.getKey())));
+            Assertions.assertEquals(entry.getValue(), SilentPaymentUtils.spendsInvalidSegwitOutput(transaction, spentScriptPubKeys), entry.getKey());
+        }
+    }
+
     // BIP352 send-side compute address tests.
 
     @Test
