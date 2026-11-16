@@ -96,6 +96,36 @@ public class Bip322Test {
     }
 
     @Test
+    public void verifyMessageBip322TaprootSighashDefault() throws InvalidAddressException, SignatureException {
+        //Taproot signatures may use SIGHASH_DEFAULT, which serializes as 64 bytes. These are the P2TR vectors from the BIP-322 test vector files.
+        Address address = Address.fromString("bc1pcquvhrqv0q68t4m0hfq6tpn006qrskyc7yrqnp2uyrf2emg3wynsdjyk38");
+        String signature = "smpAUB6B2Rbupzua8LTQIF06516wzl+cwKy1be8RgoiW0riyXdKwe6GTz/5Hnb37m67pJwIKCh+D5jDueG6KpvYpmu8";
+        Assertions.assertTrue(Bip322.verifyMessageBip322(ScriptType.P2TR, address, "PURVOQ544B6HUATVBJZN5EZJUU", signature));
+        Assertions.assertFalse(Bip322.verifyMessageBip322(ScriptType.P2TR, address, "PURVOQ544B6HUATVBJZN5EZJUV", signature));
+
+        Address address2 = Address.fromString("bc1pss0zhytly75awhm6x2hhvd5lnzv3vssgrf9axfheq8ldyzn88ges79fler");
+        String signature2 = "AUCJYOwOjxYAvatTAGYaVlNXBVyFuc4MwNQkOuK2tl8xhfKDONd0NjfYyNSYcRqeCp8hsAnCEPHAVEkO9h6vbQ/R";
+        Assertions.assertTrue(Bip322.verifyMessageBip322(ScriptType.P2TR, address2, "No prefix fallback", signature2));
+    }
+
+    @Test
+    public void verifyMessageBip322RejectsOtherSighashTypes() throws SignatureException {
+        //BIP-322 only allows SIGHASH_ALL, or SIGHASH_DEFAULT where the output type supports it
+        ECKey privKey = DumpedPrivateKey.fromBase58("L3VFeEujGtevx9w18HD1fhRbCH67Az2dpCymeRE1SoPK6XQtaN2k").getKey();
+        ECKey pubKey = ECKey.fromPublicOnly(privKey);
+        for(ScriptType scriptType : new ScriptType[] {ScriptType.P2WPKH, ScriptType.P2TR}) {
+            Address address = scriptType.getAddress(PolicyType.SINGLE_HD, privKey);
+            PSBT psbt = Bip322.getBip322Psbt(scriptType, address, "Hello World");
+            PSBTInput psbtInput = psbt.getPsbtInputs().getFirst();
+            psbtInput.setSigHash(SigHash.NONE);
+            psbtInput.sign(scriptType.getOutputKey(PolicyType.SINGLE_HD, privKey));
+
+            String signature = Bip322.getBip322SignatureFromPsbt(scriptType, psbt, pubKey);
+            Assertions.assertFalse(Bip322.verifyMessageBip322(scriptType, address, "Hello World", signature));
+        }
+    }
+
+    @Test
     public void signMessageBip322NestedSegwit() {
         ECKey privKey = DumpedPrivateKey.fromBase58("L3VFeEujGtevx9w18HD1fhRbCH67Az2dpCymeRE1SoPK6XQtaN2k").getKey();
         Address address = ScriptType.P2SH_P2WPKH.getAddress(PolicyType.SINGLE_HD, privKey);
