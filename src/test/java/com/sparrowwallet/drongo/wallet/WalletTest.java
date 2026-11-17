@@ -858,6 +858,23 @@ public class WalletTest {
         Assertions.assertTrue(wallet.getUnsignedInputs(incoming, txid -> getWalletTransactionBody(wallet, txid)).isEmpty());
     }
 
+    @Test
+    public void clearNodesTakesSilentPaymentAddressesFromThePreviousWallet() throws Exception {
+        Wallet wallet = buildSigningWallet(ScriptType.P2WPKH, PolicyType.SINGLE_HD, 1);
+        SilentPaymentAddress spAddress = SilentPaymentScanAddress.fromKeyString(SP_SCAN_ADDRESS).getSilentPaymentAddress();
+        Address removed = wallet.getAddress(wallet.getNode(KeyPurpose.RECEIVE).getChildren().iterator().next());
+        Address added = wallet.getAddress(wallet.getNode(KeyPurpose.CHANGE).getChildren().iterator().next());
+        wallet.addSilentPaymentAddress(removed, spAddress);
+
+        Wallet copy = wallet.copy();
+        wallet.clearSilentPaymentAddress(removed);
+        wallet.addSilentPaymentAddress(added, spAddress);
+        copy.clearNodes(wallet);
+
+        Assertions.assertEquals(Map.of(added, spAddress), copy.getSilentPaymentAddresses());
+        Assertions.assertEquals(Map.of(added, spAddress), copy.copy().getSilentPaymentAddresses());
+    }
+
     private void assertSignedInputs(ScriptType scriptType, PolicyType policyType, int keystoreCount) throws Exception {
         Wallet wallet = buildSigningWallet(scriptType, policyType, keystoreCount);
         Transaction signed = createSignedTransaction(wallet);

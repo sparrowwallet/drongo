@@ -2247,6 +2247,9 @@ public class Wallet extends Persistable implements Comparable<Wallet> {
 
     public void clearNodes(Wallet previousWallet) {
         detachedLabels.putAll(previousWallet.getDetachedLabels(true));
+        //This wallet may be a copy taken before the previous wallet last recorded or cleared a silent payment address
+        silentPaymentAddresses.clear();
+        silentPaymentAddresses.putAll(previousWallet.silentPaymentAddresses);
         purposeNodes.clear();
         transactions.clear();
         storedBlockHeight = 0;
