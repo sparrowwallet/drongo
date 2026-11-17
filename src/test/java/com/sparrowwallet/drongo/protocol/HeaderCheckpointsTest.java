@@ -98,6 +98,7 @@ public class HeaderCheckpointsTest {
         Assertions.assertEquals("0f9188f13cb7b2c71f2a335e3a4fc328bf5beb436012afca590b1a11466e2206", Network.REGTEST.getGenesisHash().toString());
         Assertions.assertEquals("00000008819873e925422c1ff0f99f7cc9bbb232af63a077a480a3633bee1ef6", Network.SIGNET.getGenesisHash().toString());
         Assertions.assertEquals("00000000da84f2bafbbc53dee25a72ae507ff4914b867c565be350b0da8bf043", Network.TESTNET4.getGenesisHash().toString());
+        Assertions.assertEquals("00000000000008c1637e7d3252dc1c333d4546fd6fff6a474b200d674a91d497", Network.TESTNET5.getGenesisHash().toString());
 
         for(Network network : Network.values()) {
             Network.set(network);

@@ -14,7 +14,8 @@ public enum Network {
     TESTNET("testnet", "Testnet3", "testnet3", 111, "mn", 196, "2", "tb", "tsp", "tspscan", "tspspend", ExtendedKey.Header.tprv, ExtendedKey.Header.tpub, 239, 18332),
     REGTEST("regtest", "Regtest", "regtest", 111, "mn", 196, "2", "bcrt", "sprt", "tspscan", "tspspend", ExtendedKey.Header.tprv, ExtendedKey.Header.tpub, 239, 18443),
     SIGNET("signet", "Signet", "signet", 111, "mn", 196, "2", "tb", "tsp", "tspscan", "tspspend", ExtendedKey.Header.tprv, ExtendedKey.Header.tpub, 239, 38332),
-    TESTNET4("testnet4", "Testnet4", "testnet4", 111, "mn", 196, "2", "tb", "tsp", "tspscan", "tspspend", ExtendedKey.Header.tprv, ExtendedKey.Header.tpub, 239, 48332);
+    TESTNET4("testnet4", "Testnet4", "testnet4", 111, "mn", 196, "2", "tb", "tsp", "tspscan", "tspspend", ExtendedKey.Header.tprv, ExtendedKey.Header.tpub, 239, 48332),
+    TESTNET5("testnet5", "Testnet5", "testnet5", 111, "mn", 196, "2", "tb", "tsp", "tspscan", "tspspend", ExtendedKey.Header.tprv, ExtendedKey.Header.tpub, 239, 58332);
 
     public static final String BLOCK_HEIGHT_PROPERTY = "com.sparrowwallet.blockHeight";
     private static final Network[] CANONICAL_VALUES = new Network[]{MAINNET, TESTNET, REGTEST, SIGNET};
@@ -120,6 +121,8 @@ public enum Network {
             return Utils.decodeCompactBits(0x207fffffL);
         } else if(this == SIGNET) {
             return Utils.decodeCompactBits(0x1e0377aeL);
+        } else if(this == TESTNET5) {
+            return Utils.decodeCompactBits(0x1a0fffffL);
         }
 
         return Utils.decodeCompactBits(0x1d00ffffL);
@@ -145,6 +148,7 @@ public enum Network {
             case REGTEST -> "0100000000000000000000000000000000000000000000000000000000000000000000003ba3edfd7a7b12b27ac72c3e67768f617fc81bc3888a51323a9fb8aa4b1e5e4adae5494dffff7f2002000000";
             case SIGNET -> "0100000000000000000000000000000000000000000000000000000000000000000000003ba3edfd7a7b12b27ac72c3e67768f617fc81bc3888a51323a9fb8aa4b1e5e4a008f4d5fae77031e8ad22203";
             case TESTNET4 -> "0100000000000000000000000000000000000000000000000000000000000000000000004e7b2b9128fe0291db0693af2ae418b767e657cd407e80cb1434221eaea7a07a046f3566ffff001dbb0c7817";
+            case TESTNET5 -> "00c0302200000000000000000000000000000000000000000000000000000000000000008de2a6b556ecb56779c34481ede767f09b2ae214f37ab1ad34085b5cb699588c91ebf76affff0f1a31913d65";
         };
     }
 
@@ -178,7 +182,7 @@ public enum Network {
     }
 
     public static Network getCanonical() {
-        return get() == TESTNET4 ? TESTNET : get();
+        return get() == TESTNET4 || get() == TESTNET5 ? TESTNET : get();
     }
 
     public static Network[] canonicalValues() {
