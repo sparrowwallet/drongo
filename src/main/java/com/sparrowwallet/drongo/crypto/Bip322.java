@@ -166,13 +166,20 @@ public class Bip322 {
             throw new SignatureException(scriptType + " addresses are not supported");
         }
 
+        //Signatures must use SIGHASH_ALL, or SIGHASH_DEFAULT where the output type supports it (P2TR, encoded as a 64 byte signature)
+        boolean sigHashAll = signature.sighashFlags == SigHash.ALL.byteValue();
+        boolean sigHashDefault = scriptType == ScriptType.P2TR && witness.getPushes().getFirst().length == 64;
+        if(!sigHashAll && !sigHashDefault) {
+            return false;
+        }
+
         Transaction toSpend = getBip322ToSpend(address, message);
         Transaction toSign = getBip322ToSign(toSpend);
 
         PSBT psbt = new PSBT(toSign);
         PSBTInput psbtInput = psbt.getPsbtInputs().getFirst();
         psbtInput.setWitnessUtxo(toSpend.getOutputs().getFirst());
-        psbtInput.setSigHash(SigHash.ALL);
+        psbtInput.setSigHash(signature.getSigHash());
 
         if(scriptType == ScriptType.P2TR) {
             psbtInput.setTapKeyPathSignature(signature);
