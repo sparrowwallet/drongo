@@ -15,7 +15,7 @@ public enum Network {
     REGTEST("regtest", "Regtest", "regtest", 111, "mn", 196, "2", "bcrt", "sprt", "tspscan", "tspspend", ExtendedKey.Header.tprv, ExtendedKey.Header.tpub, 239, 18443),
     SIGNET("signet", "Signet", "signet", 111, "mn", 196, "2", "tb", "tsp", "tspscan", "tspspend", ExtendedKey.Header.tprv, ExtendedKey.Header.tpub, 239, 38332),
     TESTNET4("testnet4", "Testnet4", "testnet4", 111, "mn", 196, "2", "tb", "tsp", "tspscan", "tspspend", ExtendedKey.Header.tprv, ExtendedKey.Header.tpub, 239, 48332),
-    TESTNET5("testnet5", "Testnet5", "testnet5", 111, "mn", 196, "2", "tb", "tsp", "tspscan", "tspspend", ExtendedKey.Header.tprv, ExtendedKey.Header.tpub, 239, 58332);
+    TESTNET5("testnet5", "Testnet5", "testnet5", 111, "mn", 196, "2", "tb", "tsp", "tspscan", "tspspend", ExtendedKey.Header.tprv, ExtendedKey.Header.tpub, 239, 18352);
 
     public static final String BLOCK_HEIGHT_PROPERTY = "com.sparrowwallet.blockHeight";
     private static final Network[] CANONICAL_VALUES = new Network[]{MAINNET, TESTNET, REGTEST, SIGNET};
