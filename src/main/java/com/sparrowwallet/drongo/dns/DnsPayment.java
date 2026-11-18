@@ -4,12 +4,14 @@ import com.sparrowwallet.drongo.uri.BitcoinURI;
 import org.xbill.DNS.*;
 import org.xbill.DNS.Record;
 
-import java.nio.charset.StandardCharsets;
 import java.util.Optional;
+import java.util.regex.Pattern;
 
 import static com.sparrowwallet.drongo.dns.RecordUtils.fromWire;
 
 public record DnsPayment(String hrn, BitcoinURI bitcoinURI, byte[] proofChain) {
+    public static final Pattern HRN_PATTERN = Pattern.compile("[A-Za-z0-9_+-]+(?:\\.[A-Za-z0-9_+-]+)*@[A-Za-z0-9_-]+(?:\\.[A-Za-z0-9_-]+)*\\.[A-Za-z0-9_-]{2,}");
+
     public String toString() {
         return "₿" + hrn;
     }
@@ -38,21 +40,7 @@ public record DnsPayment(String hrn, BitcoinURI bitcoinURI, byte[] proofChain) {
     }
 
     public static Optional<String> getHrn(String value) {
-        String hrn = value;
-        if(value.endsWith(".")) {
-            return Optional.empty();
-        }
-
-        if(hrn.startsWith("₿")) {
-            hrn = hrn.substring(1);
-        }
-
-        String[] addressParts = hrn.split("@");
-        if(addressParts.length == 2 && addressParts[1].indexOf('.') > -1 && addressParts[1].substring(addressParts[1].indexOf('.') + 1).length() > 1 &&
-                StandardCharsets.US_ASCII.newEncoder().canEncode(hrn)) {
-            return Optional.of(hrn);
-        }
-
-        return Optional.empty();
+        String hrn = value.startsWith("₿") ? value.substring(1) : value;
+        return HRN_PATTERN.matcher(hrn).matches() ? Optional.of(hrn) : Optional.empty();
     }
 }

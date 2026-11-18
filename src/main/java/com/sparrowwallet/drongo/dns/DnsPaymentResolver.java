@@ -41,14 +41,11 @@ public class DnsPaymentResolver {
     }
 
     public DnsPaymentResolver(String hrn, Clock clock) {
-        if(!StandardCharsets.US_ASCII.newEncoder().canEncode(hrn)) {
-            throw new IllegalArgumentException("Invalid HRN containing non-ASCII characters: " + hrn);
+        if(!DnsPayment.HRN_PATTERN.matcher(hrn).matches()) {
+            throw new IllegalArgumentException("Invalid HRN: " + hrn);
         }
         this.hrn = hrn;
         String[] parts = hrn.split("@");
-        if(parts.length != 2) {
-            throw new IllegalArgumentException("Invalid HRN: " + hrn);
-        }
         this.domain = parts[0] + ".user._bitcoin-payment." + parts[1];
         this.clock = clock;
     }

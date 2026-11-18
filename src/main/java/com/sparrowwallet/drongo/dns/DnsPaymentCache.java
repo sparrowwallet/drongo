@@ -43,9 +43,11 @@ public class DnsPaymentCache {
 
     public static DnsPayment getDnsPayment(Payment payment) {
         if(payment instanceof SilentPayment silentPayment) {
-            return dnsPayments.getIfPresent(new DnsAddress(silentPayment.getSilentPaymentAddress()));
+            DnsPayment dnsPayment = dnsPayments.getIfPresent(new DnsAddress(silentPayment.getSilentPaymentAddress()));
+            return dnsPayment != null && dnsPayment.hasSilentPaymentAddress() && silentPayment.getSilentPaymentAddress().equals(dnsPayment.bitcoinURI().getSilentPaymentAddress()) ? dnsPayment : null;
         } else {
-            return dnsPayments.getIfPresent(new DnsAddress(payment.getAddress()));
+            DnsPayment dnsPayment = dnsPayments.getIfPresent(new DnsAddress(payment.getAddress()));
+            return dnsPayment != null && dnsPayment.hasAddress() && payment.getAddress().equals(dnsPayment.bitcoinURI().getAddress()) ? dnsPayment : null;
         }
     }
 
