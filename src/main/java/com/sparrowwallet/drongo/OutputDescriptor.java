@@ -542,7 +542,7 @@ public class OutputDescriptor {
         }
 
         if(scriptType == null) {
-            throw new IllegalArgumentException("Cannot determine script type from descriptor: " + descriptor);
+            throw new IllegalArgumentException("Cannot determine script type from descriptor");
         }
 
         int threshold = getMultisigThreshold(descriptor);
@@ -752,7 +752,7 @@ public class OutputDescriptor {
         String scanHrp = Network.get().getSilentPaymentsScanKeyHrp();
         String spendHrp = Network.get().getSilentPaymentsSpendKeyHrp();
         if(!lowerArg.startsWith(scanHrp + "1") && !lowerArg.startsWith(spendHrp + "1")) {
-            throw new IllegalArgumentException("Single argument sp() descriptor requires spscan or spspend encoded key, got: " + arg);
+            throw new IllegalArgumentException("Single argument sp() descriptor requires spscan or spspend encoded key");
         }
 
         SilentPaymentScanAddress spScanAddress = SilentPaymentScanAddress.fromKeyString(arg);
@@ -807,7 +807,7 @@ public class OutputDescriptor {
         try {
             dpk = DumpedPrivateKey.fromBase58(arg);
         } catch(Exception e) {
-            throw new IllegalArgumentException("Cannot parse sp() scan key as xprv or WIF: " + arg, e);
+            throw new IllegalArgumentException("Cannot parse sp() scan key as xprv or WIF", e);
         }
 
         ECKey key = dpk.getKey();
@@ -847,7 +847,7 @@ public class OutputDescriptor {
             return ECKey.fromPublicOnly(Utils.hexToBytes(pubKeyMatcher.group(2)));
         }
 
-        throw new IllegalArgumentException("Cannot parse sp() spend key as xpub, xprv, or compressed pubkey: " + arg);
+        throw new IllegalArgumentException("Cannot parse sp() spend key as xpub, xprv, or compressed pubkey");
     }
 
     private static Map<String, Integer> parseAnnotations(String annotationString) {

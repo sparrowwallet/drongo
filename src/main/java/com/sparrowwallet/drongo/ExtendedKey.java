@@ -238,7 +238,7 @@ public class ExtendedKey {
                 }
             }
 
-            throw new IllegalArgumentException("Unrecognised extended key header for " + Network.getCanonical().getName() + ": " + xkey);
+            throw new IllegalArgumentException("Unrecognised extended key header for " + Network.getCanonical().getName());
         }
 
         public static Header fromScriptType(ScriptType scriptType, boolean privateKey) {
