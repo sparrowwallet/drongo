@@ -33,6 +33,12 @@ public class OutputDescriptor {
     private static final Pattern MULTIPATH_PATTERN = Pattern.compile("<([\\d*'hH;]+)>");
     private static final Pattern CHECKSUM_PATTERN = Pattern.compile("#([" + CHECKSUM_CHARSET + "]{8})$");
     private static final Pattern ANNOTATION_PATTERN = Pattern.compile("([a-zA-Z]+)=([0-9]+)");
+    private static final String KEY_EXPRESSION = "\\s*(?:\\[[A-Fa-f0-9]{8}[/\\d'hH]*\\])?[1-9A-HJ-NP-Za-km-z]{100,115}(?:/[/\\d*'hH<>;]+)?";
+    private static final Pattern WRAPPER_PATTERN = Pattern.compile("\\s*(?:sh|wsh|wpkh|pkh|pk|tr)\\s*\\(", Pattern.CASE_INSENSITIVE);
+    private static final Pattern MULTI_OPEN_PATTERN = Pattern.compile("\\s*(?:sorted)?multi\\s*\\(\\s*\\d+", Pattern.CASE_INSENSITIVE);
+    private static final Pattern KEY_EXPRESSION_PATTERN = Pattern.compile(KEY_EXPRESSION);
+    private static final Pattern MULTI_KEY_PATTERN = Pattern.compile("\\s*," + KEY_EXPRESSION);
+    private static final Pattern CLOSE_PATTERN = Pattern.compile("\\s*\\)");
 
     private static final int THRESHOLD_ABSENT = -1;
 
@@ -626,7 +632,70 @@ public class OutputDescriptor {
             throw new IllegalArgumentException("Invalid multisig threshold of " + multisigThreshold + " in a descriptor providing " + keyDerivationMap.size() + " key" + (keyDerivationMap.size() == 1 ? "" : "s"));
         }
 
+        int keyCount = getKeyExpressionCount(scriptType, descriptor);
+        if(keyCount != keyDerivationMap.size()) {
+            throw new IllegalArgumentException("Descriptor contains " + keyCount + " keys, but only " + keyDerivationMap.size() + " distinct extended public keys");
+        }
+
         return new OutputDescriptor(scriptType, Math.max(multisigThreshold, 1), keyDerivationMap, keyChildDerivationMap, mapExtendedPublicKeyLabels, masterPrivateKeyMap, annotations);
+    }
+
+    private static int getKeyExpressionCount(ScriptType scriptType, String descriptor) {
+        StringBuilder wrappers = new StringBuilder();
+        int position = 0;
+        Matcher matcher = WRAPPER_PATTERN.matcher(descriptor);
+        while(matcher.region(position, descriptor.length()).lookingAt()) {
+            wrappers.append(matcher.group().replaceAll("\\s", "").toLowerCase(Locale.ROOT));
+            position = matcher.end();
+        }
+
+        String expectedWrappers = ScriptType.fromDescriptor(descriptor) == null || scriptType == ScriptType.MULTISIG ? "" : scriptType.getDescriptor();
+        if(!wrappers.toString().equals(expectedWrappers)) {
+            throw new IllegalArgumentException("Unsupported descriptor script expression");
+        }
+
+        int keyCount = 0;
+        Matcher multiMatcher = MULTI_OPEN_PATTERN.matcher(descriptor);
+        Matcher keyMatcher = KEY_EXPRESSION_PATTERN.matcher(descriptor);
+        Matcher closeMatcher = CLOSE_PATTERN.matcher(descriptor);
+        if(multiMatcher.region(position, descriptor.length()).lookingAt()) {
+            position = multiMatcher.end();
+            Matcher multiKeyMatcher = MULTI_KEY_PATTERN.matcher(descriptor);
+            while(multiKeyMatcher.region(position, descriptor.length()).lookingAt()) {
+                keyCount++;
+                position = multiKeyMatcher.end();
+            }
+            if(!closeMatcher.region(position, descriptor.length()).lookingAt()) {
+                throw getUnsupportedKeyException(descriptor);
+            }
+            position = closeMatcher.end();
+        } else if(keyMatcher.region(position, descriptor.length()).lookingAt()) {
+            keyCount = 1;
+            position = keyMatcher.end();
+        } else {
+            throw getUnsupportedKeyException(descriptor);
+        }
+
+        for(int i = 0; i < wrappers.chars().filter(c -> c == '(').count(); i++) {
+            if(!closeMatcher.region(position, descriptor.length()).lookingAt()) {
+                throw new IllegalArgumentException("Descriptor is missing a closing parenthesis");
+            }
+            position = closeMatcher.end();
+        }
+
+        if(!descriptor.substring(position).isBlank()) {
+            throw new IllegalArgumentException("Unexpected text after the end of the descriptor");
+        }
+
+        return keyCount;
+    }
+
+    private static IllegalArgumentException getUnsupportedKeyException(String descriptor) {
+        if(PUBKEY_PATTERN.matcher(descriptor).find()) {
+            return new IllegalArgumentException("Descriptors with single public keys are not supported - use descriptors with xpubs");
+        }
+
+        return new IllegalArgumentException("Only single key and multisig descriptors are supported");
     }
 
     public static boolean isSilentPaymentDescriptor(String descriptor) {
@@ -786,11 +855,13 @@ public class OutputDescriptor {
         String[] pairs = annotationString.split("&");
         for(String pair : pairs) {
             Matcher matcher = ANNOTATION_PATTERN.matcher(pair);
-            if(matcher.matches()) {
-                String key = matcher.group(1).toLowerCase(Locale.ROOT);
-                if(!annotations.containsKey(key)) {
-                    annotations.put(key, Integer.parseInt(matcher.group(2)));
-                }
+            if(!matcher.matches()) {
+                throw new IllegalArgumentException("Invalid descriptor annotation: " + pair);
+            }
+
+            String key = matcher.group(1).toLowerCase(Locale.ROOT);
+            if(!annotations.containsKey(key)) {
+                annotations.put(key, Integer.parseInt(matcher.group(2)));
             }
         }
 

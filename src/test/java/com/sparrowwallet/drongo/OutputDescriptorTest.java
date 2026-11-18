@@ -136,6 +136,38 @@ public class OutputDescriptorTest {
     }
 
     @Test
+    public void testIncompleteMultisigRejected() {
+        String truncated = "wsh(sortedmulti(2," + MULTI_KEY_1 + "," + MULTI_KEY_2 + "?," + MULTI_KEY_3 + "))";
+        Assertions.assertThrows(IllegalArgumentException.class, () -> OutputDescriptor.getOutputDescriptor(OutputDescriptor.normalize(truncated)));
+        Assertions.assertThrows(IllegalArgumentException.class, () -> OutputDescriptor.getOutputDescriptor("wsh(sortedmulti(2," + MULTI_KEY_1 + "," + MULTI_KEY_2));
+        Assertions.assertThrows(IllegalArgumentException.class, () -> OutputDescriptor.getOutputDescriptor(multisigDescriptor("sortedmulti", "2") + "?x"));
+    }
+
+    @Test
+    public void testMultisigKeysCounted() {
+        String pubKey = "02e6642fd69bd211f93f7f1f36ca51a26a5290eb2dd1b0d8279a87bb0d480c8443";
+        Assertions.assertThrows(IllegalArgumentException.class, () -> OutputDescriptor.getOutputDescriptor("wsh(sortedmulti(2," + MULTI_KEY_1 + "," + MULTI_KEY_2 + "," + pubKey + "))"));
+        Assertions.assertThrows(IllegalArgumentException.class, () -> OutputDescriptor.getOutputDescriptor("wsh(sortedmulti(2," + MULTI_KEY_1 + "," + MULTI_KEY_2 + "," + MULTI_KEY_2 + "))"));
+    }
+
+    @Test
+    public void testScriptExpressionsRejected() {
+        Assertions.assertThrows(IllegalArgumentException.class, () -> OutputDescriptor.getOutputDescriptor(
+                "wsh(or_d(multi(2," + MULTI_KEY_1 + "," + MULTI_KEY_2 + "),and_v(v:pkh(" + MULTI_KEY_3 + "),older(52560))))"));
+        Assertions.assertThrows(IllegalArgumentException.class, () -> OutputDescriptor.getOutputDescriptor(
+                "wsh(andor(multi(1," + MULTI_KEY_1 + "),older(1000),multi(2," + MULTI_KEY_2 + "," + MULTI_KEY_3 + ")))"));
+        Assertions.assertThrows(IllegalArgumentException.class, () -> OutputDescriptor.getOutputDescriptor(multisigDescriptor("sortedmulti", "2") + " text"));
+    }
+
+    @Test
+    public void testSupportedDescriptorForms() {
+        Assertions.assertEquals(3, OutputDescriptor.getOutputDescriptor("sh(wsh(sortedmulti(2, " + MULTI_KEY_1 + ", " + MULTI_KEY_2 + ", " + MULTI_KEY_3 + ")))").getExtendedPublicKeys().size());
+        Assertions.assertEquals(1, OutputDescriptor.getOutputDescriptor("wpkh(" + MULTI_KEY_1 + ")").getExtendedPublicKeys().size());
+        Assertions.assertEquals(1, OutputDescriptor.getOutputDescriptor("sh(" + MULTI_KEY_1 + ")").getExtendedPublicKeys().size());
+        Assertions.assertEquals(2, OutputDescriptor.getOutputDescriptor(multisigDescriptor("sortedmulti", "2") + "?birth=850000&gap=100").getMultisigThreshold());
+    }
+
+    @Test
     public void testMultisigThresholdNeverDefaulted() {
         //A descriptor providing multiple keys but no recognisable threshold must be rejected, not silently downgraded to 1 of n
         IllegalArgumentException e = Assertions.assertThrows(IllegalArgumentException.class, () -> OutputDescriptor.getOutputDescriptor(
