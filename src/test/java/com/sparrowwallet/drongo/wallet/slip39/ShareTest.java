@@ -351,4 +351,27 @@ public class ShareTest {
         byte[] secret = recoveryState.recover(getPassphrase());
         Assertions.assertEquals("8dc652d6d6cd370d8c963141f6d79ba440300f25c467302c1d966bff8f62300d", HexFormat.of().formatHex(secret));
     }
+
+    @Test
+    public void singleShareOfRecoveredSecretDecryptsAsTheSetWithAnyPassphrase() throws MnemonicException {
+        List<String> mnemonics = List.of(
+                "budget surprise agency romp clay quiet spew favorite purchase thumb observe sympathy acrobat presence unfold focus already tricycle diagnose muscle",
+                "budget surprise birthday romp breathe scroll intend humidity aspect plains isolate crystal blimp dragon garbage both kind dance human craft",
+                "budget surprise cleanup romp early remove uncover hearing lamp firefly ounce species submit snake phrase genuine tactics mustang desire artist",
+                "budget surprise desert romp deny easy senior arena smirk average single smart fatal lecture threaten eyebrow lunar carve indicate romantic",
+                "budget surprise email romp academic anxiety sister nylon fake makeup spine breathe window true recall desktop shelter divorce luck screw");
+
+        RecoveryState recoveryState = new RecoveryState();
+        for(String mnemonic : mnemonics) {
+            recoveryState.addShare(Share.fromMnemonic(mnemonic));
+        }
+        Assertions.assertTrue(recoveryState.isComplete());
+
+        List<String> singleShare = Slip39MnemonicCode.INSTANCE.toSingleShareMnemonic(recoveryState.recoverEms());
+        for(String passphrase : List.of("", "TREZOR", "other")) {
+            byte[] expected = Shamir.combineMnemonics(mnemonics, passphrase.getBytes(StandardCharsets.US_ASCII));
+            Assertions.assertArrayEquals(expected, Slip39MnemonicCode.INSTANCE.toSeed(singleShare, passphrase), passphrase);
+        }
+        Assertions.assertEquals("609d9cf21c065a88e9f5b97c0e6928c6", HexFormat.of().formatHex(Slip39MnemonicCode.INSTANCE.toSeed(singleShare, "")));
+    }
 }

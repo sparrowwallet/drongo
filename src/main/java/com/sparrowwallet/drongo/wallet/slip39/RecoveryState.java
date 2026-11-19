@@ -99,6 +99,13 @@ public class RecoveryState {
     }
 
     public byte[] recover(byte[] passphrase) throws MnemonicException {
+        return recoverEms().decrypt(passphrase);
+    }
+
+    /**
+     * Recovers the encrypted master secret without decrypting it, so that it can be kept as it was created and decrypted with any passphrase.
+     */
+    public EncryptedMasterSecret recoverEms() throws MnemonicException {
         Map<Integer, ShareGroup> reducedGroups = new HashMap<>();
         for(Map.Entry<Integer, ShareGroup> entry : groups.entrySet()) {
             int groupIndex = entry.getKey();
@@ -112,8 +119,7 @@ public class RecoveryState {
             }
         }
 
-        EncryptedMasterSecret encryptedMasterSecret = Shamir.recoverEms(reducedGroups);
-        return encryptedMasterSecret.decrypt(passphrase);
+        return Shamir.recoverEms(reducedGroups);
     }
 
     public String getStatus() {

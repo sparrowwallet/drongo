@@ -87,6 +87,15 @@ public class Slip39MnemonicCode {
         return recoveryState.recover(getPassphraseBytes(passphrase));
     }
 
+    /**
+     * Returns a single share of an encrypted master secret recovered from a set of shares, keeping its identifier, extendable flag and iteration
+     * exponent so that the share decrypts as the set does with any passphrase.
+     */
+    public List<String> toSingleShareMnemonic(EncryptedMasterSecret encryptedMasterSecret) throws MnemonicException {
+        List<List<Share>> groupShares = Shamir.splitEms(1, List.of(new GroupParams(1, 1)), encryptedMasterSecret);
+        return groupShares.getFirst().getFirst().getWords();
+    }
+
     public List<String> toSingleShareMnemonic(byte[] masterSecret, String passphrase) throws MnemonicException {
         byte[] passphraseBytes = getPassphraseBytes(passphrase);
         List<List<String>> groupShares = Shamir.generateMnemonics(1, List.of(new GroupParams(1, 1)), masterSecret, passphraseBytes, true, 1);
