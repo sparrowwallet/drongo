@@ -25,11 +25,47 @@ import java.util.Collections;
 import java.util.Date;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.TreeSet;
 
 public class WalletTest {
     //An unrelated silent payments wallet to send to
     private static final String SP_SCAN_ADDRESS = "spscan1qu6d9s9lfd3a99nckpjw7as602lg0950wvcfwg7g4kakhsp32r57qx4853d0ylm42uewydgx6xgz0v20hgthsk2kr84f96jls3q0jywktrv8us5";
+
+    @Test
+    public void outputMissingFromUpdateKeepsLabelAndStatus() throws MnemonicException {
+        DeterministicSeed seed = new DeterministicSeed("absent essay fox snake vast pumpkin height crouch silent bulb excuse razor", "", 0, DeterministicSeed.Type.BIP39);
+        Wallet wallet = new Wallet();
+        wallet.setPolicyType(PolicyType.SINGLE_HD);
+        wallet.setScriptType(ScriptType.P2WPKH);
+        wallet.getKeystores().add(Keystore.fromSeed(seed, PolicyType.SINGLE_HD, wallet.getScriptType().getDefaultDerivation()));
+        wallet.setDefaultPolicy(Policy.getPolicy(PolicyType.SINGLE_HD, ScriptType.P2WPKH, wallet.getKeystores(), 1));
+        WalletNode node = wallet.getNode(KeyPurpose.RECEIVE).getChildren().iterator().next();
+
+        Sha256Hash hash = Sha256Hash.wrap("1111111111111111111111111111111111111111111111111111111111111111");
+        Sha256Hash spendHash = Sha256Hash.wrap("2222222222222222222222222222222222222222222222222222222222222222");
+        BlockTransactionHashIndex spentBy = new BlockTransactionHashIndex(spendHash, 0, null, null, 0, 10_000);
+        spentBy.setLabel("spend");
+        BlockTransactionHashIndex frozen = new BlockTransactionHashIndex(hash, 100, null, null, 0, 10_000);
+        frozen.setLabel("dust");
+        frozen.setStatus(Status.FROZEN);
+        BlockTransactionHashIndex spent = new BlockTransactionHashIndex(hash, 100, null, null, 1, 10_000, spentBy);
+        node.updateTransactionOutputs(wallet, Set.of(frozen, spent));
+
+        //Both outputs are briefly missing from the history, then return
+        node.updateTransactionOutputs(wallet, Collections.emptySet());
+        Assertions.assertTrue(node.getTransactionOutputs().isEmpty());
+
+        BlockTransactionHashIndex returnedSpentBy = new BlockTransactionHashIndex(spentBy.getHash(), 0, null, null, 0, 10_000);
+        BlockTransactionHashIndex returnedFrozen = new BlockTransactionHashIndex(hash, 100, null, null, 0, 10_000);
+        BlockTransactionHashIndex returnedSpent = new BlockTransactionHashIndex(hash, 100, null, null, 1, 10_000, returnedSpentBy);
+        node.updateTransactionOutputs(wallet, Set.of(returnedFrozen, returnedSpent));
+
+        Assertions.assertEquals("dust", returnedFrozen.getLabel());
+        Assertions.assertEquals(Status.FROZEN, returnedFrozen.getStatus());
+        Assertions.assertEquals("spend", returnedSpentBy.getLabel());
+        Assertions.assertTrue(wallet.getDetachedLabels().isEmpty());
+    }
 
     @Test
     public void encryptTest() throws MnemonicException {

@@ -6,6 +6,7 @@ import com.sparrowwallet.drongo.address.Address;
 import com.sparrowwallet.drongo.crypto.ChildNumber;
 import com.sparrowwallet.drongo.crypto.ECKey;
 import com.sparrowwallet.drongo.policy.PolicyType;
+import com.sparrowwallet.drongo.protocol.HashIndex;
 import com.sparrowwallet.drongo.protocol.Script;
 
 import java.util.*;
@@ -149,12 +150,25 @@ public class WalletNode extends Persistable implements Comparable<WalletNode> {
     }
 
     public synchronized void updateTransactionOutputs(Wallet wallet, Set<BlockTransactionHashIndex> updatedOutputs) {
+        Map<HashIndex, String> oldLabels = new HashMap<>();
+        Map<HashIndex, Status> oldStatuses = new HashMap<>();
+        for(BlockTransactionHashIndex oldTxo : transactionOutputs) {
+            HashIndex outpoint = new HashIndex(oldTxo.getHash(), oldTxo.getIndex());
+            if(oldTxo.getLabel() != null) {
+                oldLabels.putIfAbsent(outpoint, oldTxo.getLabel());
+            }
+            if(oldTxo.getStatus() != null) {
+                oldStatuses.putIfAbsent(outpoint, oldTxo.getStatus());
+            }
+        }
+
         for(BlockTransactionHashIndex txo : updatedOutputs) {
-            if(!transactionOutputs.isEmpty()) {
-                Optional<String> optionalLabel = transactionOutputs.stream().filter(oldTxo -> oldTxo.getHash().equals(txo.getHash()) && oldTxo.getIndex() == txo.getIndex()).map(BlockTransactionHash::getLabel).filter(Objects::nonNull).findFirst();
-                optionalLabel.ifPresent(txo::setLabel);
-                Optional<Status> optionalStatus = transactionOutputs.stream().filter(oldTxo -> oldTxo.getHash().equals(txo.getHash()) && oldTxo.getIndex() == txo.getIndex()).map(BlockTransactionHashIndex::getStatus).filter(Objects::nonNull).findFirst();
-                optionalStatus.ifPresent(txo::setStatus);
+            HashIndex outpoint = new HashIndex(txo.getHash(), txo.getIndex());
+            if(oldLabels.containsKey(outpoint)) {
+                txo.setLabel(oldLabels.get(outpoint));
+            }
+            if(oldStatuses.containsKey(outpoint)) {
+                txo.setStatus(oldStatuses.get(outpoint));
             }
 
             if(!wallet.getDetachedLabels().isEmpty()) {
@@ -178,6 +192,24 @@ public class WalletNode extends Persistable implements Comparable<WalletNode> {
 
             if(txo.isSpent() && txo.getStatus() == Status.FROZEN) {
                 txo.setStatus(null);
+            }
+        }
+
+        //An output missing from this update may return in a later one, and keeps its label and status for then
+        Set<HashIndex> updatedOutpoints = updatedOutputs.stream().map(txo -> new HashIndex(txo.getHash(), txo.getIndex())).collect(Collectors.toSet());
+        for(BlockTransactionHashIndex oldTxo : transactionOutputs) {
+            if(!updatedOutpoints.contains(new HashIndex(oldTxo.getHash(), oldTxo.getIndex()))) {
+                if(oldTxo.getLabel() != null && !oldTxo.getLabel().isEmpty()) {
+                    wallet.getDetachedLabels().put(oldTxo.getHash().toString() + "<" + oldTxo.getIndex(), oldTxo.getLabel());
+                }
+
+                if(oldTxo.getStatus() != null) {
+                    wallet.getDetachedLabels().put(oldTxo.getHash().toString() + ":" + oldTxo.getIndex(), oldTxo.getStatus().toString());
+                }
+
+                if(oldTxo.isSpent() && oldTxo.getSpentBy().getLabel() != null && !oldTxo.getSpentBy().getLabel().isEmpty()) {
+                    wallet.getDetachedLabels().put(oldTxo.getSpentBy().getHash() + ">" + oldTxo.getSpentBy().getIndex(), oldTxo.getSpentBy().getLabel());
+                }
             }
         }
 
