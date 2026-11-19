@@ -14,6 +14,7 @@ import java.util.List;
  * (including the 2016-block retarget), proof of work, and a median-time-past bound, while accumulating the chain work above the anchor.
  * On test networks (testnet, testnet4, regtest) the required-difficulty rule is relaxed to each header's own target (linkage, own proof of
  * work and median-time-past are still enforced), and chain work is the header count, following Electrum: their min-difficulty and BIP94 rules are not modelled.
+ * Testnet5 has no min-difficulty rule and so is validated with the full rules; its BIP54 timestamp rules are not modelled.
  * <p>
  * The median-time-past bound is only enforced once eleven headers have been added, because the eleven headers below the anchor are not
  * available to seed it. The first ten headers above an anchor are therefore accepted with any timestamp, including the header that opens a
@@ -114,9 +115,9 @@ public class HeaderChainState {
         return Utils.encodeCompactBits(newTarget);
     }
 
-    /** Mainnet and signet follow the full retarget rules; testnet, testnet4 and regtest do not (see class javadoc). */
+    /** Mainnet, signet and testnet5 follow the full retarget rules; testnet, testnet4 and regtest do not (see class javadoc). */
     private static boolean isFullDifficultyRules() {
-        return Network.get() == Network.MAINNET || Network.get() == Network.SIGNET;
+        return Network.get() == Network.MAINNET || Network.get() == Network.SIGNET || Network.get() == Network.TESTNET5;
     }
 
     /** The expected work to produce a block at this compact target, following Bitcoin Core's GetBlockProof: 2^256 / (target + 1). */
