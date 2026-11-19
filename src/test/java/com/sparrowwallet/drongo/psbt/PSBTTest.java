@@ -1281,6 +1281,25 @@ public class PSBTTest {
     }
 
     @Test
+    public void publicCopyClearsOutputScripts() throws PSBTParseException {
+        Script redeemScript = new Script(Utils.hexToBytes("0020d85c2b71d0060b09c9886aeb815e50991dda124dd85c2b71d0060b09c9886aeb"));
+        Script witnessScript = new Script(Utils.hexToBytes("5121030000000000000000000000000000000000000000000000000000000000000001" + "51ae"));
+        Transaction transaction = new Transaction();
+        transaction.addInput(Sha256Hash.ZERO_HASH, 0, new Script(new byte[0]));
+        transaction.addOutput(100000L, ScriptType.P2SH.getOutputScript(redeemScript));
+
+        PSBT psbt = new PSBT(transaction);
+        psbt.getPsbtOutputs().getFirst().setRedeemScript(redeemScript);
+        psbt.getPsbtOutputs().getFirst().setWitnessScript(witnessScript);
+
+        PSBT publicCopy = PSBT.fromString(psbt.getPublicCopy().toBase64String());
+        Assertions.assertNull(publicCopy.getPsbtOutputs().getFirst().getRedeemScript());
+        Assertions.assertNull(publicCopy.getPsbtOutputs().getFirst().getWitnessScript());
+        Assertions.assertNotNull(psbt.getPsbtOutputs().getFirst().getRedeemScript());
+        Assertions.assertNotNull(psbt.getPsbtOutputs().getFirst().getWitnessScript());
+    }
+
+    @Test
     public void publicCopyClearsOutputSilentPaymentInfo() throws PSBTParseException {
         String strPsbt = "cHNidP8B+wQCAAAAAQIEAgAAAAEEBAEAAAABBQQCAAAAAQYBAwABDiAlbK6m2hWAb7hW7a50mI1EDHqxtcCGHsgR0ZCSdHudHAEPBAAAAAABAR+ghgEAAAAAABYAFPja92rYA7DvqV1s/4ruCJHTrxyMARAE/v///yIGA9NX98BxjyR44/2PjMwnKd3YwMyusfArGBpvRNQ7n42NAAEDBAEAAAAiHQLQKf+W3iy894K+Q1nEhiDqkrzda+8DK5UVi5GhaT+0+CECVRZOeSbVDVKgn/mQZHpelcHbG/xophb7wtohOSf5i/8iHgLQKf+W3iy894K+Q1nEhiDqkrzda+8DK5UVi5GhaT+0+EDB1n84eIK/gXkV6hWCHWTVs4NcH8BcVYzj2CSSoX2QjBBIfbub3cEIDIwtnBlxsmYIPGkFTiIZPyRBKKxmc35gAAEDCFDDAAAAAAAAAQQiUSBVuRZLw33Ib1uJNhaCqjCItbP6U9rbQ+lfG9ETm7HANQEJQgLQKf+W3iy894K+Q1nEhiDqkrzda+8DK5UVi5GhaT+0+AP1JENIUgFlZrxF0fpqXFoYYs3ZM/FchDtCcjgi9SUyNwEKBAEAAAAAAQMIyK8AAAAAAAABBBYAFOPDEMwq86xuYsrkvSPj7lK54clZIgID01f3wHGPJHjj/Y+MzCcp3djAzK6x8CsYGm9E1DufjY0MAAAAAAAAAAAAAAABAA==";
         PSBT psbt = PSBT.fromString(strPsbt);
