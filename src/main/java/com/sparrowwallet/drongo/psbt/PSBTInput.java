@@ -955,6 +955,8 @@ public class PSBTInput {
             localSigHash = getDefaultSigHash();
         }
 
+        verifySilentPaymentSigHash();
+
         if(getNonWitnessUtxo() != null || getWitnessUtxo() != null) {
             Script signingScript = getSigningScript();
             if(signingScript != null) {
@@ -979,6 +981,13 @@ public class PSBTInput {
         }
 
         return false;
+    }
+
+    public void verifySilentPaymentSigHash() {
+        SigHash localSigHash = getSigHash() == null ? getDefaultSigHash() : getSigHash();
+        if(localSigHash != SigHash.ALL && localSigHash != SigHash.DEFAULT && psbt.hasSilentPaymentOutputs()) {
+            throw new IllegalStateException("Silent payment outputs require SIGHASH_ALL/DEFAULT signatures. Input at index " + index + " has sighash type: " + localSigHash);
+        }
     }
 
     void verifySigHash() throws PSBTSignatureException {

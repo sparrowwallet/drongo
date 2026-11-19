@@ -1426,6 +1426,55 @@ public class PSBTTest {
     }
 
     @Test
+    public void silentPaymentOutputRequiresSighashAll() throws Exception {
+        ECKey key = new ECKey();
+        Script spk = ScriptType.P2WPKH.getOutputScript(key.getPubKeyHash());
+
+        Transaction priorTx = new Transaction();
+        priorTx.addInput(Sha256Hash.ZERO_HASH, 0L, new Script(new byte[0]));
+        priorTx.addOutput(200_000L, spk);
+
+        Transaction unsigned = new Transaction();
+        unsigned.addInput(priorTx.getTxId(), 0, new Script(new byte[0]));
+        unsigned.addOutput(190_000L, spk);
+
+        PSBT psbt = new PSBT(unsigned);
+        psbt.getPsbtOutputs().getFirst().setSilentPaymentAddress(SilentPaymentAddress.from("sp1qqgste7k9hx0qftg6qmwlkqtwuy6cycyavzmzj85c6qdfhjdpdjtdgqjuexzk6murw56suy3e0rd2cgqvycxttddwsvgxe2usfpxumr70xc9pkqwv"));
+        PSBTInput psbtInput = psbt.getPsbtInputs().getFirst();
+        psbtInput.setWitnessUtxo(priorTx.getOutputs().getFirst());
+        psbtInput.setSigHash(SigHash.NONE);
+
+        IllegalStateException thrown = Assertions.assertThrows(IllegalStateException.class, () -> psbtInput.sign(key));
+        Assertions.assertTrue(thrown.getMessage().startsWith("Silent payment outputs require SIGHASH_ALL/DEFAULT signatures"));
+        Assertions.assertTrue(psbtInput.getPartialSignatures().isEmpty());
+
+        psbtInput.setSigHash(SigHash.ALL);
+        Assertions.assertTrue(psbtInput.sign(key));
+        Assertions.assertDoesNotThrow(psbtInput::verifySignatures);
+    }
+
+    @Test
+    public void sighashNoneSignsWithoutSilentPaymentOutput() {
+        ECKey key = new ECKey();
+        Script spk = ScriptType.P2WPKH.getOutputScript(key.getPubKeyHash());
+
+        Transaction priorTx = new Transaction();
+        priorTx.addInput(Sha256Hash.ZERO_HASH, 0L, new Script(new byte[0]));
+        priorTx.addOutput(200_000L, spk);
+
+        Transaction unsigned = new Transaction();
+        unsigned.addInput(priorTx.getTxId(), 0, new Script(new byte[0]));
+        unsigned.addOutput(190_000L, spk);
+
+        PSBT psbt = new PSBT(unsigned);
+        PSBTInput psbtInput = psbt.getPsbtInputs().getFirst();
+        psbtInput.setWitnessUtxo(priorTx.getOutputs().getFirst());
+        psbtInput.setSigHash(SigHash.NONE);
+
+        Assertions.assertTrue(psbtInput.sign(key));
+    }
+
+    @Test
     public void sighashSingleInRangeSegwitInputStillSigns() {
         ECKey key = new ECKey();
         Script spk = ScriptType.P2WPKH.getOutputScript(key.getPubKeyHash());
@@ -2493,6 +2542,35 @@ public class PSBTTest {
 
         PSBTSignatureException e = Assertions.assertThrows(PSBTSignatureException.class, () -> unfinalized.verifyFinalizedSignatures(finalized));
         Assertions.assertEquals("Input 0 is not finalized by the provided PSBT", e.getMessage());
+    }
+
+    @Test
+    public void silentPaymentSighashRefusedBeforeAnyInputIsSigned() throws Exception {
+        Wallet wallet = buildSigningWallet();
+        WalletNode addressNode = wallet.getNode(KeyPurpose.RECEIVE).getChildren().iterator().next();
+        Script outputScript = wallet.getOutputScript(addressNode);
+
+        Transaction funding = new Transaction();
+        funding.addInput(Sha256Hash.ZERO_HASH, 0, new Script(new byte[0]));
+        funding.addOutput(100000, outputScript);
+        funding.addOutput(100000, outputScript);
+        wallet.updateTransactions(Map.of(funding.getTxId(), new BlockTransaction(funding.getTxId(), 800000, new Date(), 0L, funding)));
+
+        Transaction spend = new Transaction();
+        spend.setVersion(2);
+        spend.addInput(funding.getTxId(), 0, new Script(new byte[0]));
+        spend.addInput(funding.getTxId(), 1, new Script(new byte[0]));
+        spend.addOutput(190000, new Script(new byte[0]));
+
+        PSBT psbt = new PSBT(spend);
+        psbt.getPsbtOutputs().getFirst().setSilentPaymentAddress(SilentPaymentAddress.from("sp1qqgste7k9hx0qftg6qmwlkqtwuy6cycyavzmzj85c6qdfhjdpdjtdgqjuexzk6murw56suy3e0rd2cgqvycxttddwsvgxe2usfpxumr70xc9pkqwv"));
+        psbt.getPsbtInputs().get(0).setWitnessUtxo(funding.getOutputs().get(0));
+        psbt.getPsbtInputs().get(0).setSigHash(SigHash.ALL);
+        psbt.getPsbtInputs().get(1).setWitnessUtxo(funding.getOutputs().get(1));
+        psbt.getPsbtInputs().get(1).setSigHash(SigHash.NONE);
+
+        Assertions.assertThrows(IllegalStateException.class, () -> wallet.sign(psbt));
+        Assertions.assertTrue(psbt.getPsbtInputs().stream().allMatch(psbtInput -> psbtInput.getPartialSignatures().isEmpty()));
     }
 
     @Test
