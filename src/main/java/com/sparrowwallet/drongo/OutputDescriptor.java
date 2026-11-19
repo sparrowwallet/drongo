@@ -246,6 +246,33 @@ public class OutputDescriptor {
         return false;
     }
 
+    /**
+     * Whether every key derives its addresses on the standard receive and change chains, and all keys on the same one, as a wallet created from this
+     * descriptor does. A key without a child derivation is taken to be an account level key, as when the descriptor is converted to a wallet.
+     */
+    public boolean hasStandardChildDerivations() {
+        Set<String> chains = new HashSet<>();
+        for(ExtendedKey pubKey : extendedPublicKeys.keySet()) {
+            String childDerivationPath = mapChildrenDerivations.get(pubKey);
+            if(childDerivationPath == null || childDerivationPath.equals("/0/*") || childDerivationPath.equals("/<0;1>/*")) {
+                chains.add("/0/*");
+            } else if(childDerivationPath.equals("/1/*")) {
+                chains.add("/1/*");
+            } else {
+                return false;
+            }
+        }
+
+        return chains.size() <= 1;
+    }
+
+    public void verifyStandardChildDerivations() {
+        if(!hasStandardChildDerivations()) {
+            throw new IllegalStateException("The descriptor does not derive its addresses on the standard receive and change chains (/0/*, /1/* or /<0;1>/*), "
+                    + "so a wallet created from it would not have the same addresses.");
+        }
+    }
+
     public List<ChildNumber> getChildDerivation() {
         List<ChildNumber> lastDerivation = null;
         for(ExtendedKey pubKey : extendedPublicKeys.keySet()) {
@@ -580,8 +607,11 @@ public class OutputDescriptor {
                 if(childDerivationPath != null) {
                     try {
                         List<ChildNumber> childPath = KeyDerivation.parsePath(childDerivationPath.replace("<0;1>", "0"));
-                        if(childPath.size() > 2 && (extendedKey.getKey().hasPrivKey() || childPath.stream().noneMatch(ChildNumber::isHardened))) {
-                            childDerivationPath = childDerivationPath.substring(childDerivationPath.lastIndexOf("/", childDerivationPath.lastIndexOf("/") - 1));
+                        int chainIndex = childDerivationPath.lastIndexOf("/", childDerivationPath.lastIndexOf("/") - 1);
+                        //Only a single path above the chain can be folded into the key, as the key cannot hold both branches of a multipath element
+                        if(childPath.size() > 2 && !childDerivationPath.substring(0, Math.max(chainIndex, 0)).contains("<")
+                                && (extendedKey.getKey().hasPrivKey() || childPath.stream().noneMatch(ChildNumber::isHardened))) {
+                            childDerivationPath = childDerivationPath.substring(chainIndex);
                             childPath = childPath.subList(0, childPath.size() - 2);
                             if(keyDerivation.getMasterFingerprint() == null) {
                                 keyDerivation = new KeyDerivation(Utils.bytesToHex(extendedKey.getKey().getFingerprint()), keyDerivation.getDerivationPath());

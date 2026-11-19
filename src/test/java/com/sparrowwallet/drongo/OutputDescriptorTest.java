@@ -608,4 +608,41 @@ public class OutputDescriptorTest {
         Assertions.assertEquals(p2shP2wshDescriptor.getAddress(p2shP2wshDescriptor.getChildDerivation()),
                 template.toWallet().getNode(KeyPurpose.RECEIVE).getChildren().iterator().next().getAddress());
     }
+
+    private static final String STANDARD_TEST_XPUB = "xpub68Gmy5EdvgibQVfPdqkBBCHxA5htiqg55crXYuXoQRKfDBFA1WEjWgP6LHhwBZeNK1VTsfTFUHCdrfp1bgwQ9xv5ski8PX9rL2dZXvgGDnw";
+    private static final String OTHER_TEST_XPUB = "xpub661MyMwAqRbcFtXgS5sYJABqqG9YLmC4Q1Rdap9gSE8NqtwybGhePY2gZ29ESFjqJoCu1Rupje8YtGqsefD265TMg7usUDFdp6W1EGMcet8";
+
+    @Test
+    public void standardChildDerivations() {
+        for(String child : new String[] {"/<0;1>/*", "/0/*", "/1/*", "", "/2/0/*"}) {
+            OutputDescriptor descriptor = OutputDescriptor.getOutputDescriptor("wpkh([3442193e/84'/0'/0']" + STANDARD_TEST_XPUB + child + ")");
+            Assertions.assertTrue(descriptor.hasStandardChildDerivations(), child);
+            descriptor.verifyStandardChildDerivations();
+        }
+
+        OutputDescriptor multisig = OutputDescriptor.getOutputDescriptor("wsh(sortedmulti(1,[3442193e/48'/0'/0'/2']" + STANDARD_TEST_XPUB + "/<0;1>/*,"
+                + "[d34db33f/48'/0'/0'/2']" + OTHER_TEST_XPUB + "/0/*))");
+        Assertions.assertTrue(multisig.hasStandardChildDerivations());
+    }
+
+    @Test
+    public void nonStandardChildDerivations() {
+        for(String child : new String[] {"/2/*", "/<1;0>/*", "/<0;1>/0/*", "/*", "/0h/*"}) {
+            OutputDescriptor descriptor = OutputDescriptor.getOutputDescriptor("wpkh([3442193e/84'/0'/0']" + STANDARD_TEST_XPUB + child + ")");
+            Assertions.assertFalse(descriptor.hasStandardChildDerivations(), child);
+            Assertions.assertThrows(IllegalStateException.class, descriptor::verifyStandardChildDerivations);
+        }
+
+        OutputDescriptor mixed = OutputDescriptor.getOutputDescriptor("wsh(sortedmulti(1,[3442193e/48'/0'/0'/2']" + STANDARD_TEST_XPUB + "/0/*,"
+                + "[d34db33f/48'/0'/0'/2']" + OTHER_TEST_XPUB + "/1/*))");
+        Assertions.assertFalse(mixed.hasStandardChildDerivations());
+    }
+
+    @Test
+    public void multipathAboveTheChainIsNotFoldedIntoTheKey() {
+        OutputDescriptor descriptor = OutputDescriptor.getOutputDescriptor("wpkh([3442193e/84'/0'/0']" + STANDARD_TEST_XPUB + "/<0;1>/0/*)");
+        ExtendedKey key = descriptor.getExtendedPublicKeys().iterator().next();
+        Assertions.assertEquals(STANDARD_TEST_XPUB, key.toString());
+        Assertions.assertEquals("m/84'/0'/0'", descriptor.getKeyDerivation(key).getDerivationPath());
+    }
 }
