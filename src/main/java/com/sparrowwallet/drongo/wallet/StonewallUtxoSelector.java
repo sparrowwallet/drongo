@@ -24,8 +24,9 @@ public class StonewallUtxoSelector implements UtxoSelector {
     public List<Collection<BlockTransactionHashIndex>> selectSets(long targetValue, Collection<OutputGroup> candidates) {
         long actualTargetValue = targetValue + noInputsFee;
 
+        //A group costing more to spend than it is worth can only lower the selected value
         List<OutputGroup> uniqueCandidates = new ArrayList<>();
-        for(OutputGroup candidate : candidates) {
+        for(OutputGroup candidate : candidates.stream().filter(outputGroup -> outputGroup.getEffectiveValue() > 0).toList()) {
             OutputGroup existingTxGroup = getTransactionAlreadySelected(uniqueCandidates, candidate);
             if(existingTxGroup != null) {
                 if(candidate.getValue() > existingTxGroup.getValue()) {

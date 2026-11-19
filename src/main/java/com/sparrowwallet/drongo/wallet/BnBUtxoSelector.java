@@ -5,6 +5,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.*;
+import java.util.stream.Collectors;
 
 public class BnBUtxoSelector extends SingleSetUtxoSelector {
     private static final Logger log = LoggerFactory.getLogger(BnBUtxoSelector.class);
@@ -21,7 +22,8 @@ public class BnBUtxoSelector extends SingleSetUtxoSelector {
 
     @Override
     public Collection<BlockTransactionHashIndex> select(long targetValue, Collection<OutputGroup> candidates) {
-        List<OutputGroup> utxoPool = new ArrayList<>(candidates);
+        //A group costing more to spend than it is worth can only lower the selected value
+        List<OutputGroup> utxoPool = candidates.stream().filter(outputGroup -> outputGroup.getEffectiveValue() > 0).collect(Collectors.toCollection(ArrayList::new));
 
         long currentValue = 0;
 

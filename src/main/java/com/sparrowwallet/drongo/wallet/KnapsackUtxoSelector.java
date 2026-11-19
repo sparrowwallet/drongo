@@ -20,7 +20,8 @@ public class KnapsackUtxoSelector extends SingleSetUtxoSelector {
     public Collection<BlockTransactionHashIndex> select(long targetValue, Collection<OutputGroup> candidates) {
         long actualTargetValue = targetValue + noInputsFee;
 
-        List<OutputGroup> shuffled = new ArrayList<>(candidates);
+        //A group costing more to spend than it is worth can only lower the selected value
+        List<OutputGroup> shuffled = candidates.stream().filter(outputGroup -> outputGroup.getEffectiveValue() > 0).collect(Collectors.toCollection(ArrayList::new));
         Collections.shuffle(shuffled, SECURE_RANDOM);
 
         OutputGroup lowestLarger = null;
