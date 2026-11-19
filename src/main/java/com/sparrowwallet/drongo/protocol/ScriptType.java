@@ -1380,6 +1380,18 @@ public enum ScriptType {
         return Collections.unmodifiableList(copy);
     }
 
+    public String getDefaultDerivationPath(PolicyType policyType) {
+        return policyType == SINGLE_SP ? KeyDerivation.writePath(KeyDerivation.getBip352Derivation(0)) : getDefaultDerivationPath();
+    }
+
+    public List<ChildNumber> getDefaultDerivation(PolicyType policyType) {
+        return policyType == SINGLE_SP ? KeyDerivation.getBip352Derivation(0) : getDefaultDerivation();
+    }
+
+    public List<ChildNumber> getDefaultDerivation(PolicyType policyType, int account) {
+        return policyType == SINGLE_SP ? KeyDerivation.getBip352Derivation(account) : getDefaultDerivation(account);
+    }
+
     public static boolean derivationMatchesAnotherNetwork(String derivationPath) {
         if(KeyDerivation.isValid(derivationPath)) {
             List<ChildNumber> derivation = new ArrayList<>(KeyDerivation.parsePath(derivationPath));
