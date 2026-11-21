@@ -1,9 +1,11 @@
 package com.sparrowwallet.drongo.dns;
 
+import com.sparrowwallet.drongo.Network;
 import com.sparrowwallet.drongo.uri.BitcoinURI;
 import org.xbill.DNS.*;
 import org.xbill.DNS.Record;
 
+import java.util.Arrays;
 import java.util.Optional;
 import java.util.regex.Pattern;
 
@@ -37,6 +39,11 @@ public record DnsPayment(String hrn, BitcoinURI bitcoinURI, byte[] proofChain) {
 
     public boolean hasSilentPaymentAddress() {
         return bitcoinURI.getSilentPaymentAddress() != null;
+    }
+
+    public boolean hasOtherNetworkSilentPaymentAddress() {
+        return Arrays.stream(Network.values()).map(Network::getSilentPaymentsAddressHrp)
+                .anyMatch(hrp -> !hrp.equals(BitcoinURI.FIELD_SILENT_PAYMENTS_ADDRESS) && bitcoinURI.getParameterByName(hrp) != null);
     }
 
     public static Optional<String> getHrn(String value) {
